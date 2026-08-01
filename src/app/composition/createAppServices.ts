@@ -1,0 +1,198 @@
+import {
+  AlchemyHistoryProvider,
+  AlchemyProvider,
+  CoinGeckoPriceProvider,
+  ConsoleLogger,
+  LogScanHistoryProvider,
+  CustomRpcProvider,
+  EncryptionService,
+  MemoryStorageService,
+  PublicRpcProvider,
+  SecureStorage,
+  SystemClock,
+  type IClock,
+} from '@/core'
+import { DappSessionService, WalletConnectTransport } from '@/features/dapp'
+import { OnboardingService, type IOnboardingService } from '@/features/onboarding'
+import { SecuritySettingsRepository } from '@/features/security'
+import { WalletSession, type IWalletSession } from '@/features/wallet'
+import { APP_CONFIG } from '@/shared/config'
+
+/** Сервисы, живущие всё время работы приложения. */
+export interface IAppServices {
+  readonly onboarding: IOnboardingService
+  readonly session: IWalletSession
+
+  /**
+   * Источник времени.
+   *
+   * Отдаётся наружу ради автоблокировки: она отсчитывает бездействие,
+   * и тест обязан уметь подставить управляемые часы вместо системных.
+   */
+  readonly clock: IClock
+
+  /** Настройки безопасности: срок автоблокировки, подтверждение подписи. */
+  readonly securitySettings: SecuritySettingsRepository
+
+  /** Подключения к приложениям. Транспорт поднимается по требованию. */
+  readonly dappSessions: DappSessionService
+}
+
+/**
+ * Composition root приложения.
+ *
+ * ЗДЕСЬ И ТОЛЬКО ЗДЕСЬ выбираются конкретные реализации. Ни один сервис
+ * не создаёт свои зависимости сам: подмена хранилища при переходе
+ * на IndexedDB либо на `chrome.storage` в расширении затронет этот файл
+ * и больше ни один.
+ *
+ * ОДНО ЗАЩИЩЁННОЕ ХРАНИЛИЩЕ НА ВСЁ ПРИЛОЖЕНИЕ. `SecureStorage` владеет
+ * сессионным ключом шифрования, полученным из пароля. Второй экземпляр
+ * поверх того же хранилища имел бы собственный ключ и не смог бы прочитать
+ * записанное первым — отсюда общий экземпляр для онбординга и для сессии
+ * кошелька.
+ *
+ * ХРАНИЛИЩЕ В ПАМЯТИ — ОГРАНИЧЕНИЕ ТЕКУЩЕГО ЭТАПА. Кошелёк не переживает
+ * перезагрузку вкладки. Криптография при этом настоящая: шифрование, вывод
+ * ключа, BIP-39 и BIP-32 работают так же, как будут работать с постоянным
+ * хранилищем.
+ */
+export function createAppServices(): IAppServices {
+  const storage = new MemoryStorageService()
+  const encryption = new EncryptionService()
+  const secureStorage = new SecureStorage(storage, encryption)
+  const clock = new SystemClock()
+  const logger = new ConsoleLogger()
+
+  const session = new WalletSession({
+    secureStorage,
+    storage,
+    clock,
+    logger,
+    rpcProviders: createRpcProviders(secureStorage),
+    historyProviders: createHistoryProviders(),
+    priceProvider: createPriceProvider(),
+  })
+
+  return {
+    onboarding: new OnboardingService({ secureStorage }),
+    session,
+    clock,
+    securitySettings: new SecuritySettingsRepository(storage),
+    dappSessions: createDappSessions(session, logger),
+  }
+}
+
+/**
+ * Подключения к приложениям.
+ *
+ * СЕРВИС СОБИРАЕТСЯ ВСЕГДА, ТРАНСПОРТ ПОДНИМАЕТСЯ ПО ТРЕБОВАНИЮ.
+ * Библиотека WalletConnect весит около трёх мегабайт и загружается
+ * динамически при заходе на экран подключений; без ключа проекта
+ * раздел откроется и честно скажет, что не настроен.
+ *
+ * АДРЕСА И СЕТИ ЧИТАЮТСЯ ИЗ СЕССИИ ФУНКЦИЯМИ, А НЕ КОПИРУЮТСЯ.
+ * Пользователь меняет аккаунт и сеть на ходу; снимок, взятый при
+ * сборке, выдал бы приложению устаревшие значения.
+ */
+function createDappSessions(session: IWalletSession, logger: ConsoleLogger): DappSessionService {
+  const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? ''
+
+  return new DappSessionService({
+    transport: new WalletConnectTransport({
+      projectId,
+      metadata: {
+        name: APP_CONFIG.name,
+        description: 'Некастодиальный криптовалютный кошелёк',
+        url: globalThis.location.origin,
+        icons: [`${globalThis.location.origin}/icons/icon-128.png`],
+      },
+      logger,
+    }),
+    logger,
+    getAddresses: () => session.getSnapshot().accounts.map((account) => account.address),
+    getActiveChainId: () => session.getSnapshot().activeNetwork?.chainId ?? null,
+    getAvailableChainIds: () => session.getSnapshot().networks.map((network) => network.chainId),
+    execute: (request) => session.executeDappRequest(request),
+  })
+}
+
+/**
+ * Источник курсов.
+ *
+ * ПОДКЛЮЧЁН, НО НЕ ВКЛЮЧЁН. Объект создаётся всегда, а обращения к нему
+ * не происходит, пока пользователь не дал явного согласия: запрос курса
+ * называет сервису адрес контракта, то есть сообщает состав портфеля.
+ * Согласие хранится в настройках и спрашивается на экране портфеля
+ * с перечислением того, что именно уйдёт наружу.
+ *
+ * РАЗМЕР ПАКЕТА ЗАВИСИТ ОТ КЛЮЧА. Бесплатный публичный доступ принимает
+ * один адрес контракта за запрос — проверено обращением к живому
+ * сервису, ответ `10012`. С ключом демонстрационного доступа предел
+ * выше, и адреса уходят пакетами: меньше запросов означает и меньше
+ * следов, и меньший расход лимита.
+ */
+function createPriceProvider(): CoinGeckoPriceProvider {
+  const apiKey = import.meta.env.VITE_COINGECKO_API_KEY ?? null
+  const hasKey = apiKey !== null && apiKey !== ''
+
+  return new CoinGeckoPriceProvider({
+    ...(hasKey ? { apiKey } : {}),
+    contractBatchSize: hasKey ? 25 : 1,
+  })
+}
+
+/**
+ * Источники истории переводов в порядке предпочтения.
+ *
+ * ИНДЕКСАТОР ПОДКЛЮЧАЕТСЯ ТОЛЬКО ПРИ НАЛИЧИИ КЛЮЧА, и это не техническое
+ * следствие, а осознанный порядок.
+ *
+ * Индексатор — единственный способ увидеть переводы нативной валюты:
+ * они не порождают событий, и в журналах узла их нет физически. Но за
+ * это он получает адрес пользователя и возвращает всю его финансовую
+ * историю разом — размер портфеля, контрагентов, время каждой операции.
+ * Обычный RPC-узел видит только те запросы, которые ему шлют.
+ *
+ * Поэтому без явно указанного ключа кошелёк работает на разборе журналов:
+ * история получается неполной, но ни один сторонний сервис не узнаёт,
+ * чей это адрес и что на нём происходило. Неполнота при этом показывается
+ * пользователю, а не замалчивается.
+ */
+function createHistoryProviders() {
+  const apiKey = import.meta.env.VITE_ALCHEMY_API_KEY ?? null
+  const useIndexer = apiKey !== null && apiKey !== ''
+
+  return useIndexer
+    ? [new AlchemyHistoryProvider(), new LogScanHistoryProvider()]
+    : [new LogScanHistoryProvider()]
+}
+
+/**
+ * Источники RPC-адресов в порядке предпочтения.
+ *
+ * ПОРЯДОК — ЭТО ПОЛИТИКА, И ОНА ЗАДАЁТСЯ ЗДЕСЬ, а не внутри механизма
+ * перебора:
+ *
+ * 1. Собственный узел пользователя. Выбран сознательно и единственный
+ *    не раскрывает адреса постороннему оператору.
+ * 2. Alchemy — значение по умолчанию, когда пользователь ничего не указал.
+ * 3. Публичные узлы из конфигурации сети — работают без ключа.
+ *
+ * КЛЮЧ ALCHEMY БЕРЁТСЯ ИЗ ОКРУЖЕНИЯ И ПУБЛИЧЕН. Vite подставляет значения
+ * `VITE_*` прямо в бандл: ключ увидит каждый, кто откроет исходники
+ * страницы. Ограничение по домену в панели Alchemy обязательно —
+ * см. `.env.example`.
+ *
+ * БЕЗ КЛЮЧА ALCHEMY НЕ ДАЁТ НИ ОДНОГО АДРЕСА, и кошелёк работает
+ * на публичных узлах. Это рабочее состояние, а не отказ.
+ */
+function createRpcProviders(secureStorage: SecureStorage) {
+  const apiKey = import.meta.env.VITE_ALCHEMY_API_KEY ?? null
+
+  return [
+    new CustomRpcProvider(secureStorage),
+    new AlchemyProvider({ apiKey }),
+    new PublicRpcProvider(),
+  ]
+}

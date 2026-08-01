@@ -1,0 +1,44 @@
+# Зависимости
+node_modules
+.pnp
+.pnp.js
+
+# Сборка
+dist
+dist-ssr
+build/output
+*.local
+
+# Тесты и покрытие
+coverage
+.vitest
+
+# Кэш инструментов
+.eslintcache
+.vite
+*.tsbuildinfo
+
+# Логи
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Секреты. Никакие .env-файлы, кроме примера, не попадают в репозиторий.
+.env
+.env.*
+!.env.example
+
+# Редакторы и ОС
+.idea
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Сквозные проверки
+playwright-report
+test-results

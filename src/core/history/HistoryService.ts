@@ -1,0 +1,220 @@
+import { areAddressesEqual } from '@/core/address'
+import type { INetworkService } from '@/core/network'
+import { NetworkNotFoundError } from '@/core/errors'
+import type { ILogger } from '@/core/platform'
+import type { IProviderResolver } from '@/core/provider'
+import type { ITransactionRepository } from '@/core/transaction'
+import type { Address, ChainId, TxHash } from '@/core/types'
+
+import type { IHistoryProvider, IHistoryQuery } from './contracts'
+import {
+  TRANSFER_DIRECTION,
+  TRANSFER_KIND,
+  TRANSFER_SOURCE,
+  type IHistoryPage,
+  type ITransferRecord,
+} from './types'
+
+const SERVICE_NAME = 'HistoryService'
+
+/** Сколько записей запрашивается по умолчанию. */
+const DEFAULT_LIMIT = 50
+
+/** Зависимости сервиса. */
+export interface IHistoryServiceDependencies {
+  /**
+   * Источники истории в порядке предпочтения.
+   *
+   * Первый обслуживающий сеть и ответивший без отказа определяет результат.
+   * Порядок задаётся снаружи: он выражает выбор между полнотой
+   * и приватностью, а это политика приложения, а не свойство механизма.
+   */
+  readonly providers: readonly IHistoryProvider[]
+
+  readonly resolver: IProviderResolver
+  readonly networks: INetworkService
+  readonly logger: ILogger
+
+  /** Локальные отправки. Подмешиваются всегда. */
+  readonly localRepository: ITransactionRepository
+}
+
+/**
+ * Сводная история переводов.
+ *
+ * ЛОКАЛЬНЫЕ ЗАПИСИ ПОДМЕШИВАЮТСЯ ВСЕГДА. Отправленная транзакция попадает
+ * в локальное хранилище сразу, а во внешний источник — после включения
+ * в блок и переиндексации. Без локальных записей пользователь, отправивший
+ * средства, не увидел бы их в истории несколько минут и решил, что
+ * отправка не состоялась.
+ *
+ * ПОВТОРЫ УБИРАЮТСЯ ПО ХЭШУ. Когда внешний источник наконец отдаёт ту же
+ * транзакцию, локальная запись уступает ей место: у внешней есть номер
+ * блока, время и подтверждённое состояние.
+ */
+export class HistoryService {
+  readonly #providers: readonly IHistoryProvider[]
+  readonly #resolver: IProviderResolver
+  readonly #networks: INetworkService
+  readonly #logger: ILogger
+  readonly #local: ITransactionRepository
+
+  constructor(dependencies: IHistoryServiceDependencies) {
+    this.#providers = dependencies.providers
+    this.#resolver = dependencies.resolver
+    this.#networks = dependencies.networks
+    this.#logger = dependencies.logger.child(SERVICE_NAME)
+    this.#local = dependencies.localRepository
+  }
+
+  /**
+   * История переводов адреса в сети.
+   *
+   * Отказ внешнего источника не приводит к отказу всей операции:
+   * локальные записи возвращаются в любом случае. Пустая история
+   * из-за недоступной сети выглядела бы как отсутствие операций.
+   */
+  async getHistory(
+    owner: Address,
+    chainId: ChainId,
+    limit: number = DEFAULT_LIMIT,
+  ): Promise<IHistoryPage> {
+    const local = await this.#loadLocal(owner, chainId)
+    const remote = await this.#loadRemote({ owner, chainId, limit })
+
+    if (remote.page === null) {
+      return {
+        transfers: local.slice(0, limit),
+        limits: {
+          nativeTransfersUnavailable: false,
+          scannedBlocks: null,
+          /* Ни один внешний источник не ответил. Показаны только
+             собственные отправки, и это обязано быть сказано прямо:
+             иначе пустой список читается как «операций не было». */
+          sourceUnavailable: true,
+          reason: remote.reason,
+        },
+      }
+    }
+
+    return {
+      transfers: merge(local, remote.page.transfers).slice(0, limit),
+      limits: remote.page.limits,
+    }
+  }
+
+  /** Локальные отправки, приведённые к общему виду записи истории. */
+  async #loadLocal(owner: Address, chainId: ChainId): Promise<readonly ITransferRecord[]> {
+    const records = await this.#local.findByAddress(owner, chainId)
+
+    return records.map((record) => ({
+      /* Ключ строится так же, как у внешних источников: хэш плюс
+         порядковый номер. Локальная запись описывает транзакцию целиком,
+         поэтому номер нулевой. */
+      id: `${record.hash}:local`,
+      hash: record.hash,
+      chainId: record.chainId,
+      kind: TRANSFER_KIND.Native,
+      direction: TRANSFER_DIRECTION.Outgoing,
+      from: record.from,
+      to: record.to,
+      value: record.value,
+      tokenId: null,
+      asset: { contract: null, symbol: null, decimals: null },
+      blockNumber: record.blockNumber ?? 0n,
+      timestamp: record.confirmedAt ?? record.submittedAt,
+      source: TRANSFER_SOURCE.Local,
+    }))
+  }
+
+  /**
+   * Первый источник, обслуживающий сеть и ответивший без отказа.
+   *
+   * Причина отказа последнего источника возвращается вместе с
+   * результатом: она показывается пользователю дословно. Обобщённое
+   * «история недоступна» не сказало бы ему, что делать, а сообщение
+   * узла «укажите адрес контракта» прямо указывает на решение —
+   * подключить свой узел либо индексатор.
+   */
+  async #loadRemote(
+    query: IHistoryQuery,
+  ): Promise<{ page: IHistoryPage | null; reason: string | null }> {
+    const network = this.#networks.getByChainId(query.chainId)
+
+    if (network === null) {
+      throw new NetworkNotFoundError(query.chainId)
+    }
+
+    let lastReason: string | null = null
+
+    for (const provider of this.#providers) {
+      if (!provider.supports(query.chainId)) {
+        continue
+      }
+
+      try {
+        return {
+          page: await provider.fetch(query, await this.#resolver.get(network)),
+          reason: null,
+        }
+      } catch (error) {
+        /* Отказ одного источника — повод перейти к следующему, а не
+           лишить пользователя истории. Причина уходит и в журнал,
+           и наружу: молчаливый переход скрыл бы неработающий ключ
+           индексатора либо узел, не принимающий выборку журналов. */
+        lastReason = error instanceof Error ? error.message : String(error)
+
+        this.#logger.warn('Источник истории недоступен', {
+          providerId: provider.id,
+          reason: lastReason,
+        })
+      }
+    }
+
+    return { page: null, reason: lastReason }
+  }
+}
+
+/**
+ * Объединяет локальные и внешние записи.
+ *
+ * Локальная запись отбрасывается, если тот же хэш пришёл извне: внешняя
+ * содержит номер блока, время и подтверждённое состояние, локальная —
+ * только намерение отправить.
+ */
+function merge(
+  local: readonly ITransferRecord[],
+  remote: readonly ITransferRecord[],
+): readonly ITransferRecord[] {
+  const remoteHashes = new Set<TxHash>(remote.map((record) => record.hash))
+  const pendingLocal = local.filter((record) => !remoteHashes.has(record.hash))
+
+  return [...remote, ...pendingLocal].sort(compareByRecency)
+}
+
+/**
+ * Сортировка от новых к старым.
+ *
+ * Записи без номера блока — ещё не включённые в блок отправки — идут
+ * первыми: именно их пользователь ждёт и ищет глазами.
+ */
+function compareByRecency(left: ITransferRecord, right: ITransferRecord): number {
+  if (left.blockNumber === 0n && right.blockNumber !== 0n) {
+    return -1
+  }
+
+  if (right.blockNumber === 0n && left.blockNumber !== 0n) {
+    return 1
+  }
+
+  if (left.blockNumber !== right.blockNumber) {
+    return Number(right.blockNumber - left.blockNumber)
+  }
+
+  return (right.timestamp ?? 0) - (left.timestamp ?? 0)
+}
+
+/** Совпадает ли адрес с владельцем истории. Вынесено для читаемости условий. */
+export function isOwner(candidate: Address | null, owner: Address): boolean {
+  return candidate !== null && areAddressesEqual(candidate, owner)
+}

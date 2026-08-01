@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--
+      Referrer-политика: не передавать URL приложения сторонним ресурсам.
+      Для кошелька это снижает утечку контекста (например, адреса в пути).
+    -->
+    <meta name="referrer" content="no-referrer" />
+
+    <!-- Приложение не должно индексироваться и кэшироваться поисковиками. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!--
+      Значки подготовлены командой `npm run icons` из `public/icon.png`.
+      Исходный файл весит около 1.4 МБ и в качестве значка вкладки
+      непригоден: браузер скачивал бы его целиком ради 16 пикселей.
+    -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+    <title>ETWallet</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app/main.tsx"></script>
+  </body>
+</html>
