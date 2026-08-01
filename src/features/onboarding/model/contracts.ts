@@ -1,4 +1,4 @@
-import type { IMnemonicCheck, ISecretBuffer, MnemonicStrength } from '@/core'
+import type { IMnemonicCheck, ISecretBuffer, IUnlockThrottleState, MnemonicStrength } from '@/core'
 
 /** Состояние кошелька, определяющее доступный экран. */
 export const ONBOARDING_STATE = {
@@ -108,6 +108,15 @@ export interface IOnboardingService {
    * и разблокировка, — расшифровкой контрольного значения.
    */
   verifyPassword(password: string): Promise<boolean>
+
+  /**
+   * Состояние ограничителя попыток ввода пароля.
+   *
+   * Нужно экрану входа: форма, молча переставшая принимать пароль,
+   * оставляет владельца в недоумении, почему верный пароль
+   * не подходит. Без ограничителя возвращает нулевое состояние.
+   */
+  getUnlockThrottleState(): Promise<IUnlockThrottleState>
 
   /** Ставит блокировку. */
   lock(): void

@@ -77,6 +77,10 @@ const RUSSIAN = {
   'unlock.password': 'Пароль',
   'unlock.submit': 'Разблокировать',
   'unlock.decrypting': 'Расшифровка…',
+  'unlock.blocked': 'Слишком много попыток. Ввод откроется через',
+  'unlock.blockedNote':
+    'Задержка растёт с каждой неудачей и переживает перезагрузку страницы. Она защищает от подбора пароля тем, кто получил доступ к устройству.',
+  'unlock.attemptsLeft': 'Осталось попыток до задержки:',
   'unlock.forgot': 'Забыли пароль?',
   'unlock.failed': 'Не удалось разблокировать кошелёк',
 
@@ -153,6 +157,10 @@ const ENGLISH: Readonly<Record<TranslationKey, string>> = {
   'unlock.password': 'Password',
   'unlock.submit': 'Unlock',
   'unlock.decrypting': 'Decrypting…',
+  'unlock.blocked': 'Too many attempts. Input reopens in',
+  'unlock.blockedNote':
+    'The delay grows with each failure and survives a page reload. It protects against password guessing by whoever got hold of the device.',
+  'unlock.attemptsLeft': 'Attempts left before a delay:',
   'unlock.forgot': 'Forgot your password?',
   'unlock.failed': 'Could not unlock the wallet',
 

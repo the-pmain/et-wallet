@@ -85,8 +85,15 @@ export function SecurityProvider({ children, clock, settingsRepository }: Securi
   )
 
   const value = useMemo<ISecurityContextValue>(
-    () => ({ autoLock, settings, setAutoLockTimeout, setConfirmBeforeSigning, verifyPassword }),
-    [autoLock, settings, setAutoLockTimeout, setConfirmBeforeSigning, verifyPassword],
+    () => ({
+      autoLock,
+      settings,
+      setAutoLockTimeout,
+      setConfirmBeforeSigning,
+      verifyPassword,
+      clock,
+    }),
+    [autoLock, settings, setAutoLockTimeout, setConfirmBeforeSigning, verifyPassword, clock],
   )
 
   return <SecurityContext value={value}>{children}</SecurityContext>

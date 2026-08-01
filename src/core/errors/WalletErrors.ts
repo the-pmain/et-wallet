@@ -51,6 +51,26 @@ export class InvalidPasswordError extends AppError {
   }
 }
 
+/**
+ * Попыток ввода пароля слишком много: ввод временно закрыт.
+ *
+ * ОТДЕЛЬНАЯ ОШИБКА, А НЕ «НЕВЕРНЫЙ ПАРОЛЬ». Различие видно и без неё —
+ * по тому, что форма перестала принимать ввод, — и скрывать его значит
+ * оставить владельца в недоумении, почему верный пароль не подходит.
+ * Подбирающему это ничего не даёт: он и так упирается в задержку.
+ */
+export class TooManyAttemptsError extends AppError {
+  readonly code: ErrorCode = ERROR_CODE.TooManyAttempts
+
+  /** Через сколько миллисекунд можно повторить. */
+  readonly retryAfterMs: number
+
+  constructor(retryAfterMs: number) {
+    super(`Слишком много попыток. Повторите через ${String(Math.ceil(retryAfterMs / 1000))} с.`)
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
 /** Пароль не удовлетворяет политике сложности. */
 export class WeakPasswordError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WeakPassword

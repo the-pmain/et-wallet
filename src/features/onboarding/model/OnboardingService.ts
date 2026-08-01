@@ -13,6 +13,8 @@ import {
   type IMnemonicCheck,
   type ISecretBuffer,
   type ISecureStorage,
+  type IUnlockThrottleState,
+  type UnlockThrottle,
   type MnemonicStrength,
 } from '@/core'
 
@@ -31,17 +33,18 @@ import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from 
  */
 export interface IOnboardingServiceDependencies {
   readonly secureStorage: ISecureStorage
+
+  /**
+   * Ограничитель попыток ввода пароля.
+   *
+   * Необязателен: без него сервис работает как прежде. Отсутствие
+   * ограничителя — осознанный выбор вызывающего (например, в проверке,
+   * где перебор задержек только замедлил бы прогон), а не умолчание
+   * боевой сборки.
+   */
+  readonly unlockThrottle?: UnlockThrottle
 }
 
-/**
- * Операции онбординга поверх ядра.
- *
- * СОСТОЯНИЕ ХРАНИЛИЩА НА ЭТОМ ЭТАПЕ. Постоянное хранилище (IndexedDB)
- * ещё не реализовано, поэтому в приложении используется хранилище
- * в памяти: кошелёк живёт до перезагрузки страницы. Криптография при
- * этом настоящая — шифрование, вывод ключа, BIP-39 и BIP-32 работают
- * ровно так же, как будут работать с постоянным хранилищем.
- */
 /**
  * Отвергает адрес, составленный неверно.
  *
@@ -59,8 +62,21 @@ function assertAcceptableEmail(email: string | undefined): void {
   }
 }
 
+/**
+ * Операции онбординга поверх ядра.
+ *
+ * ХРАНИЛИЩЕ ПОСТОЯННОЕ: кошелёк переживает перезагрузку вкладки.
+ * Сессионный ключ шифрования при этом в хранилище не попадает —
+ * он живёт в памяти и исчезает вместе со вкладкой, поэтому после
+ * перезагрузки кошелёк оказывается заблокированным.
+ *
+ * ПОДБОР ПАРОЛЯ ОГРАНИЧЕН ОДНИМ СЧЁТЧИКОМ на вход и на подтверждение
+ * перед выдачей секретов: разные счётчики означали бы, что подбирающий
+ * выберет форму без ограничения.
+ */
 export class OnboardingService implements IOnboardingService {
   readonly #secureStorage: ISecureStorage
+  readonly #unlockThrottle: UnlockThrottle | null
   readonly #mnemonicService = new MnemonicService()
   readonly #listeners = new Set<() => void>()
 
@@ -68,6 +84,7 @@ export class OnboardingService implements IOnboardingService {
 
   constructor(dependencies: IOnboardingServiceDependencies) {
     this.#secureStorage = dependencies.secureStorage
+    this.#unlockThrottle = dependencies.unlockThrottle ?? null
   }
 
   getState(): OnboardingState {
@@ -155,13 +172,25 @@ export class OnboardingService implements IOnboardingService {
    * открытым значило бы, что сверка не значит ничего.
    */
   async unlock(password: string, email?: string): Promise<void> {
-    await this.#secureStorage.unlock(password)
+    /* Проверка ДО вывода ключа: иначе каждая закрытая попытка всё равно
+       обходилась бы в 600 000 итераций PBKDF2, и ограничитель превратился
+       бы в способ нагрузить процессор владельца. */
+    await this.#unlockThrottle?.assertAllowed()
+
+    try {
+      await this.#secureStorage.unlock(password)
+    } catch (error) {
+      await this.#unlockThrottle?.recordFailure()
+
+      throw error
+    }
 
     if (email !== undefined && email.trim() !== '') {
       const stored = await this.getEmail()
 
       if (stored !== null && !areEmailsEqual(stored, email)) {
         this.#secureStorage.lock()
+        await this.#unlockThrottle?.recordFailure()
 
         /* Та же ошибка, что и при неверном пароле: сообщение,
            различающее «пароль верен, адрес нет», подсказывало бы
@@ -170,6 +199,7 @@ export class OnboardingService implements IOnboardingService {
       }
     }
 
+    await this.#unlockThrottle?.recordSuccess()
     this.#setState(ONBOARDING_STATE.Unlocked)
   }
 
@@ -177,8 +207,32 @@ export class OnboardingService implements IOnboardingService {
     return await this.#secureStorage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UserEmail)
   }
 
+  /**
+   * Проверяет пароль перед необратимым действием.
+   *
+   * ОГРАНИЧИТЕЛЬ ТОТ ЖЕ, ЧТО У ВХОДА, И ЭТО НЕ СОВПАДЕНИЕ. Форма
+   * подтверждения перед выдачей seed-фразы принимает пароль с той же
+   * скоростью, что и экран разблокировки: без общего счётчика
+   * подбирающий просто выбрал бы ту форму, где ограничения нет.
+   *
+   * @throws TooManyAttemptsError если ввод временно закрыт.
+   */
   async verifyPassword(password: string): Promise<boolean> {
-    return await this.#secureStorage.verifyPassword(password)
+    await this.#unlockThrottle?.assertAllowed()
+
+    const isValid = await this.#secureStorage.verifyPassword(password)
+
+    if (isValid) {
+      await this.#unlockThrottle?.recordSuccess()
+    } else {
+      await this.#unlockThrottle?.recordFailure()
+    }
+
+    return isValid
+  }
+
+  async getUnlockThrottleState(): Promise<IUnlockThrottleState> {
+    return (await this.#unlockThrottle?.getState()) ?? { failedAttempts: 0, retryAfterMs: 0 }
   }
 
   lock(): void {

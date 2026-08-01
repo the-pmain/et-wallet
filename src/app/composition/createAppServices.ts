@@ -10,6 +10,7 @@ import {
   PublicRpcProvider,
   SecureStorage,
   SystemClock,
+  UnlockThrottle,
   type IClock,
 } from '@/core'
 import { DappSessionService, WalletConnectTransport } from '@/features/dapp'
@@ -80,7 +81,13 @@ export function createAppServices(): IAppServices {
   })
 
   return {
-    onboarding: new OnboardingService({ secureStorage }),
+    onboarding: new OnboardingService({
+      secureStorage,
+      /* Счётчик попыток лежит в незашифрованных настройках: он обязан
+         работать до разблокировки, когда ключ дешифрования ещё
+         не выведен. */
+      unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
+    }),
     session,
     clock,
     securitySettings: new SecuritySettingsRepository(storage),

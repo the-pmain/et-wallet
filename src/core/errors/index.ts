@@ -55,6 +55,7 @@ export {
   MNEMONIC_INVALID_REASON,
   type MnemonicInvalidReason,
   InvalidPasswordError,
+  TooManyAttemptsError,
   InvalidPrivateKeyError,
   KeyringCannotSignError,
   KeyringNotFoundError,

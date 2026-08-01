@@ -101,6 +101,47 @@ test.describe('Сквозной путь: создание и работа ко�
     await expect(page.getByRole('link', { name: /создать новый кошелёк/i })).toBeHidden()
   })
 
+  test('подбор пароля упирается в растущую задержку', async ({ page }) => {
+    /*
+      Ограничитель попыток. Проверяется в собранном приложении, потому
+      что счётчик лежит в IndexedDB, а он и есть то, что делает задержку
+      непреодолимой перезагрузкой.
+
+      Число попыток берётся с запасом: точный порог задан в ядре
+      и проверен модульно, здесь важно, что задержка вообще наступает.
+    */
+    await importWallet(page)
+    await page.reload()
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await page.getByLabel('Пароль').fill('Sobaka-9-Solnce!')
+      await page.getByRole('button', { name: 'Разблокировать' }).click()
+      await page.waitForTimeout(150)
+    }
+
+    await expect(page.getByText(/Слишком много попыток/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Разблокировать' })).toBeDisabled()
+  })
+
+  test('задержка переживает перезагрузку страницы', async ({ page }) => {
+    /* Ограничитель, обнуляемый обновлением страницы, не ограничивает
+       ничего: подбирающий нажимает F5 после каждой неудачи. */
+    await importWallet(page)
+    await page.reload()
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await page.getByLabel('Пароль').fill('Sobaka-9-Solnce!')
+      await page.getByRole('button', { name: 'Разблокировать' }).click()
+      await page.waitForTimeout(150)
+    }
+
+    await expect(page.getByText(/Слишком много попыток/i)).toBeVisible()
+
+    await page.reload()
+
+    await expect(page.getByText(/Слишком много попыток/i)).toBeVisible()
+  })
+
   test('после перезагрузки кошелёк открывается тем же паролем', async ({ page }) => {
     await importWallet(page)
     await page.reload()

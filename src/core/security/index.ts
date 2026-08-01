@@ -30,6 +30,13 @@ export {
 } from './ExportGuard'
 export { ExportPermit } from './ExportPermit'
 export {
+  FREE_UNLOCK_ATTEMPTS,
+  UnlockThrottle,
+  delayFor as unlockDelayFor,
+  type IUnlockThrottleDependencies,
+  type IUnlockThrottleState,
+} from './UnlockThrottle'
+export {
   EXPORT_KIND,
   EXPORT_RISK,
   EXPORT_RISK_ORDER,

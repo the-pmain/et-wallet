@@ -23,6 +23,7 @@ export const ERROR_CODE = {
   WalletNotInitialized: 'WALLET_NOT_INITIALIZED',
   WalletAlreadyInitialized: 'WALLET_ALREADY_INITIALIZED',
   InvalidPassword: 'INVALID_PASSWORD',
+  TooManyAttempts: 'TOO_MANY_ATTEMPTS',
   WeakPassword: 'WEAK_PASSWORD',
   InvalidMnemonic: 'INVALID_MNEMONIC',
   InvalidPrivateKey: 'INVALID_PRIVATE_KEY',

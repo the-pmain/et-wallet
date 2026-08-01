@@ -1,4 +1,4 @@
-import { MemoryStorageService, SecureStorage, type IProviderFactory } from '@/core'
+import { MemoryStorageService, SecureStorage, UnlockThrottle, type IProviderFactory } from '@/core'
 import { DappSessionService } from '@/features/dapp'
 import { OnboardingService } from '@/features/onboarding'
 import { SecuritySettingsRepository } from '@/features/security'
@@ -75,7 +75,10 @@ export function createTestAppServices(): ITestAppServices {
   const dappTransport = new FakeSessionTransport()
 
   return {
-    onboarding: new OnboardingService({ secureStorage }),
+    onboarding: new OnboardingService({
+      secureStorage,
+      unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
+    }),
     session,
     providerFactory,
     priceProvider,

@@ -1,5 +1,7 @@
 import { createContext, use } from 'react'
 
+import { SystemClock, type IClock } from '@/core'
+
 import type { IAutoLockState } from './useAutoLock'
 import { DEFAULT_SECURITY_SETTINGS, type ISecuritySettings } from './SecuritySettings'
 
@@ -13,6 +15,17 @@ export interface ISecurityContextValue {
 
   /** Проверяет пароль, не меняя состояния блокировки. */
   readonly verifyPassword: (password: string) => Promise<boolean>
+
+  /**
+   * Источник времени приложения.
+   *
+   * ЗАЧЕМ ОН ЭКРАНАМ. Обратный отсчёт до конца задержки обязан идти
+   * по тем же часам, по которым ограничитель считает срок. Системный
+   * таймер рядом с внедрёнными часами — два источника времени, и они
+   * расходятся: в проверке отсчёт не двигался бы вовсе, а в боевом
+   * коде показанное значение разошлось бы с действительным сроком.
+   */
+  readonly clock: IClock
 }
 
 /**
@@ -30,6 +43,7 @@ export const SecurityContext = createContext<ISecurityContextValue>({
   setAutoLockTimeout: () => Promise.resolve(),
   setConfirmBeforeSigning: () => Promise.resolve(),
   verifyPassword: () => Promise.resolve(false),
+  clock: new SystemClock(),
 })
 
 /** Доступ к состоянию безопасности. */
