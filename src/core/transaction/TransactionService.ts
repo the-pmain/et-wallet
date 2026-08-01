@@ -49,6 +49,29 @@ const MULTIPLIER_BASE = 100n
  */
 const GAS_LIMIT_HEADROOM = 120n
 
+/**
+ * Как часто опрашиваются отправленные транзакции.
+ *
+ * Близко ко времени блока Ethereum. Опрашивать чаще бессмысленно:
+ * состояние меняется не быстрее блока, а лимиты публичного узла
+ * расходуются на каждый вызов. В сетях с более быстрыми блоками
+ * отставание составляет секунды и на решения пользователя не влияет.
+ */
+const TRACKING_INTERVAL_MS = 12_000
+
+/**
+ * После скольких подтверждений слежение прекращается.
+ *
+ * ЭТО НЕ ОКОНЧАТЕЛЬНОСТЬ, А ГРАНИЦА РАЗУМНОГО ОЖИДАНИЯ. Полной
+ * невозвратности в сетях EVM нет вовсе: реорганизация возможна
+ * на любой глубине, просто с быстро убывающей вероятностью. Три блока —
+ * компромисс: реорганизации такой глубины после перехода Ethereum
+ * на Proof-of-Stake наблюдаются исключительно редко, а бесконечный опрос
+ * узла ради каждой давней транзакции стоил бы лимитов и раскрывал бы
+ * активность кошелька.
+ */
+const CONFIRMATIONS_TO_STOP_TRACKING = 3
+
 /** Зависимости сервиса. */
 export interface ITransactionServiceDependencies {
   readonly resolver: IProviderResolver
@@ -77,6 +100,13 @@ export class TransactionService implements ITransactionService {
   readonly #repository: ITransactionRepository
   readonly #clock: IClock
   readonly #logger: ILogger
+
+  /* Отмена периодического опроса. `null`, пока слежение не запущено. */
+  #cancelTracking: Unsubscribe | null = null
+
+  /* Идёт проход опроса. Защищает от наложения проходов, когда узел
+     отвечает медленнее, чем наступает следующий период. */
+  #isTracking = false
 
   readonly #events = new EventBus<TransactionEventMap>({
     onListenerError: (error, event) => {
@@ -209,6 +239,7 @@ export class TransactionService implements ITransactionService {
       gasUsed: null,
       effectiveGasPrice: null,
       replacedBy: null,
+      confirmations: 0,
     }
 
     await this.#repository.save(record)
@@ -275,14 +306,185 @@ export class TransactionService implements ITransactionService {
     return Promise.reject(new NotImplementedError(`${SERVICE_NAME}.prepareCancel`))
   }
 
+  /**
+   * Начинает следить за отправленными транзакциями.
+   *
+   * ЧТО ИМЕННО ОТСЛЕЖИВАЕТСЯ. Каждая запись в состоянии ожидания
+   * опрашивается по квитанции. Возможны четыре исхода, и все четыре
+   * означают для пользователя разное:
+   *
+   * - квитанции нет, nonce не израсходован — транзакция ещё в мемпуле;
+   * - квитанции нет, nonce уже израсходован — её место заняла другая
+   *   транзакция того же отправителя. Показывать её как ожидающую
+   *   значило бы обещать перевод, которого не будет;
+   * - квитанция есть, выполнение успешно — операция состоялась;
+   * - квитанция есть, выполнение откачено — газ списан, операция
+   *   не выполнена. Это НЕ успех, и показывать её как успех нельзя.
+   *
+   * РЕОРГАНИЗАЦИЯ ЦЕПИ УЧТЕНА. Квитанция может исчезнуть после того,
+   * как была получена: блок, содержавший транзакцию, вытеснен другим.
+   * Такая запись возвращается в состояние ожидания, а не остаётся
+   * подтверждённой — иначе кошелёк утверждал бы состоявшимся то, чего
+   * в цепи нет.
+   *
+   * ОПРАШИВАЮТСЯ И УЖЕ ПОДТВЕРЖДЁННЫЕ ЗАПИСИ, пока их глубина меньше
+   * порога: иначе обработка реорганизации была бы мёртвым кодом —
+   * подтверждённая запись просто не попадала бы в выборку.
+   *
+   * ОПРАШИВАЮТСЯ ВСЕ СЕТИ, а не только активная:
+   * транзакция не перестаёт существовать оттого, что пользователь
+   * переключил сеть. Обычно таких сетей ноль или одна, и стоимость
+   * опроса пропорциональна действительной работе.
+   *
+   * ПОВТОРНЫЙ ВЫЗОВ БЕЗВРЕДЕН: второй таймер не создаётся.
+   */
   startTracking(): void {
-    /* Отслеживание с учётом реорганизации цепи — предмет отдельного
-       этапа. Пустая реализация честнее исключения: вызывающий код
-       не обязан знать, что слежения ещё нет. */
+    if (this.#cancelTracking !== null) {
+      return
+    }
+
+    this.#cancelTracking = this.#clock.setInterval(() => {
+      void this.#trackPending()
+    }, TRACKING_INTERVAL_MS)
+
+    /* Первый проход выполняется сразу: приложение могло быть закрыто
+       на час, и ждать ещё период опроса, чтобы узнать судьбу перевода,
+       незачем. */
+    void this.#trackPending()
   }
 
   stopTracking(): void {
-    /* См. `startTracking`. */
+    this.#cancelTracking?.()
+    this.#cancelTracking = null
+  }
+
+  /** Опрашивает все ожидающие записи по всем сетям. */
+  async #trackPending(): Promise<void> {
+    if (this.#isTracking) {
+      /* Предыдущий проход не завершился: узел отвечает медленнее, чем
+         идёт опрос. Наложение проходов удвоило бы нагрузку и могло бы
+         записать устаревший результат поверх свежего. */
+      return
+    }
+
+    this.#isTracking = true
+
+    try {
+      const pending = await this.#repository.findUnsettled(CONFIRMATIONS_TO_STOP_TRACKING)
+
+      for (const record of pending) {
+        try {
+          await this.#refreshTracked(record)
+        } catch (error) {
+          /* Недоступность одной сети не имеет права остановить слежение
+             за остальными. */
+          this.#logger.warn('Состояние транзакции получить не удалось', {
+            chainId: record.chainId,
+            reason: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+    } finally {
+      this.#isTracking = false
+    }
+  }
+
+  /** Обновляет одну запись по данным сети. */
+  async #refreshTracked(record: ITransactionRecord): Promise<void> {
+    const network = this.#networks.getByChainId(record.chainId)
+
+    if (network === null) {
+      /* Сеть удалена из списка. Судить о транзакции нечем, и молча
+         объявлять её потерянной нельзя. */
+      return
+    }
+
+    const provider = await this.#resolver.get(network)
+    const receipt = await provider.getTransactionReceipt(record.hash)
+
+    if (receipt === null) {
+      await this.#handleMissingReceipt(record, provider)
+
+      return
+    }
+
+    const latestBlock = await provider.getBlockNumber()
+    const confirmations = Math.max(1, Number(latestBlock - receipt.blockNumber) + 1)
+
+    const status =
+      receipt.status === 'success' ? TRANSACTION_STATUS.Confirmed : TRANSACTION_STATUS.Reverted
+
+    await this.#repository.save({
+      ...record,
+      status,
+      confirmedAt: record.confirmedAt ?? this.#clock.now(),
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed,
+      effectiveGasPrice: receipt.effectiveGasPrice,
+      confirmations,
+    })
+
+    if (record.status !== status) {
+      this.#events.emit('transaction:statusChanged', { hash: record.hash, status })
+    }
+
+    if (confirmations >= CONFIRMATIONS_TO_STOP_TRACKING) {
+      /* Глубина достаточна: в следующую выборку запись не попадёт,
+         и опрос по ней прекратится сам. */
+      this.#logger.info('Транзакция подтверждена окончательно', {
+        chainId: record.chainId,
+        confirmations,
+      })
+    }
+  }
+
+  /**
+   * Разбирает случай, когда квитанции нет.
+   *
+   * Отличить «ещё летит» от «место занято другой транзакцией» можно
+   * по числу отправленных с адреса транзакций: если оно превысило nonce
+   * нашей, значит этот nonce уже израсходован, а квитанции нет —
+   * израсходован не нами.
+   *
+   * ХЭШ ЗАМЕЩАЮЩЕЙ ТРАНЗАКЦИИ НЕИЗВЕСТЕН, и выдумывать его нельзя:
+   * найти его можно только обходом блоков, а это работа индексатора.
+   * Поле остаётся пустым — пользователю сообщается сам факт.
+   */
+  async #handleMissingReceipt(record: ITransactionRecord, provider: IProvider): Promise<void> {
+    const confirmedCount = await provider.getTransactionCount(record.from, 'latest')
+
+    if (confirmedCount > record.nonce) {
+      await this.#applyRollback(record, TRANSACTION_STATUS.Replaced)
+
+      return
+    }
+
+    if (record.confirmations === 0) {
+      /* Обычное ожидание: ничего не изменилось. */
+      return
+    }
+
+    /* Запись была подтверждена, а квитанции больше нет: блок вытеснен
+       реорганизацией цепи. Оставить её подтверждённой значило бы
+       утверждать состоявшимся то, чего в цепи нет. */
+    this.#logger.warn('Транзакция вернулась в ожидание: блок вытеснен', {
+      chainId: record.chainId,
+    })
+
+    await this.#applyRollback(record, TRANSACTION_STATUS.Pending)
+  }
+
+  /** Сбрасывает сведения о включении в блок и сообщает о смене состояния. */
+  async #applyRollback(record: ITransactionRecord, status: TransactionStatus): Promise<void> {
+    await this.#repository.save({
+      ...record,
+      status,
+      confirmations: 0,
+      blockNumber: null,
+      confirmedAt: null,
+    })
+
+    this.#events.emit('transaction:statusChanged', { hash: record.hash, status })
   }
 
   on<TName extends keyof TransactionEventMap>(

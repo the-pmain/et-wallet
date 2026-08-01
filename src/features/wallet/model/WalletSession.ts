@@ -216,6 +216,7 @@ export class WalletSession implements IWalletSession {
 
   #unsubscribeBalance: Unsubscribe | null = null
   #unsubscribeBalanceEvents: Unsubscribe | null = null
+  #unsubscribeTransactionEvents: Unsubscribe | null = null
 
   /* Фоновый опрос включён, пока вкладка на виду. Управляет им слой
      интерфейса: `document.visibilityState` — часть DOM, а сессия
@@ -287,6 +288,14 @@ export class WalletSession implements IWalletSession {
 
     this.#unsubscribeBalanceEvents?.()
     this.#unsubscribeBalanceEvents = null
+
+    this.#unsubscribeTransactionEvents?.()
+    this.#unsubscribeTransactionEvents = null
+
+    /* Слежение останавливается вместе с сессией: таймер, переживший
+       блокировку, продолжал бы опрашивать узел и раскрывать
+       оператору, что кошелёк с этими адресами существует. */
+    this.#transactionService?.stopTracking()
 
     this.#balances?.stop()
     await this.#providers?.destroy()
@@ -939,6 +948,42 @@ export class WalletSession implements IWalletSession {
     this.#unsubscribeBalanceEvents = this.#balances.on('balance:updated', () => {
       void this.#applyCachedBalance()
     })
+
+    /*
+      Смена состояния отправленной транзакции перерисовывает историю
+      и перезапрашивает баланс.
+
+      Баланс — потому что подтверждение перевода меняет его, а кэш
+      об этом не знает: он обновляется по времени, и до следующего
+      опроса пользователь видел бы прежнюю сумму рядом с уже
+      подтверждённой операцией.
+    */
+    this.#unsubscribeTransactionEvents = this.#transactionService.on(
+      'transaction:statusChanged',
+      () => {
+        void this.#onTransactionStatusChanged()
+      },
+    )
+
+    /* Слежение начинается сразу после сборки сервисов: транзакция,
+       отправленная в прошлой сессии, могла подтвердиться, пока
+       кошелёк был закрыт. */
+    this.#transactionService.startTracking()
+  }
+
+  /** Перечитывает историю и баланс после смены состояния транзакции. */
+  async #onTransactionStatusChanged(): Promise<void> {
+    const account = this.#snapshot.activeAccount
+    const network = this.#snapshot.activeNetwork
+
+    if (account === null || network === null) {
+      return
+    }
+
+    this.#balances?.invalidate(account.address, network.chainId)
+
+    await this.#loadHistory(account, network)
+    await this.#loadBalance(account, network)
   }
 
   /**

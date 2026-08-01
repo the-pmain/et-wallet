@@ -99,6 +99,23 @@ export interface ITransactionRepository {
   /** Транзакции, ожидающие подтверждения. Читаются при запуске приложения. */
   findPending(chainId: ChainId): Promise<readonly ITransactionRecord[]>
 
+  /**
+   * Транзакции, за которыми ещё нужно следить, из всех сетей.
+   *
+   * ЭТО НЕ ТО ЖЕ САМОЕ, ЧТО «ОЖИДАЮЩИЕ». Сюда входят и уже включённые
+   * в блок записи, набравшие меньше `maxConfirmations` подтверждений:
+   * блок с ними может быть вытеснен реорганизацией цепи, и перестать
+   * следить за ними значило бы оставить на экране подтверждение того,
+   * чего в цепи уже нет.
+   *
+   * Порог задаёт вызывающий: сколько подтверждений считать
+   * достаточными — политика слоя транзакций, а не свойство хранилища.
+   *
+   * Выборка идёт по всем сетям: транзакция не перестаёт существовать
+   * оттого, что пользователь переключился на другую сеть.
+   */
+  findUnsettled(maxConfirmations: number): Promise<readonly ITransactionRecord[]>
+
   save(record: ITransactionRecord): Promise<void>
   updateStatus(hash: TxHash, status: TransactionStatus): Promise<void>
 

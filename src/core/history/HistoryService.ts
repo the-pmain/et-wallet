@@ -124,6 +124,9 @@ export class HistoryService {
       blockNumber: record.blockNumber ?? 0n,
       timestamp: record.confirmedAt ?? record.submittedAt,
       source: TRANSFER_SOURCE.Local,
+      /* Состояние берётся из записи транзакции: именно оно
+         отличает ожидание от выполнения, отката и замещения. */
+      status: record.status,
     }))
   }
 

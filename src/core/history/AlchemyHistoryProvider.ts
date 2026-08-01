@@ -1,3 +1,5 @@
+import { TRANSACTION_STATUS } from '@/core/transaction'
+
 import { areAddressesEqual, isValidAddress, toAddress } from '@/core/address'
 import { BUILT_IN_CHAIN_ID } from '@/core/network'
 import type { IProvider } from '@/core/provider'
@@ -151,6 +153,8 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
       blockNumber: raw.blockNumber,
       timestamp: raw.timestamp,
       source: TRANSFER_SOURCE.Indexer,
+      /* Запись существует только потому, что уже попала в блок. */
+      status: TRANSACTION_STATUS.Confirmed,
     }
 
     if (raw.erc1155Items.length > 0) {

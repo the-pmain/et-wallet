@@ -36,6 +36,16 @@ interface IStoredRecord {
   readonly gasUsed: string | null
   readonly effectiveGasPrice: string | null
   readonly replacedBy: string | null
+
+  /**
+   * Число подтверждений.
+   *
+   * Необязательно ради записей, сохранённых до появления отслеживания:
+   * прочитанные без него считаются неподтверждёнными, а не портят
+   * разбор. Кошелёк обязан открывать хранилище, созданное прежней
+   * версией, — иначе обновление приложения означало бы потерю истории.
+   */
+  readonly confirmations?: number
 }
 
 /**
@@ -91,6 +101,25 @@ export class TransactionRepository implements ITransactionRepository {
     return records.filter(
       (record) => record.chainId === chainId && record.status === TRANSACTION_STATUS.Pending,
     )
+  }
+
+  async findUnsettled(maxConfirmations: number): Promise<readonly ITransactionRecord[]> {
+    const records = await this.#readAll()
+
+    return records.filter((record) => {
+      if (record.status === TRANSACTION_STATUS.Pending) {
+        return true
+      }
+
+      /* Замещённая транзакция окончательна: её место занято, и вернуть
+         её в цепь нечем. */
+      if (record.status === TRANSACTION_STATUS.Replaced) {
+        return false
+      }
+
+      /* Включённая в блок, но неглубоко: реорганизация ещё возможна. */
+      return record.confirmations < maxConfirmations
+    })
   }
 
   async save(record: ITransactionRecord): Promise<void> {
@@ -154,6 +183,7 @@ function encode(record: ITransactionRecord): IStoredRecord {
     effectiveGasPrice:
       record.effectiveGasPrice === null ? null : record.effectiveGasPrice.toString(),
     replacedBy: record.replacedBy,
+    confirmations: record.confirmations,
   }
 }
 
@@ -173,5 +203,6 @@ function decode(stored: IStoredRecord): ITransactionRecord {
     gasUsed: stored.gasUsed === null ? null : BigInt(stored.gasUsed),
     effectiveGasPrice: stored.effectiveGasPrice === null ? null : BigInt(stored.effectiveGasPrice),
     replacedBy: stored.replacedBy as TxHash | null,
+    confirmations: stored.confirmations ?? 0,
   }
 }

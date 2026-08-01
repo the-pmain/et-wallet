@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  TRANSACTION_STATUS,
   TRANSFER_DIRECTION,
   TRANSFER_KIND,
   TRANSFER_SOURCE,
@@ -55,6 +56,7 @@ function record(params: {
     blockNumber: 19_000n,
     timestamp: null,
     source: TRANSFER_SOURCE.Logs,
+    status: TRANSACTION_STATUS.Confirmed,
   }
 }
 

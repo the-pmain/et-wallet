@@ -1,3 +1,5 @@
+import { TRANSACTION_STATUS } from '@/core/transaction'
+
 import { areAddressesEqual } from '@/core/address'
 import type { ILogEntry, IProvider } from '@/core/provider'
 import type { Address, ChainId, HexString } from '@/core/types'
@@ -322,6 +324,8 @@ export class LogScanHistoryProvider implements IHistoryProvider {
       blockNumber: log.blockNumber,
       timestamp: null,
       source: TRANSFER_SOURCE.Logs,
+      /* Запись существует только потому, что уже попала в блок. */
+      status: TRANSACTION_STATUS.Confirmed,
     }
   }
 }

@@ -1,3 +1,5 @@
+import type { TransactionStatus } from '@/core/transaction'
+
 import type { Address, ChainId, Timestamp, TxHash } from '@/core/types'
 
 /** Что именно переведено. */
@@ -86,6 +88,20 @@ export interface ITransferRecord {
   readonly tokenId: bigint | null
 
   readonly asset: ITransferAsset
+
+  /**
+   * Состояние перевода.
+   *
+   * Для записей от индексатора и из журналов узла всегда
+   * «подтверждён»: они существуют только потому, что уже попали
+   * в блок. Смысл поле обретает у собственных отправок кошелька —
+   * оно отличает «ждёт включения», «выполнено», «откачено» и
+   * «замещено другой транзакцией».
+   *
+   * ОТКАЧЕННАЯ ОПЕРАЦИЯ — НЕ УСПЕХ. Газ списан, перевода не было,
+   * и показывать её наравне с состоявшейся нельзя.
+   */
+  readonly status: TransactionStatus
 
   readonly blockNumber: bigint
 

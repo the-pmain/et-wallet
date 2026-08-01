@@ -2,6 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, ExternalLink } from 'lucide-react'
 import { memo } from 'react'
 
 import {
+  TRANSACTION_STATUS,
   TRANSFER_DIRECTION,
   TRANSFER_SOURCE,
   type INetworkConfig,
@@ -70,9 +71,7 @@ export const TransferRow = memo(function TransferRow({ record, network }: Transf
             ? `Блок ${record.blockNumber.toString()}`
             : formatTimestamp(record.timestamp)}
 
-          {record.source === TRANSFER_SOURCE.Local ? (
-            <Badge variant="warning">Отправлено, ждёт подтверждения</Badge>
-          ) : null}
+          <StatusBadge record={record} />
 
           {amount.isRaw ? (
             /* Число знаков контракта неизвестно, поэтому показаны
@@ -104,3 +103,43 @@ export const TransferRow = memo(function TransferRow({ record, network }: Transf
     </div>
   )
 })
+
+/**
+ * Пометка состояния перевода.
+ *
+ * ЧЕТЫРЕ СОСТОЯНИЯ РАЗЛИЧАЮТСЯ, ПОТОМУ ЧТО ОЗНАЧАЮТ РАЗНОЕ.
+ * Прежде все собственные отправки помечались одинаково — «ждёт
+ * подтверждения», — и оставались такими навсегда, потому что следить
+ * за ними было некому. Пользователь не мог узнать, дошёл перевод или
+ * нет, из самого кошелька.
+ *
+ * ОТКАТ ВЫДЕЛЕН ОТДЕЛЬНО И ОКРАШЕН КАК ОШИБКА. Транзакция попала
+ * в блок, газ списан, а операция не выполнена: показать её наравне
+ * с состоявшейся значит сообщить о переводе, которого не было.
+ *
+ * ПОДТВЕРЖДЁННЫЕ ЗАПИСИ ПОМЕТКИ НЕ ПОЛУЧАЮТ. Пометка на каждой строке
+ * перестаёт читаться; выделяется то, что требует внимания.
+ */
+function StatusBadge({ record }: { readonly record: ITransferRecord }) {
+  if (record.status === TRANSACTION_STATUS.Pending) {
+    return (
+      <Badge variant="warning">
+        {record.source === TRANSFER_SOURCE.Local ? 'Отправлено, ждёт блока' : 'Ждёт блока'}
+      </Badge>
+    )
+  }
+
+  if (record.status === TRANSACTION_STATUS.Reverted) {
+    return <Badge variant="danger">Откачено, газ списан</Badge>
+  }
+
+  if (record.status === TRANSACTION_STATUS.Replaced) {
+    return <Badge variant="outline">Замещено другой транзакцией</Badge>
+  }
+
+  if (record.status === TRANSACTION_STATUS.Dropped) {
+    return <Badge variant="outline">Вытеснено из очереди</Badge>
+  }
+
+  return null
+}
