@@ -1,7 +1,8 @@
 import { AlertTriangle, FileSignature, Globe, ShieldAlert } from 'lucide-react'
+import { useState } from 'react'
 
 import { DAPP_REQUEST_KIND, DAPP_RISK, type DappRisk, type IDappRequest } from '@/core'
-import { UntrustedText } from '@/features/security'
+import { ConfirmPassword, UntrustedText, useSecurity } from '@/features/security'
 import { Alert, AlertDescription, AlertTitle, Badge, Button, Card, CardContent } from '@/shared/ui'
 
 import type { IPendingRequest } from '../model/DappSessionService'
@@ -27,9 +28,18 @@ interface DappRequestCardProps {
  * ИМЯ И АДРЕС ПРИЛОЖЕНИЯ — ЗАЯВЛЕНИЕ СТОРОНЫ, А НЕ ФАКТ. Назваться
  * известным приложением может кто угодно, поэтому они показаны как
  * присланные значения и обезврежены от скрытых символов.
+ *
+ * ПАРОЛЬ СПРАШИВАЕТСЯ ПО ТОЙ ЖЕ НАСТРОЙКЕ, ЧТО И ПРИ ОТПРАВКЕ ИЗ
+ * КОШЕЛЬКА. Раньше не спрашивался вовсе, и это было хуже всего:
+ * удалённый запрос приходит от постороннего приложения, а собственная
+ * отправка — от владельца за устройством. Требовать подтверждение
+ * у второго и не требовать у первого значит защищать слабее там,
+ * где опаснее.
  */
 export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRequestCardProps) {
   const { request, risks } = pending
+  const { settings, verifyPassword } = useSecurity()
+  const [isConfirming, setConfirming] = useState(false)
 
   return (
     <Card className="border-primary/40">
@@ -71,20 +81,47 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
           </AlertDescription>
         </Alert>
 
-        <div className="flex gap-2">
-          <Button variant="default" className="flex-1" disabled={isBusy} onClick={onReject}>
-            Отклонить
-          </Button>
+        {/* Повторный ввод пароля защищает от того, кто получил доступ
+            к уже разблокированному кошельку, и от приложения, которое
+            дождалось разблокировки. Настройка одна с отправкой:
+            два переключателя означали бы, что владелец защитил один
+            путь и не заметил второго. */}
+        {isConfirming ? (
+          <ConfirmPassword
+            action="подпись по запросу приложения"
+            onVerify={verifyPassword}
+            onConfirmed={() => {
+              setConfirming(false)
+              onApprove()
+            }}
+            onCancel={() => {
+              setConfirming(false)
+            }}
+          />
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="default" className="flex-1" disabled={isBusy} onClick={onReject}>
+              Отклонить
+            </Button>
 
-          <Button
-            variant="outline"
-            className="flex-1 border-destructive text-destructive hover:bg-destructive/10"
-            disabled={isBusy}
-            onClick={onApprove}
-          >
-            {isBusy ? 'Выполняем…' : 'Подтвердить'}
-          </Button>
-        </div>
+            <Button
+              variant="outline"
+              className="flex-1 border-destructive text-destructive hover:bg-destructive/10"
+              disabled={isBusy}
+              onClick={() => {
+                if (settings.confirmBeforeSigning) {
+                  setConfirming(true)
+
+                  return
+                }
+
+                onApprove()
+              }}
+            >
+              {isBusy ? 'Выполняем…' : 'Подтвердить'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

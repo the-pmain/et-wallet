@@ -209,7 +209,10 @@ describe('Подключения: запрос подписи', () => {
     expect(await screen.findByText(/Подпись отозвать невозможно/i)).toBeInTheDocument()
   })
 
-  it('подписывает по подтверждению', async () => {
+  it('подписывает после подтверждения и пароля', async () => {
+    /* Пароль спрашивается по той же настройке, что и при отправке
+       из кошелька: удалённый запрос не может быть защищён слабее
+       собственного действия владельца. */
     const user = userEvent.setup()
 
     renderApp()
@@ -217,6 +220,9 @@ describe('Подключения: запрос подписи', () => {
 
     services.dappTransport.emitRequest(messageRequest())
     await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+
+    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
 
     await waitFor(() => {
       expect(services.dappTransport.responses).toHaveLength(1)
@@ -226,6 +232,37 @@ describe('Подключения: запрос подписи', () => {
 
     expect(response?.kind).toBe('approved')
     expect(response?.kind === 'approved' ? response.result : '').toMatch(/^0x[0-9a-f]+$/i)
+  })
+
+  it('без пароля подпись не выполняется', async () => {
+    /* Приложение, дождавшееся разблокировки кошелька, не должно
+       получать подпись одним нажатием. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openConnections()
+
+    services.dappTransport.emitRequest(messageRequest())
+    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+
+    expect(await screen.findByLabelText('Пароль')).toBeInTheDocument()
+    expect(services.dappTransport.responses).toHaveLength(0)
+  })
+
+  it('неверный пароль подпись не выдаёт', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openConnections()
+
+    services.dappTransport.emitRequest(messageRequest())
+    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+
+    await user.type(await screen.findByLabelText('Пароль'), 'Sobaka-9-Solnce!')
+    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+
+    expect(await screen.findByText('Неверный пароль.')).toBeInTheDocument()
+    expect(services.dappTransport.responses).toHaveLength(0)
   })
 
   it('отклоняет по отказу и не подписывает', async () => {
