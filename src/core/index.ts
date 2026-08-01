@@ -95,6 +95,7 @@ export {
   TokenNotFoundError,
   TooManyAttemptsError,
   TransactionNotFoundError,
+  TransactionNotReplaceableError,
   TransactionUnderpricedError,
   UnsupportedTokenStandardError,
   UnsupportedVaultVersionError,

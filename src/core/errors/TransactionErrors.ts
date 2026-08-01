@@ -1,3 +1,18 @@
+/**
+ * Транзакцию нельзя заменить.
+ *
+ * Причина называется дословно и показывается пользователю: «ускорить
+ * не удалось» без объяснения оставляет владельца наедине с зависшим
+ * переводом, а причины требуют разных действий — подождать, обновить
+ * приложение либо не делать ничего, потому что перевод уже прошёл.
+ */
+export class TransactionNotReplaceableError extends AppError {
+  readonly code: ErrorCode = ERROR_CODE.TransactionNotReplaceable
+
+  constructor(reason: string) {
+    super(`Заменить транзакцию нельзя: ${reason}.`)
+  }
+}
 import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 

@@ -1,9 +1,22 @@
-import { InsufficientFundsError, NetworkNotFoundError, NotImplementedError } from '@/core/errors'
+import {
+  InsufficientFundsError,
+  NetworkNotFoundError,
+  TransactionNotFoundError,
+  TransactionNotReplaceableError,
+} from '@/core/errors'
 import { EventBus, type EventListener } from '@/core/events'
-import type { INetworkService } from '@/core/network'
+import type { INetworkConfig, INetworkService } from '@/core/network'
 import type { IClock, ILogger } from '@/core/platform'
 import type { IProvider, IProviderResolver } from '@/core/provider'
-import type { Address, ChainId, HexString, TxHash, Unsubscribe, Wei } from '@/core/types'
+import {
+  toWei,
+  type Address,
+  type ChainId,
+  type HexString,
+  type TxHash,
+  type Unsubscribe,
+  type Wei,
+} from '@/core/types'
 
 import type { ITransactionRepository, ITransactionService } from './contracts'
 import {
@@ -71,6 +84,25 @@ const TRACKING_INTERVAL_MS = 12_000
  * активность кошелька.
  */
 const CONFIRMATIONS_TO_STOP_TRACKING = 3
+
+/**
+ * Надбавка к комиссии при замене транзакции, в процентах.
+ *
+ * Узел принимает замену только если новая комиссия ЗАМЕТНО выше
+ * прежней: у geth порог задаётся `txpool.pricebump` и по умолчанию
+ * равен десяти процентам. Ровно десять брать нельзя — целочисленное
+ * округление вниз даёт значение на единицу меньше порога, и узел
+ * отвечает отказом «замена недооценена». Пятнадцать проходит
+ * и у узлов с повышенным порогом.
+ *
+ * НАДБАВКА ПРИМЕНЯЕТСЯ К ОБЕИМ ЧАСТЯМ комиссии EIP-1559. Подняв
+ * только предельную цену и оставив приоритетную, замену получить
+ * не удастся: узел сравнивает обе.
+ */
+const REPLACEMENT_BUMP_PERCENT = 115n
+
+/** Стоимость простого перевода без данных вызова. Задана стандартом. */
+const SIMPLE_TRANSFER_GAS = 21_000n
 
 /** Зависимости сервиса. */
 export interface ITransactionServiceDependencies {
@@ -240,6 +272,14 @@ export class TransactionService implements ITransactionService {
       effectiveGasPrice: null,
       replacedBy: null,
       confirmations: 0,
+      /* Параметры сохраняются ради ускорения: оно повторяет ТУ ЖЕ
+         операцию с тем же nonce. Без данных вызова и лимита газа
+         вместо ускорения ушла бы другая транзакция с тем же номером. */
+      data: signed.transaction.data,
+      gasLimit: signed.transaction.gasLimit,
+      maxFeePerGas: signed.transaction.maxFeePerGas,
+      maxPriorityFeePerGas: signed.transaction.maxPriorityFeePerGas,
+      gasPrice: signed.transaction.gasPrice,
     }
 
     await this.#repository.save(record)
@@ -298,12 +338,156 @@ export class TransactionService implements ITransactionService {
     return status
   }
 
-  prepareSpeedUp(_hash: TxHash): Promise<ISignableTransaction> {
-    return Promise.reject(new NotImplementedError(`${SERVICE_NAME}.prepareSpeedUp`))
+  /**
+   * Готовит ускорение зависшей транзакции.
+   *
+   * ЧТО ТАКОЕ УСКОРЕНИЕ. Повторная отправка ТОЙ ЖЕ операции с тем же
+   * nonce и большей комиссией. Узел заменяет прежнюю транзакцию новой,
+   * потому что две с одним номером существовать не могут.
+   *
+   * ПОВТОРЯЕТСЯ ИМЕННО ИСХОДНАЯ ОПЕРАЦИЯ: получатель, сумма, данные
+   * вызова и лимит газа берутся из сохранённой записи. Пересчитать их
+   * заново значило бы отправить под тем же номером другую транзакцию —
+   * пользователь ждал бы ускорения своего перевода, а получил бы
+   * неизвестно что.
+   *
+   * @throws TransactionNotReplaceableError если транзакция уже
+   *         в блоке, замещена либо её параметры не сохранены.
+   */
+  async prepareSpeedUp(hash: TxHash): Promise<ISignableTransaction> {
+    const record = await this.#requireReplaceable(hash)
+
+    if (record.data === null || record.gasLimit === null) {
+      /* Запись сделана версией без сохранения параметров.
+         Восстановить их неоткуда, а догадка означала бы отправку
+         другой операции под тем же номером. */
+      throw new TransactionNotReplaceableError(
+        'параметры исходной транзакции не сохранены; отмена по-прежнему возможна',
+      )
+    }
+
+    const network = this.#requireNetwork({ chainId: record.chainId })
+    const provider = await this.#resolver.get(network)
+
+    const transaction = await this.#buildReplacement(provider, network, record, {
+      to: record.to,
+      value: record.value,
+      data: record.data,
+      gasLimit: record.gasLimit,
+    })
+
+    await this.#assertSufficientFunds(provider, transaction)
+
+    return transaction
   }
 
-  prepareCancel(_hash: TxHash): Promise<ISignableTransaction> {
-    return Promise.reject(new NotImplementedError(`${SERVICE_NAME}.prepareCancel`))
+  /**
+   * Готовит отмену зависшей транзакции.
+   *
+   * ОТМЕНИТЬ ОТПРАВЛЕННУЮ ТРАНЗАКЦИЮ НЕЛЬЗЯ. Можно лишь занять её
+   * номер другой, более дорогой: перевод самому себе на нулевую сумму.
+   * Если узлы примут её первой, исходная операция не состоится.
+   *
+   * ГАРАНТИИ НЕТ, И ЭТО НУЖНО ГОВОРИТЬ ПРЯМО. Исходная транзакция
+   * может попасть в блок раньше отменяющей; тогда отмена окажется
+   * лишней и просто не будет принята — её номер уже израсходован.
+   * Комиссия в этом случае не списывается: невключённая транзакция
+   * ничего не стоит.
+   *
+   * ПАРАМЕТРЫ ИСХОДНОЙ ЗДЕСЬ НЕ НУЖНЫ, поэтому отмена доступна и для
+   * записей, сделанных до появления замены.
+   *
+   * @throws TransactionNotReplaceableError если транзакция уже
+   *         в блоке либо замещена.
+   */
+  async prepareCancel(hash: TxHash): Promise<ISignableTransaction> {
+    const record = await this.#requireReplaceable(hash)
+    const network = this.#requireNetwork({ chainId: record.chainId })
+    const provider = await this.#resolver.get(network)
+
+    const transaction = await this.#buildReplacement(provider, network, record, {
+      /* Перевод самому себе: средства не уходят никуда, а номер
+         оказывается занят. */
+      to: record.from,
+      value: toWei(0n),
+      data: '0x' as HexString,
+      /* Стоимость простого перевода. Оценивать нечего: операции нет. */
+      gasLimit: SIMPLE_TRANSFER_GAS,
+    })
+
+    /* Отмена ничего не переводит, но комиссию требует, а средства
+       заняты исходной транзакцией. Узел отверг бы её и сам, но по одной
+       фразе о недооценке владелец не понял бы, что дело в балансе. */
+    await this.#assertSufficientFunds(provider, transaction)
+
+    return transaction
+  }
+
+  /** Проверяет, что транзакцию ещё можно заменить. */
+  async #requireReplaceable(hash: TxHash): Promise<ITransactionRecord> {
+    const record = await this.#repository.findByHash(hash)
+
+    if (record === null) {
+      throw new TransactionNotFoundError(hash)
+    }
+
+    if (record.status === TRANSACTION_STATUS.Confirmed) {
+      throw new TransactionNotReplaceableError('она уже включена в блок')
+    }
+
+    if (record.status === TRANSACTION_STATUS.Reverted) {
+      throw new TransactionNotReplaceableError(
+        'она уже включена в блок, хотя и завершилась откатом',
+      )
+    }
+
+    if (record.status === TRANSACTION_STATUS.Replaced) {
+      throw new TransactionNotReplaceableError('её место уже занято другой транзакцией')
+    }
+
+    return record
+  }
+
+  /**
+   * Собирает замещающую транзакцию с поднятой комиссией.
+   *
+   * Комиссия берётся как наибольшее из двух: прежняя с надбавкой
+   * и текущее предложение узла. Первое нужно, чтобы узел принял
+   * замену; второе — чтобы новая транзакция не зависла так же, как
+   * прежняя, если сеть подорожала.
+   */
+  async #buildReplacement(
+    provider: IProvider,
+    network: INetworkConfig,
+    record: ITransactionRecord,
+    payload: {
+      readonly to: Address | null
+      readonly value: Wei
+      readonly data: HexString
+      readonly gasLimit: bigint
+    },
+  ): Promise<ISignableTransaction> {
+    const feeData = await provider.getFeeData()
+    const useEip1559 = network.supportsEip1559 && feeData.maxFeePerGas !== null
+
+    return {
+      type: useEip1559 ? TRANSACTION_TYPE.Eip1559 : TRANSACTION_TYPE.Legacy,
+      chainId: record.chainId,
+      from: record.from,
+      to: payload.to,
+      value: payload.value,
+      data: payload.data,
+      /* ТОТ ЖЕ НОМЕР — в нём весь смысл замены. Взяв следующий
+         свободный, кошелёк отправил бы вторую транзакцию вдобавок
+         к зависшей, а не вместо неё. */
+      nonce: record.nonce,
+      gasLimit: payload.gasLimit,
+      maxFeePerGas: useEip1559 ? bumped(record.maxFeePerGas, feeData.maxFeePerGas) : null,
+      maxPriorityFeePerGas: useEip1559
+        ? bumped(record.maxPriorityFeePerGas, feeData.maxPriorityFeePerGas)
+        : null,
+      gasPrice: useEip1559 ? null : bumped(record.gasPrice, feeData.gasPrice),
+    }
   }
 
   /**
@@ -605,4 +789,21 @@ export class TransactionService implements ITransactionService {
 
     return network
   }
+}
+
+/**
+ * Комиссия замещающей транзакции.
+ *
+ * Наибольшее из двух: прежнее значение с надбавкой и текущее
+ * предложение узла. Прежнее нужно, чтобы узел принял замену, текущее —
+ * чтобы новая транзакция не зависла так же, если сеть подорожала.
+ *
+ * Отсутствие прежнего значения не повод отказаться от замены: берётся
+ * предложение узла. Ноль означал бы транзакцию, которую не примет
+ * никто.
+ */
+function bumped(previous: bigint | null, current: bigint | null): bigint {
+  const raised = previous === null ? 0n : (previous * REPLACEMENT_BUMP_PERCENT) / MULTIPLIER_BASE
+
+  return raised > (current ?? 0n) ? raised : (current ?? 0n)
 }

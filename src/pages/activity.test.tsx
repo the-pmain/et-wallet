@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  BUILT_IN_CHAIN_ID,
+  TRANSACTION_STATUS,
+  TRANSACTION_TYPE,
   TRANSFER_SINGLE_TOPIC,
   TRANSFER_TOPIC,
   addressToTopic,
@@ -10,9 +13,11 @@ import {
   type Address,
   type HexString,
   type ILogEntry,
+  type ITransactionRecord,
   type TxHash,
   type Wei,
 } from '@/core'
+import { TransactionRepository } from '@/core/transaction/TransactionRepository'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
@@ -352,5 +357,193 @@ describe('История: отказ источника', () => {
     await openActivity()
 
     expect(await screen.findByText(/Историю получить не удалось/i)).toBeInTheDocument()
+  })
+})
+
+describe('История: замена зависшей отправки', () => {
+  /* Хэш локальной отправки, ожидающей блока. */
+  const STUCK = `0x${'55'.repeat(32)}` as TxHash
+
+  /** Кладёт в хранилище собственную отправку, ожидающую подтверждения. */
+  async function saveStuckTransfer(overrides: Partial<ITransactionRecord> = {}): Promise<void> {
+    await new TransactionRepository(services.secureStorage).save({
+      hash: STUCK,
+      chainId: BUILT_IN_CHAIN_ID.Ethereum,
+      from: OWNER,
+      to: PEER,
+      value: 10_000_000_000_000_000n as Wei,
+      nonce: 0,
+      status: TRANSACTION_STATUS.Pending,
+      type: TRANSACTION_TYPE.Eip1559,
+      submittedAt: 1_700_000_000_000 as ITransactionRecord['submittedAt'],
+      confirmedAt: null,
+      blockNumber: null,
+      gasUsed: null,
+      effectiveGasPrice: null,
+      replacedBy: null,
+      confirmations: 0,
+      data: '0x' as HexString,
+      gasLimit: 21_000n,
+      maxFeePerGas: 30_000_000_000n,
+      maxPriorityFeePerGas: 2_000_000_000n,
+      gasPrice: null,
+      ...overrides,
+    })
+  }
+
+  it('предлагает ускорение и отмену только у собственных ожидающих отправок', async () => {
+    await saveStuckTransfer()
+
+    renderApp()
+    await openActivity()
+
+    /* Пять записей: четыре чужих из журналов и одна своя.
+       Кнопки появляются ровно у последней: чужую транзакцию заменить
+       невозможно — замена подписывается ключом отправителя. */
+    expect(await screen.findByRole('button', { name: 'Ускорить' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Ускорить' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Отменить' })).toHaveLength(1)
+  })
+
+  it('показывает номер исходной транзакции в подтверждении ускорения', async () => {
+    const user = userEvent.setup()
+
+    await saveStuckTransfer({ nonce: 3 })
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+
+    /* Совпадение номера — это и есть механизм замены. Пользователь
+       должен видеть, что отправляет замену, а не вторую транзакцию
+       вдобавок к застрявшей. */
+    await screen.findByRole('heading', { name: 'Ускорение транзакции' })
+    expect(screen.getByText('Номер (nonce)').nextElementSibling).toHaveTextContent('3')
+  })
+
+  it('отмена уходит на собственный адрес с нулевой суммой', async () => {
+    const user = userEvent.setup()
+
+    await saveStuckTransfer()
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Отменить' }))
+
+    await screen.findByRole('heading', { name: 'Отмена транзакции' })
+    expect(screen.getByText('Получатель').nextElementSibling).toHaveTextContent(OWNER)
+    expect(screen.getByText('Сумма').nextElementSibling).toHaveTextContent('0 ETH')
+  })
+
+  it('не обещает, что отмена сработает', async () => {
+    const user = userEvent.setup()
+
+    await saveStuckTransfer()
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Отменить' }))
+
+    /* Исходная транзакция может попасть в блок первой. Обещание
+       «перевод отменён» там, где отмена лишь вероятна, заставит
+       владельца перестать следить за исходом. */
+    expect(await screen.findByText('Успех не гарантирован')).toBeInTheDocument()
+  })
+
+  it('называет причину, по которой ускорение невозможно', async () => {
+    const user = userEvent.setup()
+
+    /* Запись сделана версией без сохранения параметров: повторить ту же
+       операцию неоткуда. Отмена при этом остаётся доступной, и сказать
+       об этом обязаны. */
+    await saveStuckTransfer({ data: null, gasLimit: null })
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+
+    expect(
+      await screen.findByText(/параметры исходной транзакции не сохранены/i),
+    ).toBeInTheDocument()
+  })
+
+  it('возвращает к истории, если заменить не удалось', async () => {
+    const user = userEvent.setup()
+
+    await saveStuckTransfer({ data: null, gasLimit: null })
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+    await user.click(await screen.findByRole('button', { name: 'Вернуться к истории' }))
+
+    expect(await screen.findByRole('heading', { name: 'История' })).toBeInTheDocument()
+  })
+})
+
+describe('История: отправка замены', () => {
+  const STUCK = `0x${'66'.repeat(32)}` as TxHash
+
+  beforeEach(async () => {
+    await new TransactionRepository(services.secureStorage).save({
+      hash: STUCK,
+      chainId: BUILT_IN_CHAIN_ID.Ethereum,
+      from: OWNER,
+      to: PEER,
+      value: 10_000_000_000_000_000n as Wei,
+      nonce: 4,
+      status: TRANSACTION_STATUS.Pending,
+      type: TRANSACTION_TYPE.Eip1559,
+      submittedAt: 1_700_000_000_000 as ITransactionRecord['submittedAt'],
+      confirmedAt: null,
+      blockNumber: null,
+      gasUsed: null,
+      effectiveGasPrice: null,
+      replacedBy: null,
+      confirmations: 0,
+      data: '0x' as HexString,
+      gasLimit: 21_000n,
+      maxFeePerGas: 30_000_000_000n,
+      maxPriorityFeePerGas: 2_000_000_000n,
+      gasPrice: null,
+    })
+  })
+
+  it('спрашивает пароль перед подписью замены', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+    await user.click(await screen.findByRole('button', { name: 'Отправить ускорение' }))
+
+    /* Замена — такая же транзакция с подписью, и защита от того, кто
+       получил доступ к разблокированному кошельку, здесь та же. */
+    expect(await screen.findByLabelText('Пароль')).toBeInTheDocument()
+    expect(screen.getByText(/Подтвердите паролем/i)).toHaveTextContent('ускорение транзакции')
+  })
+
+  it('отправляет замену с номером исходной транзакции', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+    await user.click(await screen.findByRole('button', { name: 'Отправить ускорение' }))
+    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+
+    /* После отправки экран возвращается к истории. */
+    expect(await screen.findByRole('heading', { name: 'История' })).toBeInTheDocument()
+
+    /* Замена сохранена с номером исходной транзакции. Возьми она
+       следующий свободный номер — в сети оказались бы две транзакции
+       вместо одной, и вторая списала бы средства повторно. */
+    const saved = await new TransactionRepository(services.secureStorage).findByAddress(
+      OWNER,
+      BUILT_IN_CHAIN_ID.Ethereum,
+    )
+
+    expect(saved.filter((record) => record.nonce === 4)).toHaveLength(2)
   })
 })

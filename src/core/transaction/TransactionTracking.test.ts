@@ -152,6 +152,11 @@ async function savePending(overrides: Partial<ITransactionRecord> = {}): Promise
     effectiveGasPrice: null,
     replacedBy: null,
     confirmations: 0,
+    data: null,
+    gasLimit: null,
+    maxFeePerGas: null,
+    maxPriorityFeePerGas: null,
+    gasPrice: null,
     ...overrides,
   })
 }

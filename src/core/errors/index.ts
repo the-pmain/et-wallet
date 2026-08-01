@@ -41,6 +41,7 @@ export {
   NonceTooLowError,
   TokenNotFoundError,
   TransactionNotFoundError,
+  TransactionNotReplaceableError,
   TransactionUnderpricedError,
   UnsupportedTokenStandardError,
   UserRejectedError,

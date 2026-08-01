@@ -1,8 +1,11 @@
 import { Info, RefreshCw } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
+import type { TxHash } from '@/core'
 import {
   EMPTY_TRANSFER_FILTER,
+  REPLACEMENT_KIND,
+  ReplaceTransactionCard,
   TRANSFER_CATEGORY,
   TransferFilterBar,
   TransferList,
@@ -10,9 +13,29 @@ import {
   isFilterActive,
   useWallet,
   useWalletSnapshot,
+  type IPreparedTransfer,
   type ITransferFilter,
+  type ReplacementKind,
 } from '@/features/wallet'
-import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
+import { Alert, AlertDescription, AlertTitle, Button, Card, CardContent } from '@/shared/ui'
+
+/**
+ * Состояние замены зависшей транзакции.
+ *
+ * ПОДГОТОВКА И ОТПРАВКА РАЗДЕЛЕНЫ. Между ними стоит подтверждение
+ * пользователя, и объект, который он увидел, обязан дойти до подписи
+ * без пересчёта.
+ */
+interface IReplacementState {
+  readonly hash: TxHash
+  readonly kind: ReplacementKind
+
+  /** `null`, пока замена готовится либо подготовить её не удалось. */
+  readonly prepared: IPreparedTransfer | null
+
+  readonly error: string | null
+  readonly isBusy: boolean
+}
 
 /**
  * История переводов активного аккаунта.
@@ -51,6 +74,97 @@ export function ActivityPage() {
      утверждение, которого кошелёк в этом случае делать не вправе. */
   const isNativeBlindSpot =
     filter.category === TRANSFER_CATEGORY.Native && limits?.nativeTransfersUnavailable === true
+
+  const [replacement, setReplacement] = useState<IReplacementState | null>(null)
+
+  /* Номер запроса отсекает ответ на отменённую подготовку: пользователь
+     мог закрыть карточку или выбрать другую транзакцию, пока узел считал
+     комиссию, и опоздавший ответ показал бы чужие данные. */
+  const requestId = useRef(0)
+
+  const startReplacement = useCallback(
+    (hash: TxHash, kind: ReplacementKind) => {
+      const id = ++requestId.current
+
+      setReplacement({ hash, kind, prepared: null, error: null, isBusy: false })
+
+      const prepare =
+        kind === REPLACEMENT_KIND.Cancel
+          ? session.prepareCancel(hash)
+          : session.prepareSpeedUp(hash)
+
+      void prepare.then(
+        (prepared) => {
+          if (id === requestId.current) {
+            setReplacement({ hash, kind, prepared, error: null, isBusy: false })
+          }
+        },
+        (error: unknown) => {
+          if (id === requestId.current) {
+            setReplacement({
+              hash,
+              kind,
+              prepared: null,
+              error: error instanceof Error ? error.message : String(error),
+              isBusy: false,
+            })
+          }
+        },
+      )
+    },
+    [session],
+  )
+
+  const closeReplacement = useCallback(() => {
+    /* Счётчик сдвигается и здесь: иначе ответ уже начатой подготовки
+       открыл бы карточку заново поверх закрытой. */
+    requestId.current += 1
+    setReplacement(null)
+  }, [])
+
+  const confirmReplacement = useCallback(() => {
+    setReplacement((current) =>
+      current === null || current.prepared === null ? current : { ...current, isBusy: true },
+    )
+  }, [])
+
+  if (replacement !== null) {
+    return (
+      <ReplacementScreen
+        state={replacement}
+        network={network}
+        onRetryClose={closeReplacement}
+        onConfirm={() => {
+          const prepared = replacement.prepared
+
+          if (prepared === null) {
+            return
+          }
+
+          const id = requestId.current
+
+          confirmReplacement()
+
+          void session.sendTransfer(prepared.transaction).then(
+            () => {
+              if (id === requestId.current) {
+                closeReplacement()
+              }
+            },
+            (error: unknown) => {
+              if (id === requestId.current) {
+                setReplacement({
+                  ...replacement,
+                  isBusy: false,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              }
+            },
+          )
+        }}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -117,6 +231,7 @@ export function ActivityPage() {
             transfers={visible}
             network={network}
             isLoading={snapshot.isHistoryLoading}
+            onReplace={startReplacement}
             emptyTitle={hasFilter ? 'Под условия ничего не подошло' : 'Операций пока нет'}
             emptyDescription={
               hasFilter ? (
@@ -144,5 +259,68 @@ export function ActivityPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/**
+ * Шаг замены зависшей транзакции.
+ *
+ * ЗАНИМАЕТ ЭКРАН ЦЕЛИКОМ, а не всплывает над списком: подтверждение
+ * подписи — не фоновое действие, и внимание в этот момент делить не с чем.
+ *
+ * ОТКАЗ ПОДГОТОВКИ ПОКАЗЫВАЕТСЯ ДОСЛОВНО. «Ускорить не удалось» без
+ * причины не даёт понять, что делать: у отказа три разных исхода —
+ * подождать, обновить приложение либо не делать ничего, потому что
+ * перевод уже прошёл.
+ */
+function ReplacementScreen({
+  state,
+  network,
+  onRetryClose,
+  onConfirm,
+}: {
+  readonly state: IReplacementState
+  readonly network: ReturnType<typeof useWalletSnapshot>['activeNetwork']
+  readonly onRetryClose: () => void
+  readonly onConfirm: () => void
+}) {
+  const isCancel = state.kind === REPLACEMENT_KIND.Cancel
+
+  if (state.prepared === null) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="text-lg font-semibold">
+          {isCancel ? 'Отмена транзакции' : 'Ускорение транзакции'}
+        </h1>
+
+        {state.error === null ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+            <RefreshCw className="size-4 animate-spin" aria-hidden />
+            Готовим замену…
+          </div>
+        ) : (
+          <Alert variant="danger">
+            <AlertTitle>Заменить транзакцию не получится</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Button variant="outline" onClick={onRetryClose}>
+          Вернуться к истории
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <ReplaceTransactionCard
+      kind={state.kind}
+      prepared={state.prepared}
+      network={network}
+      isBusy={state.isBusy}
+      error={state.error}
+      onConfirm={onConfirm}
+      onCancel={onRetryClose}
+    />
   )
 }

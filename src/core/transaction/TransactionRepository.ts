@@ -46,6 +46,13 @@ interface IStoredRecord {
    * версией, — иначе обновление приложения означало бы потерю истории.
    */
   readonly confirmations?: number
+
+  /** Параметры исходной транзакции. Необязательны у прежних записей. */
+  readonly data?: string | null
+  readonly gasLimit?: string | null
+  readonly maxFeePerGas?: string | null
+  readonly maxPriorityFeePerGas?: string | null
+  readonly gasPrice?: string | null
 }
 
 /**
@@ -184,6 +191,12 @@ function encode(record: ITransactionRecord): IStoredRecord {
       record.effectiveGasPrice === null ? null : record.effectiveGasPrice.toString(),
     replacedBy: record.replacedBy,
     confirmations: record.confirmations,
+    data: record.data,
+    gasLimit: record.gasLimit === null ? null : record.gasLimit.toString(),
+    maxFeePerGas: record.maxFeePerGas === null ? null : record.maxFeePerGas.toString(),
+    maxPriorityFeePerGas:
+      record.maxPriorityFeePerGas === null ? null : record.maxPriorityFeePerGas.toString(),
+    gasPrice: record.gasPrice === null ? null : record.gasPrice.toString(),
   }
 }
 
@@ -204,5 +217,15 @@ function decode(stored: IStoredRecord): ITransactionRecord {
     effectiveGasPrice: stored.effectiveGasPrice === null ? null : BigInt(stored.effectiveGasPrice),
     replacedBy: stored.replacedBy as TxHash | null,
     confirmations: stored.confirmations ?? 0,
+    data: (stored.data ?? null) as ITransactionRecord['data'],
+    gasLimit: toBigIntOrNull(stored.gasLimit),
+    maxFeePerGas: toBigIntOrNull(stored.maxFeePerGas),
+    maxPriorityFeePerGas: toBigIntOrNull(stored.maxPriorityFeePerGas),
+    gasPrice: toBigIntOrNull(stored.gasPrice),
   }
+}
+
+/** Читает необязательное большое число. */
+function toBigIntOrNull(value: string | null | undefined): bigint | null {
+  return value === null || value === undefined ? null : BigInt(value)
 }

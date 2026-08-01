@@ -7,16 +7,26 @@ import {
   TRANSFER_SOURCE,
   type INetworkConfig,
   type ITransferRecord,
+  type TxHash,
 } from '@/core'
 import { cn } from '@/shared/lib/utils'
 import { Badge } from '@/shared/ui'
 
 import { formatTimestamp, shortenAddress } from '../lib/format'
+import { REPLACEMENT_KIND, isReplaceable, type ReplacementKind } from '../lib/replacement'
 import { describeAmount, describeKind } from '../lib/transfer-display'
 
 interface TransferRowProps {
   readonly record: ITransferRecord
   readonly network: INetworkConfig | null
+
+  /**
+   * Начинает замену зависшей отправки.
+   *
+   * Необязателен: строка используется и там, где заменять нечем, —
+   * например в списке чужих переводов.
+   */
+  readonly onReplace?: ((hash: TxHash, kind: ReplacementKind) => void) | undefined
 }
 
 /**
@@ -37,11 +47,16 @@ interface TransferRowProps {
  * список при прокрутке. Отсюда `h-16` и усечение длинных значений вместо
  * переноса.
  */
-export const TransferRow = memo(function TransferRow({ record, network }: TransferRowProps) {
+export const TransferRow = memo(function TransferRow({
+  record,
+  network,
+  onReplace,
+}: TransferRowProps) {
   const isOutgoing = record.direction === TRANSFER_DIRECTION.Outgoing
   const amount = describeAmount(record, network)
   const counterparty = isOutgoing ? record.to : record.from
   const explorer = network?.blockExplorerUrls[0] ?? null
+  const canReplace = onReplace !== undefined && isReplaceable(record)
 
   return (
     <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
@@ -88,7 +103,23 @@ export const TransferRow = memo(function TransferRow({ record, network }: Transf
           {amount.text} {amount.unit}
         </span>
 
-        {explorer === null ? null : (
+        {/* У зависшей отправки действия важнее ссылки: обозреватель
+            покажет ровно то же ожидание, а исправить положение можно
+            только заменой. У остальных записей всё наоборот. */}
+        {canReplace ? (
+          <span className="flex items-center gap-2">
+            <RowAction
+              label="Ускорить"
+              hint="Повторить ту же операцию с большей комиссией"
+              onClick={() => onReplace(record.hash, REPLACEMENT_KIND.SpeedUp)}
+            />
+            <RowAction
+              label="Отменить"
+              hint="Занять номер транзакции переводом самому себе"
+              onClick={() => onReplace(record.hash, REPLACEMENT_KIND.Cancel)}
+            />
+          </span>
+        ) : explorer === null ? null : (
           <a
             href={`${explorer}/tx/${record.hash}`}
             target="_blank"
@@ -103,6 +134,37 @@ export const TransferRow = memo(function TransferRow({ record, network }: Transf
     </div>
   )
 })
+
+/**
+ * Действие в строке списка.
+ *
+ * ОБЫЧНАЯ КНОПКА, А НЕ ССЫЛКА: замена меняет состояние кошелька,
+ * никуда не ведёт и должна отзываться на пробел так же, как на Enter.
+ *
+ * ПОЯСНЕНИЕ ДАЁТСЯ В `title`, потому что в строке фиксированной высоты
+ * места под текст нет, а «ускорить» и «отменить» — не синонимы: первое
+ * доводит перевод до конца, второе пытается его не допустить.
+ */
+function RowAction({
+  label,
+  hint,
+  onClick,
+}: {
+  readonly label: string
+  readonly hint: string
+  readonly onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      title={hint}
+      onClick={onClick}
+      className="rounded text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
+      {label}
+    </button>
+  )
+}
 
 /**
  * Пометка состояния перевода.

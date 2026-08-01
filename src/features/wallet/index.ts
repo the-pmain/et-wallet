@@ -13,6 +13,7 @@ export {
   positionKey,
   sliceColor,
 } from './lib/portfolio-display'
+export { REPLACEMENT_KIND, isReplaceable, type ReplacementKind } from './lib/replacement'
 export { describeAmount, describeKind, type ITransferAmount } from './lib/transfer-display'
 export {
   DIRECTION_FILTER,
@@ -44,6 +45,7 @@ export { BalanceCard } from './ui/BalanceCard'
 export { NetworkList } from './ui/NetworkList'
 export { QuickActions } from './ui/QuickActions'
 export { ImportTokenForm } from './ui/ImportTokenForm'
+export { ReplaceTransactionCard } from './ui/ReplaceTransactionCard'
 export { RpcSettings } from './ui/RpcSettings'
 export { TokenAvatar } from './ui/TokenAvatar'
 export { TokenList } from './ui/TokenList'

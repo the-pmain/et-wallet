@@ -1,9 +1,10 @@
 import { Inbox, RefreshCw } from 'lucide-react'
 import { useCallback, type ReactNode } from 'react'
 
-import type { INetworkConfig, ITransferRecord } from '@/core'
+import type { INetworkConfig, ITransferRecord, TxHash } from '@/core'
 import { EmptyState, VirtualList } from '@/shared/ui'
 
+import type { ReplacementKind } from '../lib/replacement'
 import { TransferRow } from './TransferRow'
 
 /**
@@ -32,6 +33,14 @@ interface TransferListProps {
   readonly emptyTitle?: string
 
   readonly emptyDescription: ReactNode
+
+  /**
+   * Начинает замену зависшей отправки.
+   *
+   * Ссылка обязана быть устойчивой: её смена перерисовывает всё окно
+   * виртуального списка и обесценивает мемоизацию строк.
+   */
+  readonly onReplace?: ((hash: TxHash, kind: ReplacementKind) => void) | undefined
 }
 
 /**
@@ -56,13 +65,16 @@ export function TransferList({
   isLoading,
   emptyTitle = 'Операций пока нет',
   emptyDescription,
+  onReplace,
 }: TransferListProps) {
   /* Обработчики создаются заново при смене сети, а не на каждый рендер:
      новая ссылка на `renderItem` заставила бы `VirtualList` перерисовать
      всё окно, обесценив мемоизацию строк. */
   const renderItem = useCallback(
-    (record: ITransferRecord) => <TransferRow record={record} network={network} />,
-    [network],
+    (record: ITransferRecord) => (
+      <TransferRow record={record} network={network} onReplace={onReplace} />
+    ),
+    [network, onReplace],
   )
 
   const getKey = useCallback((record: ITransferRecord) => record.id, [])

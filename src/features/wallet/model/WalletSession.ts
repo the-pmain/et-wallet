@@ -678,6 +678,29 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
+   * Готовит ускорение зависшей транзакции.
+   *
+   * ОТПРАВЛЯЕТСЯ ОБЫЧНЫМ `sendTransfer`. Замена — такая же транзакция
+   * с подписью и комиссией; отдельный путь отправки означал бы второе
+   * место, где решается, что подписывать, и подтверждение пользователя
+   * можно было бы обойти.
+   */
+  async prepareSpeedUp(hash: TxHash): Promise<IPreparedTransfer> {
+    const transactions = this.#requireTransactions()
+    const transaction = await transactions.prepareSpeedUp(hash)
+
+    return { transaction, fees: await transactions.estimateFees(transaction) }
+  }
+
+  /** Готовит отмену зависшей транзакции. */
+  async prepareCancel(hash: TxHash): Promise<IPreparedTransfer> {
+    const transactions = this.#requireTransactions()
+    const transaction = await transactions.prepareCancel(hash)
+
+    return { transaction, fees: await transactions.estimateFees(transaction) }
+  }
+
+  /**
    * Определяет, является ли адрес контрактом.
    *
    * ЗАПРОС ВЫПОЛНЯЕТСЯ ОДИН РАЗ, НА ШАГЕ ПОДТВЕРЖДЕНИЯ, а не при вводе

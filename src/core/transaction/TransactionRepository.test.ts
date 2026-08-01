@@ -40,6 +40,11 @@ function record(overrides: Partial<ITransactionRecord> = {}): ITransactionRecord
     effectiveGasPrice: null,
     replacedBy: null,
     confirmations: 0,
+    data: null,
+    gasLimit: null,
+    maxFeePerGas: null,
+    maxPriorityFeePerGas: null,
+    gasPrice: null,
     ...overrides,
   }
 }
