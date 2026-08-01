@@ -72,6 +72,8 @@ const RUSSIAN = {
   'unlock.title': 'С возвращением',
   'unlock.description': 'Введите адрес и пароль, чтобы разблокировать кошелёк',
   'unlock.email': 'Адрес электронной почты',
+  'unlock.emailOptional':
+    'Необязательно. Заполните, если указывали адрес при создании кошелька: он сверяется после расшифровки и помогает не перепутать кошельки.',
   'unlock.password': 'Пароль',
   'unlock.submit': 'Разблокировать',
   'unlock.decrypting': 'Расшифровка…',
@@ -146,6 +148,8 @@ const ENGLISH: Readonly<Record<TranslationKey, string>> = {
   'unlock.title': 'Welcome back',
   'unlock.description': 'Enter your address and password to unlock the wallet',
   'unlock.email': 'Email address',
+  'unlock.emailOptional':
+    'Optional. Fill it in if you set an address when creating the wallet: it is checked after decryption and helps you not to confuse wallets.',
   'unlock.password': 'Password',
   'unlock.submit': 'Unlock',
   'unlock.decrypting': 'Decrypting…',

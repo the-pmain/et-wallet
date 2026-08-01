@@ -6,7 +6,7 @@ import {
   LogScanHistoryProvider,
   CustomRpcProvider,
   EncryptionService,
-  MemoryStorageService,
+  IndexedDbStorageService,
   PublicRpcProvider,
   SecureStorage,
   SystemClock,
@@ -52,13 +52,18 @@ export interface IAppServices {
  * записанное первым — отсюда общий экземпляр для онбординга и для сессии
  * кошелька.
  *
- * ХРАНИЛИЩЕ В ПАМЯТИ — ОГРАНИЧЕНИЕ ТЕКУЩЕГО ЭТАПА. Кошелёк не переживает
- * перезагрузку вкладки. Криптография при этом настоящая: шифрование, вывод
- * ключа, BIP-39 и BIP-32 работают так же, как будут работать с постоянным
- * хранилищем.
+ * ХРАНИЛИЩЕ ПОСТОЯННОЕ. Данные лежат в IndexedDB и переживают
+ * перезагрузку вкладки. Хранилище в памяти осталось в проекте
+ * для тестов и для возможного режима «не оставлять следов
+ * на этом устройстве».
+ *
+ * БРАУЗЕР ВПРАВЕ ВЫТЕСНИТЬ ДАННЫЕ САЙТА при нехватке места, а для
+ * кошелька это потеря зашифрованной seed-фразы. Хранилище просит
+ * постоянного хранения при открытии; получено оно или нет, видно
+ * через `IndexedDbStorageService.isPersistent`.
  */
 export function createAppServices(): IAppServices {
-  const storage = new MemoryStorageService()
+  const storage = new IndexedDbStorageService()
   const encryption = new EncryptionService()
   const secureStorage = new SecureStorage(storage, encryption)
   const clock = new SystemClock()

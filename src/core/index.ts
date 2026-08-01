@@ -295,11 +295,13 @@ export {
 
 /* --- Хранилище --- */
 export {
+  IndexedDbStorageService,
   MemoryStorageService,
   SETTINGS_KEY,
   STORAGE_NAMESPACE,
   VAULT_KEY,
   toStorageKey,
+  type IIndexedDbStorageOptions,
   type IStorageEstimate,
   type IStorageMigration,
   type IStorageService,

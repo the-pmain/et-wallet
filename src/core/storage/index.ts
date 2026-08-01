@@ -1,3 +1,4 @@
+export { IndexedDbStorageService, type IIndexedDbStorageOptions } from './IndexedDbStorageService'
 export { MemoryStorageService } from './MemoryStorageService'
 export { SETTINGS_KEY, VAULT_KEY, toStorageKey } from './StorageKeys'
 export type { IStorageService } from './StorageService'

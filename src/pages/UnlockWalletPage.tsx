@@ -95,7 +95,6 @@ export function UnlockWalletPage() {
                 type="email"
                 value={email}
                 disabled={isBusy}
-                autoFocus
                 autoComplete="username"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -105,6 +104,12 @@ export function UnlockWalletPage() {
                   setError(null)
                 }}
               />
+              {/* Адрес необязателен, и сказать об этом обязательно.
+                  Кошелёк, восстановленный по seed-фразе, адреса не имеет
+                  вовсе: экран импорта его не собирает. Форма, требующая
+                  адрес всегда, не пускала бы владельца в собственный
+                  кошелёк — вход был бы невозможен. */}
+              <p className="text-xs text-muted-foreground">{t('unlock.emailOptional')}</p>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -114,6 +119,9 @@ export function UnlockWalletPage() {
                 type="password"
                 value={password}
                 disabled={isBusy}
+                /* Фокус на пароле, а не на адресе: пароль обязателен,
+                   адрес — нет. */
+                autoFocus
                 autoComplete="current-password"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -131,11 +139,7 @@ export function UnlockWalletPage() {
               </Alert>
             )}
 
-            <Button
-              type="submit"
-              size="lg"
-              disabled={isBusy || password.length === 0 || email.trim().length === 0}
-            >
+            <Button type="submit" size="lg" disabled={isBusy || password.length === 0}>
               {isBusy ? t('unlock.decrypting') : t('unlock.submit')}
             </Button>
 
