@@ -304,6 +304,7 @@ export {
   IndexedDbStorageService,
   MemoryStorageService,
   SETTINGS_KEY,
+  STORAGE_DURABILITY,
   STORAGE_NAMESPACE,
   VAULT_KEY,
   toStorageKey,
@@ -312,6 +313,7 @@ export {
   type IStorageMigration,
   type IStorageService,
   type IStorageTransaction,
+  type StorageDurability,
   type StorageKey,
   type StorageNamespace,
 } from './storage'

@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 
 import { APP_CONFIG } from '@/shared/config'
 import { useOnboarding } from '@/features/onboarding'
-import { AUTO_LOCK_OPTIONS, useSecurity } from '@/features/security'
+import { AUTO_LOCK_OPTIONS, StorageDurabilityAlert, useSecurity } from '@/features/security'
 import {
   AccountList,
   AddNetworkForm,
@@ -48,6 +48,7 @@ export function SettingsPage() {
   const session = useWallet()
   const snapshot = useWalletSnapshot()
   const onboarding = useOnboarding()
+  const { storageDurability } = useSecurity()
   const { theme, setTheme } = useTheme()
 
   return (
@@ -120,9 +121,11 @@ export function SettingsPage() {
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Хранилище работает в памяти: без записанной seed-фразы перезагрузка страницы означает
-            потерю доступа к кошельку.
+            Записанная на бумаге seed-фраза — единственный способ восстановить кошелёк при потере
+            устройства или очистке данных браузера.
           </p>
+
+          <StorageDurabilityAlert durability={storageDurability} />
         </CardContent>
       </Card>
 
@@ -185,10 +188,7 @@ export function SettingsPage() {
 
       <Alert>
         <Info />
-        <AlertDescription>
-          Версия {APP_CONFIG.version}. Хранилище работает в памяти: перезагрузка страницы потребует
-          восстановления по seed-фразе.
-        </AlertDescription>
+        <AlertDescription>Версия {APP_CONFIG.version}.</AlertDescription>
       </Alert>
     </div>
   )

@@ -50,7 +50,11 @@ export function AppProviders({ children, services }: AppProvidersProps) {
           {/* Модуль безопасности вложен в онбординг и охватывает сессию
               кошелька: автоблокировка следит за состоянием блокировки,
               а её срабатывание обязано закрыть сессию. */}
-          <SecurityProvider clock={value.clock} settingsRepository={value.securitySettings}>
+          <SecurityProvider
+            clock={value.clock}
+            settingsRepository={value.securitySettings}
+            storage={value.storage}
+          >
             <WalletProvider session={value.session}>
               {/* Подключения вложены в сессию кошелька: запрос
                   от приложения выполняется её ключами и в её сети. */}

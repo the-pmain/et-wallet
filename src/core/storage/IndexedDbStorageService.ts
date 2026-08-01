@@ -7,10 +7,12 @@ import {
 
 import type { IStorageService } from './StorageService'
 import {
+  STORAGE_DURABILITY,
   STORAGE_NAMESPACE,
   type IStorageEstimate,
   type IStorageMigration,
   type IStorageTransaction,
+  type StorageDurability,
   type StorageKey,
   type StorageNamespace,
 } from './types'
@@ -67,7 +69,7 @@ export interface IIndexedDbStorageOptions {
  * ХРАНИЛИЩЕ БРАУЗЕРА МОЖЕТ БЫТЬ ОЧИЩЕНО БЕЗ СПРОСА. При нехватке места
  * браузер вправе вытеснить данные сайта, а для кошелька это значит
  * потерю зашифрованной seed-фразы. Поэтому при открытии запрашивается
- * постоянное хранение; результат доступен через {@link isPersistent}
+ * постоянное хранение; результат доступен через {@link durability}
  * и обязан быть показан пользователю, если разрешение не получено.
  */
 export class IndexedDbStorageService implements IStorageService {
@@ -81,10 +83,8 @@ export class IndexedDbStorageService implements IStorageService {
    * Браузер обещал не вытеснять данные.
    *
    * `false` до открытия базы и в средах, где обещание недоступно.
-   * Значение не влияет на работу хранилища — оно нужно интерфейсу,
-   * чтобы предупредить владельца средств.
    */
-  isPersistent = false
+  #isPersistent = false
 
   constructor(options: IIndexedDbStorageOptions = {}) {
     this.#databaseName = options.databaseName ?? DEFAULT_DATABASE_NAME
@@ -211,6 +211,19 @@ export class IndexedDbStorageService implements IStorageService {
        и отсутствие сведений — разные утверждения, и второе, показанное
        как первое, успокаивает без оснований. */
     return usage === undefined || quota === undefined ? null : { usage, quota }
+  }
+
+  /**
+   * Насколько надёжно хранилище удерживает данные.
+   *
+   * База открывается, если ещё не открыта: разрешение на постоянное
+   * хранение запрашивается там же, и отвечать до этого значило бы
+   * пугать владельца состоянием, которого уже нет.
+   */
+  async durability(): Promise<StorageDurability> {
+    await this.#open()
+
+    return this.#isPersistent ? STORAGE_DURABILITY.Persistent : STORAGE_DURABILITY.BestEffort
   }
 
   async destroy(): Promise<void> {
@@ -353,9 +366,9 @@ export class IndexedDbStorageService implements IStorageService {
     }
 
     try {
-      this.isPersistent = (await storage.persisted()) || (await storage.persist())
+      this.#isPersistent = (await storage.persisted()) || (await storage.persist())
     } catch {
-      this.isPersistent = false
+      this.#isPersistent = false
     }
   }
 

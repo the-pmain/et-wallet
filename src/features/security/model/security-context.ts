@@ -1,6 +1,6 @@
 import { createContext, use } from 'react'
 
-import { SystemClock, type IClock } from '@/core'
+import { SystemClock, type IClock, type StorageDurability } from '@/core'
 
 import type { IAutoLockState } from './useAutoLock'
 import { DEFAULT_SECURITY_SETTINGS, type ISecuritySettings } from './SecuritySettings'
@@ -26,6 +26,15 @@ export interface ISecurityContextValue {
    * коде показанное значение разошлось бы с действительным сроком.
    */
   readonly clock: IClock
+
+  /**
+   * Насколько надёжно хранилище удерживает данные.
+   *
+   * `null`, пока состояние не прочитано. Отличается от «данные
+   * не защищены»: показывать предупреждение до того, как ответ получен,
+   * значит пугать владельца тем, чего может не быть.
+   */
+  readonly storageDurability: StorageDurability | null
 }
 
 /**
@@ -44,6 +53,7 @@ export const SecurityContext = createContext<ISecurityContextValue>({
   setConfirmBeforeSigning: () => Promise.resolve(),
   verifyPassword: () => Promise.resolve(false),
   clock: new SystemClock(),
+  storageDurability: null,
 })
 
 /** Доступ к состоянию безопасности. */

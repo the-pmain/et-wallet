@@ -1,5 +1,12 @@
 import type { IStorageService } from './StorageService'
-import type { IStorageEstimate, IStorageTransaction, StorageKey, StorageNamespace } from './types'
+import {
+  STORAGE_DURABILITY,
+  type IStorageEstimate,
+  type IStorageTransaction,
+  type StorageDurability,
+  type StorageKey,
+  type StorageNamespace,
+} from './types'
 
 type NamespaceData = Map<StorageKey, unknown>
 
@@ -93,6 +100,11 @@ export class MemoryStorageService implements IStorageService {
 
   estimate(): Promise<IStorageEstimate | null> {
     return Promise.resolve(null)
+  }
+
+  /** Данные исчезают вместе со вкладкой — и об этом надо говорить прямо. */
+  durability(): Promise<StorageDurability> {
+    return Promise.resolve(STORAGE_DURABILITY.Session)
   }
 
   destroy(): Promise<void> {

@@ -12,6 +12,7 @@ import {
   SystemClock,
   UnlockThrottle,
   type IClock,
+  type IStorageService,
 } from '@/core'
 import { DappSessionService, WalletConnectTransport } from '@/features/dapp'
 import { OnboardingService, type IOnboardingService } from '@/features/onboarding'
@@ -37,6 +38,15 @@ export interface IAppServices {
 
   /** Подключения к приложениям. Транспорт поднимается по требованию. */
   readonly dappSessions: DappSessionService
+
+  /**
+   * Хранилище приложения.
+   *
+   * Отдаётся наружу ради одного вопроса: переживут ли данные закрытие
+   * вкладки и не вправе ли браузер их вытеснить. Ответ определяет,
+   * увидит ли владелец предупреждение о риске потерять кошелёк.
+   */
+  readonly storage: IStorageService
 }
 
 /**
@@ -92,6 +102,7 @@ export function createAppServices(): IAppServices {
     clock,
     securitySettings: new SecuritySettingsRepository(storage),
     dappSessions: createDappSessions(session, logger),
+    storage,
   }
 }
 

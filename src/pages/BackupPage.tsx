@@ -11,7 +11,13 @@ import {
   type IExportRiskAssessment,
 } from '@/core'
 import { useOnboarding } from '@/features/onboarding'
-import { ConfirmPassword, DangerConfirm, SecretReveal } from '@/features/security'
+import {
+  ConfirmPassword,
+  DangerConfirm,
+  SecretReveal,
+  StorageDurabilityAlert,
+  useSecurity,
+} from '@/features/security'
 import { useWallet, useWalletSnapshot } from '@/features/wallet'
 import {
   Alert,
@@ -68,6 +74,7 @@ export function BackupPage() {
   const session = useWallet()
   const snapshot = useWalletSnapshot()
   const onboarding = useOnboarding()
+  const { storageDurability } = useSecurity()
 
   const [target, setTarget] = useState<Target | null>(null)
   const [stage, setStage] = useState<Stage>(STAGE.Idle)
@@ -191,6 +198,10 @@ export function BackupPage() {
           документы, — не в заметках, не в переписке и не в облаке.
         </AlertDescription>
       </Alert>
+
+      {/* Состояние хранилища относится к делу прямо: именно здесь
+          владелец решает, достаточно ли защищён его кошелёк. */}
+      <StorageDurabilityAlert durability={storageDurability} showWhenPersistent />
 
       {error !== null && (
         <Alert variant="danger">

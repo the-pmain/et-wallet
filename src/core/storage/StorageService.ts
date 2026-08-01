@@ -1,4 +1,10 @@
-import type { IStorageEstimate, IStorageTransaction, StorageKey, StorageNamespace } from './types'
+import type {
+  IStorageEstimate,
+  IStorageTransaction,
+  StorageDurability,
+  StorageKey,
+  StorageNamespace,
+} from './types'
 
 /**
  * Постоянное хранилище приложения.
@@ -59,6 +65,14 @@ export interface IStorageService {
 
   /** Оценка занятого объёма. `null`, если браузер не предоставляет данные. */
   estimate(): Promise<IStorageEstimate | null>
+
+  /**
+   * Насколько надёжно хранилище удерживает данные.
+   *
+   * Реализация обязана отвечать честно: завышенная оценка означает,
+   * что владелец не узнает о риске потерять кошелёк.
+   */
+  durability(): Promise<StorageDurability>
 
   /**
    * Полностью удаляет все данные приложения.
