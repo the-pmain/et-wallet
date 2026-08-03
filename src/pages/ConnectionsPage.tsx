@@ -1,8 +1,8 @@
-import { ArrowLeft, Info, Plug } from 'lucide-react'
+import { ArrowLeft, Info, Plug, QrCode } from 'lucide-react'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 
-import { DappProposalCard, DappRequestCard, SessionList, useDapp } from '@/features/dapp'
+import { DappProposalCard, DappRequestCard, QrScanner, SessionList, useDapp } from '@/features/dapp'
 import { useWalletSnapshot } from '@/features/wallet'
 import {
   Alert,
@@ -37,6 +37,10 @@ export function ConnectionsPage() {
   const [uri, setUri] = useState('')
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /* Видоискатель открывается по требованию, а не сам: камера
+     включается только тогда, когда человек этого попросил. */
+  const [isScanning, setScanning] = useState(false)
 
   /* Зависимость — только само действие, а не весь контекст. Контекст
      меняется при каждом изменении снимка, и эффект, зависящий от него,
@@ -147,10 +151,55 @@ export function ConnectionsPage() {
               emails or messages here: a connection lets the other side send you signing requests.
             </p>
 
-            <Button type="submit" disabled={isBusy || uri.trim() === '' || !dapp.snapshot.isReady}>
-              <Plug className="size-4" aria-hidden />
-              Connect
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                className="flex-1"
+                disabled={isBusy || uri.trim() === '' || !dapp.snapshot.isReady}
+              >
+                <Plug className="size-4" aria-hidden />
+                Connect
+              </Button>
+
+              {/* Чтение кода — второй способ ввести ту же ссылку, а не
+                  отдельный путь подключения: прочитанное попадает в то
+                  же поле и проходит те же проверки. На телефоне это
+                  основной способ, набрать полторы сотни символов
+                  руками там невозможно. */}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isBusy || !dapp.snapshot.isReady}
+                onClick={() => {
+                  setError(null)
+                  setScanning(true)
+                }}
+              >
+                <QrCode className="size-4" aria-hidden />
+                Scan a code
+              </Button>
+            </div>
+
+            {isScanning ? (
+              <QrScanner
+                onCancel={() => {
+                  setScanning(false)
+                }}
+                onScanned={(scanned) => {
+                  setScanning(false)
+                  setUri(scanned)
+
+                  /* Подключение начинается сразу: прочитанное видно
+                     в поле, а решение о доступе принимается позже,
+                     на экране предложения. Лишнее нажатие здесь
+                     не добавило бы ни одной проверки. */
+                  void run(async () => {
+                    await dapp.pair(scanned)
+                    setUri('')
+                  })
+                }}
+              />
+            ) : null}
           </form>
         </CardContent>
       </Card>
