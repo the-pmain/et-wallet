@@ -105,7 +105,9 @@ const CLOSED_SNAPSHOT: IWalletSnapshot = {
   isBalanceLoading: false,
   transfers: [],
   historyLimits: null,
+  historyCursor: null,
   isHistoryLoading: false,
+  isHistoryLoadingMore: false,
   tokenBalances: [],
   isTokensLoading: false,
   nfts: null,
@@ -494,6 +496,65 @@ export class WalletSession implements IWalletSession {
     this.#publish({ ...this.#snapshot, isHistoryLoading: true })
 
     await this.#loadHistory(this.#snapshot.activeAccount, this.#snapshot.activeNetwork)
+  }
+
+  /**
+   * Дозагружает более ранний участок истории.
+   *
+   * ЗАПРОС ИДЁТ РОВНО ОДИН. Второе нажатие при незавершённом первом
+   * ушло бы с той же меткой и вернуло бы тот же участок; записи
+   * отсеялись бы по ключу, но узел был бы опрошен дважды, а оператор
+   * увидел бы адрес лишний раз.
+   */
+  async loadMoreHistory(): Promise<void> {
+    const cursor = this.#snapshot.historyCursor
+    const account = this.#snapshot.activeAccount
+    const network = this.#snapshot.activeNetwork
+
+    if (
+      cursor === null ||
+      account === null ||
+      network === null ||
+      this.#history === null ||
+      this.#snapshot.isHistoryLoadingMore
+    ) {
+      return
+    }
+
+    this.#publish({ ...this.#snapshot, isHistoryLoadingMore: true })
+
+    try {
+      const page = await this.#history.getHistory(account.address, network.chainId, { cursor })
+
+      /* Активный аккаунт либо сеть могли смениться, пока узел отвечал.
+         Дописать полученное к чужой истории значило бы показать
+         операции другого адреса как свои. */
+      if (
+        this.#snapshot.activeAccount?.id !== account.id ||
+        this.#snapshot.activeNetwork?.chainId !== network.chainId
+      ) {
+        return
+      }
+
+      this.#publish({
+        ...this.#snapshot,
+        transfers: appendTransfers(
+          this.#snapshot.transfers,
+          this.#withKnownAssets(page.transfers, network.chainId),
+        ),
+        historyLimits: page.limits,
+        historyCursor: page.cursor,
+        isHistoryLoadingMore: false,
+      })
+    } catch (error) {
+      this.#logger.warn('The earlier part of the history is unavailable', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+
+      /* Метка сохраняется: отказ узла — не конец истории, и повторная
+         попытка обязана начинаться с того же места. */
+      this.#publish({ ...this.#snapshot, isHistoryLoadingMore: false })
+    }
   }
 
   async previewToken(address: Address): Promise<ITokenMetadata> {
@@ -1369,7 +1430,9 @@ export class WalletSession implements IWalletSession {
       activeNetwork,
       transfers: [],
       historyLimits: null,
+      historyCursor: null,
       isHistoryLoading: activeAccount !== null,
+      isHistoryLoadingMore: false,
       tokenBalances: [],
       isTokensLoading: activeAccount !== null,
       /* Предметы сбрасываются вместе с сетью и аккаунтом: показать
@@ -1589,7 +1652,7 @@ export class WalletSession implements IWalletSession {
    */
   async #loadHistory(account: IAccount | null, network: INetworkConfig | null): Promise<void> {
     if (account === null || network === null || this.#history === null) {
-      this.#publish({ ...this.#snapshot, isHistoryLoading: false })
+      this.#publish({ ...this.#snapshot, isHistoryLoading: false, historyCursor: null })
 
       return
     }
@@ -1601,14 +1664,18 @@ export class WalletSession implements IWalletSession {
         ...this.#snapshot,
         transfers: this.#withKnownAssets(page.transfers, network.chainId),
         historyLimits: page.limits,
+        /* Метка заменяется, а не дополняется: это чтение с начала,
+           и продолжать надо от него, а не от прежнего участка. */
+        historyCursor: page.cursor,
         isHistoryLoading: false,
+        isHistoryLoadingMore: false,
       })
     } catch (error) {
       this.#logger.warn('The transfer history is unavailable', {
         reason: error instanceof Error ? error.message : String(error),
       })
 
-      this.#publish({ ...this.#snapshot, isHistoryLoading: false })
+      this.#publish({ ...this.#snapshot, isHistoryLoading: false, historyCursor: null })
     }
   }
 
@@ -1768,4 +1835,25 @@ export class WalletSession implements IWalletSession {
       listener()
     }
   }
+}
+
+/**
+ * Дописывает более ранний участок истории к показанному.
+ *
+ * ПОВТОРЫ ОТБРАСЫВАЮТСЯ ПО КЛЮЧУ, а не по хэшу: одна транзакция
+ * порождает десятки переводов, и хэш у них общий. Повторы возникают
+ * законно — окна источников перекрываются на границе, — и молча
+ * удвоенный перевод читается как две отправки вместо одной.
+ *
+ * ПОРЯДОК СОХРАНЯЕТСЯ: показанное остаётся на месте, новое идёт следом.
+ * Пересортировка сдвинула бы строки под пальцем у того, кто в этот
+ * момент читает список.
+ */
+function appendTransfers(
+  shown: readonly ITransferRecord[],
+  earlier: readonly ITransferRecord[],
+): readonly ITransferRecord[] {
+  const seen = new Set<string>(shown.map((record) => record.id))
+
+  return [...shown, ...earlier.filter((record) => !seen.has(record.id))]
 }

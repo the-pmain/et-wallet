@@ -1,4 +1,4 @@
-import { Info, RefreshCw } from 'lucide-react'
+import { ChevronDown, Info, RefreshCw } from 'lucide-react'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { TxHash } from '@/core'
@@ -68,6 +68,12 @@ export function ActivityPage() {
   const visible = useMemo(() => filterTransfers(transfers, filter), [transfers, filter])
 
   const hasFilter = isFilterActive(filter)
+
+  /* Есть ли за показанным ещё история. От этого зависят два разных
+     утверждения в пустом состоянии: «таких операций нет» и «среди
+     загруженных таких нет». Первое кошелёк вправе сделать, только
+     дочитав историю до конца. */
+  const hasMore = snapshot.historyCursor !== null
 
   /* Отбор по нативной валюте при источнике, который её не видит, даёт
      пустой список. Без объяснения он читается как «переводов не было» —
@@ -211,8 +217,9 @@ export function ActivityPage() {
         <Alert>
           <Info />
           <AlertDescription>
-            The last {limits.scannedBlocks.toLocaleString('en-GB')} blocks were scanned. Earlier
-            operations are not returned by a single node query.
+            {limits.scannedBlocks.toLocaleString('en-GB')} blocks were scanned. A single node query
+            returns no more than that
+            {hasMore ? ', so earlier operations have to be loaded separately' : null}.
           </AlertDescription>
         </Alert>
       )}
@@ -221,7 +228,8 @@ export function ActivityPage() {
 
       {hasFilter && transfers.length > 0 ? (
         <p className="text-xs text-muted-foreground" role="status">
-          Showing {visible.length} of {transfers.length}
+          Showing {visible.length} of {transfers.length} loaded
+          {hasMore ? ' — the filter does not reach the part that is not loaded yet' : null}
         </p>
       ) : null}
 
@@ -232,12 +240,27 @@ export function ActivityPage() {
             network={network}
             isLoading={snapshot.isHistoryLoading}
             onReplace={startReplacement}
-            emptyTitle={hasFilter ? 'Nothing matched the filter' : 'No operations yet'}
+            emptyTitle={
+              hasFilter
+                ? hasMore
+                  ? 'Nothing matched among the loaded records'
+                  : 'Nothing matched the filter'
+                : hasMore
+                  ? 'No operations in the loaded part'
+                  : 'No operations yet'
+            }
             emptyDescription={
               hasFilter ? (
                 <>
                   The filter applies to records already fetched and does not query the history
                   again.
+                  {hasMore ? (
+                    <>
+                      {' '}
+                      Older operations have not been loaded, so this is not an answer about them —
+                      load the earlier part and repeat the search.
+                    </>
+                  ) : null}
                   {isNativeBlindSpot ? (
                     <>
                       {' '}
@@ -250,13 +273,33 @@ export function ActivityPage() {
                 </>
               ) : (
                 <>
-                  No operations were found for the available period. The wallet shows transfers of
-                  the native currency, ERC-20 tokens and collectible tokens — as far as the
-                  connected source reports them.
+                  {hasMore
+                    ? 'Nothing was found in the part that has been loaded. This says nothing about the earlier part — it has not been fetched.'
+                    : 'No operations were found for the available period.'}{' '}
+                  The wallet shows transfers of the native currency, ERC-20 tokens and collectible
+                  tokens — as far as the connected source reports them.
                 </>
               )
             }
           />
+
+          {hasMore ? (
+            <div className="border-t p-3">
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={snapshot.isHistoryLoadingMore}
+                onClick={() => void session.loadMoreHistory()}
+              >
+                {snapshot.isHistoryLoadingMore ? (
+                  <RefreshCw className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <ChevronDown className="size-4" aria-hidden />
+                )}
+                {snapshot.isHistoryLoadingMore ? 'Loading earlier operations…' : 'Load earlier'}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

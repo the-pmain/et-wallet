@@ -18,6 +18,10 @@ const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 interface IStubResponse {
   readonly sent?: readonly unknown[]
   readonly received?: readonly unknown[]
+
+  /** Ключи следующей страницы по выборкам. Отсутствие — выдача исчерпана. */
+  readonly sentPageKey?: string
+  readonly receivedPageKey?: string
 }
 
 class StubProvider implements IProvider {
@@ -41,8 +45,11 @@ class StubProvider implements IProvider {
     const [params] = (request.params ?? []) as readonly Record<string, unknown>[]
     const isSent = params !== undefined && 'fromAddress' in params
 
+    const pageKey = isSent ? this.response.sentPageKey : this.response.receivedPageKey
+
     return Promise.resolve({
       transfers: (isSent ? this.response.sent : this.response.received) ?? [],
+      ...(pageKey === undefined ? {} : { pageKey }),
     } as TResult)
   }
 
@@ -367,5 +374,70 @@ describe('AlchemyHistoryProvider: недоверенный ответ', () => {
 
     expect(page.limits.nativeTransfersUnavailable).toBe(false)
     expect(page.limits.scannedBlocks).toBeNull()
+  })
+})
+
+describe('AlchemyHistoryProvider: продолжение выдачи', () => {
+  it('без ключей страниц продолжения нет', async () => {
+    /* Конец выдачи объявляет индексатор, а не мы по числу записей:
+       последняя страница вполне может оказаться полной. */
+    expect((await source.fetch(query, node)).cursor).toBeNull()
+  })
+
+  it('ключ страницы уходит обратно в запрос', async () => {
+    node.response = { sentPageKey: 'sent-2', receivedPageKey: 'received-2' }
+
+    const first = await source.fetch(query, node)
+
+    node.requests = []
+
+    await source.fetch({ ...query, cursor: first.cursor }, node)
+
+    const keys = node.requests.map(
+      (request) => (request.params?.[0] as Record<string, unknown> | undefined)?.['pageKey'],
+    )
+
+    expect(keys).toContain('sent-2')
+    expect(keys).toContain('received-2')
+  })
+
+  it('исчерпанная выборка на продолжении не повторяется', async () => {
+    /* Отправленного и полученного у адреса разное количество. Без
+       этого условия более короткая сторона выдавала бы свою первую
+       страницу заново при каждом «показать более ранние». */
+    node.response = { receivedPageKey: 'received-2' }
+
+    const first = await source.fetch(query, node)
+
+    node.requests = []
+
+    await source.fetch({ ...query, cursor: first.cursor }, node)
+
+    expect(node.requests).toHaveLength(1)
+    expect((node.requests[0]?.params?.[0] as Record<string, unknown>)['toAddress']).toBe(OWNER)
+  })
+
+  it('исчерпание обеих выборок закрывает продолжение', async () => {
+    node.response = { sentPageKey: 'sent-2' }
+
+    const first = await source.fetch(query, node)
+
+    node.response = {}
+
+    expect((await source.fetch({ ...query, cursor: first.cursor }, node)).cursor).toBeNull()
+  })
+
+  it('чужая метка читается как первая страница', async () => {
+    /* Метка разбора журналов — номер блока; истолковать её как ключ
+       страницы индексатора нельзя. Показать начало заново — худшее,
+       что при этом допустимо. */
+    await source.fetch({ ...query, cursor: { providerId: 'logs', value: '19000:10000' } }, node)
+
+    const withKey = node.requests.filter(
+      (request) => 'pageKey' in ((request.params?.[0] as Record<string, unknown>) ?? {}),
+    )
+
+    expect(node.requests).toHaveLength(2)
+    expect(withKey).toHaveLength(0)
   })
 })

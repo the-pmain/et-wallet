@@ -98,7 +98,32 @@ const INCOMING_ERC1155 = log({
   hash: `0x${'44'.repeat(32)}`,
 })
 
-const LOGS = [INCOMING_TOKEN, OUTGOING_TOKEN, INCOMING_NFT, INCOMING_ERC1155]
+/**
+ * Контрагент, встречающийся только в старой части истории.
+ *
+ * Нужен проверке отбора: поиск по нему обязан отличать «такой операции
+ * не было» от «она не загружена».
+ */
+const OLD_PEER = toAddress('0x220866B1A2219f40e72f5c628B65D54268cA3A9D')
+
+/**
+ * Перевод за пределами первого окна просмотра.
+ *
+ * Блок выбран заведомо ниже нижней границы первого окна
+ * (`LATEST_BLOCK - 9999`), поэтому первая страница его не видит,
+ * а вторая — видит.
+ */
+const OLD_TOKEN = {
+  ...log({
+    address: USDC,
+    topics: [TRANSFER_TOPIC, addressToTopic(OLD_PEER), addressToTopic(OWNER)],
+    data: `0x${word(7_000_000n)}`,
+    hash: `0x${'55'.repeat(32)}`,
+  }),
+  blockNumber: 5_000n,
+}
+
+const LOGS = [INCOMING_TOKEN, OUTGOING_TOKEN, INCOMING_NFT, INCOMING_ERC1155, OLD_TOKEN]
 
 let services: ITestAppServices
 
@@ -122,6 +147,11 @@ async function openActivity(): Promise<void> {
 /** Список записей истории. Заголовки и предупреждения в него не входят. */
 function transferList(): HTMLElement {
   return screen.getByRole('list')
+}
+
+/** Адрес в том виде, в каком его показывает строка списка. */
+function shortAddress(address: string): string {
+  return `${address.slice(0, 6)}…${address.slice(-6)}`
 }
 
 /** Число показанных записей. */
@@ -185,7 +215,7 @@ describe('История: содержимое', () => {
     renderApp()
     await openActivity()
 
-    expect(screen.getByText(/The last/i)).toBeInTheDocument()
+    expect(screen.getByText(/blocks were scanned/i)).toBeInTheDocument()
   })
 })
 
@@ -231,7 +261,7 @@ describe('История: фильтрация', () => {
     await openActivity()
     await user.click(screen.getByRole('button', { name: 'Outgoing' }))
 
-    expect(screen.getByText('Showing 1 of 4')).toBeInTheDocument()
+    expect(screen.getByText(/Showing 1 of 4 loaded/)).toBeInTheDocument()
   })
 
   it('пустой результат отбора не выдаётся за пустую историю', async () => {
@@ -243,8 +273,10 @@ describe('История: фильтрация', () => {
 
     /* «Операций не было» и «под условия ничего не подошло» — разные
        утверждения, и первое, показанное вместо второго, читается
-       владельцем средств как пропажа. */
-    expect(screen.getByText('Nothing matched the filter')).toBeInTheDocument()
+       владельцем средств как пропажа. Разбор журналов дочитан не до
+       конца, поэтому заголовок обязан ограничивать сказанное ещё и
+       загруженной частью. */
+    expect(screen.getByText('Nothing matched among the loaded records')).toBeInTheDocument()
     expect(screen.queryByText('No operations yet')).not.toBeInTheDocument()
   })
 
@@ -547,5 +579,89 @@ describe('История: отправка замены', () => {
     )
 
     expect(saved.filter((record) => record.nonce === 4)).toHaveLength(2)
+  })
+})
+
+describe('История: более ранняя часть', () => {
+  it('первая страница не выдаёт себя за всю историю', async () => {
+    /* Разбор журналов охватывает окно блоков, а не историю целиком.
+       Кнопка продолжения — то, чем это сказано пользователю. */
+    renderApp()
+    await openActivity()
+
+    expect(screen.getByRole('button', { name: /load earlier/i })).toBeInTheDocument()
+  })
+
+  it('дозагрузка приносит операции, которых на первой странице не было', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+
+    const before = visibleCount()
+
+    await user.click(screen.getByRole('button', { name: /load earlier/i }))
+
+    await screen.findByText(shortAddress(OLD_PEER))
+
+    expect(visibleCount()).toBe(before + 1)
+  })
+
+  it('дочитав до начала цепи, кнопка исчезает', async () => {
+    /* Иначе «показать более ранние» осталось бы навсегда и обещало бы
+       историю, которой нет. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+    await user.click(screen.getByRole('button', { name: /load earlier/i }))
+    await screen.findByText(shortAddress(OLD_PEER))
+
+    expect(screen.queryByRole('button', { name: /load earlier/i })).not.toBeInTheDocument()
+  })
+
+  it('повторные записи не удваиваются при дозагрузке', async () => {
+    /* Окна источников смыкаются, но запись на границе может прийти
+       дважды. Удвоенный перевод читается как две отправки вместо
+       одной. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+    await user.click(screen.getByRole('button', { name: /load earlier/i }))
+    await screen.findByText(shortAddress(OLD_PEER))
+
+    const hashes = within(transferList())
+      .getAllByRole('listitem')
+      .map((item) => item.textContent)
+
+    expect(new Set(hashes).size).toBe(hashes.length)
+  })
+})
+
+describe('История: отбор и незагруженная часть', () => {
+  it('пустой отбор при незагруженном остатке не объявляет операций отсутствующими', async () => {
+    /* ЭТО И ЕСТЬ ГЛАВНОЕ. Поиск идёт по загруженным записям. Ответ
+       «ничего не найдено» без оговорки означал бы утверждение обо
+       всей истории — том, чего кошелёк не проверял. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+    await user.type(screen.getByPlaceholderText(/Address, hash, token symbol/i), OLD_PEER)
+
+    expect(await screen.findByText('Nothing matched among the loaded records')).toBeInTheDocument()
+    expect(screen.getByText(/load the earlier part and repeat the search/i)).toBeInTheDocument()
+  })
+
+  it('после дозагрузки тот же поиск находит операцию', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openActivity()
+    await user.type(screen.getByPlaceholderText(/Address, hash, token symbol/i), OLD_PEER)
+    await user.click(screen.getByRole('button', { name: /load earlier/i }))
+
+    expect(await screen.findByText(shortAddress(OLD_PEER))).toBeInTheDocument()
   })
 })

@@ -11,6 +11,7 @@ import {
   TRANSFER_DIRECTION,
   TRANSFER_KIND,
   TRANSFER_SOURCE,
+  type IHistoryCursor,
   type IHistoryPage,
   type ITransferRecord,
   type TransferKind,
@@ -72,16 +73,27 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
   }
 
   async fetch(query: IHistoryQuery, provider: IProvider): Promise<IHistoryPage> {
+    const position = resolvePosition(query.cursor)
+
     /* Индексатор не умеет объединять условия «отправитель ИЛИ получатель»,
        поэтому выборок две. Запрашиваются параллельно: последовательные
        удвоили бы ожидание на экране, который открывают ради быстрого
-       взгляда. */
+       взгляда.
+
+       НА ПРОДОЛЖЕНИИ ИСЧЕРПАННАЯ ВЫБОРКА НЕ ПОВТОРЯЕТСЯ. Полученного
+       и отправленного у адреса разное количество, и без этого условия
+       более короткая сторона выдавала бы свою первую страницу заново
+       при каждом нажатии «показать более ранние». */
     const [sent, received] = await Promise.all([
-      this.#request(provider, query, 'fromAddress'),
-      this.#request(provider, query, 'toAddress'),
+      position.isFirstPage || position.sent !== null
+        ? this.#request(provider, query, 'fromAddress', position.sent)
+        : EMPTY_BATCH,
+      position.isFirstPage || position.received !== null
+        ? this.#request(provider, query, 'toAddress', position.received)
+        : EMPTY_BATCH,
     ])
 
-    const transfers = [...sent, ...received]
+    const transfers = [...sent.transfers, ...received.transfers]
       .flatMap((raw) => this.#toRecords(raw, query))
       .sort((left, right) => Number(right.blockNumber - left.blockNumber))
 
@@ -93,6 +105,7 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
         sourceUnavailable: false,
         reason: null,
       },
+      cursor: encodeCursor(sent.pageKey, received.pageKey),
     }
   }
 
@@ -100,7 +113,8 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
     provider: IProvider,
     query: IHistoryQuery,
     direction: 'fromAddress' | 'toAddress',
-  ): Promise<readonly IRawTransfer[]> {
+    pageKey: string | null,
+  ): Promise<IRawBatch> {
     const response = await provider.request<unknown>({
       method: METHOD,
       params: [
@@ -113,11 +127,12 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
           excludeZeroValue: false,
           order: 'desc',
           maxCount: `0x${query.limit.toString(16)}`,
+          ...(pageKey === null ? {} : { pageKey }),
         },
       ],
     })
 
-    return extractTransfers(response)
+    return { transfers: extractTransfers(response), pageKey: extractPageKey(response) }
   }
 
   /**
@@ -177,6 +192,74 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
       },
     ]
   }
+}
+
+/** Ответ индексатора на одну выборку. */
+interface IRawBatch {
+  readonly transfers: readonly IRawTransfer[]
+
+  /** Ключ следующей страницы. `null` — выборка исчерпана. */
+  readonly pageKey: string | null
+}
+
+const EMPTY_BATCH: IRawBatch = { transfers: [], pageKey: null }
+
+/** Положение обеих выборок между страницами. */
+interface IPosition {
+  readonly isFirstPage: boolean
+  readonly sent: string | null
+  readonly received: string | null
+}
+
+/**
+ * Разбирает метку продолжения.
+ *
+ * Чужая либо испорченная метка означает первую страницу: показать
+ * начало истории заново лучше, чем отказать в ней целиком.
+ */
+function resolvePosition(cursor: IHistoryQuery['cursor']): IPosition {
+  if (cursor === null || cursor === undefined || cursor.providerId !== PROVIDER_ID) {
+    return { isFirstPage: true, sent: null, received: null }
+  }
+
+  try {
+    const parsed = asRecord(JSON.parse(cursor.value)) ?? {}
+
+    return {
+      isFirstPage: false,
+      sent: readString(parsed, 'sent'),
+      received: readString(parsed, 'received'),
+    }
+  } catch {
+    return { isFirstPage: true, sent: null, received: null }
+  }
+}
+
+function encodeCursor(sent: string | null, received: string | null): IHistoryCursor | null {
+  if (sent === null && received === null) {
+    return null
+  }
+
+  return {
+    providerId: PROVIDER_ID,
+    value: JSON.stringify({
+      ...(sent === null ? {} : { sent }),
+      ...(received === null ? {} : { received }),
+    }),
+  }
+}
+
+/**
+ * Ключ следующей страницы из ответа.
+ *
+ * Отсутствие поля — признак конца выдачи, установленный индексатором,
+ * а не догадка по числу записей: последняя страница вполне может быть
+ * полной.
+ */
+function extractPageKey(response: unknown): string | null {
+  const record = asRecord(response)
+
+  return record === null ? null : readString(record, 'pageKey')
 }
 
 /** Запись ответа индексатора после проверки. */

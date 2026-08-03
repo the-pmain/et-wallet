@@ -7,6 +7,7 @@ import type {
   IBackupManager,
   IBalance,
   IDappRequest,
+  IHistoryCursor,
   IHistoryLimits,
   INetworkConfig,
   IFeeEstimate,
@@ -186,6 +187,19 @@ export interface IWalletSnapshot {
 
   /** Идёт загрузка истории. */
   readonly isHistoryLoading: boolean
+
+  /**
+   * Чем продолжить историю. `null` — продолжать нечем.
+   *
+   * ОТЛИЧАЕТ «ЭТО ВСЯ ИСТОРИЯ» ОТ «ЭТО ПЕРВЫЙ УЧАСТОК». Отбор
+   * и поиск работают по загруженным записям, и пустой результат при
+   * непустой метке означает лишь «среди загруженного не нашлось»,
+   * а не «таких операций не было».
+   */
+  readonly historyCursor: IHistoryCursor | null
+
+  /** Идёт дозагрузка более раннего участка. */
+  readonly isHistoryLoadingMore: boolean
 
   /**
    * Отслеживаемые токены активной сети с балансами.
@@ -374,8 +388,17 @@ export interface IWalletSession {
    */
   setBackgroundRefreshEnabled(enabled: boolean): void
 
-  /** Перезапрашивает историю переводов активного аккаунта. */
+  /** Перезапрашивает историю переводов активного аккаунта с начала. */
   refreshHistory(): Promise<void>
+
+  /**
+   * Дозапрашивает более ранний участок истории.
+   *
+   * Ничего не делает, когда продолжать нечем либо запрос уже идёт:
+   * повторное нажатие не должно порождать вторую выборку с той же
+   * меткой и удваивать записи.
+   */
+  loadMoreHistory(): Promise<void>
 
   /**
    * Читает метаданные контракта, не добавляя токен.

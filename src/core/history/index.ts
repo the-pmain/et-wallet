@@ -1,6 +1,10 @@
 export { AlchemyHistoryProvider } from './AlchemyHistoryProvider'
 export type { IHistoryProvider, IHistoryQuery } from './contracts'
-export { HistoryService, type IHistoryServiceDependencies } from './HistoryService'
+export {
+  HistoryService,
+  type IHistoryOptions,
+  type IHistoryServiceDependencies,
+} from './HistoryService'
 export { LogScanHistoryProvider, type ILogScanOptions } from './LogScanHistoryProvider'
 export {
   TRANSFER_BATCH_TOPIC,
@@ -15,6 +19,7 @@ export {
   TRANSFER_DIRECTION,
   TRANSFER_KIND,
   TRANSFER_SOURCE,
+  type IHistoryCursor,
   type IHistoryLimits,
   type IHistoryPage,
   type ITransferAsset,

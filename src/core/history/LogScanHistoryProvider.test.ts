@@ -378,3 +378,78 @@ describe('LogScanHistoryProvider: устойчивость', () => {
     expect((await source.fetch({ ...query, limit: 4 }, node)).transfers).toHaveLength(4)
   })
 })
+
+describe('LogScanHistoryProvider: продолжение просмотра', () => {
+  it('первая страница обещает продолжение', async () => {
+    /* Разбор журналов охватывает лишь окно блоков. Метка продолжения —
+       единственное, что отличает «это вся история» от «это её конец
+       сверху», и без неё пустой список читался бы как отсутствие
+       операций за всё время. */
+    expect((await source.fetch(query, node)).cursor).not.toBeNull()
+  })
+
+  it('вторая страница просматривает окно, вплотную предшествующее первому', async () => {
+    /* Пропуск между окнами потерял бы операции беззвучно, перекрытие —
+       показало бы их дважды. Границы обязаны смыкаться. */
+    const first = await source.fetch(query, node)
+
+    node.requestedFilters = []
+
+    await source.fetch({ ...query, cursor: first.cursor }, node)
+
+    const firstWindowStart = LATEST_BLOCK - 9_999n
+
+    expect(node.requestedFilters[0]?.toBlock).toBe(firstWindowStart - 1n)
+    expect(node.requestedFilters[0]?.fromBlock).toBe(firstWindowStart - 10_000n)
+  })
+
+  it('за меткой узел о последнем блоке не спрашивается', async () => {
+    /* Сеть уходит вперёд между страницами. Возьми продолжение свежий
+       последний блок — окно сдвинулось бы, и между страницами возник
+       бы пропуск ровно на выросшую часть цепи. */
+    const first = await source.fetch(query, node)
+    let asked = 0
+
+    node.getBlockNumber = () => {
+      asked += 1
+
+      return Promise.resolve(LATEST_BLOCK + 5_000n)
+    }
+
+    await source.fetch({ ...query, cursor: first.cursor }, node)
+
+    expect(asked).toBe(0)
+  })
+
+  it('глубина просмотра суммируется по страницам', async () => {
+    /* Надпись «просмотрено десять тысяч блоков» после третьего
+       нажатия была бы неверна втрое. */
+    const first = await source.fetch(query, node)
+    const second = await source.fetch({ ...query, cursor: first.cursor }, node)
+
+    expect(second.limits.scannedBlocks).toBe(20_000)
+  })
+
+  it('у начала цепи продолжения нет', async () => {
+    /* Нулевой блок — дно истории. Метка здесь означала бы, что
+       кнопка «показать более ранние» никогда не исчезнет. */
+    node.getBlockNumber = () => Promise.resolve(5_000n)
+
+    const page = await source.fetch(query, node)
+
+    expect(page.cursor).toBeNull()
+    expect(page.limits.scannedBlocks).toBe(5_001)
+  })
+
+  it('чужая метка начинает просмотр заново, а не ломает выдачу', async () => {
+    /* Метку выдал другой источник: истолковать её как номер блока
+       значило бы уйти в неизвестную часть цепи. Показать начало
+       заново — худшее, что при этом допустимо. */
+    const page = await source.fetch(
+      { ...query, cursor: { providerId: 'alchemy', value: '{"sent":"key"}' } },
+      node,
+    )
+
+    expect(page.limits.scannedBlocks).toBe(10_000)
+  })
+})

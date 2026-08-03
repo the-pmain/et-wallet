@@ -1,7 +1,7 @@
 import type { IProvider } from '@/core/provider'
 import type { Address, ChainId } from '@/core/types'
 
-import type { IHistoryPage } from './types'
+import type { IHistoryCursor, IHistoryPage } from './types'
 
 /** Параметры запроса истории. */
 export interface IHistoryQuery {
@@ -16,6 +16,13 @@ export interface IHistoryQuery {
    * исчерпает память вкладки.
    */
   readonly limit: number
+
+  /**
+   * Продолжение предыдущей выдачи.
+   *
+   * Отсутствие означает первую страницу — от самых свежих записей.
+   */
+  readonly cursor?: IHistoryCursor | null | undefined
 }
 
 /**

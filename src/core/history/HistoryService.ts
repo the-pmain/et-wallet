@@ -12,6 +12,7 @@ import {
   TRANSFER_DIRECTION,
   TRANSFER_KIND,
   TRANSFER_SOURCE,
+  type IHistoryCursor,
   type IHistoryPage,
   type ITransferRecord,
   type TransferKind,
@@ -21,6 +22,18 @@ const SERVICE_NAME = 'HistoryService'
 
 /** Сколько записей запрашивается по умолчанию. */
 const DEFAULT_LIMIT = 50
+
+/** Уточнения запроса истории. */
+export interface IHistoryOptions {
+  readonly limit?: number
+
+  /**
+   * Продолжение предыдущей выдачи.
+   *
+   * Отсутствие означает первую страницу — с самых свежих записей.
+   */
+  readonly cursor?: IHistoryCursor | null
+}
 
 /** Зависимости сервиса. */
 export interface IHistoryServiceDependencies {
@@ -79,10 +92,18 @@ export class HistoryService {
   async getHistory(
     owner: Address,
     chainId: ChainId,
-    limit: number = DEFAULT_LIMIT,
+    options: IHistoryOptions = {},
   ): Promise<IHistoryPage> {
-    const local = await this.#loadLocal(owner, chainId)
-    const remote = await this.#loadRemote({ owner, chainId, limit })
+    const limit = options.limit ?? DEFAULT_LIMIT
+    const cursor = options.cursor ?? null
+
+    /* СОБСТВЕННЫЕ ОТПРАВКИ ПОДМЕШИВАЮТСЯ ТОЛЬКО К ПЕРВОЙ СТРАНИЦЕ.
+       Они не принадлежат ни одному участку истории и хранятся целиком
+       у нас; повтори их каждая страница — ожидающая отправка
+       появлялась бы в списке заново после каждого «показать более
+       ранние». */
+    const local = cursor === null ? await this.#loadLocal(owner, chainId) : []
+    const remote = await this.#loadRemote({ owner, chainId, limit, cursor })
 
     if (remote.page === null) {
       return {
@@ -96,12 +117,17 @@ export class HistoryService {
           sourceUnavailable: true,
           reason: remote.reason,
         },
+        /* Метка возвращается неизменной: отказ источника не означает,
+           что продолжения нет, и повторная попытка обязана начинаться
+           с того же места. */
+        cursor,
       }
     }
 
     return {
       transfers: merge(local, remote.page.transfers).slice(0, limit),
       limits: remote.page.limits,
+      cursor: remote.page.cursor,
     }
   }
 
@@ -158,6 +184,17 @@ export class HistoryService {
 
     for (const provider of this.#providers) {
       if (!provider.supports(query.chainId)) {
+        continue
+      }
+
+      /* ПРОДОЛЖЕНИЕ ОБСЛУЖИВАЕТ ТОЛЬКО ВЫДАВШИЙ МЕТКУ ИСТОЧНИК.
+         Перейди мы на следующий, он истолковал бы чужую метку как
+         начало выдачи и вернул бы самые свежие записи под видом более
+         ранних: список продолжился бы тем, что уже показан, и человек
+         решил бы, что дальше истории нет. */
+      const cursor = query.cursor ?? null
+
+      if (cursor !== null && cursor.providerId !== provider.id) {
         continue
       }
 

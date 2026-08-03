@@ -17,6 +17,7 @@ import {
   TRANSFER_DIRECTION,
   TRANSFER_KIND,
   TRANSFER_SOURCE,
+  type IHistoryCursor,
   type IHistoryPage,
   type ITransferRecord,
   type TransferKind,
@@ -43,6 +44,19 @@ const ERC721_TOPIC_COUNT = 4
 /** Настройки источника. */
 export interface ILogScanOptions {
   readonly scanBlocks?: number
+}
+
+/** Где остановился предыдущий просмотр. */
+interface IScanPosition {
+  /** Верхний блок следующего окна, включительно. */
+  readonly ceiling: bigint
+
+  /** Сколько блоков просмотрено за все предыдущие страницы. */
+  readonly scanned: number
+}
+
+function encodeCursor(ceiling: bigint, scanned: number): IHistoryCursor {
+  return { providerId: PROVIDER_ID, value: `${ceiling.toString()}:${scanned.toString()}` }
 }
 
 /**
@@ -78,7 +92,12 @@ export class LogScanHistoryProvider implements IHistoryProvider {
   }
 
   async fetch(query: IHistoryQuery, provider: IProvider): Promise<IHistoryPage> {
-    const latest = await provider.getBlockNumber()
+    const position = this.#resolvePosition(query.cursor)
+    /* Номер последнего блока нужен только на первой странице:
+       на последующих потолок окна задан меткой. Лишний запрос к узлу
+       здесь ничего не уточнил бы — сеть за это время ушла вперёд,
+       и повторное чтение сдвинуло бы окно, оставив пропуск. */
+    const ceiling = position?.ceiling ?? (await provider.getBlockNumber())
     /* ОКНО СОДЕРЖИТ РОВНО `scanBlocks` БЛОКОВ, ВКЛЮЧАЯ ПОСЛЕДНИЙ.
        Вычитание всей глубины давало окно на блок шире объявленного,
        и узлы с пределом ровно в десять тысяч отвечали отказом
@@ -86,7 +105,8 @@ export class LogScanHistoryProvider implements IHistoryProvider {
        отвергал именно наш запрос, хотя предел совпадал с нашей
        глубиной. */
     const span = BigInt(this.#scanBlocks) - 1n
-    const fromBlock = latest > span ? latest - span : 0n
+    const fromBlock = ceiling > span ? ceiling - span : 0n
+    const latest = ceiling
     const ownerTopic = addressToTopic(query.owner)
 
     /* Шесть выборок: отправленное и полученное, отдельно для трёх
@@ -126,16 +146,48 @@ export class LogScanHistoryProvider implements IHistoryProvider {
       .filter((log) => !log.removed)
       .flatMap((log) => this.#toRecords(log, query))
 
+    /* Просмотрено с самого начала просмотра, а не за одну страницу:
+       после третьего нажатия «показать более ранние» надпись
+       «просмотрено десять тысяч блоков» была бы неверна втрое. */
+    const scannedBlocks = Number(latest - fromBlock + 1n) + (position?.scanned ?? 0)
+
     return {
       transfers: dedupeById(transfers).slice(0, query.limit),
       limits: {
         nativeTransfersUnavailable: true,
-        scannedBlocks: this.#scanBlocks,
+        scannedBlocks,
         sourceUnavailable: false,
         /* Часть выборок могла отказать: история неполна, и об этом
            сообщается, а не умалчивается. */
         reason: failure?.error ?? null,
       },
+      /* Нулевой блок — начало цепи: продолжать некуда. */
+      cursor: fromBlock === 0n ? null : encodeCursor(fromBlock - 1n, scannedBlocks),
+    }
+  }
+
+  /**
+   * Разбирает метку продолжения.
+   *
+   * ЧУЖАЯ ЛИБО ИСПОРЧЕННАЯ МЕТКА НАЧИНАЕТ ПРОСМОТР ЗАНОВО, а не
+   * приводит к отказу. Повторно показанные свежие записи будут
+   * отброшены по ключу выше по стеку, тогда как исключение оставило бы
+   * пользователя с сообщением об ошибке вместо истории.
+   */
+  #resolvePosition(cursor: IHistoryQuery['cursor']): IScanPosition | null {
+    if (cursor === null || cursor === undefined || cursor.providerId !== PROVIDER_ID) {
+      return null
+    }
+
+    const [ceiling, scanned] = cursor.value.split(':')
+
+    try {
+      return {
+        ceiling: BigInt(ceiling ?? ''),
+        scanned: Number(scanned ?? '0'),
+      }
+    } catch {
+      return null
     }
   }
 
