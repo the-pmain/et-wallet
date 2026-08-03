@@ -90,7 +90,7 @@ export class AccountManager implements IAccountManager {
 
   readonly #events = new EventBus<AccountEventMap>({
     onListenerError: (error, event) => {
-      this.#logger.error('Сбой обработчика события аккаунтов', {
+      this.#logger.error('Account event listener failed', {
         event: String(event),
         error: error instanceof Error ? error.message : String(error),
       })
@@ -140,7 +140,7 @@ export class AccountManager implements IAccountManager {
 
     this.#initialized = true
 
-    this.#logger.info('Аккаунты загружены', {
+    this.#logger.info('Accounts loaded', {
       total: this.#accounts.size,
       hasActive: this.#activeId !== null,
     })
@@ -179,7 +179,7 @@ export class AccountManager implements IAccountManager {
     if (account.hidden) {
       throw new InvalidArgumentError(
         'accountId',
-        'скрытый аккаунт не может быть активным: пользователь не увидит, откуда уходят средства',
+        'a hidden account cannot be active: the owner would not see where the funds leave from',
       )
     }
 
@@ -217,7 +217,7 @@ export class AccountManager implements IAccountManager {
 
     await this.#persist(account)
 
-    this.#logger.info('Создан аккаунт из HD-дерева', { addressIndex })
+    this.#logger.info('Account derived from the HD tree', { addressIndex })
 
     return account
   }
@@ -253,8 +253,8 @@ export class AccountManager implements IAccountManager {
     await this.#importedKeys.save(account.id, params.privateKey)
     await this.#persist(account)
 
-    this.#logger.warn('Импортирован приватный ключ', {
-      note: 'ключ не восстанавливается из seed-фразы',
+    this.#logger.warn('Private key imported', {
+      note: 'the key cannot be restored from the seed phrase',
     })
 
     return account
@@ -272,12 +272,12 @@ export class AccountManager implements IAccountManager {
     if (hidden && this.#activeId === id) {
       throw new InvalidArgumentError(
         'accountId',
-        'нельзя скрыть активный аккаунт: сначала выберите другой',
+        'the active account cannot be hidden: select another one first',
       )
     }
 
     if (hidden && this.listVisible().length <= 1) {
-      throw new InvalidArgumentError('accountId', 'нельзя скрыть последний видимый аккаунт')
+      throw new InvalidArgumentError('accountId', 'the last visible account cannot be hidden')
     }
 
     await this.#persist({ ...account, hidden })
@@ -291,7 +291,7 @@ export class AccountManager implements IAccountManager {
          кошелька по той же seed-фразе. Кнопка «удалить», которая на деле
          лишь прячет запись, вводит пользователя в заблуждение. */
       throw new AccountNotRemovableError(
-        'аккаунт выведен из seed-фразы и появится снова при восстановлении кошелька; используйте скрытие',
+        'the account is derived from the seed phrase and will reappear when the wallet is restored; hide it instead',
       )
     }
 
@@ -303,7 +303,10 @@ export class AccountManager implements IAccountManager {
       const replacement = this.list().find((candidate) => candidate.id !== id && !candidate.hidden)
 
       if (replacement === undefined) {
-        throw new InvalidArgumentError('accountId', 'нельзя удалить единственный аккаунт кошелька')
+        throw new InvalidArgumentError(
+          'accountId',
+          'the only account of the wallet cannot be removed',
+        )
       }
 
       await this.setActive(replacement.id)
@@ -316,8 +319,8 @@ export class AccountManager implements IAccountManager {
     await this.#repository.delete(id)
     this.#accounts.delete(id)
 
-    this.#logger.warn('Импортированный аккаунт удалён вместе с ключом', {
-      note: 'операция необратима',
+    this.#logger.warn('Imported account removed together with its key', {
+      note: 'the operation cannot be undone',
     })
     this.#emitListChanged()
   }
@@ -326,10 +329,7 @@ export class AccountManager implements IAccountManager {
     this.#assertInitialized()
 
     if (orderedIds.length !== this.#accounts.size) {
-      throw new InvalidArgumentError(
-        'orderedIds',
-        'список обязан содержать все существующие аккаунты',
-      )
+      throw new InvalidArgumentError('orderedIds', 'the list must contain every existing account')
     }
 
     const reordered: IAccount[] = []
@@ -461,7 +461,7 @@ export class AccountManager implements IAccountManager {
       /* Разрешение для импортированного ключа гасится здесь: у него нет
          индекса в HD-дереве, поэтому `HDWalletService` его не проверит. */
       if (!permit.matches(EXPORT_KIND.PrivateKey, importedKeyScope(account.keyringId), null)) {
-        throw new ExportNotPermittedError('разрешение выдано на другую операцию')
+        throw new ExportNotPermittedError('the permit was issued for a different operation')
       }
 
       permit.consume()
@@ -471,7 +471,7 @@ export class AccountManager implements IAccountManager {
 
     if (account.addressIndex === null) {
       throw new ExportNotPermittedError(
-        `аккаунт типа "${account.source}" не хранит извлекаемого приватного ключа`,
+        `an account of type "${account.source}" holds no extractable private key`,
       )
     }
 

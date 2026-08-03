@@ -34,7 +34,7 @@ const SECRET_KEY_MARKERS: readonly string[] = [
 ]
 
 /** Замена, выводимая вместо секретного значения. */
-const REDACTED = '[скрыто]'
+const REDACTED = '[hidden]'
 
 /**
  * Адрес электронной почты.

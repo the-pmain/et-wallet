@@ -54,7 +54,7 @@ export function describeAmount(
     const decimals = network?.nativeCurrency.decimals ?? record.asset.decimals
 
     return decimals === null
-      ? { text: record.value.toString(), unit: 'ед.', isRaw: true }
+      ? { text: record.value.toString(), unit: 'units', isRaw: true }
       : {
           text: formatTokenAmount(record.value, decimals),
           unit: network?.nativeCurrency.symbol ?? record.asset.symbol ?? '',
@@ -65,7 +65,7 @@ export function describeAmount(
   if (record.asset.decimals === null) {
     return {
       text: record.value.toString(),
-      unit: record.asset.symbol ?? 'ед.',
+      unit: record.asset.symbol ?? 'units',
       isRaw: true,
     }
   }
@@ -81,9 +81,9 @@ export function describeAmount(
 export function describeKind(kind: TransferKind): string {
   switch (kind) {
     case TRANSFER_KIND.Native:
-      return 'Перевод'
+      return 'Transfer'
     case TRANSFER_KIND.Erc20:
-      return 'Токен'
+      return 'Token'
     case TRANSFER_KIND.Erc721:
       return 'NFT'
     case TRANSFER_KIND.Erc1155:

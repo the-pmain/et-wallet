@@ -63,21 +63,21 @@ export function encodePayload(payload: IEncryptedPayload): IEncryptedPayloadReco
  */
 export function decodePayload(record: unknown): IEncryptedPayload {
   if (typeof record !== 'object' || record === null) {
-    throw new VaultCorruptedError('контейнер не является объектом')
+    throw new VaultCorruptedError('the container is not an object')
   }
 
   const candidate = record as Partial<IEncryptedPayloadRecord>
 
   if (typeof candidate.version !== 'number') {
-    throw new VaultCorruptedError('отсутствует версия формата')
+    throw new VaultCorruptedError('the format version is missing')
   }
 
   if (candidate.cipher !== CIPHER_ALGORITHM.AesGcm) {
-    throw new VaultCorruptedError(`неизвестный алгоритм шифрования "${String(candidate.cipher)}"`)
+    throw new VaultCorruptedError(`unknown cipher "${String(candidate.cipher)}"`)
   }
 
   if (typeof candidate.iv !== 'string' || typeof candidate.ciphertext !== 'string') {
-    throw new VaultCorruptedError('отсутствует вектор инициализации либо шифротекст')
+    throw new VaultCorruptedError('the initialisation vector or the ciphertext is missing')
   }
 
   return {
@@ -91,19 +91,19 @@ export function decodePayload(record: unknown): IEncryptedPayload {
 
 function decodeKdfParams(kdf: IEncryptedPayloadRecord['kdf'] | undefined): IKdfParams {
   if (typeof kdf !== 'object') {
-    throw new VaultCorruptedError('отсутствуют параметры вывода ключа')
+    throw new VaultCorruptedError('the key derivation parameters are missing')
   }
 
   if (kdf.algorithm !== KDF_ALGORITHM.Pbkdf2 && kdf.algorithm !== KDF_ALGORITHM.Argon2id) {
-    throw new VaultCorruptedError(`неизвестный алгоритм вывода ключа "${String(kdf.algorithm)}"`)
+    throw new VaultCorruptedError(`unknown key derivation algorithm "${String(kdf.algorithm)}"`)
   }
 
   if (!Number.isSafeInteger(kdf.iterations) || kdf.iterations <= 0) {
-    throw new VaultCorruptedError('некорректное число итераций')
+    throw new VaultCorruptedError('the iteration count is invalid')
   }
 
   if (!Number.isSafeInteger(kdf.keyLength) || kdf.keyLength <= 0) {
-    throw new VaultCorruptedError('некорректная длина ключа')
+    throw new VaultCorruptedError('the key length is invalid')
   }
 
   return {
@@ -118,13 +118,15 @@ function decodeKdfParams(kdf: IEncryptedPayloadRecord['kdf'] | undefined): IKdfP
 
 function safeHexToBytes(value: unknown, field: string): Uint8Array {
   if (typeof value !== 'string' || value.length === 0 || value.length % 2 !== 0) {
-    throw new VaultCorruptedError(`поле "${field}" не является шестнадцатеричной строкой`)
+    throw new VaultCorruptedError(`the field "${field}" is not a hexadecimal string`)
   }
 
   try {
     return hexToBytes(value)
   } catch (error) {
-    throw new VaultCorruptedError(`поле "${field}" содержит недопустимые символы`, { cause: error })
+    throw new VaultCorruptedError(`the field "${field}" contains characters that are not allowed`, {
+      cause: error,
+    })
   }
 }
 
@@ -164,6 +166,6 @@ export function buildAdditionalData(
 /** Проверяет, что число байт положительно. Защита от вырожденных вызовов. */
 export function assertPositiveLength(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new InvalidArgumentError(name, 'ожидается положительное целое число')
+    throw new InvalidArgumentError(name, 'a positive integer is expected')
   }
 }

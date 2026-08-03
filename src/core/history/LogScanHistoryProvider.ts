@@ -23,7 +23,7 @@ import {
 } from './types'
 
 const PROVIDER_ID = 'logs'
-const PROVIDER_NAME = 'Журналы узла'
+const PROVIDER_NAME = 'Node logs'
 
 /**
  * Глубина выборки в блоках.
@@ -109,7 +109,7 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     const failure = batches.find((batch) => batch.error !== null)
 
     if (batches.every((batch) => batch.error !== null) && failure !== undefined) {
-      throw new Error(failure.error ?? 'узел отказал в выборке журналов')
+      throw new Error(failure.error ?? 'the node refused the log query')
     }
 
     const transfers = batches

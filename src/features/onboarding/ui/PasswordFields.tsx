@@ -12,17 +12,17 @@ import { Input, Label } from '@/shared/ui'
 
 /** Пояснения к нарушенным правилам. Коды приходят из ядра, тексты — отсюда. */
 const ISSUE_TEXT: Readonly<Record<PasswordIssue, string>> = {
-  [PASSWORD_ISSUE.TooShort]: `не короче ${String(MIN_PASSWORD_LENGTH)} символов`,
-  [PASSWORD_ISSUE.TooLong]: 'слишком длинный',
-  [PASSWORD_ISSUE.TooFewClasses]: 'смешайте строчные, заглавные, цифры и знаки',
-  [PASSWORD_ISSUE.Common]: 'слишком распространённый',
-  [PASSWORD_ISSUE.Repetitive]: 'состоит из повторяющегося фрагмента',
+  [PASSWORD_ISSUE.TooShort]: `at least ${String(MIN_PASSWORD_LENGTH)} characters`,
+  [PASSWORD_ISSUE.TooLong]: 'too long',
+  [PASSWORD_ISSUE.TooFewClasses]: 'mix lower case, upper case, digits and punctuation',
+  [PASSWORD_ISSUE.Common]: 'too common',
+  [PASSWORD_ISSUE.Repetitive]: 'made of a repeated fragment',
 }
 
 const STRENGTH_TEXT = {
-  [PASSWORD_STRENGTH.Weak]: 'слабый',
-  [PASSWORD_STRENGTH.Fair]: 'приемлемый',
-  [PASSWORD_STRENGTH.Strong]: 'хороший',
+  [PASSWORD_STRENGTH.Weak]: 'weak',
+  [PASSWORD_STRENGTH.Fair]: 'acceptable',
+  [PASSWORD_STRENGTH.Strong]: 'strong',
 } as const
 
 const STRENGTH_COLOR = {
@@ -65,7 +65,7 @@ export function PasswordFields({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <Label htmlFor={passwordId}>Пароль</Label>
+        <Label htmlFor={passwordId}>Password</Label>
         <Input
           id={passwordId}
           type="password"
@@ -82,7 +82,7 @@ export function PasswordFields({
 
         {password.length > 0 && (
           <p className={cn('text-xs', STRENGTH_COLOR[assessment.strength])}>
-            Пароль {STRENGTH_TEXT[assessment.strength]}
+            Password is {STRENGTH_TEXT[assessment.strength]}
             {assessment.issues.length > 0 &&
               `: ${assessment.issues.map((issue) => ISSUE_TEXT[issue]).join('; ')}`}
           </p>
@@ -90,7 +90,7 @@ export function PasswordFields({
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={confirmationId}>Повторите пароль</Label>
+        <Label htmlFor={confirmationId}>Repeat the password</Label>
         <Input
           id={confirmationId}
           type="password"
@@ -105,7 +105,7 @@ export function PasswordFields({
           }}
         />
 
-        {isMismatched && <p className="text-xs text-risk-high">Пароли не совпадают</p>}
+        {isMismatched && <p className="text-xs text-risk-high">The passwords do not match</p>}
       </div>
     </div>
   )

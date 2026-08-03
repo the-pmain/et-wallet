@@ -1,0 +1,167 @@
+src/core/account/AccountManager.ts	Сбой обработчика события аккаунтов
+src/core/account/AccountManager.ts	Аккаунты загружены
+src/core/account/AccountManager.ts	скрытый аккаунт не может быть активным: пользователь не увидит, откуда уходят средства
+src/core/account/AccountManager.ts	Создан аккаунт из HD-дерева
+src/core/account/AccountManager.ts	Импортирован приватный ключ
+src/core/account/AccountManager.ts	ключ не восстанавливается из seed-фразы
+src/core/account/AccountManager.ts	нельзя скрыть активный аккаунт: сначала выберите другой
+src/core/account/AccountManager.ts	нельзя скрыть последний видимый аккаунт
+src/core/account/AccountManager.ts	аккаунт выведен из seed-фразы и появится снова при восстановлении кошелька; используйте скрытие
+src/core/account/AccountManager.ts	нельзя удалить единственный аккаунт кошелька
+src/core/account/AccountManager.ts	Импортированный аккаунт удалён вместе с ключом
+src/core/account/AccountManager.ts	операция необратима
+src/core/account/AccountManager.ts	список обязан содержать все существующие аккаунты
+src/core/account/AccountManager.ts	разрешение выдано на другую операцию
+src/core/account/AccountRepository.ts	запись аккаунта не содержит адреса либо имени
+src/core/account/ImportedKeyStore.ts	приватный ключ аккаунта повреждён
+src/core/account/identity.ts	имя аккаунта не может быть пустым
+src/core/account/identity.ts	имя длиннее ${String(MAX_ACCOUNT_NAME_LENGTH)} символов вытеснит адрес из подтверждения транзакции
+src/core/account/identity.ts	Аккаунт ${String(order + 1)}
+src/core/address/Address.ts	ожидалось ${String(ADDRESS_BYTE_LENGTH)} байт, получено ${String(bytes.length)}
+src/core/address/Address.ts	несжатый ключ должен начинаться с байта 0x04
+src/core/address/Address.ts	точка не лежит на кривой secp256k1
+src/core/address/Address.ts	допустимы длины ${String(COMPRESSED_PUBLIC_KEY_LENGTH)}, 
+src/core/address/Address.ts	${String(RAW_PUBLIC_KEY_LENGTH)} и ${String(UNCOMPRESSED_PUBLIC_KEY_LENGTH)} байт, 
+src/core/address/Address.ts	получено ${String(publicKey.length)}
+src/core/approval/ApprovalService.ts	Список разрешений недоступен
+src/core/approval/ApprovalService.ts	Выборка журналов отклонена узлом
+src/core/approval/ApprovalService.ts	Разрешение проверить не удалось
+src/core/backup/BackupManager.ts	Выдана мнемоническая фраза
+src/core/backup/BackupManager.ts	кошелёк воспроизводим целиком любым, кто её получил
+src/core/backup/BackupManager.ts	Выдан приватный ключ аккаунта
+src/core/backup/BackupManager.ts	адрес переходит под контроль получателя ключа безвозвратно
+src/core/balance/BalanceService.ts	Сбой обработчика события балансов
+src/core/balance/BalanceService.ts	Баланс токена недоступен
+src/core/balance/BalanceService.ts	Не удалось обновить баланс
+src/core/dapp/request-risk.ts	запрошена сеть ${request.chainId.toString()}, в кошельке выбрана ${activeChainId.toString()}
+src/core/dapp/request-risk.ts	сумма не ограничена
+src/core/dapp/request-risk.ts	сумма не ограничена
+src/core/dapp/request-risk.ts	сумма не ограничена
+src/core/dapp/request-risk.ts	разрешение на всю коллекцию
+src/core/encryption/EncryptionService.ts	crypto.subtle недоступен — требуется защищённый контекст (https либо localhost)
+src/core/encryption/SecureStorage.ts	доступ к зашифрованному хранилищу
+src/core/encryption/SecureStorage.ts	доступ к параметрам шифрования
+src/core/encryption/payload-codec.ts	контейнер не является объектом
+src/core/encryption/payload-codec.ts	отсутствует версия формата
+src/core/encryption/payload-codec.ts	отсутствует вектор инициализации либо шифротекст
+src/core/encryption/payload-codec.ts	отсутствуют параметры вывода ключа
+src/core/encryption/payload-codec.ts	некорректное число итераций
+src/core/encryption/payload-codec.ts	некорректная длина ключа
+src/core/encryption/payload-codec.ts	ожидается положительное целое число
+src/core/encryption/random.ts	запрошен недопустимый размер: ${String(length)} байт (допустимо 1..${String(MAX_BYTES_PER_CALL)})
+src/core/encryption/random.ts	Web Crypto API недоступен в этой среде
+src/core/encryption/random.ts	генератор случайных чисел вернул нулевой буфер — источник энтропии неисправен
+src/core/ens/EnsService.ts	Обратная запись ENS не прошла нормализацию
+src/core/ens/EnsService.ts	имя не показано, вместо него остаётся адрес
+src/core/ens/EnsService.ts	Обратная запись ENS не подтвердилась прямым разрешением
+src/core/ens/EnsService.ts	имя не показано: владелец адреса вправе объявить любое имя
+src/core/hdwallet/HDWalletService.ts	длина seed должна быть от ${String(MIN_SEED_LENGTH)} до ${String(MAX_SEED_LENGTH)} байт
+src/core/hdwallet/HDWalletService.ts	строка не разбирается как ключ BIP-32
+src/core/hdwallet/HDWalletService.ts	count должен быть целым числом от 1 до ${String(MAX_ACCOUNTS_PER_CALL)}
+src/core/hdwallet/HDWalletService.ts	кошелёк создан из расширенного публичного ключа: приватного ключа нет
+src/core/hdwallet/HDWalletService.ts	кошелёк создан из расширенного публичного ключа и работает в режиме наблюдения
+src/core/hdwallet/HDWalletService.ts	разрешение уже использовано
+src/core/hdwallet/HDWalletService.ts	разрешение выдано на другую операцию
+src/core/hdwallet/HDWalletService.ts	узел дерева не содержит публичного ключа
+src/core/hdwallet/HDWalletService.ts	 лежит вне ветви аккаунта 
+src/core/hdwallet/path.ts	${name} должен быть целым числом от 0 до ${String(HARDENED_OFFSET - 1)}
+src/core/hdwallet/path.ts	путь BIP-44 состоит из пяти уровней, получено ${String(segments.length)}
+src/core/hdwallet/path.ts	первые три уровня BIP-44 обязаны быть закалёнными
+src/core/hdwallet/path.ts	уровни change и addressIndex не могут быть закалёнными
+src/core/history/AlchemyHistoryProvider.ts	Индексатор Alchemy
+src/core/history/HistoryService.ts	Источник истории недоступен
+src/core/history/LogScanHistoryProvider.ts	Журналы узла
+src/core/history/LogScanHistoryProvider.ts	узел отказал в выборке журналов
+src/core/history/transfer-events.ts	Тема журнала имеет неверную длину: ${String(topic.length)}
+src/core/mnemonic/MnemonicService.ts	допустимы только значения 128 и 256
+src/core/network/NetworkService.ts	Сбой обработчика события сети
+src/core/network/NetworkService.ts	Сохранённая копия встроенной сети проигнорирована
+src/core/network/NetworkService.ts	Сети загружены
+src/core/network/NetworkService.ts	Активная сеть изменена
+src/core/network/NetworkService.ts	Добавлена пользовательская сеть
+src/core/network/NetworkService.ts	Пользовательская сеть удалена
+src/core/network/NetworkService.ts	Узел сообщил чужой chainId
+src/core/network/rpc-url.ts	требуется хотя бы один RPC-адрес
+src/core/nft/NftService.ts	Список предметов недоступен
+src/core/nft/NftService.ts	Выборка журналов отклонена узлом
+src/core/nft/NftService.ts	Принадлежность предмета не подтверждена
+src/core/nft/abi.ts	Значение не может быть отрицательным.
+src/core/nft/abi.ts	Значение не помещается в uint256.
+src/core/nft/abi.ts	контракт вернул ответ короче слова
+src/core/nft/abi.ts	ответ не является адресом
+src/core/platform/ConsoleLogger.ts	[скрыто]
+src/core/price/CoinGeckoPriceProvider.ts	Курсы получить не удалось: ${firstError.message}
+src/core/price/CoinGeckoPriceProvider.ts	Источник курсов ответил ${String(response.status)}.
+src/core/price/CoinGeckoPriceProvider.ts	Источник курсов вернул неожиданный ответ.
+src/core/price/CoinGeckoPriceProvider.ts	Источник курсов отказал в запросе.
+src/core/price/NullPriceProvider.ts	Источник курсов не подключён
+src/core/price/PriceService.ts	Курсы получить не удалось
+src/core/provider/CustomRpcProvider.ts	Собственный узел
+src/core/provider/CustomRpcProvider.ts	этот адрес уже добавлен для данной сети
+src/core/provider/CustomRpcProvider.ts	для одной сети допускается не более ${String(MAX_ENDPOINTS_PER_NETWORK)} адресов
+src/core/provider/FailoverProvider.ts	Узел исключён из перебора
+src/core/provider/ProviderPool.ts	Пул соединений уже закрыт
+src/core/provider/ProviderPool.ts	Соединение закрыто с ошибкой
+src/core/provider/PublicRpcProvider.ts	Публичный узел
+src/core/provider/RpcClient.ts	соединение закрыто вызывающим кодом
+src/core/provider/RpcClientFactory.ts	Узел обслуживает другую сеть и исключён из перебора
+src/core/provider/RpcClientFactory.ts	Узел недоступен, переход к резервному
+src/core/provider/RpcManager.ts	Добавлен пользовательский RPC-адрес
+src/core/provider/RpcManager.ts	источник пользовательских адресов не подключён к менеджеру
+src/core/provider/RpcManager.ts	Соединение закрыто с ошибкой
+src/core/provider/error-mapping.ts	вызов завершился откатом
+src/core/security/ExportGuard.ts	, фактический — 
+src/core/security/UnlockThrottle.ts	Ввод пароля временно закрыт
+src/core/security/UnlockThrottle.ts	Состояние ограничителя повреждено и сброшено
+src/core/signing/SigningService.ts	транзакция без идентификатора сети действительна во всех сетях одновременно
+src/core/signing/SigningService.ts	ожидается неотрицательное целое число
+src/core/signing/SigningService.ts	лимит газа должен быть положительным
+src/core/signing/SigningService.ts	сумма не может быть отрицательной
+src/core/signing/SigningService.ts	для транзакции EIP-1559 требуются maxFeePerGas и maxPriorityFeePerGas
+src/core/signing/SigningService.ts	приоритетная надбавка не может превышать maxFeePerGas
+src/core/signing/SigningService.ts	ключ соответствует адресу ${derived}, а транзакция отправляется с ${from}
+src/core/signing/typed-data.ts	основной тип не указан
+src/core/signing/typed-data.ts	структура без указания сети действительна во всех сетях одновременно
+src/core/signing/typed-data.ts	структура предназначена для сети ${actual.toString()}, 
+src/core/signing/typed-data.ts	активна сеть ${expectedChainId.toString()}
+src/core/storage/IndexedDbStorageService.ts	удаление базы не выполнено
+src/core/storage/IndexedDbStorageService.ts	база открыта в другой вкладке; закройте её и повторите сброс
+src/core/storage/IndexedDbStorageService.ts	IndexedDB недоступен в этой среде
+src/core/storage/IndexedDbStorageService.ts	миграция схемы не выполнена
+src/core/storage/IndexedDbStorageService.ts	не удалось открыть базу
+src/core/storage/IndexedDbStorageService.ts	обновление схемы заблокировано другой вкладкой; закройте её и обновите страницу
+src/core/storage/IndexedDbStorageService.ts	нестроковый ключ записи: ${typeof key}
+src/core/storage/IndexedDbStorageService.ts	Запрос к хранилищу отклонён без причины.
+src/core/storage/IndexedDbStorageService.ts	Транзакция хранилища отклонена.
+src/core/storage/IndexedDbStorageService.ts	Транзакция хранилища прервана.
+src/core/storage/StorageKeys.ts	ключ не может быть пустым
+src/core/token/TokenService.ts	Сбой обработчика события токенов
+src/core/token/TokenService.ts	значение не является адресом
+src/core/token/TokenService.ts	контракт сообщает ${String(metadata.decimals)} знаков, 
+src/core/token/TokenService.ts	а указано ${String(params.decimals)}
+src/core/token/TokenService.ts	Добавлен токен
+src/core/token/TokenService.ts	контракт не сообщает число десятичных знаков
+src/core/token/TokenService.ts	недопустимое число десятичных знаков: ${raw.toString()}
+src/core/token/erc20.ts	Сумма перевода не может быть отрицательной.
+src/core/token/erc20.ts	Сумма перевода не помещается в uint256.
+src/core/token/erc20.ts	контракт вернул пустой ответ
+src/core/token/erc20.ts	контракт вернул пустой ответ
+src/core/token/erc20.ts	ответ короче объявленного смещения
+src/core/transaction/TransactionService.ts	Сбой обработчика транзакционного события
+src/core/transaction/TransactionService.ts	у вас ${balance.toString()} экз., а отправляется ${amount.toString()}
+src/core/transaction/TransactionService.ts	он принадлежит другому адресу
+src/core/transaction/TransactionService.ts	Принадлежность предмета проверить не удалось
+src/core/transaction/TransactionService.ts	Баланс токена прочитать не удалось
+src/core/transaction/TransactionService.ts	Транзакция опубликована
+src/core/transaction/TransactionService.ts	параметры исходной транзакции не сохранены; отмена по-прежнему возможна
+src/core/transaction/TransactionService.ts	она уже включена в блок
+src/core/transaction/TransactionService.ts	она уже включена в блок, хотя и завершилась откатом
+src/core/transaction/TransactionService.ts	её место уже занято другой транзакцией
+src/core/transaction/TransactionService.ts	Состояние транзакции получить не удалось
+src/core/transaction/TransactionService.ts	Транзакция подтверждена окончательно
+src/core/transaction/TransactionService.ts	Транзакция вернулась в ожидание: блок вытеснен
+src/core/types/amount.ts	значение типа number должно быть целым и в пределах безопасного диапазона
+src/core/types/amount.ts	сумма не может быть отрицательной
+src/core/types/amount.ts	сумма превышает максимум, представимый в EVM
+src/core/types/chain-id.ts	идентификатор сети должен быть положительным
+src/core/types/chain-id.ts	идентификатор превышает максимум ${MAX_CHAIN_ID.toString()}

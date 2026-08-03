@@ -27,7 +27,7 @@ const MAX_BYTES_PER_CALL = 65536
 export function getRandomBytes(length: number): Uint8Array {
   if (!Number.isInteger(length) || length <= 0 || length > MAX_BYTES_PER_CALL) {
     throw new RandomnessUnavailableError(
-      `запрошен недопустимый размер: ${String(length)} байт (допустимо 1..${String(MAX_BYTES_PER_CALL)})`,
+      `requested size is not allowed: ${String(length)} bytes (allowed 1..${String(MAX_BYTES_PER_CALL)})`,
     )
   }
 
@@ -37,7 +37,7 @@ export function getRandomBytes(length: number): Uint8Array {
      Приложение обязано остановиться: кошелёк без криптостойкой случайности
      не может безопасно создать ни один ключ. */
   if (typeof source?.getRandomValues !== 'function') {
-    throw new RandomnessUnavailableError('Web Crypto API недоступен в этой среде')
+    throw new RandomnessUnavailableError('the Web Crypto API is unavailable in this environment')
   }
 
   const bytes = new Uint8Array(length)
@@ -88,7 +88,7 @@ function assertNotAllZeros(bytes: Uint8Array): void {
 
   if (bytes.every((byte) => byte === 0)) {
     throw new RandomnessUnavailableError(
-      'генератор случайных чисел вернул нулевой буфер — источник энтропии неисправен',
+      'the random generator returned an all-zero buffer — the entropy source is broken',
     )
   }
 }

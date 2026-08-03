@@ -97,7 +97,7 @@ describe('ConsoleLogger: редакция секретов', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.warn('Проверка', { name: 'owner@example.com' })
+    logger.warn('Checking', { name: 'owner@example.com' })
 
     restore()
 

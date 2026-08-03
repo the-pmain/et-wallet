@@ -42,7 +42,7 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
                 делающие подделку визуально неотличимой от оригинала. */}
             <span className="flex items-center gap-1.5 truncate text-sm font-medium">
               <UntrustedText value={entry.token.symbol} />
-              {entry.token.isCustom ? <Badge variant="outline">непроверенный</Badge> : null}
+              {entry.token.isCustom ? <Badge variant="outline">unverified</Badge> : null}
             </span>
             <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
               <UntrustedText value={entry.token.name} />
@@ -67,7 +67,7 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Убрать токен ${entry.token.symbol}`}
+                aria-label={`Remove token ${entry.token.symbol}`}
                 onClick={() => {
                   onRemove(entry.token.address as Address)
                 }}

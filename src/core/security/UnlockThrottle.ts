@@ -151,7 +151,7 @@ export class UnlockThrottle {
     if (delayMs > 0) {
       /* Пароль в журнал не попадает — только факт и срок: запись нужна,
          чтобы владелец мог заметить чужие попытки входа. */
-      this.#logger.warn('Ввод пароля временно закрыт', {
+      this.#logger.warn('Password entry is temporarily closed', {
         failedAttempts,
         delaySeconds: Math.round(delayMs / 1000),
       })
@@ -190,7 +190,7 @@ export class UnlockThrottle {
       /* Испорченная запись трактуется как отсутствие ограничения, а не
          как вечная блокировка: иначе повреждение настроек запирало бы
          владельца в собственном кошельке навсегда. */
-      this.#logger.warn('Состояние ограничителя повреждено и сброшено')
+      this.#logger.warn('The throttle state was corrupted and has been reset')
 
       return null
     }

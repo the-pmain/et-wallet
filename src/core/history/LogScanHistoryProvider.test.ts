@@ -60,7 +60,7 @@ class StubProvider implements IProvider {
     this.requestedFilters.push(filter)
 
     if (this.failGetLogs) {
-      return Promise.reject(new Error('диапазон слишком широк'))
+      return Promise.reject(new Error('the range is too wide'))
     }
 
     /* Дублёр повторяет поведение узла: возвращает только те записи,
@@ -327,7 +327,7 @@ describe('LogScanHistoryProvider: устойчивость', () => {
     /* Публичные узлы отвергают выборку журналов без указания контракта —
        именно такую, какая нужна для поиска всех токенов сразу. Проглотив
        отказ, кошелёк утверждал бы, что операций не было. */
-    await expect(source.fetch(query, node)).rejects.toThrow(/диапазон слишком широк/)
+    await expect(source.fetch(query, node)).rejects.toThrow(/the range is too wide/)
   })
 
   it('доводит причину отказа дословно', async () => {
@@ -335,7 +335,7 @@ describe('LogScanHistoryProvider: устойчивость', () => {
 
     /* Обобщённое «история недоступна» не подсказывает решения,
        а сообщение узла указывает на него прямо. */
-    await expect(source.fetch(query, node)).rejects.toThrow(/диапазон/)
+    await expect(source.fetch(query, node)).rejects.toThrow(/range/)
   })
 
   it('не повторяет перевод, попавший в обе выборки', async () => {

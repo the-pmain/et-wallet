@@ -83,7 +83,7 @@ export const TransferRow = memo(function TransferRow({
 
         <span className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
           {record.timestamp === null
-            ? `Блок ${record.blockNumber.toString()}`
+            ? `Block ${record.blockNumber.toString()}`
             : formatTimestamp(record.timestamp)}
 
           <StatusBadge record={record} />
@@ -92,7 +92,7 @@ export const TransferRow = memo(function TransferRow({
             /* Число знаков контракта неизвестно, поэтому показаны
                необработанные единицы. Без пометки пользователь прочитал
                бы их как обычную сумму и ошибся на порядки. */
-            <Badge variant="outline">единицы контракта</Badge>
+            <Badge variant="outline">contract units</Badge>
           ) : null}
         </span>
       </span>
@@ -109,13 +109,13 @@ export const TransferRow = memo(function TransferRow({
         {canReplace ? (
           <span className="flex items-center gap-2">
             <RowAction
-              label="Ускорить"
-              hint="Повторить ту же операцию с большей комиссией"
+              label="Speed up"
+              hint="Repeat the same operation with a higher fee"
               onClick={() => onReplace(record.hash, REPLACEMENT_KIND.SpeedUp)}
             />
             <RowAction
-              label="Отменить"
-              hint="Занять номер транзакции переводом самому себе"
+              label="Cancel"
+              hint="Take the transaction nonce with a transfer to yourself"
               onClick={() => onReplace(record.hash, REPLACEMENT_KIND.Cancel)}
             />
           </span>
@@ -126,7 +126,7 @@ export const TransferRow = memo(function TransferRow({
             rel="noreferrer noopener"
             className="flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            Обозреватель
+            Explorer
             <ExternalLink className="size-3" aria-hidden />
           </a>
         )}
@@ -186,21 +186,23 @@ function StatusBadge({ record }: { readonly record: ITransferRecord }) {
   if (record.status === TRANSACTION_STATUS.Pending) {
     return (
       <Badge variant="warning">
-        {record.source === TRANSFER_SOURCE.Local ? 'Отправлено, ждёт блока' : 'Ждёт блока'}
+        {record.source === TRANSFER_SOURCE.Local
+          ? 'Sent, waiting for a block'
+          : 'Waiting for a block'}
       </Badge>
     )
   }
 
   if (record.status === TRANSACTION_STATUS.Reverted) {
-    return <Badge variant="danger">Откачено, газ списан</Badge>
+    return <Badge variant="danger">Reverted, gas spent</Badge>
   }
 
   if (record.status === TRANSACTION_STATUS.Replaced) {
-    return <Badge variant="outline">Замещено другой транзакцией</Badge>
+    return <Badge variant="outline">Replaced by another transaction</Badge>
   }
 
   if (record.status === TRANSACTION_STATUS.Dropped) {
-    return <Badge variant="outline">Вытеснено из очереди</Badge>
+    return <Badge variant="outline">Dropped from the queue</Badge>
   }
 
   return null

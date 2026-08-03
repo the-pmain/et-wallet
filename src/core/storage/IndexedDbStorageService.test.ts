@@ -341,7 +341,7 @@ describe('IndexedDbStorageService: открытие', () => {
   it('работает без явного init', async () => {
     /* Требование «вызвать init раньше всех» нарушается при добавлении
        нового потребителя, и нарушение выглядит как пустое хранилище —
-       то есть как потерянный кошелёк. */
+       то есть как funds will be lostный кошелёк. */
     await expect(storage.set(STORAGE_NAMESPACE.Settings, KEY, 'без init')).resolves.toBeUndefined()
     await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('без init')
   })

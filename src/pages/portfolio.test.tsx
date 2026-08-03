@@ -45,17 +45,17 @@ function renderApp() {
 async function openPortfolio(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
-  await user.click(screen.getByRole('link', { name: /портфель/i }))
-  await screen.findByRole('heading', { name: 'Портфель', level: 1 })
+  await screen.findByText('Account 1')
+  await user.click(screen.getByRole('link', { name: /portfolio/i }))
+  await screen.findByRole('heading', { name: 'Portfolio', level: 1 })
 }
 
 /** Даёт согласие на обращение к источнику курсов. */
 async function enablePrices(): Promise<void> {
   const user = userEvent.setup()
 
-  await user.click(screen.getByRole('button', { name: /показывать стоимость/i }))
-  await screen.findByText('Распределение')
+  await user.click(screen.getByRole('button', { name: /Show the value/i }))
+  await screen.findByText('Allocation')
 }
 
 /** Котировки только по нативной валюте. */
@@ -77,7 +77,7 @@ describe('Портфель: согласие на источник курсов'
     renderApp()
     await openPortfolio()
 
-    expect(screen.getByText('Стоимость портфеля выключена')).toBeInTheDocument()
+    expect(screen.getByText('Portfolio value is turned off')).toBeInTheDocument()
   })
 
   it('без согласия источник курсов не опрашивается ни разу', async () => {
@@ -95,15 +95,15 @@ describe('Портфель: согласие на источник курсов'
     renderApp()
     await openPortfolio()
 
-    expect(screen.getByText(/состав портфеля/i)).toBeInTheDocument()
-    expect(screen.getByText(/IP-адрес/i)).toBeInTheDocument()
+    expect(screen.getByText(/the composition of the portfolio/i)).toBeInTheDocument()
+    expect(screen.getByText(/IP address/i)).toBeInTheDocument()
   })
 
   it('называет, что адрес кошелька не передаётся', async () => {
     renderApp()
     await openPortfolio()
 
-    expect(screen.getByText(/адрес вашего кошелька — он не передаётся/i)).toBeInTheDocument()
+    expect(screen.getByText(/your wallet address — it is never sent/i)).toBeInTheDocument()
   })
 
   it('после согласия появляется стоимость', async () => {
@@ -145,7 +145,7 @@ describe('Портфель: стоимость и изменение', () => {
   it('оговаривает, что изменение посчитано по курсам, а не по составу', () => {
     /* Покупка актива увеличивает стоимость портфеля, но это не рост
        курса, и приписывать его пользователю как доход нельзя. */
-    expect(screen.getByText(/при неизменном составе/i)).toBeInTheDocument()
+    expect(screen.getByText(/with an unchanged composition/i)).toBeInTheDocument()
   })
 
   it('показывает вчерашнюю оценку', () => {
@@ -173,7 +173,7 @@ describe('Портфель: распределение', () => {
     await openPortfolio()
     await enablePrices()
 
-    const allocation = screen.getByText('Распределение').closest('[data-slot=card]') as HTMLElement
+    const allocation = screen.getByText('Allocation').closest('[data-slot=card]') as HTMLElement
 
     expect(within(allocation).getByText('100.0 %')).toBeInTheDocument()
   })
@@ -202,12 +202,12 @@ describe('Портфель: неизвестное не подменяется �
 
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: /показывать стоимость/i }))
+    await user.click(screen.getByRole('button', { name: /Show the value/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/без известного курса/i)).toBeInTheDocument()
+      expect(screen.getByText(/without a known price/i)).toBeInTheDocument()
     })
-    expect(screen.getByText(/не означает, что они ничего не стоят/i)).toBeInTheDocument()
+    expect(screen.getByText(/does not mean they are worthless/i)).toBeInTheDocument()
   })
 
   it('не обвиняет источник, когда портфель просто ничего не стоил', async () => {
@@ -222,12 +222,12 @@ describe('Портфель: неизвестное не подменяется �
 
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: /показывать стоимость/i }))
+    await user.click(screen.getByRole('button', { name: /Show the value/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/ничего не стоил/i)).toBeInTheDocument()
+      expect(screen.getByText(/was worth nothing/i)).toBeInTheDocument()
     })
-    expect(screen.queryByText(/источник не сообщил/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/the source reported none/i)).not.toBeInTheDocument()
   })
 
   it('без единого курса показывает прочерк, а не нулевую стоимость', async () => {
@@ -240,10 +240,10 @@ describe('Портфель: неизвестное не подменяется �
 
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: /показывать стоимость/i }))
+    await user.click(screen.getByRole('button', { name: /Show the value/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/стоимость не посчитана/i)).toBeInTheDocument()
+      expect(screen.getByText(/the value was not calculated/i)).toBeInTheDocument()
     })
     expect(screen.queryByText(/^0,00\s?\$$/u)).not.toBeInTheDocument()
   })
@@ -258,14 +258,12 @@ describe('Портфель: отказ источника', () => {
 
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: /показывать стоимость/i }))
+    await user.click(screen.getByRole('button', { name: /Show the value/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Курсы получить не удалось')).toBeInTheDocument()
+      expect(screen.getByText('Prices could not be fetched')).toBeInTheDocument()
     })
-    expect(
-      screen.getByText(/не означает, что остальные активы ничего не стоят/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/does not mean the rest are\s+worthless/i)).toBeInTheDocument()
   })
 })
 
@@ -275,7 +273,7 @@ describe('Портфель: статистика', () => {
     await openPortfolio()
     await enablePrices()
 
-    expect(screen.getByText(/считаются в минимальных единицах сети/i)).toBeInTheDocument()
+    expect(screen.getByText(/counted\s+in the minimal units of the network/i)).toBeInTheDocument()
   })
 
   it('называет источник курсов', async () => {
@@ -293,9 +291,9 @@ describe('Портфель: вход с главного экрана', () => {
     /* Портфель не попал в нижнюю панель: пять пунктов — предел
        для окна шириной 360 пикселей. */
     renderApp()
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
-    expect(screen.getByRole('link', { name: /портфель/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /portfolio/i })).toHaveAttribute(
       'href',
       '#/wallet/portfolio',
     )

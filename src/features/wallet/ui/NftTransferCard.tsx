@@ -71,7 +71,7 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
       const resolution = await session.resolveRecipient(recipient.trim())
 
       if (resolution.address === null) {
-        setError('Получатель не разобран: введите адрес либо имя ENS, которое существует.')
+        setError('The recipient was not resolved: enter an address or an ENS name that exists.')
 
         return
       }
@@ -124,35 +124,35 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
       <div className="flex flex-col gap-4">
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <h2 className="text-base font-semibold">Подтверждение передачи</h2>
+            <h2 className="text-base font-semibold">Confirm the transfer</h2>
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">Предмет</span>
+              <span className="text-xs text-muted-foreground">Item</span>
               <span className="text-sm">
-                {item.collectionName ?? 'Коллекция без названия'} · #{item.tokenId.toString()}
-                {isMultiple ? ` · ${amount} экз.` : ''}
+                {item.collectionName ?? 'Collection without a name'} · #{item.tokenId.toString()}
+                {isMultiple ? ` · ${amount} pcs` : ''}
               </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">Получатель</span>
+              <span className="text-xs text-muted-foreground">Recipient</span>
               <span className="font-mono text-sm break-all">{confirmedRecipient ?? '—'}</span>
             </div>
 
             <div className="flex flex-col gap-1.5 rounded-xl border p-3">
               <span className="text-xs text-muted-foreground">
-                Транзакция будет отправлена контракту коллекции
+                The transaction will be sent to the collection contract
               </span>
               <span className="font-mono text-sm break-all">{transaction.to ?? '—'}</span>
               <span className="text-xs text-muted-foreground">
-                Так работает передача предмета: контракт переписывает его на адрес получателя. Самой
-                валюты при этом переводится ноль — списывается только комиссия.
+                This is how an item transfer works: the contract reassigns it to the recipient
+                address. Zero currency is transferred — only the fee is charged.
               </span>
             </div>
 
             <dl className="flex flex-col gap-2 border-t pt-3">
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-xs text-muted-foreground">Максимальная комиссия</dt>
+                <dt className="text-xs text-muted-foreground">Maximum fee</dt>
                 <dd className="text-right font-mono text-xs tabular-nums">
                   {formatTokenAmount(maxFee, decimals)} {symbol}
                 </dd>
@@ -162,10 +162,11 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
         </Card>
 
         <Alert variant="danger">
-          <AlertTitle>Передача необратима</AlertTitle>
+          <AlertTitle>The transfer cannot be undone</AlertTitle>
           <AlertDescription>
-            Предмет существует в одном экземпляре. Отправленный не по тому адресу, он не вернётся ни
-            через кошелёк, ни через поддержку. Сверьте адрес получателя посимвольно.
+            The item exists in a single copy. Sent to the wrong address, it comes back neither
+            through the wallet nor through support. Check the recipient address character by
+            character.
           </AlertDescription>
         </Alert>
 
@@ -177,7 +178,7 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
 
         {isConfirming ? (
           <ConfirmPassword
-            action="передачу предмета"
+            action="transferring the item"
             onVerify={verifyPassword}
             onConfirmed={() => {
               setConfirming(false)
@@ -203,7 +204,7 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
                 void send()
               }}
             >
-              {isBusy ? 'Отправка…' : 'Передать предмет'}
+              {isBusy ? 'Sending…' : 'Transfer the item'}
             </Button>
 
             <Button
@@ -214,7 +215,7 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
                 setPrepared(null)
               }}
             >
-              Назад
+              Back
             </Button>
           </div>
         )}
@@ -226,19 +227,19 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
     <Card>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold">Передать предмет</h2>
+          <h2 className="text-base font-semibold">Transfer the item</h2>
           <p className="text-xs text-muted-foreground">
-            {item.collectionName ?? 'Коллекция без названия'} · #{item.tokenId.toString()} ·{' '}
+            {item.collectionName ?? 'Collection without a name'} · #{item.tokenId.toString()} ·{' '}
             {shortenAddress(item.contract)}
           </p>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`${fieldId}-to`}>Адрес получателя или имя ENS</Label>
+          <Label htmlFor={`${fieldId}-to`}>Recipient address or ENS name</Label>
           <Input
             id={`${fieldId}-to`}
             value={recipient}
-            placeholder="0x… или имя.eth"
+            placeholder="0x… or name.eth"
             autoComplete="off"
             autoCapitalize="off"
             autoCorrect="off"
@@ -252,7 +253,7 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
 
         {isMultiple ? (
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${fieldId}-amount`}>Сколько экземпляров</Label>
+            <Label htmlFor={`${fieldId}-amount`}>How many copies</Label>
             <Input
               id={`${fieldId}-amount`}
               value={amount}
@@ -264,7 +265,7 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
               }}
             />
             <p className="text-xs text-muted-foreground">
-              У вас {item.balance.toString()} экз. этого предмета.
+              You own {item.balance.toString()} of this item.
             </p>
           </div>
         ) : null}
@@ -281,11 +282,11 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
             disabled={isBusy || recipient.trim() === ''}
             onClick={() => void prepare()}
           >
-            {isBusy ? 'Оценка комиссии…' : 'Далее'}
+            {isBusy ? 'Estimating the fee…' : 'Next'}
           </Button>
 
           <Button variant="ghost" className="sm:flex-1" disabled={isBusy} onClick={onCancel}>
-            Отмена
+            Cancel
           </Button>
         </div>
       </CardContent>

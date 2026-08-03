@@ -13,7 +13,7 @@ export class InvalidDerivationPathError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidDerivationPath
 
   constructor(path: string, reason: string) {
-    super(`Некорректный путь деривации "${path}": ${reason}`)
+    super(`Invalid derivation path "${path}": ${reason}`)
   }
 }
 
@@ -27,7 +27,7 @@ export class InvalidExtendedKeyError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidExtendedKey
 
   constructor(reason: string, options?: ErrorOptions) {
-    super(`Расширенный ключ некорректен: ${reason}`, options)
+    super(`Extended key is invalid: ${reason}`, options)
   }
 }
 
@@ -36,7 +36,7 @@ export class InvalidAddressError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidAddress
 
   constructor(value: string) {
-    super(`Значение "${value}" не является адресом EVM.`)
+    super(`The value "${value}" is not an EVM address.`)
   }
 }
 
@@ -56,7 +56,8 @@ export class AddressChecksumMismatchError extends AppError {
 
   constructor(value: string) {
     super(
-      `Контрольная сумма адреса "${value}" не сходится. ` + 'Проверьте адрес: возможна опечатка.',
+      `The checksum of the address "${value}" does not match. ` +
+        'Check the address: it may contain a typo.',
     )
   }
 }
@@ -66,6 +67,6 @@ export class InvalidPublicKeyError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidPublicKey
 
   constructor(reason: string, options?: ErrorOptions) {
-    super(`Публичный ключ некорректен: ${reason}`, options)
+    super(`Public key is invalid: ${reason}`, options)
   }
 }

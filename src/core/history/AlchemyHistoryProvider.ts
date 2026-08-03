@@ -17,7 +17,7 @@ import {
 } from './types'
 
 const PROVIDER_ID = 'alchemy'
-const PROVIDER_NAME = 'Индексатор Alchemy'
+const PROVIDER_NAME = 'Alchemy indexer'
 
 /** Метод индексатора. Не входит в стандарт JSON-RPC. */
 const METHOD = 'alchemy_getAssetTransfers'

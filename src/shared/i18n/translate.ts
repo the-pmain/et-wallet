@@ -43,8 +43,5 @@ export function translate(
   key: TranslationKey,
   values?: TranslationValues,
 ): string {
-  const dictionary = DICTIONARIES[language]
-  const fallback = DICTIONARIES.ru
-
-  return interpolate(dictionary[key] ?? fallback[key], values)
+  return interpolate(DICTIONARIES[language][key], values)
 }

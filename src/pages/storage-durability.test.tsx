@@ -22,10 +22,10 @@ function renderApp() {
 
 /** Открывает раздел настроек разблокированного кошелька. */
 async function openSettings(): Promise<void> {
-  await screen.findByText('Аккаунт 1')
+  await screen.findByText('Account 1')
   window.location.hash = '#/wallet/settings'
 
-  await screen.findByRole('heading', { name: 'Настройки' })
+  await screen.findByRole('heading', { name: 'Settings' })
 }
 
 beforeEach(async () => {
@@ -48,14 +48,14 @@ describe('Предупреждение о стойкости хранилища'
     renderApp()
     await openSettings()
 
-    expect(await screen.findByText(/не переживёт закрытие вкладки/i)).toBeInTheDocument()
+    expect(await screen.findByText(/will not survive closing the tab/i)).toBeInTheDocument()
   })
 
   it('предупреждение называет seed-фразу единственным выходом', async () => {
     renderApp()
     await openSettings()
 
-    expect(await screen.findByText(/по записанной seed-фразе/i)).toBeInTheDocument()
+    expect(await screen.findByText(/from the\s+seed phrase you wrote down/i)).toBeInTheDocument()
   })
 
   it('устаревшего утверждения про потерю доступа после перезагрузки больше нет', async () => {
@@ -65,6 +65,6 @@ describe('Предупреждение о стойкости хранилища'
     renderApp()
     await openSettings()
 
-    expect(screen.queryByText(/Хранилище работает в памяти/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/The storage works in memory/i)).not.toBeInTheDocument()
   })
 })

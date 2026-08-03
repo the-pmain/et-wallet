@@ -29,17 +29,17 @@ export function toChainId(value: bigint | number | string): ChainId {
   try {
     parsed = BigInt(value)
   } catch {
-    throw new InvalidArgumentError('chainId', `значение "${String(value)}" не является числом`)
+    throw new InvalidArgumentError('chainId', `the value "${String(value)}" is not a number`)
   }
 
   if (parsed <= 0n) {
-    throw new InvalidArgumentError('chainId', 'идентификатор сети должен быть положительным')
+    throw new InvalidArgumentError('chainId', 'the chain identifier must be positive')
   }
 
   if (parsed > MAX_CHAIN_ID) {
     throw new InvalidArgumentError(
       'chainId',
-      `идентификатор превышает максимум ${MAX_CHAIN_ID.toString()}`,
+      `the identifier exceeds the maximum ${MAX_CHAIN_ID.toString()}`,
     )
   }
 
@@ -59,7 +59,7 @@ export function parseChainIdFromHex(value: unknown): ChainId {
   if (typeof value !== 'string' || !/^0x[0-9a-fA-F]+$/.test(value)) {
     throw new InvalidArgumentError(
       'chainId',
-      `ответ узла "${String(value)}" не является hex-числом`,
+      `the node response "${String(value)}" is not a hexadecimal number`,
     )
   }
 

@@ -14,7 +14,7 @@ import type { StorageKey } from './types'
  */
 export function toStorageKey(value: string): StorageKey {
   if (value.length === 0) {
-    throw new InvalidArgumentError('storageKey', 'ключ не может быть пустым')
+    throw new InvalidArgumentError('storageKey', 'the key cannot be empty')
   }
 
   return value as StorageKey

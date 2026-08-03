@@ -30,7 +30,7 @@ async function openBackup(): Promise<void> {
   await screen.findByText(EMAIL)
   window.location.hash = '#/wallet/backup'
 
-  await screen.findByRole('heading', { name: 'Резервная копия' })
+  await screen.findByRole('heading', { name: 'Backup' })
 }
 
 /** Проходит путь до ввода пароля для указанного секрета. */
@@ -55,7 +55,7 @@ describe('Резервная копия: экран', () => {
     renderApp()
     await openBackup()
 
-    expect(screen.getByText(/тот получил кошелёк/i)).toBeInTheDocument()
+    expect(screen.getByText(/obtains the wallet/i)).toBeInTheDocument()
   })
 
   it('не показывает секретов до запроса', async () => {
@@ -73,10 +73,10 @@ describe('Резервная копия: seed-фраза', () => {
     renderApp()
     await openBackup()
 
-    await user.click(await screen.findByRole('button', { name: 'Показать seed-фразу' }))
+    await user.click(await screen.findByRole('button', { name: 'Show the seed phrase' }))
 
-    expect(screen.getByText('Фраза открывает весь кошелёк')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Показать фразу' })).toBeDisabled()
+    expect(screen.getByText('The phrase opens the whole wallet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show the phrase' })).toBeDisabled()
   })
 
   it('называет, что пароль устройства фразу не защищает', async () => {
@@ -85,18 +85,18 @@ describe('Резервная копия: seed-фраза', () => {
     renderApp()
     await openBackup()
 
-    await user.click(await screen.findByRole('button', { name: 'Показать seed-фразу' }))
+    await user.click(await screen.findByRole('button', { name: 'Show the seed phrase' }))
 
-    expect(screen.getByText(/Пароль этого устройства её не защищает/i)).toBeInTheDocument()
+    expect(screen.getByText(/The password of this device does not protect it/i)).toBeInTheDocument()
   })
 
   it('спрашивает пароль даже при разблокированном кошельке', async () => {
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать seed-фразу', 'Показать фразу')
+    await reachPasswordStep('Show the seed phrase', 'Show the phrase')
 
-    expect(screen.getByText(/показ seed-фразы/i)).toBeInTheDocument()
-    expect(screen.getByLabelText('Пароль')).toBeInTheDocument()
+    expect(screen.getByText(/revealing the seed phrase/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toBeInTheDocument()
   })
 
   it('показывает фразу после верного пароля', async () => {
@@ -104,10 +104,10 @@ describe('Резервная копия: seed-фраза', () => {
 
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать seed-фразу', 'Показать фразу')
+    await reachPasswordStep('Show the seed phrase', 'Show the phrase')
 
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     expect(await screen.findByText('about')).toBeInTheDocument()
     expect(screen.getAllByText('abandon')).toHaveLength(11)
@@ -118,12 +118,12 @@ describe('Резервная копия: seed-фраза', () => {
 
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать seed-фразу', 'Показать фразу')
+    await reachPasswordStep('Show the seed phrase', 'Show the phrase')
 
-    await user.type(screen.getByLabelText('Пароль'), WRONG_PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText('Password'), WRONG_PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByText('Неверный пароль.')).toBeInTheDocument()
+    expect(await screen.findByText('Wrong password.')).toBeInTheDocument()
     expect(screen.queryByText('about')).not.toBeInTheDocument()
   })
 
@@ -135,14 +135,14 @@ describe('Резервная копия: seed-фраза', () => {
 
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать seed-фразу', 'Показать фразу')
+    await reachPasswordStep('Show the seed phrase', 'Show the phrase')
 
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await screen.findByText('about')
 
-    expect(screen.queryByRole('button', { name: /Копировать/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Copy/i })).not.toBeInTheDocument()
   })
 
   it('убирает фразу с экрана по закрытию', async () => {
@@ -150,13 +150,13 @@ describe('Резервная копия: seed-фраза', () => {
 
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать seed-фразу', 'Показать фразу')
+    await reachPasswordStep('Show the seed phrase', 'Show the phrase')
 
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await screen.findByText('about')
-    await user.click(screen.getByRole('button', { name: 'Скрыть и закрыть' }))
+    await user.click(screen.getByRole('button', { name: 'Hide and close' }))
 
     expect(screen.queryByText('about')).not.toBeInTheDocument()
   })
@@ -169,9 +169,9 @@ describe('Резервная копия: приватный ключ', () => {
     renderApp()
     await openBackup()
 
-    await user.click(await screen.findByRole('button', { name: 'Показать приватный ключ' }))
+    await user.click(await screen.findByRole('button', { name: 'Show the private key' }))
 
-    expect(screen.getByText('Ключ передаёт адрес навсегда')).toBeInTheDocument()
+    expect(screen.getByText('The key hands over the address for good')).toBeInTheDocument()
   })
 
   it('выдаёт ключ после подтверждения и пароля', async () => {
@@ -179,10 +179,10 @@ describe('Резервная копия: приватный ключ', () => {
 
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать приватный ключ', 'Показать ключ')
+    await reachPasswordStep('Show the private key', 'Show the key')
 
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     expect(await screen.findByText(/^0x[0-9a-f]{64}$/i)).toBeInTheDocument()
   })
@@ -192,14 +192,14 @@ describe('Резервная копия: приватный ключ', () => {
 
     renderApp()
     await openBackup()
-    await reachPasswordStep('Показать приватный ключ', 'Показать ключ')
+    await reachPasswordStep('Show the private key', 'Show the key')
 
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     /* Значение присутствует в разметке, но скрыто от чтения с экрана
        и размыто: случайный взгляд и демонстрация экрана его не раскроют. */
     expect(await screen.findByText(/^0x[0-9a-f]{64}$/i)).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.getByRole('button', { name: 'Показать' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show' })).toBeInTheDocument()
   })
 })

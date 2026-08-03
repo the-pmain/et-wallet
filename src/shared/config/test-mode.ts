@@ -59,9 +59,9 @@ export const TEST_MODE = {
 export function assertTestModeIsDisabledInProduction(): void {
   if (IS_TEST_MODE && import.meta.env.PROD) {
     throw new Error(
-      'Сборка собрана с временными послаблениями безопасности (IS_TEST_MODE). ' +
-        'Проверка записи seed-фразы и восстановление по ней отключены. ' +
-        'Верните IS_TEST_MODE в false в src/shared/config/test-mode.ts.',
+      'This build was made with temporary security relaxations (IS_TEST_MODE). ' +
+        'Seed phrase confirmation and restoring from it are disabled. ' +
+        'Set IS_TEST_MODE back to false in src/shared/config/test-mode.ts.',
     )
   }
 }

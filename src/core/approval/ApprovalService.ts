@@ -141,7 +141,7 @@ export class ApprovalService {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
 
-      this.#logger.warn('Список разрешений недоступен', { reason })
+      this.#logger.warn('The list of approvals is unavailable', { reason })
 
       return {
         items: [],
@@ -209,7 +209,7 @@ export class ApprovalService {
         } catch (error) {
           reason = error instanceof Error ? error.message : String(error)
 
-          this.#logger.warn('Выборка журналов отклонена узлом', { reason })
+          this.#logger.warn('The node rejected the log query', { reason })
 
           return null
         }
@@ -314,7 +314,7 @@ export class ApprovalService {
         decimals: null,
       }
     } catch (error) {
-      this.#logger.debug('Разрешение проверить не удалось', {
+      this.#logger.debug('The approval could not be verified', {
         reason: error instanceof Error ? error.message : String(error),
       })
 

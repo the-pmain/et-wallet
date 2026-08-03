@@ -41,7 +41,7 @@ export function assertValidRpcUrl(value: string): void {
  */
 export function assertValidRpcUrls(values: readonly string[]): void {
   if (values.length === 0) {
-    throw new InvalidArgumentError('rpcUrls', 'требуется хотя бы один RPC-адрес')
+    throw new InvalidArgumentError('rpcUrls', 'at least one RPC endpoint is required')
   }
 
   for (const value of values) {

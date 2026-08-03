@@ -126,7 +126,7 @@ export class AccountRepository implements IAccountRepository {
 
   static #fromRecord(record: IAccountRecord): IAccount {
     if (typeof record.address !== 'string' || typeof record.name !== 'string') {
-      throw new VaultCorruptedError('запись аккаунта не содержит адреса либо имени')
+      throw new VaultCorruptedError('the account record has no address or no name')
     }
 
     return {

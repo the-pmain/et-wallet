@@ -75,7 +75,7 @@ export function SecretReveal({ label, value, canCopy = true }: SecretRevealProps
           }}
         >
           {isRevealed ? <EyeOff /> : <Eye />}
-          {isRevealed ? 'Скрыть' : 'Показать'}
+          {isRevealed ? 'Hide' : 'Show'}
         </Button>
 
         {canCopy && isRevealed && (
@@ -87,15 +87,15 @@ export function SecretReveal({ label, value, canCopy = true }: SecretRevealProps
             }}
           >
             {isCopied ? <Check /> : <Copy />}
-            {isCopied ? 'Скопировано' : 'Копировать'}
+            {isCopied ? 'Copied' : 'Copy'}
           </Button>
         )}
       </div>
 
       {canCopy && isRevealed && (
         <p className="text-xs text-muted-foreground">
-          Буфер обмена доступен другим приложениям. Скопированное значение стирается через минуту,
-          если вы не скопировали что-то ещё.
+          The clipboard is available to other applications. The copied value is cleared after a
+          minute unless you copy something else.
         </p>
       )}
     </div>

@@ -27,7 +27,6 @@ import {
   Checkbox,
   Input,
   Label,
-  LanguageSwitch,
 } from '@/shared/ui'
 
 /** Шаги создания кошелька. */
@@ -115,7 +114,7 @@ export function CreateWalletPage() {
     const mnemonic = mnemonicRef.current
 
     if (mnemonic === null) {
-      setError('Фраза недоступна. Начните создание заново.')
+      setError('The phrase is unavailable. Start the creation again.')
       return
     }
 
@@ -141,8 +140,6 @@ export function CreateWalletPage() {
 
   return (
     <div className="flex min-h-svh items-start justify-center p-6">
-      <LanguageSwitch className="absolute top-4 right-4" />
-
       <Card className="w-full max-w-lg">
         <CardHeader>
           <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">

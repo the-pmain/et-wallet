@@ -85,13 +85,13 @@ export function QuickActions({ account, onRefresh, onLock, isBusy }: QuickAction
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Отправляется нативная валюта сети. Перевод токенов появится отдельным экраном: там
-          получатель указывается в данных вызова, а не в поле получателя транзакции.
+          The native currency of the network is sent here. Token transfers live on their own screen:
+          there the recipient is written into the call data, not into the recipient field.
         </p>
 
         {isAddressVisible && account !== null ? (
           <div className="flex flex-col gap-2 rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">Адрес для получения средств</p>
+            <p className="text-xs text-muted-foreground">Address for receiving funds</p>
             <p className="font-mono text-sm break-all">{account.address}</p>
 
             <div className="flex items-center gap-2">
@@ -103,16 +103,16 @@ export function QuickActions({ account, onRefresh, onLock, isBusy }: QuickAction
                 }}
               >
                 <Copy className="size-4" aria-hidden />
-                {isCopied ? 'Скопировано' : 'Копировать'}
+                {isCopied ? 'Copied' : 'Copy'}
               </Button>
             </div>
 
             <Alert variant="warning">
               <AlertDescription>
-                Сверьте адрес посимвольно перед отправкой средств: вредоносное расширение способно
-                подменить содержимое буфера обмена. Адрес одинаков во всех сетях EVM, но токены,
-                отправленные в другой сети, окажутся именно в ней. Скопированный адрес будет удалён
-                из буфера обмена через минуту.
+                Check the address character by character before sending funds: a malicious extension
+                can replace the contents of the clipboard. The address is the same in every EVM
+                network, but tokens sent in another network stay in that one. The copied address is
+                removed from the clipboard after a minute.
               </AlertDescription>
             </Alert>
           </div>

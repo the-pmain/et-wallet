@@ -9,8 +9,6 @@ export interface I18nContextValue {
 
   /** Переводит по ключу, подставляя значения. */
   readonly t: (key: TranslationKey, values?: TranslationValues) => string
-
-  readonly setLanguage: (language: Language) => void
 }
 
 /**
@@ -24,7 +22,6 @@ export interface I18nContextValue {
 export const I18nContext = createContext<I18nContextValue>({
   language: DEFAULT_LANGUAGE,
   t: (key, values) => translate(DEFAULT_LANGUAGE, key, values),
-  setLanguage: () => undefined,
 })
 
 /** Доступ к переводам. */

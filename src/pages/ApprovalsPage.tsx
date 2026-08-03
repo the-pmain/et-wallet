@@ -165,12 +165,12 @@ export function ApprovalsPage() {
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="icon" aria-label="Назад">
+          <Button asChild variant="ghost" size="icon" aria-label="Back">
             <Link to="/wallet/settings">
               <ArrowLeft className="size-4" aria-hidden />
             </Link>
           </Button>
-          <h1 className="text-lg font-semibold">Разрешения</h1>
+          <h1 className="text-lg font-semibold">Approvals</h1>
         </div>
 
         <Button
@@ -183,15 +183,15 @@ export function ApprovalsPage() {
             className={snapshot.isApprovalsLoading ? 'size-4 animate-spin' : 'size-4'}
             aria-hidden
           />
-          Обновить
+          Refresh
         </Button>
       </header>
 
       {sentHash === null ? null : (
         <Alert>
           <AlertDescription>
-            Отзыв отправлен. Разрешение перестанет действовать, когда транзакция попадёт в блок; до
-            тех пор оно остаётся в силе.
+            The revocation has been sent. The approval stops working once the transaction lands in a
+            block; until then it remains in force.
           </AlertDescription>
         </Alert>
       )}
@@ -199,9 +199,9 @@ export function ApprovalsPage() {
       {limits?.sourceUnavailable === true ? (
         <Alert variant="danger">
           <AlertDescription>
-            Проверить разрешения не удалось: узел не ответил.
-            {limits.reason === null ? null : <> Он сообщил: «{limits.reason}».</>} Пустой список
-            здесь не означает, что разрешений нет.
+            The approvals could not be checked: the node did not answer.
+            {limits.reason === null ? null : <> It reported: "{limits.reason}".</>} An empty list
+            here does not mean there are no approvals.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -209,9 +209,9 @@ export function ApprovalsPage() {
       {limits !== null && limits.skipped > 0 ? (
         <Alert variant="warning">
           <AlertDescription>
-            Проверены не все найденные выдачи: {limits.skipped.toLocaleString('ru-RU')} осталось
-            непроверенными. Каждая проверка — отдельное обращение к контракту, и их число
-            ограничено, чтобы узел не отказал в обслуживании.
+            Not every approval found was checked: {limits.skipped.toLocaleString('en-GB')} remain
+            unverified. Each check is a separate call to a contract, and their number is limited so
+            that the node does not refuse service.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -221,21 +221,21 @@ export function ApprovalsPage() {
           {snapshot.isApprovalsLoading && items === null ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
               <RefreshCw className="size-4 animate-spin" aria-hidden />
-              Проверяем разрешения…
+              Checking the approvals…
             </div>
           ) : items === null || items.length === 0 ? (
             <EmptyState
               icon={ShieldCheck}
-              title="Действующих разрешений не найдено"
+              title="No active approvals found"
               description={
                 <>
-                  Кошелёк просматривает последние{' '}
+                  The wallet scans the last{' '}
                   {limits === null || limits.scannedBlocks === null
-                    ? 'блоки'
-                    : `${limits.scannedBlocks.toLocaleString('ru-RU')} блоков`}{' '}
-                  и проверяет каждое найденное разрешение в контракте. Выданное раньше этого окна
-                  сюда не попадёт — проверьте адрес в обозревателе, если пользовались приложениями
-                  давно.
+                    ? 'blocks'
+                    : `${limits.scannedBlocks.toLocaleString('en-GB')} blocks`}{' '}
+                  and checks every approval it finds against the contract. Anything granted before
+                  that window will not appear here — check the address in an explorer if you used
+                  applications long ago.
                 </>
               }
             />
@@ -259,9 +259,9 @@ export function ApprovalsPage() {
       <Alert variant="warning">
         <ShieldAlert />
         <AlertDescription>
-          Разрешение позволяет контракту забирать ваши токены без новой подписи. Оно не истекает
-          само: пока вы его не отзовёте, оно действует и после того, как приложение стало ненужным.
-          Отзыв — обычная транзакция, за неё списывается комиссия.
+          An approval lets a contract take your tokens without a new signature. It does not expire
+          on its own: until you revoke it, it keeps working long after the application is no longer
+          needed. Revoking is an ordinary transaction and costs a fee.
         </AlertDescription>
       </Alert>
     </div>
@@ -303,26 +303,26 @@ function ApprovalRow({
             {record.symbol ?? shortenAddress(record.contract)}
           </span>
           <Badge variant="outline">
-            {record.standard === TOKEN_STANDARD.Erc20 ? 'Токен' : 'Коллекция'}
+            {record.standard === TOKEN_STANDARD.Erc20 ? 'Token' : 'Collection'}
           </Badge>
         </span>
 
         <span className="truncate text-xs text-muted-foreground">
-          Кому: <span className="font-mono">{shortenAddress(record.spender)}</span>
+          To: <span className="font-mono">{shortenAddress(record.spender)}</span>
         </span>
 
         <span className="text-xs">
           {record.isUnlimited ? (
             <span className="font-medium text-destructive">
               {record.standard === TOKEN_STANDARD.Erc20
-                ? 'Без ограничения суммы'
-                : 'Вся коллекция, включая будущие предметы'}
+                ? 'Unlimited amount'
+                : 'The whole collection, including future items'}
             </span>
           ) : (
             <span className="text-muted-foreground">
-              До{' '}
+              Up to{' '}
               {record.decimals === null
-                ? `${(record.amount ?? 0n).toString()} ед.`
+                ? `${(record.amount ?? 0n).toString()} units`
                 : `${formatTokenAmount(record.amount ?? 0n, record.decimals)} ${record.symbol ?? ''}`}
             </span>
           )}
@@ -330,7 +330,7 @@ function ApprovalRow({
       </span>
 
       <Button variant="outline" size="sm" className="shrink-0" onClick={onRevoke}>
-        Отозвать
+        Revoke
       </Button>
     </div>
   )
@@ -358,30 +358,30 @@ function RevokeScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold">Отзыв разрешения</h1>
+      <h1 className="text-lg font-semibold">Revoke the approval</h1>
 
       <Card>
         <CardContent className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Контракт</span>
+            <span className="text-xs text-muted-foreground">Contract</span>
             <span className="font-mono text-sm break-all">{record.contract}</span>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Кому было разрешено</span>
+            <span className="text-xs text-muted-foreground">Granted to</span>
             <span className="font-mono text-sm break-all">{record.spender}</span>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            После подтверждения контракт больше не сможет распоряжаться вашими средствами. Уже
-            выполненные им операции это не отменяет.
+            After the confirmation the contract will no longer be able to dispose of your funds.
+            Operations it has already carried out are not undone by this.
           </p>
         </CardContent>
       </Card>
 
       {state.error === null ? null : (
         <Alert variant="danger">
-          <AlertTitle>Отозвать не удалось</AlertTitle>
+          <AlertTitle>Revoking failed</AlertTitle>
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       )}
@@ -391,7 +391,7 @@ function RevokeScreen({
           {state.isBusy ? (
             <>
               <RefreshCw className="size-4 animate-spin" aria-hidden />
-              Готовим отзыв…
+              Preparing the revocation…
             </>
           ) : null}
         </div>
@@ -399,7 +399,7 @@ function RevokeScreen({
 
       {isConfirming ? (
         <ConfirmPassword
-          action="отзыв разрешения"
+          action="revoking the approval"
           onVerify={onVerify}
           onConfirmed={onConfirmed}
           onCancel={onCancelConfirm}
@@ -411,11 +411,11 @@ function RevokeScreen({
             disabled={state.isBusy || prepared === null}
             onClick={onConfirmRequested}
           >
-            {state.isBusy ? 'Отправка…' : 'Отозвать разрешение'}
+            {state.isBusy ? 'Sending…' : 'Revoke the approval'}
           </Button>
 
           <Button variant="ghost" className="sm:flex-1" disabled={state.isBusy} onClick={onBack}>
-            Назад
+            Back
           </Button>
         </div>
       )}

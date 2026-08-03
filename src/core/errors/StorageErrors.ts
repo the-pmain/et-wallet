@@ -15,7 +15,7 @@ export class RandomnessUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.RandomnessUnavailable
 
   constructor(detail: string) {
-    super(`Источник случайности непригоден: ${detail}`)
+    super(`The randomness source is unusable: ${detail}`)
   }
 }
 
@@ -30,7 +30,7 @@ export class DecryptionFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.DecryptionFailed
 
   constructor(options?: ErrorOptions) {
-    super('Не удалось расшифровать данные.', options)
+    super('The data could not be decrypted.', options)
   }
 }
 
@@ -39,7 +39,7 @@ export class VaultCorruptedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.VaultCorrupted
 
   constructor(detail: string, options?: ErrorOptions) {
-    super(`Хранилище повреждено: ${detail}`, options)
+    super(`The storage is corrupted: ${detail}`, options)
   }
 }
 
@@ -56,7 +56,7 @@ export class UnsupportedVaultVersionError extends AppError {
 
   constructor(found: number, supported: number) {
     super(
-      `Версия хранилища ${String(found)} не поддерживается. Максимальная: ${String(supported)}.`,
+      `Storage version ${String(found)} is not supported. The highest supported version is ${String(supported)}.`,
     )
   }
 }
@@ -66,7 +66,7 @@ export class SecretBufferWipedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.SecretBufferWiped
 
   constructor() {
-    super('Буфер секрета уже затёрт и не может быть прочитан.')
+    super('The secret buffer has been wiped and can no longer be read.')
   }
 }
 
@@ -75,7 +75,7 @@ export class StorageUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.StorageUnavailable
 
   constructor(detail: string, options?: ErrorOptions) {
-    super(`Хранилище недоступно: ${detail}`, options)
+    super(`The storage is unavailable: ${detail}`, options)
   }
 }
 
@@ -84,7 +84,7 @@ export class StorageWriteFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.StorageWriteFailed
 
   constructor(key: string, options?: ErrorOptions) {
-    super(`Не удалось записать данные по ключу "${key}".`, options)
+    super(`The data could not be written under the key "${key}".`, options)
   }
 }
 
@@ -93,7 +93,7 @@ export class StorageReadFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.StorageReadFailed
 
   constructor(key: string, options?: ErrorOptions) {
-    super(`Не удалось прочитать данные по ключу "${key}".`, options)
+    super(`The data could not be read under the key "${key}".`, options)
   }
 }
 
@@ -102,6 +102,6 @@ export class MigrationFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.MigrationFailed
 
   constructor(version: number, options?: ErrorOptions) {
-    super(`Миграция хранилища до версии ${String(version)} не выполнена.`, options)
+    super(`Storage migration to version ${String(version)} was not performed.`, options)
   }
 }

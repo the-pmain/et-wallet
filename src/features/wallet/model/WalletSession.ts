@@ -144,7 +144,7 @@ export interface IWalletSessionDependencies {
   readonly providerFactory?: IProviderFactory
 
   /**
-   * Источники RPC-адресов в порядке предпочтения.
+   * Источники RPC endpointов в порядке предпочтения.
    *
    * Задаются снаружи: набор источников и их приоритет — политика
    * приложения, а не свойство сессии. Источник пользовательских адресов
@@ -592,7 +592,7 @@ export class WalletSession implements IWalletSession {
             isAscii: resolution.isAscii,
           }
     } catch (error) {
-      this.#logger.warn('Имя ENS разрешить не удалось', {
+      this.#logger.warn('The ENS name could not be resolved', {
         reason: error instanceof Error ? error.message : String(error),
       })
 
@@ -685,7 +685,7 @@ export class WalletSession implements IWalletSession {
     const sender = accounts.getByAddress(transaction.from)
 
     if (sender === null) {
-      throw new Error('Отправитель не принадлежит этому кошельку.')
+      throw new Error('The sender does not belong to this wallet.')
     }
 
     const signed = await accounts.signTransaction(sender.id, transaction)
@@ -881,7 +881,7 @@ export class WalletSession implements IWalletSession {
       const account = accounts.getByAddress(payload.address)
 
       if (account === null) {
-        throw new Error('Запрос адресован аккаунту, которого нет в этом кошельке.')
+        throw new Error('The request targets an account that does not exist in this wallet.')
       }
 
       return payload.kind === DAPP_REQUEST_KIND.SignMessage
@@ -892,7 +892,7 @@ export class WalletSession implements IWalletSession {
     const sender = accounts.getByAddress(payload.transaction.from)
 
     if (sender === null) {
-      throw new Error('Запрос адресован аккаунту, которого нет в этом кошельке.')
+      throw new Error('The request targets an account that does not exist in this wallet.')
     }
 
     /* Транзакция проходит через ту же подготовку, что и отправка
@@ -931,7 +931,7 @@ export class WalletSession implements IWalletSession {
 
   #requireTransactions(): TransactionService {
     if (this.#transactionService === null) {
-      throw new Error('Сессия кошелька закрыта.')
+      throw new Error('The wallet session is closed.')
     }
 
     return this.#transactionService
@@ -979,7 +979,7 @@ export class WalletSession implements IWalletSession {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      this.#logger.error('Не удалось открыть сессию кошелька', { reason: message })
+      this.#logger.error('The wallet session could not be opened', { reason: message })
 
       /* Частично построенные сервисы обязаны быть разобраны: иначе
          в памяти остался бы выведенный корневой ключ при неоткрытой сессии. */
@@ -1338,7 +1338,7 @@ export class WalletSession implements IWalletSession {
           found.set(account.address.toLowerCase(), resolution.displayName)
         }
       } catch (error) {
-        this.#logger.warn('Имя ENS получить не удалось', {
+        this.#logger.warn('The ENS name could not be fetched', {
           reason: error instanceof Error ? error.message : String(error),
         })
       }
@@ -1406,7 +1406,7 @@ export class WalletSession implements IWalletSession {
       try {
         balances.push({ token, balance: await service.getBalance(token, account.address) })
       } catch (error) {
-        this.#logger.warn('Баланс токена недоступен', {
+        this.#logger.warn('Token balance is unavailable', {
           reason: error instanceof Error ? error.message : String(error),
         })
         balances.push({ token, balance: null })
@@ -1459,7 +1459,7 @@ export class WalletSession implements IWalletSession {
 
   #requireTokens(): TokenService {
     if (this.#tokens === null) {
-      throw new Error('Сессия кошелька закрыта.')
+      throw new Error('The wallet session is closed.')
     }
 
     return this.#tokens
@@ -1490,7 +1490,7 @@ export class WalletSession implements IWalletSession {
         isHistoryLoading: false,
       })
     } catch (error) {
-      this.#logger.warn('История переводов недоступна', {
+      this.#logger.warn('The transfer history is unavailable', {
         reason: error instanceof Error ? error.message : String(error),
       })
 
@@ -1602,7 +1602,7 @@ export class WalletSession implements IWalletSession {
   #publishBalanceFailure(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error)
 
-    this.#logger.warn('Баланс недоступен', { reason: message })
+    this.#logger.warn('The balance is unavailable', { reason: message })
 
     /* Прежнее значение сохраняется: отказ узла не означает, что средств нет.
        Замена баланса нулём при недоступной сети — прямая дезинформация. */
@@ -1615,7 +1615,7 @@ export class WalletSession implements IWalletSession {
 
   #requireAccounts(): AccountManager {
     if (this.#accounts === null) {
-      throw new Error('Сессия кошелька закрыта.')
+      throw new Error('The wallet session is closed.')
     }
 
     return this.#accounts
@@ -1623,7 +1623,7 @@ export class WalletSession implements IWalletSession {
 
   #requireNetworks(): NetworkService {
     if (this.#networks === null) {
-      throw new Error('Сессия кошелька закрыта.')
+      throw new Error('The wallet session is closed.')
     }
 
     return this.#networks
@@ -1631,7 +1631,7 @@ export class WalletSession implements IWalletSession {
 
   #requireProviders(): RpcManager {
     if (this.#providers === null) {
-      throw new Error('Сессия кошелька закрыта.')
+      throw new Error('The wallet session is closed.')
     }
 
     return this.#providers
@@ -1641,7 +1641,7 @@ export class WalletSession implements IWalletSession {
     const network = this.#snapshot.activeNetwork
 
     if (network === null) {
-      throw new Error('Активная сеть не выбрана.')
+      throw new Error('No active network is selected.')
     }
 
     return network

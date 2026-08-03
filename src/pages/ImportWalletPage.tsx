@@ -67,7 +67,7 @@ export function ImportWalletPage() {
 
       await navigate('/')
     } catch (caught) {
-      setError(isAppError(caught) ? caught.message : 'Не удалось импортировать кошелёк')
+      setError(isAppError(caught) ? caught.message : 'The wallet could not be imported')
     } finally {
       setIsBusy(false)
     }
@@ -80,13 +80,13 @@ export function ImportWalletPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
             <Link to="/">
               <ArrowLeft />
-              Назад
+              Back
             </Link>
           </Button>
 
-          <CardTitle>Импорт кошелька</CardTitle>
+          <CardTitle>Import a wallet</CardTitle>
           <CardDescription>
-            Введите seed-фразу из 12 или 24 слов и придумайте пароль для этого устройства
+            Enter a seed phrase of 12 or 24 words and choose a password for this device
           </CardDescription>
         </CardHeader>
 
@@ -109,26 +109,26 @@ export function ImportWalletPage() {
           {validation.isGuessable && (
             <Alert variant="danger">
               <AlertDescription>
-                Это общеизвестная тестовая фраза: её приватные ключи вычисляет любой желающий.
-                Средства, поступившие на её адреса, выводятся ботами за секунды. Импортируйте её
-                только для проверки работы кошелька.
+                This is a well-known test phrase: anyone can compute its private keys. Funds
+                arriving at its addresses are swept by bots within seconds. Import it only to check
+                that the wallet works.
               </AlertDescription>
             </Alert>
           )}
 
           <Alert variant="warning">
             <AlertDescription>
-              Вводите фразу только в этом окне. Ни один сотрудник поддержки и ни один сайт не имеет
-              права её запрашивать.
+              Enter the phrase in this window only. No support agent and no website has the right to
+              ask for it.
             </AlertDescription>
           </Alert>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor={usernameId}>Имя пользователя</Label>
+            <Label htmlFor={usernameId}>Your name</Label>
             <Input
               id={usernameId}
               value={username}
-              placeholder="Например, Дмитрий"
+              placeholder="For example, Alex"
               disabled={isBusy}
               autoComplete="off"
               autoCapitalize="words"
@@ -144,8 +144,8 @@ export function ImportWalletPage() {
                 его здесь значило бы придумывать препятствие человеку,
                 который восстанавливает доступ к своим средствам. */}
             <p className="text-xs text-muted-foreground">
-              Необязательно. Имя хранится только на этом устройстве и подписывает кошелёк в
-              интерфейсе — учётной записью оно не является.
+              Optional. The name is stored on this device only and labels the wallet in the
+              interface — it is not an account.
             </p>
           </div>
 
@@ -170,7 +170,7 @@ export function ImportWalletPage() {
               void handleImport()
             }}
           >
-            {isBusy ? 'Шифрование…' : 'Импортировать'}
+            {isBusy ? 'Encrypting…' : 'Import'}
           </Button>
         </CardContent>
       </Card>

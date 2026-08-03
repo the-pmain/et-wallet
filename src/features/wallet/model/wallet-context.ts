@@ -20,7 +20,7 @@ export function useWallet(): IWalletSession {
   const session = use(WalletContext)
 
   if (session === null) {
-    throw new Error('useWallet должен вызываться внутри WalletProvider.')
+    throw new Error('useWallet must be called inside WalletProvider.')
   }
 
   return session

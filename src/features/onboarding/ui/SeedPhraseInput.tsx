@@ -10,11 +10,12 @@ import { Label, Textarea } from '@/shared/ui'
 
 /** Пояснения к причинам отказа. Коды приходят из ядра, тексты — отсюда. */
 const REASON_TEXT: Readonly<Record<MnemonicInvalidReason, string>> = {
-  [MNEMONIC_INVALID_REASON.Empty]: 'Введите фразу',
-  [MNEMONIC_INVALID_REASON.WordCount]: `Допустимо ${VALID_WORD_COUNTS.join(', ')} слов`,
-  [MNEMONIC_INVALID_REASON.UnknownWord]: 'Некоторых слов нет в словаре — проверьте написание',
+  [MNEMONIC_INVALID_REASON.Empty]: 'Enter the phrase',
+  [MNEMONIC_INVALID_REASON.WordCount]: `Allowed word counts: ${VALID_WORD_COUNTS.join(', ')}`,
+  [MNEMONIC_INVALID_REASON.UnknownWord]:
+    'Some words are missing from the word list — check the spelling',
   [MNEMONIC_INVALID_REASON.Checksum]:
-    'Слова верные, но контрольная сумма не сходится — вероятно, перепутан порядок',
+    'The words are valid, but the checksum does not match — the order is probably wrong',
 }
 
 interface SeedPhraseInputProps {
@@ -50,14 +51,14 @@ export function SeedPhraseInput({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>Мнемоническая фраза</Label>
+      <Label htmlFor={inputId}>Seed phrase</Label>
 
       <Textarea
         id={inputId}
         value={value}
         disabled={disabled}
         rows={4}
-        placeholder="Введите 12 или 24 слова через пробел"
+        placeholder="Enter 12 or 24 words separated by spaces"
         autoComplete="off"
         autoCapitalize="off"
         autoCorrect="off"
@@ -68,9 +69,9 @@ export function SeedPhraseInput({
       />
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Слов: {validation.wordCount}</p>
+        <p className="text-xs text-muted-foreground">Words: {validation.wordCount}</p>
 
-        {validation.isValid && <p className="text-xs text-risk-low">Фраза корректна</p>}
+        {validation.isValid && <p className="text-xs text-risk-low">The phrase is valid</p>}
       </div>
 
       {shouldShowError && validation.reason !== null && (
@@ -79,7 +80,7 @@ export function SeedPhraseInput({
 
       {shouldShowError && validation.unknownWordIndexes.length > 0 && (
         <p className="text-xs text-risk-high">
-          Проверьте слова на позициях:{' '}
+          Check the words at positions:{' '}
           {validation.unknownWordIndexes.map((index) => index + 1).join(', ')}
         </p>
       )}

@@ -69,7 +69,7 @@ export function DonutChart({ slices, caption, captionHint, className }: DonutCha
   const visible = slices.filter((slice) => slice.share >= MIN_VISIBLE_SHARE)
 
   const description = visible
-    .map((slice) => `${slice.label} ${(slice.share * 100).toFixed(1)} процента`)
+    .map((slice) => `${slice.label} ${(slice.share * 100).toFixed(1)} percent`)
     .join(', ')
 
   /* Смещения считаются заранее, а не накоплением по ходу разметки:

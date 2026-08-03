@@ -20,7 +20,7 @@ describe('toSafeText: обычные строки', () => {
   })
 
   it('пропускает кириллицу и пробелы внутри', () => {
-    expect(toSafeText('Тестовая сеть').text).toBe('Тестовая сеть')
+    expect(toSafeText('Test network').text).toBe('Test network')
   })
 
   it('обрезает пробелы по краям', () => {

@@ -8,7 +8,7 @@ export class NetworkNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NetworkNotFound
 
   constructor(chainId: bigint) {
-    super(`Сеть с chainId ${chainId.toString()} не найдена.`)
+    super(`Network with chainId ${chainId.toString()} was not found.`)
   }
 }
 
@@ -17,7 +17,7 @@ export class NetworkAlreadyExistsError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NetworkAlreadyExists
 
   constructor(chainId: bigint) {
-    super(`Сеть с chainId ${chainId.toString()} уже добавлена.`)
+    super(`Network with chainId ${chainId.toString()} has already been added.`)
   }
 }
 
@@ -33,7 +33,7 @@ export class BuiltInNetworkImmutableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.BuiltInNetworkImmutable
 
   constructor(chainId: bigint) {
-    super(`Встроенную сеть ${chainId.toString()} нельзя изменить или удалить.`)
+    super(`Built-in network ${chainId.toString()} cannot be changed or removed.`)
   }
 }
 
@@ -47,7 +47,7 @@ export class InvalidRpcUrlError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidRpcUrl
 
   constructor(value: string) {
-    super(`Значение "${value}" не является корректным URL.`)
+    super(`The value "${value}" is not a valid URL.`)
   }
 }
 
@@ -63,7 +63,7 @@ export class InsecureRpcUrlError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InsecureRpcUrl
 
   constructor(protocol: string) {
-    super(`Протокол "${protocol}" недопустим для RPC. Разрешены только https и wss.`)
+    super(`The protocol "${protocol}" is not allowed for RPC. Only https and wss are permitted.`)
   }
 }
 
@@ -89,8 +89,8 @@ export class ChainIdMismatchError extends AppError {
 
   constructor(expected: bigint, actual: bigint) {
     super(
-      `Узел вернул chainId ${actual.toString()}, ожидался ${expected.toString()}. ` +
-        'Соединение разорвано.',
+      `The node returned chainId ${actual.toString()}, expected ${expected.toString()}. ` +
+        'The connection was lost.',
     )
     this.expected = expected
     this.actual = actual
@@ -121,9 +121,9 @@ export class NetworkImpersonationError extends AppError {
 
   constructor(impersonatedName: string, impersonatedChainId: bigint, actualChainId: bigint) {
     super(
-      `Сеть с именем «${impersonatedName}» уже существует и имеет chainId ` +
-        `${impersonatedChainId.toString()}, а добавляемая — ${actualChainId.toString()}. ` +
-        'Совпадение имени при другом идентификаторе — типичный приём подмены сети.',
+      `A network named "${impersonatedName}" already exists and has chainId ` +
+        `${impersonatedChainId.toString()}, while the one being added has ${actualChainId.toString()}. ` +
+        'A matching name with a different identifier is a common network spoofing trick.',
     )
     this.impersonatedName = impersonatedName
     this.impersonatedChainId = impersonatedChainId
@@ -135,7 +135,7 @@ export class ProviderUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.ProviderUnavailable
 
   constructor(chainId: bigint, options?: ErrorOptions) {
-    super(`Нет доступных RPC-узлов для сети ${chainId.toString()}.`, options)
+    super(`No RPC endpoints are available for network ${chainId.toString()}.`, options)
   }
 }
 
@@ -156,7 +156,7 @@ export class RpcError extends AppError {
   readonly data: unknown
 
   constructor(rpcCode: number, message: string, data?: unknown) {
-    super(`Ошибка RPC ${String(rpcCode)}: ${message}`)
+    super(`RPC error ${String(rpcCode)}: ${message}`)
     this.rpcCode = rpcCode
     this.data = data
   }

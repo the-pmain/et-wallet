@@ -72,12 +72,12 @@ export function ConnectionsPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" aria-label="Назад">
+        <Button asChild variant="ghost" size="icon" aria-label="Back">
           <Link to="/wallet">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Подключения</h1>
+        <h1 className="text-lg font-semibold">Connections</h1>
       </header>
 
       {dapp.snapshot.proposal === null ? null : (
@@ -101,7 +101,7 @@ export function ConnectionsPage() {
 
       {dapp.snapshot.error === null ? null : (
         <Alert variant="warning">
-          <AlertTitle>Подключения недоступны</AlertTitle>
+          <AlertTitle>Connections are unavailable</AlertTitle>
           {/* Причина показывается дословно и без дополнений: транспорт
               уже объясняет последствие, и вторая такая же фраза рядом
               выглядит сбоем разметки. */}
@@ -118,14 +118,14 @@ export function ConnectionsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-medium text-muted-foreground">
-            Новое подключение
+            New connection
           </CardTitle>
         </CardHeader>
 
         <CardContent>
           <form className="flex flex-col gap-3" onSubmit={submit}>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={uriId}>Ссылка подключения</Label>
+              <Label htmlFor={uriId}>Connection link</Label>
               <Input
                 id={uriId}
                 value={uri}
@@ -143,13 +143,13 @@ export function ConnectionsPage() {
                 и вставлять сюда что-то, пришедшее из письма или чата, —
                 верный способ подключить чужого. */}
             <p className="text-xs text-muted-foreground">
-              Ссылку показывает приложение, которое вы открыли сами. Не вставляйте сюда ссылки из
-              писем и сообщений: подключение даёт возможность присылать вам запросы на подпись.
+              The link is shown by an application you opened yourself. Do not paste links from
+              emails or messages here: a connection lets the other side send you signing requests.
             </p>
 
             <Button type="submit" disabled={isBusy || uri.trim() === '' || !dapp.snapshot.isReady}>
               <Plug className="size-4" aria-hidden />
-              Подключить
+              Connect
             </Button>
           </form>
         </CardContent>
@@ -158,7 +158,7 @@ export function ConnectionsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-medium text-muted-foreground">
-            Действующие подключения
+            Active connections
           </CardTitle>
         </CardHeader>
 
@@ -174,9 +174,9 @@ export function ConnectionsPage() {
       <Alert>
         <Info />
         <AlertDescription>
-          Подключение не даёт приложению распоряжаться средствами: каждая подпись спрашивается
-          отдельно. Сервер WalletConnect при этом видит адреса ваших аккаунтов и время каждого
-          запроса.
+          A connection does not let an application dispose of your funds: every signature is asked
+          for separately. The WalletConnect server, however, sees the addresses of your accounts and
+          the time of every request.
         </AlertDescription>
       </Alert>
     </div>

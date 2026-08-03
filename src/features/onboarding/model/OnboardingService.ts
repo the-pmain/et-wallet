@@ -56,7 +56,7 @@ function assertAcceptableUsername(username: string | undefined): void {
   }
 
   if (!isValidUsername(username)) {
-    throw new InvalidArgumentError('username', 'имя не подходит')
+    throw new InvalidArgumentError('username', 'the name is not acceptable')
   }
 }
 

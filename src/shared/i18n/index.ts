@@ -3,8 +3,6 @@ export {
   DEFAULT_LANGUAGE,
   DICTIONARIES,
   LANGUAGE,
-  LANGUAGE_NAME,
-  isLanguage,
   type Language,
   type TranslationKey,
 } from './dictionary'

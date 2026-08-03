@@ -395,7 +395,7 @@ describe('NetworkService: изменение сети', () => {
   it('не меняет идентификатор сети', async () => {
     const updated = await context.service.update(CUSTOM_CHAIN_ID, {
       chainId: toChainId(777),
-      name: 'Подмена',
+      name: 'Impersonation',
     })
 
     expect(updated.chainId).toBe(CUSTOM_CHAIN_ID)
@@ -404,7 +404,7 @@ describe('NetworkService: изменение сети', () => {
 
   it('отказывает в изменении встроенной сети', async () => {
     await expect(
-      context.service.update(BUILT_IN_CHAIN_ID.Ethereum, { name: 'Поддельный Ethereum' }),
+      context.service.update(BUILT_IN_CHAIN_ID.Ethereum, { name: 'Fake Ethereum' }),
     ).rejects.toThrow(BuiltInNetworkImmutableError)
   })
 

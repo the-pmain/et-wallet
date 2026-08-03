@@ -52,7 +52,7 @@ export function mapProviderError(error: unknown, chainId: ChainId): Error {
     /* Вызов завершился откатом. При оценке газа это означает, что
        и сама транзакция откатится: отправлять её нельзя — газ спишется,
        а операция не выполнится. */
-    return new GasEstimationFailedError(error.reason ?? 'вызов завершился откатом', {
+    return new GasEstimationFailedError(error.reason ?? 'the call reverted', {
       cause: error,
     })
   }

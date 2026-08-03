@@ -87,7 +87,7 @@ function renderApp() {
 async function openNft(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
+  await screen.findByText('Account 1')
   await user.click(screen.getByRole('link', { name: /nft/i }))
   await screen.findByRole('heading', { level: 1, name: 'NFT' })
 }
@@ -129,7 +129,7 @@ describe('NFT: список принадлежащих предметов', () =
     renderApp()
     await openNft()
 
-    expect(await screen.findByText('Предметов не найдено')).toBeInTheDocument()
+    expect(await screen.findByText('No items found')).toBeInTheDocument()
   })
 
   it('показывает количество экземпляров ERC-1155', async () => {
@@ -178,7 +178,7 @@ describe('NFT: список принадлежащих предметов', () =
     renderApp()
     await openNft()
 
-    expect(await screen.findByText('Коллекция без названия')).toBeInTheDocument()
+    expect(await screen.findByText('Collection without a name')).toBeInTheDocument()
   })
 })
 
@@ -191,21 +191,21 @@ describe('NFT: границы поиска', () => {
     renderApp()
     await openNft()
 
-    expect(await screen.findByText(/просматривает последние/i)).toBeInTheDocument()
+    expect(await screen.findByText(/scans the last/i)).toBeInTheDocument()
   })
 
   it('отказ узла не выдаётся за отсутствие коллекции', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
-      logsError: 'диапазон слишком широк',
+      logsError: 'the range is too wide',
     })
 
     renderApp()
     await openNft()
 
-    expect(await screen.findByText(/Найти предметы не удалось/i)).toBeInTheDocument()
-    expect(screen.getByText(/диапазон слишком широк/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The items could not be found/i)).toBeInTheDocument()
+    expect(screen.getByText(/the range is too wide/i)).toBeInTheDocument()
   })
 
   it('предупреждает, что изображения не загружаются', async () => {
@@ -214,7 +214,7 @@ describe('NFT: границы поиска', () => {
     renderApp()
     await openNft()
 
-    expect(await screen.findByText(/Изображения не загружаются намеренно/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Images are deliberately not loaded/i)).toBeInTheDocument()
   })
 })
 
@@ -234,8 +234,8 @@ describe('NFT: передача предмета', () => {
     const user = userEvent.setup()
 
     await openNft()
-    await user.click(await screen.findByRole('button', { name: 'Передать' }))
-    await screen.findByRole('heading', { level: 1, name: 'Передача предмета' })
+    await user.click(await screen.findByRole('button', { name: 'Transfer' }))
+    await screen.findByRole('heading', { level: 1, name: 'Transfer an item' })
   }
 
   it('форма называет предмет и коллекцию', async () => {
@@ -250,12 +250,12 @@ describe('NFT: передача предмета', () => {
 
     renderApp()
     await openTransfer()
-    await user.type(screen.getByLabelText(/Адрес получателя/), PEER)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.type(screen.getByLabelText(/Recipient address/), PEER)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
     /* Человек, сверяющий адреса, обязан понимать, почему их два:
        передачу выполняет контракт коллекции. */
-    expect(await screen.findByText('Подтверждение передачи')).toBeInTheDocument()
+    expect(await screen.findByText('Confirm the transfer')).toBeInTheDocument()
     expect(screen.getByText(PEER)).toBeInTheDocument()
     expect(screen.getByText(PUNKS)).toBeInTheDocument()
   })
@@ -265,12 +265,12 @@ describe('NFT: передача предмета', () => {
 
     renderApp()
     await openTransfer()
-    await user.type(screen.getByLabelText(/Адрес получателя/), PEER)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.type(screen.getByLabelText(/Recipient address/), PEER)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
     /* Предмет существует в одном экземпляре: отправленный не туда,
        он не возвращается и не покупается заново. */
-    expect(await screen.findByText('Передача необратима')).toBeInTheDocument()
+    expect(await screen.findByText('The transfer cannot be undone')).toBeInTheDocument()
   })
 
   it('отправка требует пароля и сообщает об успехе', async () => {
@@ -278,13 +278,13 @@ describe('NFT: передача предмета', () => {
 
     renderApp()
     await openTransfer()
-    await user.type(screen.getByLabelText(/Адрес получателя/), PEER)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
-    await user.click(await screen.findByRole('button', { name: 'Передать предмет' }))
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(screen.getByLabelText(/Recipient address/), PEER)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(await screen.findByRole('button', { name: 'Transfer the item' }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByText(/Передача отправлена/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The transfer has been sent/i)).toBeInTheDocument()
   })
 
   it('не даёт передать предмет, принадлежащий другому адресу', async () => {
@@ -302,9 +302,9 @@ describe('NFT: передача предмета', () => {
       nftOwners: [{ contract: PUNKS, tokenId: 777n, owner: PEER }],
     })
 
-    await user.type(screen.getByLabelText(/Адрес получателя/), PEER)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.type(screen.getByLabelText(/Recipient address/), PEER)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect(await screen.findByText(/принадлежит другому адресу/i)).toBeInTheDocument()
+    expect(await screen.findByText(/belongs to a different address/i)).toBeInTheDocument()
   })
 })

@@ -60,13 +60,13 @@ export function stripDomainType(
  */
 export function assertTypedDataMatchesChain(data: ITypedData, expectedChainId: ChainId): void {
   if (typeof data.primaryType !== 'string' || data.primaryType.length === 0) {
-    throw new InvalidArgumentError('typedData.primaryType', 'основной тип не указан')
+    throw new InvalidArgumentError('typedData.primaryType', 'the primary type is missing')
   }
 
   if (!Object.prototype.hasOwnProperty.call(data.types, data.primaryType)) {
     throw new InvalidArgumentError(
       'typedData.primaryType',
-      `тип "${data.primaryType}" отсутствует в наборе типов`,
+      `the type "${data.primaryType}" is missing from the type set`,
     )
   }
 
@@ -77,7 +77,7 @@ export function assertTypedDataMatchesChain(data: ITypedData, expectedChainId: C
        подпись, действительную во всех сетях сразу. Отказ намеренный. */
     throw new InvalidArgumentError(
       'typedData.domain.chainId',
-      'структура без указания сети действительна во всех сетях одновременно',
+      'a structure without a chain identifier is valid in every network at once',
     )
   }
 
@@ -89,8 +89,8 @@ export function assertTypedDataMatchesChain(data: ITypedData, expectedChainId: C
   if (actual !== expectedChainId) {
     throw new InvalidArgumentError(
       'typedData.domain.chainId',
-      `структура предназначена для сети ${actual.toString()}, ` +
-        `активна сеть ${expectedChainId.toString()}`,
+      `the structure targets network ${actual.toString()}, ` +
+        `while network ${expectedChainId.toString()} is active`,
     )
   }
 }

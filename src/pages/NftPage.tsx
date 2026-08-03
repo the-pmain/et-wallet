@@ -59,7 +59,7 @@ export function NftPage() {
   if (sending !== null) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-semibold">Передача предмета</h1>
+        <h1 className="text-lg font-semibold">Transfer an item</h1>
 
         <NftTransferCard
           item={sending}
@@ -95,15 +95,16 @@ export function NftPage() {
             className={snapshot.isNftLoading ? 'size-4 animate-spin' : 'size-4'}
             aria-hidden
           />
-          Обновить
+          Refresh
         </Button>
       </header>
 
       {sentHash === null ? null : (
         <Alert>
           <AlertDescription>
-            Передача отправлена. Предмет исчезнет из списка, когда транзакция попадёт в блок; до тех
-            пор он числится за вами. Следите за состоянием в разделе «История».
+            The transfer has been sent. The item disappears from the list once the transaction lands
+            in a block; until then it is still counted as yours. Watch its state in the History
+            section.
           </AlertDescription>
         </Alert>
       )}
@@ -111,9 +112,9 @@ export function NftPage() {
       {limits?.sourceUnavailable === true ? (
         <Alert variant="danger">
           <AlertDescription>
-            Найти предметы не удалось: узел не ответил.
-            {limits.reason === null ? null : <> Он сообщил: «{limits.reason}».</>} Пустой список
-            здесь не означает, что коллекции нет.
+            The items could not be found: the node did not answer.
+            {limits.reason === null ? null : <> It reported: "{limits.reason}".</>} An empty list
+            here does not mean the collection is gone.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -121,9 +122,9 @@ export function NftPage() {
       {limits !== null && limits.skipped > 0 ? (
         <Alert variant="warning">
           <AlertDescription>
-            Показаны не все предметы: {limits.skipped.toLocaleString('ru-RU')} осталось
-            непроверенными. Принадлежность каждого требует отдельного обращения к контракту, и число
-            проверок ограничено, чтобы узел не отказал в обслуживании.
+            Not every item is shown: {limits.skipped.toLocaleString('en-GB')} remain unverified.
+            Ownership of each one takes a separate call to a contract, and the number of checks is
+            limited so that the node does not refuse service.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -133,20 +134,20 @@ export function NftPage() {
           {snapshot.isNftLoading && items === null ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
               <RefreshCw className="size-4 animate-spin" aria-hidden />
-              Ищем предметы…
+              Searching for items…
             </div>
           ) : items === null || items.length === 0 ? (
             <EmptyState
               icon={Images}
-              title="Предметов не найдено"
+              title="No items found"
               description={
                 <>
-                  Кошелёк просматривает последние{' '}
+                  The wallet scans the last{' '}
                   {limits === null || limits.scannedBlocks === null
-                    ? 'блоки'
-                    : `${limits.scannedBlocks.toLocaleString('ru-RU')} блоков`}{' '}
-                  и проверяет принадлежность каждого найденного предмета. Полученное раньше этого
-                  окна и с тех пор не двигавшееся сюда не попадёт — проверьте адрес в обозревателе.
+                    ? 'blocks'
+                    : `${limits.scannedBlocks.toLocaleString('en-GB')} blocks`}{' '}
+                  and checks ownership of every item it finds. Anything received before that window
+                  and not moved since will not appear here — check the address in an explorer.
                 </>
               }
               action={
@@ -158,7 +159,7 @@ export function NftPage() {
                       rel="noreferrer noopener"
                     >
                       <ExternalLink className="size-4" aria-hidden />
-                      Открыть в обозревателе
+                      Open in the explorer
                     </a>
                   </Button>
                 )
@@ -186,9 +187,9 @@ export function NftPage() {
       <Alert variant="warning">
         <ShieldAlert />
         <AlertDescription>
-          Изображения не загружаются намеренно. Ссылки на них задаёт автор контракта, и его сервер
-          увидел бы ваш IP-адрес рядом с адресом кошелька. Название коллекции тоже задаёт автор
-          контракта — сверяйте адрес контракта, а не имя.
+          Images are deliberately not loaded. Their links are set by the contract author, and their
+          server would see your IP address next to your wallet address. The collection name is set
+          by the contract author too — check the contract address, not the name.
         </AlertDescription>
       </Alert>
     </div>
@@ -220,7 +221,7 @@ function NftRow({
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium">
-            {item.collectionName ?? 'Коллекция без названия'}
+            {item.collectionName ?? 'Collection without a name'}
           </span>
           <Badge variant="outline">{item.standard}</Badge>
         </span>
@@ -236,7 +237,7 @@ function NftRow({
         ) : null}
 
         <Button variant="outline" size="sm" onClick={onSend}>
-          Передать
+          Transfer
         </Button>
 
         {explorer === null ? null : (
@@ -246,7 +247,7 @@ function NftRow({
             rel="noreferrer noopener"
             className="flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            Обозреватель
+            Explorer
             <ExternalLink className="size-3" aria-hidden />
           </a>
         )}

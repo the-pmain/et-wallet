@@ -30,17 +30,17 @@ export function AutoLockWarning({ isVisible, remainingMs, onExtend }: AutoLockWa
   return (
     <Alert variant="warning" className="sticky top-2 z-30">
       <Clock />
-      <AlertTitle>Кошелёк скоро заблокируется</AlertTitle>
+      <AlertTitle>The wallet is about to lock</AlertTitle>
       <AlertDescription className="flex flex-col items-start gap-2">
         <span>
           {seconds === null
-            ? 'Вы бездействовали, и сессия закроется.'
-            : `Вы бездействовали. Сессия закроется примерно через ${String(seconds)} с.`}{' '}
-          Средства при этом не затрагиваются: закроется только доступ, и его вернёт пароль.
+            ? 'You have been inactive, and the session is about to close.'
+            : `You have been inactive. The session closes in about ${String(seconds)} s.`}{' '}
+          Your funds are not affected: only access closes, and the password brings it back.
         </span>
 
         <Button size="sm" onClick={onExtend}>
-          Остаться в кошельке
+          Stay in the wallet
         </Button>
       </AlertDescription>
     </Alert>

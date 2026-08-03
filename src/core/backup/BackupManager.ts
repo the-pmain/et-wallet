@@ -123,8 +123,8 @@ export class BackupManager implements IBackupManager {
        оставлять действующее разрешение. */
     permit.consume()
 
-    this.#logger.warn('Выдана мнемоническая фраза', {
-      note: 'кошелёк воспроизводим целиком любым, кто её получил',
+    this.#logger.warn('Seed phrase revealed', {
+      note: 'anyone who obtains it can reproduce the whole wallet',
     })
 
     /* Разбор фразы заново, а не возврат строки из хранилища: вызывающий
@@ -157,8 +157,8 @@ export class BackupManager implements IBackupManager {
 
     const permit = await this.#exportGuard.confirm(request, acknowledgedRisk)
 
-    this.#logger.warn('Выдан приватный ключ аккаунта', {
-      note: 'адрес переходит под контроль получателя ключа безвозвратно',
+    this.#logger.warn('Account private key revealed', {
+      note: 'the address passes irreversibly under the control of whoever receives the key',
     })
 
     return await this.#accounts.exportPrivateKey(id, password, permit)
@@ -195,7 +195,7 @@ export class BackupManager implements IBackupManager {
 
     if (account.addressIndex === null) {
       throw new ExportNotPermittedError(
-        `аккаунт типа "${account.source}" не хранит извлекаемого приватного ключа`,
+        `an account of type "${account.source}" holds no extractable private key`,
       )
     }
 

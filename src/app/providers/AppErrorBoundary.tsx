@@ -41,7 +41,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     /* Единственное место в приложении, где вывод в консоль оправдан:
        иначе сведения о сбое исчезают вместе с деревом компонентов. */
-    console.error('Сбой отрисовки', error, info.componentStack)
+    console.error('Rendering failure', error, info.componentStack)
   }
 
   override render(): ReactNode {
@@ -53,21 +53,21 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6">
-        <h1 className="text-lg font-semibold">Приложение остановилось</h1>
+        <h1 className="text-lg font-semibold">The application stopped</h1>
 
         <p className="text-sm">
-          Средства на месте. Сбой произошёл в интерфейсе кошелька и не затрагивает ни ключи, ни
-          seed-фразу, ни то, что уже записано в блокчейне: они хранятся отдельно от того, что
-          рисуется на экране.
+          Your funds are safe. The failure happened in the wallet interface and touches neither the
+          keys, nor the seed phrase, nor anything already written to the blockchain: they are stored
+          separately from what is drawn on the screen.
         </p>
 
         <p className="text-sm">
-          Перезагрузите страницу. Если сбой повторяется, состояние адреса всегда можно проверить в
-          обозревателе блоков — кошелёк для этого не нужен.
+          Reload the page. If the failure repeats, the state of your address can always be checked
+          in a block explorer — the wallet is not needed for that.
         </p>
 
         <div className="flex flex-col gap-1.5 rounded-xl border p-3">
-          <span className="text-xs text-muted-foreground">Что сообщил браузер</span>
+          <span className="text-xs text-muted-foreground">What the browser reported</span>
           <span className="font-mono text-xs break-all">{reason}</span>
         </div>
 
@@ -78,11 +78,11 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
             globalThis.location.reload()
           }}
         >
-          Перезагрузить
+          Reload
         </button>
 
         <p className="text-xs text-muted-foreground">
-          Seed-фраза при перезагрузке не потребуется: кошелёк откроется тем же паролем.
+          The seed phrase is not needed to reload: the wallet opens with the same password.
         </p>
       </div>
     )

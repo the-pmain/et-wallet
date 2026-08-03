@@ -60,53 +60,53 @@ export function ReplaceTransactionCard({
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <h2 className="text-base font-semibold">
-              {isCancel ? 'Отмена транзакции' : 'Ускорение транзакции'}
+              {isCancel ? 'Cancelling a transaction' : 'Speeding up a transaction'}
             </h2>
             <p className="text-xs text-muted-foreground">
               {isCancel
-                ? 'Кошелёк отправит перевод самому себе на нулевую сумму с тем же номером и большей комиссией. Если сеть примет его первым, исходная операция не состоится.'
-                : 'Кошелёк повторит ту же операцию с тем же номером и большей комиссией. Сеть заменит прежнюю транзакцию новой.'}
+                ? 'The wallet will send a zero-value transfer to yourself with the same nonce and a higher fee. If the network accepts it first, the original operation will not happen.'
+                : 'The wallet will repeat the same operation with the same nonce and a higher fee. The network will replace the previous transaction with the new one.'}
             </p>
           </div>
 
           <dl className="flex flex-col gap-2 border-t pt-3 text-sm">
-            <Row label="Номер (nonce)">{String(transaction.nonce)}</Row>
-            <Row label="Получатель">{transaction.to ?? '—'}</Row>
-            <Row label="Сумма">
+            <Row label="Nonce">{String(transaction.nonce)}</Row>
+            <Row label="Recipient">{transaction.to ?? '—'}</Row>
+            <Row label="Amount">
               {formatTokenAmount(transaction.value, decimals)} {symbol}
             </Row>
-            <Row label="Максимальная комиссия">
+            <Row label="Maximum fee">
               {formatTokenAmount(maxFee, decimals)} {symbol}
             </Row>
-            <Row label="Лимит газа">{transaction.gasLimit.toString()}</Row>
+            <Row label="Gas limit">{transaction.gasLimit.toString()}</Row>
           </dl>
 
           <p className="text-xs text-muted-foreground">
-            Комиссия исходной транзакции не возвращается только в одном случае: если в блок попадёт
-            именно она. Невключённая транзакция не стоит ничего.
+            The fee of the original transaction is lost only in one case: if that transaction is the
+            one that lands in a block. A transaction that is never included costs nothing.
           </p>
         </CardContent>
       </Card>
 
       <Alert variant="warning">
-        <AlertTitle>Успех не гарантирован</AlertTitle>
+        <AlertTitle>Success is not guaranteed</AlertTitle>
         <AlertDescription>
           {isCancel
-            ? 'Исходная транзакция может попасть в блок раньше отменяющей — тогда перевод состоится, а отмена просто не будет принята. Следите за историей до тех пор, пока одна из них не подтвердится.'
-            : 'Узлы принимают замену только при заметно большей комиссии и не обязаны это делать. Если замену отклонят, исходная транзакция останется в очереди.'}
+            ? 'The original transaction may land in a block before the cancelling one — then the transfer happens and the cancellation is simply not accepted. Watch the history until one of them is confirmed.'
+            : 'Nodes accept a replacement only when the fee is noticeably higher, and they are not obliged to. If the replacement is rejected, the original transaction stays in the queue.'}
         </AlertDescription>
       </Alert>
 
       {error === null ? null : (
         <Alert variant="danger">
-          <AlertTitle>{isCancel ? 'Отменить не удалось' : 'Ускорить не удалось'}</AlertTitle>
+          <AlertTitle>{isCancel ? 'Cancelling failed' : 'Speeding up failed'}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {isConfirming ? (
         <ConfirmPassword
-          action={isCancel ? 'отмену транзакции' : 'ускорение транзакции'}
+          action={isCancel ? 'cancelling the transaction' : 'speeding up the transaction'}
           onVerify={verifyPassword}
           onConfirmed={() => {
             setConfirming(false)
@@ -131,11 +131,11 @@ export function ReplaceTransactionCard({
               onConfirm()
             }}
           >
-            {isBusy ? 'Отправка…' : isCancel ? 'Отправить отмену' : 'Отправить ускорение'}
+            {isBusy ? 'Sending…' : isCancel ? 'Send the cancellation' : 'Send the speed-up'}
           </Button>
 
           <Button variant="ghost" className="sm:flex-1" disabled={isBusy} onClick={onCancel}>
-            Ничего не делать
+            Do nothing
           </Button>
         </div>
       )}

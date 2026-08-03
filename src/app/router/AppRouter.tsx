@@ -83,7 +83,7 @@ function UnlockedOnly() {
 function LoadingScreen() {
   return (
     <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
-      Загрузка…
+      Loading…
     </div>
   )
 }
@@ -98,7 +98,7 @@ function LoadingScreen() {
 function SectionFallback() {
   return (
     <div className="flex min-h-40 items-center justify-center text-sm text-muted-foreground">
-      Загрузка…
+      Loading…
     </div>
   )
 }

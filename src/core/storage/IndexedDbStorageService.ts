@@ -239,7 +239,9 @@ export class IndexedDbStorageService implements IStorageService {
         resolve()
       }
       request.onerror = () => {
-        reject(new StorageUnavailableError('удаление базы не выполнено', { cause: request.error }))
+        reject(
+          new StorageUnavailableError('the database was not deleted', { cause: request.error }),
+        )
       }
       /* Удаление ждёт закрытия всех соединений. Другая вкладка, держащая
          базу открытой, заблокирует его — и это не ошибка, а причина,
@@ -247,7 +249,7 @@ export class IndexedDbStorageService implements IStorageService {
       request.onblocked = () => {
         reject(
           new StorageUnavailableError(
-            'база открыта в другой вкладке; закройте её и повторите сброс',
+            'the database is open in another tab; close it and repeat the reset',
           ),
         )
       }
@@ -271,7 +273,7 @@ export class IndexedDbStorageService implements IStorageService {
 
   async #openOnce(): Promise<IDBDatabase> {
     if (globalThis.indexedDB === undefined) {
-      throw new StorageUnavailableError('IndexedDB недоступен в этой среде')
+      throw new StorageUnavailableError('IndexedDB is unavailable in this environment')
     }
 
     await this.#requestPersistence()
@@ -298,7 +300,9 @@ export class IndexedDbStorageService implements IStorageService {
           reject(
             error instanceof Error
               ? error
-              : new StorageUnavailableError('миграция схемы не выполнена', { cause: error }),
+              : new StorageUnavailableError('the schema migration was not performed', {
+                  cause: error,
+                }),
           )
         })
       }
@@ -318,7 +322,7 @@ export class IndexedDbStorageService implements IStorageService {
 
       request.onerror = () => {
         reject(
-          new StorageUnavailableError('не удалось открыть базу', {
+          new StorageUnavailableError('the database could not be opened', {
             cause: request.error,
           }),
         )
@@ -327,7 +331,7 @@ export class IndexedDbStorageService implements IStorageService {
       request.onblocked = () => {
         reject(
           new StorageUnavailableError(
-            'обновление схемы заблокировано другой вкладкой; закройте её и обновите страницу',
+            'the schema upgrade is blocked by another tab; close it and reload the page',
           ),
         )
       }
@@ -411,7 +415,7 @@ export class IndexedDbStorageService implements IStorageService {
  */
 function toStorageKeyFromIdb(key: IDBValidKey): StorageKey {
   if (typeof key !== 'string') {
-    throw new StorageUnavailableError(`нестроковый ключ записи: ${typeof key}`)
+    throw new StorageUnavailableError(`a non-string record key: ${typeof key}`)
   }
 
   return key as StorageKey
@@ -424,7 +428,7 @@ async function promisify<TResult>(request: IDBRequest<TResult>): Promise<TResult
       resolve(request.result)
     }
     request.onerror = () => {
-      reject(request.error ?? new Error('Запрос к хранилищу отклонён без причины.'))
+      reject(request.error ?? new Error('The storage request was rejected without a reason.'))
     }
   })
 }
@@ -441,10 +445,10 @@ function trackCompletion(transaction: IDBTransaction): Promise<void> {
       resolve()
     }
     transaction.onerror = () => {
-      reject(transaction.error ?? new Error('Транзакция хранилища отклонена.'))
+      reject(transaction.error ?? new Error('The storage transaction was rejected.'))
     }
     transaction.onabort = () => {
-      reject(transaction.error ?? new Error('Транзакция хранилища прервана.'))
+      reject(transaction.error ?? new Error('The storage transaction was aborted.'))
     }
   })
 }

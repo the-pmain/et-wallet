@@ -165,7 +165,7 @@ export class NftService {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
 
-      this.#logger.warn('Список предметов недоступен', { reason })
+      this.#logger.warn('The list of items is unavailable', { reason })
 
       return {
         items: [],
@@ -241,7 +241,7 @@ export class NftService {
         } catch (error) {
           reason = error instanceof Error ? error.message : String(error)
 
-          this.#logger.warn('Выборка журналов отклонена узлом', { reason })
+          this.#logger.warn('The node rejected the log query', { reason })
 
           return null
         }
@@ -328,7 +328,7 @@ export class NftService {
       /* Сожжённый предмет — самый частый случай: `ownerOf` для него
          отвечает откатом. Отличить его от недоступности узла нечем,
          и оба означают «показывать нельзя». */
-      this.#logger.debug('Принадлежность предмета не подтверждена', {
+      this.#logger.debug('Ownership of the item was not confirmed', {
         reason: error instanceof Error ? error.message : String(error),
       })
 

@@ -28,27 +28,27 @@ function renderApp() {
 async function openSettings(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
-  await user.click(screen.getByRole('link', { name: 'Настройки' }))
-  await screen.findByRole('heading', { name: 'Настройки' })
+  await screen.findByText('Account 1')
+  await user.click(screen.getByRole('link', { name: 'Settings' }))
+  await screen.findByRole('heading', { name: 'Settings' })
 }
 
 /** Раскрывает форму добавления сети. */
 async function openAddForm(): Promise<void> {
   const user = userEvent.setup()
 
-  await user.click(screen.getByRole('button', { name: /добавить сеть/i }))
-  await screen.findByLabelText('Название сети')
+  await user.click(screen.getByRole('button', { name: /Add a network/i }))
+  await screen.findByLabelText('Network name')
 }
 
 /** Заполняет обязательные поля формы. */
 async function fillNetwork(name: string, chainId: number): Promise<void> {
   const user = userEvent.setup()
 
-  await user.type(screen.getByLabelText('Название сети'), name)
-  await user.type(screen.getByLabelText('Идентификатор сети'), String(chainId))
-  await user.type(screen.getByLabelText('RPC-адрес'), 'https://node.example')
-  await user.type(screen.getByLabelText('Символ валюты'), 'TST')
+  await user.type(screen.getByLabelText('Network name'), name)
+  await user.type(screen.getByLabelText('Chain ID'), String(chainId))
+  await user.type(screen.getByLabelText('RPC endpoint'), 'https://node.example')
+  await user.type(screen.getByLabelText('Currency symbol'), 'TST')
 }
 
 beforeEach(async () => {
@@ -66,7 +66,7 @@ describe('Сети: список', () => {
 
     /* Запрос ограничен карточкой сетей: имя активной сети встречается
        ещё и в шапке оболочки. */
-    const card = screen.getByText('Сети').closest('[data-slot=card]') as HTMLElement
+    const card = screen.getByText('Networks').closest('[data-slot=card]') as HTMLElement
 
     expect(within(card).getByText('Ethereum')).toBeInTheDocument()
     expect(within(card).getByText('Polygon')).toBeInTheDocument()
@@ -79,7 +79,9 @@ describe('Сети: список', () => {
     /* Конфигурация встроенной сети — часть защиты от подмены: удалив
        основную сеть, пользователь мог бы добавить вместо неё
        одноимённую с чужим идентификатором. */
-    expect(screen.queryByRole('button', { name: /удалить сеть Ethereum/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /remove network Ethereum/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('переключает активную сеть', async () => {
@@ -107,7 +109,7 @@ describe('Сети: добавление', () => {
     await openAddForm()
     await fillNetwork('My Private Chain', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
 
     await waitFor(() => {
       expect(screen.getByText('My Private Chain')).toBeInTheDocument()
@@ -122,13 +124,13 @@ describe('Сети: добавление', () => {
     await openAddForm()
     await fillNetwork('My Private Chain', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
 
     /* Различие между проверенной встроенной конфигурацией и добавленной
        вручную важно: у второй и узел, и обозреватель заданы тем,
        кто её добавил. */
     await waitFor(() => {
-      expect(screen.getByText('своя')).toBeInTheDocument()
+      expect(screen.getByText('custom')).toBeInTheDocument()
     })
   })
 
@@ -140,12 +142,12 @@ describe('Сети: добавление', () => {
     await openAddForm()
     await fillNetwork('Ethereum', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
 
     /* Сверка chainId с узлом этого не поймает: узел честно подтвердит
        свой идентификатор. */
-    expect(await screen.findByText('Сеть выдаёт себя за существующую')).toBeInTheDocument()
-    expect(screen.getByText(/типичный приём подмены сети/i)).toBeInTheDocument()
+    expect(await screen.findByText('The network impersonates an existing one')).toBeInTheDocument()
+    expect(screen.getByText(/a common network spoofing trick/i)).toBeInTheDocument()
   })
 
   it('не добавляет одноимённую сеть без согласия', async () => {
@@ -156,10 +158,10 @@ describe('Сети: добавление', () => {
     await openAddForm()
     await fillNetwork('Ethereum', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
-    await screen.findByText('Сеть выдаёт себя за существующую')
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
+    await screen.findByText('The network impersonates an existing one')
 
-    expect(screen.queryByText('своя')).not.toBeInTheDocument()
+    expect(screen.queryByText('custom')).not.toBeInTheDocument()
   })
 
   it('добавляет одноимённую сеть по явному согласию', async () => {
@@ -170,11 +172,11 @@ describe('Сети: добавление', () => {
     await openAddForm()
     await fillNetwork('Ethereum', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
-    await user.click(await screen.findByRole('button', { name: 'Всё равно добавить' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
+    await user.click(await screen.findByRole('button', { name: 'Add anyway' }))
 
     await waitFor(() => {
-      expect(screen.getByText('своя')).toBeInTheDocument()
+      expect(screen.getByText('custom')).toBeInTheDocument()
     })
   })
 
@@ -191,9 +193,9 @@ describe('Сети: добавление', () => {
 
     await openAddForm()
     await fillNetwork('My Private Chain', CUSTOM_CHAIN)
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
 
-    /* «Узел обслуживает другую сеть» и «адрес недоступен» требуют
+    /* «The node serves a different network» и «адрес недоступен» требуют
        разных действий: обобщение лишило бы пользователя возможности
        понять, что исправлять. */
     /* На экране несколько предупреждений: постоянное о доверии к узлу
@@ -202,7 +204,9 @@ describe('Сети: добавление', () => {
     await waitFor(() => {
       const alerts = screen.getAllByRole('alert').map((node) => node.textContent ?? '')
 
-      expect(alerts.some((text) => /Нет доступных RPC-узлов|chainId 137/.test(text))).toBe(true)
+      expect(alerts.some((text) => /No RPC endpoints are available|chainId 137/.test(text))).toBe(
+        true,
+      )
     })
   })
 
@@ -211,7 +215,7 @@ describe('Сети: добавление', () => {
     await openSettings()
     await openAddForm()
 
-    expect(screen.getByText(/задаёт тот, кто\s+добавляет сеть/i)).toBeInTheDocument()
+    expect(screen.getByText(/supplied by whoever\s+adds the network/i)).toBeInTheDocument()
   })
 })
 
@@ -224,12 +228,12 @@ describe('Сети: удаление', () => {
     await openAddForm()
     await fillNetwork('My Private Chain', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
     await waitFor(() => {
       expect(screen.getByText('My Private Chain')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Удалить сеть My Private Chain' }))
+    await user.click(screen.getByRole('button', { name: 'Remove network My Private Chain' }))
 
     await waitFor(() => {
       expect(screen.queryByText('My Private Chain')).not.toBeInTheDocument()
@@ -244,18 +248,18 @@ describe('Сети: удаление', () => {
     await openAddForm()
     await fillNetwork('My Private Chain', CUSTOM_CHAIN)
 
-    await user.click(screen.getByRole('button', { name: 'Добавить сеть' }))
+    await user.click(screen.getByRole('button', { name: 'Add network' }))
     await waitFor(() => {
       expect(screen.getByText('My Private Chain')).toBeInTheDocument()
     })
 
     await user.click(screen.getByText('My Private Chain'))
-    await user.click(screen.getByRole('button', { name: 'Удалить сеть My Private Chain' }))
+    await user.click(screen.getByRole('button', { name: 'Remove network My Private Chain' }))
 
     /* Удаление активной сети обязано оставить кошелёк в рабочем
        состоянии, а не в положении «активной сети нет». */
     await waitFor(() => {
-      const list = screen.getByText('Сети').closest('[data-slot=card]') as HTMLElement
+      const list = screen.getByText('Networks').closest('[data-slot=card]') as HTMLElement
 
       expect(within(list).getByText('Ethereum')).toBeInTheDocument()
     })

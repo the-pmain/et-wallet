@@ -47,10 +47,10 @@ function renderApp() {
  * подписку.
  */
 async function openConnections(): Promise<void> {
-  await screen.findByText('Аккаунт 1')
+  await screen.findByText('Account 1')
   window.location.hash = '#/wallet/connections'
 
-  await screen.findByRole('heading', { name: 'Подключения' })
+  await screen.findByRole('heading', { name: 'Connections' })
 
   await waitFor(() => {
     expect(services.dappSessions.getSnapshot().isReady).toBe(true)
@@ -64,7 +64,11 @@ function messageRequest(address: Address = OWNER): IDappRequest {
     sessionId: 'session-1',
     dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
     chainId: ETHEREUM,
-    payload: { kind: DAPP_REQUEST_KIND.SignMessage, address, message: 'Войти в приложение' },
+    payload: {
+      kind: DAPP_REQUEST_KIND.SignMessage,
+      address,
+      message: 'Sign in to the application',
+    },
   }
 }
 
@@ -101,7 +105,7 @@ describe('Подключения: экран', () => {
     renderApp()
     await openConnections()
 
-    expect(screen.getByText('Подключений нет')).toBeInTheDocument()
+    expect(screen.getByText('No connections')).toBeInTheDocument()
   })
 
   it('называет, что видит сервер WalletConnect', async () => {
@@ -110,14 +114,14 @@ describe('Подключения: экран', () => {
     renderApp()
     await openConnections()
 
-    expect(screen.getByText(/видит адреса ваших аккаунтов/i)).toBeInTheDocument()
+    expect(screen.getByText(/sees the addresses of your accounts/i)).toBeInTheDocument()
   })
 
   it('предупреждает не вставлять ссылки из писем', async () => {
     renderApp()
     await openConnections()
 
-    expect(screen.getByText(/Не вставляйте сюда ссылки/i)).toBeInTheDocument()
+    expect(screen.getByText(/Do not paste links/i)).toBeInTheDocument()
   })
 })
 
@@ -128,8 +132,8 @@ describe('Подключения: предложение', () => {
 
     services.dappTransport.emitProposal('p1', [ETHEREUM])
 
-    expect(await screen.findByText(/Приложение получит/i)).toBeInTheDocument()
-    expect(screen.getByText(/seed-фразу и приватные ключи/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The application will get/i)).toBeInTheDocument()
+    expect(screen.getByText(/the seed phrase or the private keys/i)).toBeInTheDocument()
   })
 
   it('предупреждает, что имя приложения непроверяемо', async () => {
@@ -138,7 +142,7 @@ describe('Подключения: предложение', () => {
 
     services.dappTransport.emitProposal('p1', [ETHEREUM])
 
-    expect(await screen.findByText(/Назваться известным сервисом/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Anyone can claim to be a/i)).toBeInTheDocument()
   })
 
   it('подключает по согласию', async () => {
@@ -148,7 +152,7 @@ describe('Подключения: предложение', () => {
     await openConnections()
 
     services.dappTransport.emitProposal('p1', [ETHEREUM])
-    await user.click(await screen.findByRole('button', { name: 'Разрешить подключение' }))
+    await user.click(await screen.findByRole('button', { name: 'Allow the connection' }))
 
     await waitFor(() => {
       expect(services.dappTransport.proposalAnswers).toHaveLength(1)
@@ -163,7 +167,7 @@ describe('Подключения: предложение', () => {
     await openConnections()
 
     services.dappTransport.emitProposal('p1', [ETHEREUM])
-    await user.click(await screen.findByRole('button', { name: 'Отклонить' }))
+    await user.click(await screen.findByRole('button', { name: 'Reject' }))
 
     await waitFor(() => {
       expect(services.dappTransport.proposalAnswers.at(-1)?.[1]).toBeNull()
@@ -179,7 +183,7 @@ describe('Подключения: запрос подписи', () => {
 
     services.dappTransport.emitRequest(messageRequest())
 
-    expect(await screen.findByText('Войти в приложение')).toBeInTheDocument()
+    expect(await screen.findByText('Sign in to the application')).toBeInTheDocument()
   })
 
   it('предупреждает о разрешении на токены', async () => {
@@ -188,7 +192,9 @@ describe('Подключения: запрос подписи', () => {
 
     services.dappTransport.emitRequest(unlimitedPermitRequest())
 
-    expect(await screen.findByText('Подпись отдаёт распоряжение токенами')).toBeInTheDocument()
+    expect(
+      await screen.findByText('This signature hands over control of your tokens'),
+    ).toBeInTheDocument()
   })
 
   it('предупреждает о неограниченной сумме', async () => {
@@ -199,7 +205,7 @@ describe('Подключения: запрос подписи', () => {
 
     services.dappTransport.emitRequest(unlimitedPermitRequest())
 
-    expect(await screen.findByText('Сумма разрешения не ограничена')).toBeInTheDocument()
+    expect(await screen.findByText('The approved amount is unlimited')).toBeInTheDocument()
   })
 
   it('оговаривает, что подпись не отзывается', async () => {
@@ -208,7 +214,7 @@ describe('Подключения: запрос подписи', () => {
 
     services.dappTransport.emitRequest(messageRequest())
 
-    expect(await screen.findByText(/Подпись отозвать невозможно/i)).toBeInTheDocument()
+    expect(await screen.findByText(/A signature cannot be revoked/i)).toBeInTheDocument()
   })
 
   it('подписывает после подтверждения и пароля', async () => {
@@ -221,10 +227,10 @@ describe('Подключения: запрос подписи', () => {
     await openConnections()
 
     services.dappTransport.emitRequest(messageRequest())
-    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }))
 
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await waitFor(() => {
       expect(services.dappTransport.responses).toHaveLength(1)
@@ -245,9 +251,9 @@ describe('Подключения: запрос подписи', () => {
     await openConnections()
 
     services.dappTransport.emitRequest(messageRequest())
-    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByLabelText('Пароль')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument()
     expect(services.dappTransport.responses).toHaveLength(0)
   })
 
@@ -258,12 +264,12 @@ describe('Подключения: запрос подписи', () => {
     await openConnections()
 
     services.dappTransport.emitRequest(messageRequest())
-    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }))
 
-    await user.type(await screen.findByLabelText('Пароль'), 'Sobaka-9-Solnce!')
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.type(await screen.findByLabelText('Password'), 'Sobaka-9-Solnce!')
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByText('Неверный пароль.')).toBeInTheDocument()
+    expect(await screen.findByText('Wrong password.')).toBeInTheDocument()
     expect(services.dappTransport.responses).toHaveLength(0)
   })
 
@@ -274,7 +280,7 @@ describe('Подключения: запрос подписи', () => {
     await openConnections()
 
     services.dappTransport.emitRequest(messageRequest())
-    await user.click(await screen.findByRole('button', { name: 'Отклонить' }))
+    await user.click(await screen.findByRole('button', { name: 'Reject' }))
 
     await waitFor(() => {
       expect(services.dappTransport.responses.at(-1)?.response.kind).toBe('rejected')
@@ -293,7 +299,7 @@ describe('Подключения: запрос подписи', () => {
       expect(services.dappTransport.responses.at(-1)?.response.kind).toBe('rejected')
     })
 
-    expect(screen.queryByText('Войти в приложение')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sign in to the application')).not.toBeInTheDocument()
   })
 })
 
@@ -306,16 +312,16 @@ describe('Подключения: отключение сессий', () => {
 
     services.dappTransport.emitConnected({
       id: 'session-1',
-      dapp: { name: 'Биржа', url: 'https://example.com', description: null, iconUrl: null },
+      dapp: { name: 'Exchange', url: 'https://example.com', description: null, iconUrl: null },
       chainIds: [ETHEREUM],
       addresses: [OWNER],
       connectedAt: 0,
       expiresAt: null,
     })
 
-    expect(await screen.findByText('Биржа')).toBeInTheDocument()
+    expect(await screen.findByText('Exchange')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Отключить Биржа/i }))
+    await user.click(screen.getByRole('button', { name: /Disconnect Exchange/i }))
 
     await waitFor(() => {
       expect(services.dappTransport.disconnected).toEqual(['session-1'])
@@ -350,7 +356,7 @@ describe('Подключения: развёртывание контракта'
 
     services.dappTransport.emitRequest(deploymentRequest())
 
-    expect(await screen.findByText('Разворачивается контракт')).toBeInTheDocument()
+    expect(await screen.findByText('A contract is being deployed')).toBeInTheDocument()
   })
 
   it('подписывается развёртывание, а не перевод самому себе', async () => {
@@ -364,9 +370,9 @@ describe('Подключения: развёртывание контракта'
     await openConnections()
 
     services.dappTransport.emitRequest(deploymentRequest())
-    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await waitFor(() => {
       expect(services.dappTransport.responses).toHaveLength(1)

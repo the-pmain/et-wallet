@@ -318,17 +318,17 @@ export function SendPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" aria-label="Назад">
+        <Button asChild variant="ghost" size="icon" aria-label="Back">
           <Link to="/wallet">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Отправка</h1>
+        <h1 className="text-lg font-semibold">Send</h1>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Откуда</CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">From</CardTitle>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-3">
@@ -353,12 +353,13 @@ export function SendPage() {
               значило бы дать два места смены одного и того же состояния
               и получить расхождение между ними. */}
           <p className="text-xs text-muted-foreground">
-            Сеть и аккаунт меняются в настройках. Перевод уйдёт из сети {network?.name ?? '—'} с
-            показанного адреса.
+            The network and the account are changed in the settings. The transfer leaves the{' '}
+            {network?.name ?? '—'}
+            network from the address shown above.
           </p>
 
           <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Доступно</span>
+            <span className="text-muted-foreground">Available</span>
             <span className="tabular-nums">
               {available === null ? '—' : `${formatTokenAmount(available, decimals)} ${symbol}`}
             </span>
@@ -375,11 +376,11 @@ export function SendPage() {
             }}
           >
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}-to`}>Адрес получателя или имя ENS</Label>
+              <Label htmlFor={`${fieldId}-to`}>Recipient address or ENS name</Label>
               <Input
                 id={`${fieldId}-to`}
                 value={recipient}
-                placeholder="0x… или имя.eth"
+                placeholder="0x… or name.eth"
                 autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -398,7 +399,7 @@ export function SendPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}-asset`}>Что отправить</Label>
+              <Label htmlFor={`${fieldId}-asset`}>What to send</Label>
               <select
                 id={`${fieldId}-asset`}
                 value={assetAddress ?? NATIVE_ASSET_VALUE}
@@ -423,7 +424,7 @@ export function SendPage() {
                     value={item.token.address ?? NATIVE_ASSET_VALUE}
                   >
                     {item.token.symbol}
-                    {item.token.isCustom ? ' — добавлен вручную' : ''}
+                    {item.token.isCustom ? ' — added by hand' : ''}
                   </option>
                 ))}
               </select>
@@ -433,13 +434,13 @@ export function SendPage() {
                    с чужим символом может кто угодно. Адрес контракта —
                    единственное, что отличает настоящий USDC от поддельного. */
                 <p className="text-xs break-all text-muted-foreground">
-                  Контракт: <span className="font-mono">{token.address}</span>
+                  Contract: <span className="font-mono">{token.address}</span>
                 </p>
               )}
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}-amount`}>Сумма, {symbol}</Label>
+              <Label htmlFor={`${fieldId}-amount`}>Amount, {symbol}</Label>
               <Input
                 id={`${fieldId}-amount`}
                 value={amount}
@@ -454,7 +455,7 @@ export function SendPage() {
             </div>
 
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm font-medium">Скорость</legend>
+              <legend className="mb-1 text-sm font-medium">Speed</legend>
               <div className="grid grid-cols-3 gap-2">
                 {FEE_LEVELS.map((level) => (
                   <button
@@ -490,7 +491,7 @@ export function SendPage() {
               }
             >
               <Send className="size-4" aria-hidden />
-              {isBusy ? 'Оценка комиссии…' : 'Далее'}
+              {isBusy ? 'Estimating the fee…' : 'Next'}
             </Button>
           </form>
         </CardContent>
@@ -520,7 +521,7 @@ interface RecipientHintProps {
  */
 function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHintProps) {
   if (isResolving) {
-    return <p className="text-xs text-muted-foreground">Проверка…</p>
+    return <p className="text-xs text-muted-foreground">Checking…</p>
   }
 
   switch (resolution.status) {
@@ -530,15 +531,16 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
     case RECIPIENT_STATUS.Address:
       return resolution.name === null ? null : (
         <p className="text-xs text-muted-foreground">
-          Имя этого адреса: <span className="font-medium text-foreground">{resolution.name}</span>.
-          Имя подтверждено прямым разрешением.
+          The name of this address:{' '}
+          <span className="font-medium text-foreground">{resolution.name}</span>. The name is
+          confirmed by forward resolution.
         </p>
       )
 
     case RECIPIENT_STATUS.NameResolved:
       return (
         <p className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          <span>Имя разрешено в адрес:</span>
+          <span>The name resolves to the address:</span>
           <span className="font-mono break-all text-foreground">{resolution.address}</span>
           {/* ENSIP-15 запрещает смешивать письменности внутри метки,
               но имя, целиком записанное другой письменностью, остаётся
@@ -546,8 +548,8 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
               нельзя, промолчать о нём тоже. */}
           {resolution.isAscii ? null : (
             <span>
-              Имя записано не латиницей. Похожие по виду имена принадлежат разным людям — сверьте
-              адрес с тем, который вам назвали.
+              The name is not written in Latin script. Names that look alike belong to different
+              people — check the address against the one you were given.
             </span>
           )}
         </p>
@@ -556,15 +558,15 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
     case RECIPIENT_STATUS.NameNotFound:
       return (
         <p className="text-xs text-destructive">
-          Записи для этого имени нет. Проверьте написание — средства уйдут только на адрес.
+          There is no record for this name. Check the spelling — funds only ever go to an address.
         </p>
       )
 
     case RECIPIENT_STATUS.NameUnsupported:
       return (
         <p className="text-xs text-destructive">
-          Имя не проходит проверку ENS: в одной части имени смешаны разные письменности либо
-          использован запрещённый символ. Так подделывают имена под чужие — вводите адрес.
+          The name fails the ENS check: one label mixes different scripts or uses a forbidden
+          character. That is how names are forged to pass for others — enter an address instead.
         </p>
       )
 
@@ -572,22 +574,23 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
       return (
         <p className="text-xs text-muted-foreground">
           {isEnsSupported
-            ? 'Имена ENS сейчас недоступны.'
-            : 'Реестр ENS существует только в сети Ethereum. В текущей сети имя разрешить нечем — введите адрес.'}
+            ? 'ENS names are unavailable right now.'
+            : 'The ENS registry exists only in the Ethereum network. In the current network there is nothing to resolve the name with — enter an address.'}
         </p>
       )
 
     case RECIPIENT_STATUS.Failed:
       return (
         <p className="text-xs text-destructive">
-          Проверить имя не удалось: узел не ответил. Это не значит, что имени не существует.
+          The name could not be checked: the node did not answer. That does not mean the name does
+          not exist.
         </p>
       )
 
     case RECIPIENT_STATUS.Invalid:
       return (
         <p className="text-xs text-muted-foreground">
-          Введите адрес из 42 символов, начинающийся с 0x, либо имя ENS вида имя.eth.
+          Enter a 42-character address starting with 0x, or an ENS name such as name.eth.
         </p>
       )
   }
@@ -595,9 +598,9 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
 
 /** Уровни срочности в порядке возрастания. */
 const FEE_LEVELS: readonly { value: FeePriority; label: string }[] = [
-  { value: FEE_PRIORITY.Low, label: 'Обычная' },
-  { value: FEE_PRIORITY.Medium, label: 'Быстрая' },
-  { value: FEE_PRIORITY.High, label: 'Срочная' },
+  { value: FEE_PRIORITY.Low, label: 'Normal' },
+  { value: FEE_PRIORITY.Medium, label: 'Fast' },
+  { value: FEE_PRIORITY.High, label: 'Urgent' },
 ]
 
 /**
@@ -696,10 +699,10 @@ function ConfirmTransfer({
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="Назад" onClick={onBack}>
+        <Button variant="ghost" size="icon" aria-label="Back" onClick={onBack}>
           <ArrowLeft className="size-4" aria-hidden />
         </Button>
-        <h1 className="text-lg font-semibold">Подтверждение</h1>
+        <h1 className="text-lg font-semibold">Confirmation</h1>
       </header>
 
       <Card>
@@ -711,14 +714,14 @@ function ConfirmTransfer({
             <span className="text-xs text-muted-foreground">{networkName}</span>
             {token === null ? null : (
               <span className="text-xs text-muted-foreground">
-                Токен {token.name}
-                {token.isCustom ? ', добавлен вручную' : ''}
+                Token {token.name}
+                {token.isCustom ? ', added by hand' : ''}
               </span>
             )}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Получатель</span>
+            <span className="text-xs text-muted-foreground">Recipient</span>
 
             {/* Имя выводится НАД адресом и не заменяет его. Подписывается
                 адрес: показать вместо него имя значило бы показать не то,
@@ -732,8 +735,8 @@ function ConfirmTransfer({
 
             {recipientName === null ? null : (
               <span className="text-xs text-muted-foreground">
-                Адрес получен из имени ENS. Сверьте его с тем, который вам назвали: имя может
-                указывать на другой адрес, чем вчера.
+                The address came from an ENS name. Check it against the one you were given: a name
+                may point to a different address than it did yesterday.
               </span>
             )}
           </div>
@@ -744,37 +747,37 @@ function ConfirmTransfer({
                умолчать об этом значит показать одно, а подписать другое. */
             <div className="flex flex-col gap-1.5 rounded-xl border p-3">
               <span className="text-xs text-muted-foreground">
-                Транзакция будет отправлена контракту токена
+                The transaction will be sent to the token contract
               </span>
               <span className="font-mono text-sm break-all">{transaction.to ?? '—'}</span>
               <span className="text-xs text-muted-foreground">
-                Так работает перевод токена: контракт переписывает {symbol} на адрес получателя.
-                Самой валюты {'«'}
+                This is how a token transfer works: the contract reassigns {symbol} to the recipient
+                address. Zero {'«'}
                 {networkName}
-                {'»'} при этом переводится ноль — списывается только комиссия.
+                {'»'} is transferred — only the fee is charged.
               </span>
             </div>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Отправитель</span>
+            <span className="text-xs text-muted-foreground">Sender</span>
             <span className="font-mono text-sm break-all">{transaction.from}</span>
           </div>
 
           <dl className="flex flex-col gap-2 border-t pt-3 text-sm">
-            <Row label="Максимальная комиссия">
+            <Row label="Maximum fee">
               {formatTokenAmount(maxFee, decimals)} {symbol}
             </Row>
-            <Row label="Лимит газа">{transaction.gasLimit.toString()}</Row>
-            <Row label="Номер (nonce)">{String(transaction.nonce)}</Row>
-            <Row label="Тип">
+            <Row label="Gas limit">{transaction.gasLimit.toString()}</Row>
+            <Row label="Nonce">{String(transaction.nonce)}</Row>
+            <Row label="Type">
               {transaction.type === TRANSACTION_TYPE.Eip1559 ? 'EIP-1559' : 'Legacy'}
             </Row>
             <Row label="chainId">{transaction.chainId.toString()}</Row>
           </dl>
 
           <p className="text-xs text-muted-foreground">
-            Списано будет не больше указанной комиссии; неизрасходованный газ вернётся.
+            No more than the stated fee will be charged; unspent gas is returned.
           </p>
         </CardContent>
       </Card>
@@ -785,18 +788,18 @@ function ConfirmTransfer({
 
       {error === null ? null : (
         <Alert variant="danger">
-          <AlertTitle>Отправить не удалось</AlertTitle>
+          <AlertTitle>Sending failed</AlertTitle>
           <AlertDescription>
-            {error} Если узел не ответил, судьба перевода неизвестна: возможно, он принят. Проверьте
-            историю и обозреватель прежде, чем отправлять повторно.
+            {error} If the node did not answer, the fate of the transfer is unknown: it may have
+            been accepted. Check the history and an explorer before sending again.
           </AlertDescription>
         </Alert>
       )}
 
       <Alert variant="warning">
         <AlertDescription>
-          Перевод в блокчейне необратим. Отменить его после отправки невозможно ни кошельком, ни
-          поддержкой.
+          A transfer on the blockchain cannot be undone. Neither the wallet nor support can cancel
+          it after sending.
         </AlertDescription>
       </Alert>
 
@@ -805,7 +808,7 @@ function ConfirmTransfer({
           по умолчанию: цена ошибки здесь — все средства. */}
       {isConfirming ? (
         <ConfirmPassword
-          action="отправку перевода"
+          action="sending the transfer"
           onVerify={verifyPassword}
           onConfirmed={() => {
             setConfirming(false)
@@ -830,7 +833,7 @@ function ConfirmTransfer({
             onConfirm()
           }}
         >
-          {isBusy ? 'Отправка…' : 'Подтвердить и отправить'}
+          {isBusy ? 'Sending…' : 'Confirm and send'}
         </Button>
       )}
     </div>
@@ -851,9 +854,9 @@ function RiskAlert({ risk }: { readonly risk: string }) {
     return (
       <Alert variant="danger">
         <Flame />
-        <AlertTitle>Адрес сжигания</AlertTitle>
+        <AlertTitle>Burn address</AlertTitle>
         <AlertDescription>
-          Средства, отправленные на этот адрес, исчезнут безвозвратно: получить их не сможет никто.
+          Funds sent to this address disappear for good: nobody will be able to retrieve them.
         </AlertDescription>
       </Alert>
     )
@@ -863,8 +866,8 @@ function RiskAlert({ risk }: { readonly risk: string }) {
     return (
       <Alert variant="warning">
         <AlertDescription>
-          Получатель совпадает с отправителем. Перевод состоится, но средства останутся на том же
-          адресе, а комиссия будет списана.
+          The recipient is the same as the sender. The transfer will happen, but the funds stay at
+          the same address while the fee is charged.
         </AlertDescription>
       </Alert>
     )
@@ -874,12 +877,12 @@ function RiskAlert({ risk }: { readonly risk: string }) {
     return (
       <Alert variant="danger">
         <FileCode />
-        <AlertTitle>Получатель — контракт</AlertTitle>
+        <AlertTitle>The recipient is a contract</AlertTitle>
         <AlertDescription>
-          По этому адресу размещён код, а не обычный кошелёк. Монеты, отправленные контракту,
-          который их не принимает, теряются безвозвратно: вернуть их может только код самого
-          контракта, а его может не оказаться. Самый частый случай — перевод монет на адрес
-          токен-контракта.
+          This address holds code, not an ordinary wallet. Coins sent to a contract that does not
+          accept them are lost for good: only the code of the contract itself could return them, and
+          it may not be there. The most common case is sending coins to the address of a token
+          contract.
         </AlertDescription>
       </Alert>
     )
@@ -889,8 +892,8 @@ function RiskAlert({ risk }: { readonly risk: string }) {
     <Alert variant="warning">
       <ShieldAlert />
       <AlertDescription>
-        Адрес записан без контрольной суммы: опечатка в нём не обнаруживается. Сверьте адрес
-        посимвольно — перевод на ошибочный адрес необратим.
+        The address is written without a checksum: a typo in it goes unnoticed. Check the address
+        character by character — a transfer to a wrong address cannot be undone.
       </AlertDescription>
     </Alert>
   )
@@ -912,23 +915,23 @@ function SendResult({
         </span>
 
         <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Транзакция отправлена</h1>
+          <h1 className="text-lg font-semibold">Transaction sent</h1>
           <p className="text-sm text-muted-foreground">
-            Она принята узлом и ожидает включения в блок.
+            It has been accepted by the node and is waiting to be included in a block.
           </p>
         </div>
       </div>
 
       <Card>
         <CardContent className="flex flex-col gap-2">
-          <span className="text-xs text-muted-foreground">Хэш транзакции</span>
+          <span className="text-xs text-muted-foreground">Transaction hash</span>
           <span className="font-mono text-sm break-all">{hash}</span>
 
           {explorer === null ? null : (
             <Button asChild variant="outline" size="sm" className="mt-2">
               <a href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer noopener">
                 <ExternalLink className="size-4" aria-hidden />
-                Открыть в обозревателе
+                Open in the explorer
               </a>
             </Button>
           )}
@@ -937,12 +940,13 @@ function SendResult({
 
       <Alert>
         <AlertDescription>
-          Принятие узлом не означает включения в блок. Состояние обновится в разделе «История».
+          Acceptance by a node does not mean inclusion in a block. The state updates in the History
+          section.
         </AlertDescription>
       </Alert>
 
       <Button asChild size="lg">
-        <Link to="/wallet">Вернуться в кошелёк</Link>
+        <Link to="/wallet">Back to the wallet</Link>
       </Button>
     </div>
   )

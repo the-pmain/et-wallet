@@ -290,7 +290,7 @@ export class RpcClient implements IProvider {
     this.#provider.destroy()
     this.#events.emit('provider:disconnected', {
       chainId: this.chainId,
-      reason: 'соединение закрыто вызывающим кодом',
+      reason: 'the connection was closed by the caller',
     })
     this.#events.removeAllListeners()
   }

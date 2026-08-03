@@ -22,7 +22,7 @@ function renderApp() {
 }
 
 async function findDashboard(): Promise<HTMLElement> {
-  return await screen.findByText('Аккаунт 1')
+  return await screen.findByText('Account 1')
 }
 
 beforeEach(async () => {
@@ -38,9 +38,9 @@ describe('Навигация кошелька', () => {
     renderApp()
     await findDashboard()
 
-    const navigation = screen.getByRole('navigation', { name: 'Разделы кошелька' })
+    const navigation = screen.getByRole('navigation', { name: 'Wallet sections' })
 
-    for (const label of ['Кошелёк', 'Активы', 'NFT', 'История', 'Настройки']) {
+    for (const label of ['Wallet', 'Assets', 'NFT', 'Activity', 'Settings']) {
       expect(within(navigation).getByRole('link', { name: label })).toBeInTheDocument()
     }
   })
@@ -51,9 +51,9 @@ describe('Навигация кошелька', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Активы' }))
+    await user.click(screen.getByRole('link', { name: 'Assets' }))
 
-    expect(await screen.findByRole('heading', { name: 'Активы' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
   })
 
   it('открывает раздел NFT', async () => {
@@ -73,9 +73,9 @@ describe('Навигация кошелька', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'История' }))
+    await user.click(screen.getByRole('link', { name: 'Activity' }))
 
-    expect(await screen.findByRole('heading', { name: 'История' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
   })
 
   it('открывает раздел настроек', async () => {
@@ -84,9 +84,9 @@ describe('Навигация кошелька', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Настройки' }))
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
 
-    expect(await screen.findByRole('heading', { name: 'Настройки' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 
   it('сохраняет шапку при переходе между разделами', async () => {
@@ -95,12 +95,12 @@ describe('Навигация кошелька', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Активы' }))
+    await user.click(screen.getByRole('link', { name: 'Assets' }))
 
     /* Шапка и навигация вынесены в общий маршрут-лейаут: их пересоздание
        на каждом экране давало бы мерцание при переходе. */
-    expect(screen.getByText('Аккаунт 1')).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Разделы кошелька' })).toBeInTheDocument()
+    expect(screen.getByText('Account 1')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
   })
 })
 
@@ -114,7 +114,7 @@ describe('Доступ к разделам кошелька', () => {
     /* Прямой переход по адресу обязан приводить к экрану пароля:
        иначе пользователь увидит части интерфейса, доступ к которым
        не подтверждал. */
-    expect(await screen.findByText('С возвращением')).toBeInTheDocument()
+    expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 })
 
@@ -125,12 +125,12 @@ describe('Раздел активов', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Активы' }))
+    await user.click(screen.getByRole('link', { name: 'Assets' }))
 
     /* Список известных токенов не подставляется: показанный в кошельке
        токен выглядит одобренным, а прислать приманку с именем известного
        проекта может кто угодно. Добавляет пользователь. */
-    expect(await screen.findByRole('button', { name: /импорт токена/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Import a token/i })).toBeInTheDocument()
   })
 
   it('показывает нативную валюту сети', async () => {
@@ -139,7 +139,7 @@ describe('Раздел активов', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Активы' }))
+    await user.click(screen.getByRole('link', { name: 'Assets' }))
 
     expect(await screen.findByText('Ether')).toBeInTheDocument()
   })
@@ -156,8 +156,8 @@ describe('Раздел NFT', () => {
 
     await user.click(screen.getByRole('link', { name: 'NFT' }))
 
-    expect(await screen.findByText('Предметов не найдено')).toBeInTheDocument()
-    expect(screen.getByText(/просматривает последние/i)).toBeInTheDocument()
+    expect(await screen.findByText('No items found')).toBeInTheDocument()
+    expect(screen.getByText(/scans the last/i)).toBeInTheDocument()
   })
 
   it('предупреждает о раскрытии IP при загрузке изображений', async () => {
@@ -168,7 +168,7 @@ describe('Раздел NFT', () => {
 
     await user.click(screen.getByRole('link', { name: 'NFT' }))
 
-    expect(await screen.findByText(/увидел бы ваш IP-адрес/i)).toBeInTheDocument()
+    expect(await screen.findByText(/would see your IP address/i)).toBeInTheDocument()
   })
 })
 
@@ -179,8 +179,8 @@ describe('Раздел настроек', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Настройки' }))
-    await user.click(await screen.findByRole('button', { name: 'Тёмная' }))
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
+    await user.click(await screen.findByRole('button', { name: 'Dark' }))
 
     expect(document.documentElement).toHaveClass('dark')
   })
@@ -191,11 +191,11 @@ describe('Раздел настроек', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Настройки' }))
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
 
-    expect(await screen.findByText('Аккаунты')).toBeInTheDocument()
-    expect(screen.getByText('Сети')).toBeInTheDocument()
-    expect(screen.getByText('RPC-узлы')).toBeInTheDocument()
+    expect(await screen.findByText('Accounts')).toBeInTheDocument()
+    expect(screen.getByText('Networks')).toBeInTheDocument()
+    expect(screen.getByText('RPC nodes')).toBeInTheDocument()
   })
 
   it('даёт выбрать срок автоблокировки', async () => {
@@ -208,10 +208,10 @@ describe('Раздел настроек', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Настройки' }))
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
 
-    expect(await screen.findByText('Блокировать после бездействия')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '15 мин' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('Lock after inactivity')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '15 min' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('объясняет, чем опасен разблокированный кошелёк', async () => {
@@ -220,8 +220,8 @@ describe('Раздел настроек', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'Настройки' }))
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
 
-    expect(await screen.findByText(/держит ключи в памяти/i)).toBeInTheDocument()
+    expect(await screen.findByText(/keeps the keys in memory/i)).toBeInTheDocument()
   })
 })

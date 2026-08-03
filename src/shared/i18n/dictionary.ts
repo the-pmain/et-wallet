@@ -1,5 +1,5 @@
 /**
- * Словари интерфейса.
+ * Словарь интерфейса.
  *
  * ПОЧЕМУ БЕЗ БИБЛИОТЕКИ. `i18next` с реактовской обвязкой добавляет
  * к бандлу десятки килобайт ради возможностей, которых здесь нет:
@@ -7,112 +7,25 @@
  * подстановки по числам во многих формах и разбора ICU. Нужен словарь
  * и функция подстановки — это тридцать строк.
  *
- * КЛЮЧИ ТИПИЗИРОВАНЫ. Русский словарь объявлен первым и служит
- * образцом: английский обязан содержать ровно те же ключи, иначе
- * сборка не пройдёт. Пропущенный перевод в кошельке — это пустая
- * строка на месте предупреждения о риске.
- *
- * ОБЪЁМ ЭТОГО ЭТАПА. Переведены экраны входа, панель и навигация.
- * Остальные экраны остаются на русском и переводятся следующими
- * этапами; отсутствие ключа для них — не ошибка, они просто пока
- * не обращаются к словарю.
+ * ЯЗЫК ОДИН. Кошелёк говорит по-английски: это язык, на котором
+ * написаны стандарты, названия сетей и сообщения узлов, и смешение
+ * с переводом порождало бы фразы вроде «Недостаточно средств для gas».
+ * Механизм подстановки сохранён — он понадобится, когда языков станет
+ * больше, — но выбора языка в интерфейсе нет.
  */
 
 /** Поддерживаемые языки. */
 export const LANGUAGE = {
-  Russian: 'ru',
   English: 'en',
 } as const
 
 export type Language = (typeof LANGUAGE)[keyof typeof LANGUAGE]
 
-/** Язык по умолчанию. Используется, когда выбор не сделан и не угадан. */
-export const DEFAULT_LANGUAGE: Language = LANGUAGE.Russian
+/** Язык по умолчанию и единственный. */
+export const DEFAULT_LANGUAGE: Language = LANGUAGE.English
 
-const RUSSIAN = {
-  /* Общее */
-  'common.back': 'Назад',
-  'common.next': 'Далее',
-  'common.cancel': 'Отмена',
-  'common.language': 'Язык',
-
-  /* Приветствие */
-  'welcome.tagline': 'Ваши ключи. Ваша криптовалюта.',
-  'welcome.headline': 'Ваши ключи остаются у вас',
-  'welcome.subtitle': '{app} хранит приватные ключи зашифрованными на вашем устройстве.',
-  'welcome.create': 'Создать новый кошелёк',
-  'welcome.import': 'Импортировать по seed-фразе',
-  'welcome.notice':
-    'Доступ восстанавливается только seed-фразой: мы не храним ключи и не сможем помочь при её утрате. Никакая поддержка никогда не попросит эту фразу — такая просьба означает попытку кражи.',
-  'welcome.noticeTestMode':
-    'Вход по seed-фразе временно отключён для тестирования. Восстановить кошелёк при забытом пароле сейчас нечем: сохраните фразу, показанную при создании.',
-
-  /* Создание кошелька */
-  'create.title': 'Создайте кошелёк',
-  'create.description': 'Имя подписывает кошелёк, пароль его шифрует',
-  'create.phraseTitle': 'Сохраните seed-фразу',
-  'create.phraseDescription': 'Двенадцать слов, восстанавливающих доступ',
-  'create.confirmTitle': 'Проверим, что вы записали',
-  'create.confirmDescription': 'Выберите слова, которые стоят на указанных местах',
-  'create.username': 'Имя пользователя',
-  'create.usernamePlaceholder': 'Например, Дмитрий',
-  'create.usernameNotice':
-    'Имя хранится только на этом устройстве и подписывает кошелёк в интерфейсе. Это не учётная запись: восстановить доступ по имени невозможно, и обращаться за этим некуда.',
-  'create.passwordNotice':
-    'Пароль защищает кошелёк только на этом устройстве. Он не восстанавливает доступ и не заменяет seed-фразу.',
-  'create.acknowledge':
-    'Я записал фразу и понимаю, что без неё доступ к средствам восстановить невозможно',
-  'create.skipConfirmationNotice':
-    'Проверка записанной фразы временно отключена для ускоренного тестирования. Кошелёк будет создан сразу. Если фраза нигде не записана, потеря устройства означает потерю средств безвозвратно.',
-  'create.showPhrase': 'Показать фразу',
-  'create.submit': 'Создать кошелёк',
-  'create.encrypting': 'Шифрование…',
-  'create.failed': 'Не удалось создать кошелёк',
-
-  /* Разблокировка */
-  'unlock.title': 'С возвращением',
-  'unlock.description': 'Введите пароль, чтобы разблокировать кошелёк',
-  'unlock.password': 'Пароль',
-  'unlock.submit': 'Разблокировать',
-  'unlock.decrypting': 'Расшифровка…',
-  'unlock.blocked': 'Слишком много попыток. Ввод откроется через',
-  'unlock.blockedNote':
-    'Задержка растёт с каждой неудачей и переживает перезагрузку страницы. Она защищает от подбора пароля тем, кто получил доступ к устройству.',
-  'unlock.attemptsLeft': 'Осталось попыток до задержки:',
-  'unlock.forgot': 'Забыли пароль?',
-  'unlock.otherWallet': 'Создать другой кошелёк или восстановить по seed-фразе',
-  'unlock.failed': 'Не удалось разблокировать кошелёк',
-
-  /* Навигация */
-  'nav.wallet': 'Кошелёк',
-  'nav.assets': 'Активы',
-  'nav.nft': 'NFT',
-  'nav.activity': 'История',
-  'nav.settings': 'Настройки',
-
-  /* Панель */
-  'dashboard.balance': 'Баланс',
-  'dashboard.nativeOnly': 'Показан баланс нативной валюты. Токены и оценка стоимости — в портфеле.',
-  'dashboard.portfolio': 'Портфель',
-  'dashboard.send': 'Отправить',
-  'dashboard.receive': 'Получить',
-  'dashboard.refresh': 'Обновить',
-  'dashboard.lock': 'Заблокировать',
-  'dashboard.smartContract': 'Смарт контракт',
-  'dashboard.recent': 'Последние операции',
-  'dashboard.allHistory': 'Вся история',
-} as const
-
-/** Ключ перевода. Выводится из русского словаря: он полон по построению. */
-export type TranslationKey = keyof typeof RUSSIAN
-
-/**
- * Английский словарь.
- *
- * Тип требует ровно тех же ключей: пропущенный перевод останавливает
- * сборку, а не превращается в пустое место на экране.
- */
-const ENGLISH: Readonly<Record<TranslationKey, string>> = {
+/** Словарь интерфейса. */
+const ENGLISH = {
   'common.back': 'Back',
   'common.next': 'Next',
   'common.cancel': 'Cancel',
@@ -179,21 +92,12 @@ const ENGLISH: Readonly<Record<TranslationKey, string>> = {
   'dashboard.smartContract': 'Smart contract',
   'dashboard.recent': 'Recent activity',
   'dashboard.allHistory': 'Full history',
-}
+} as const
+
+/** Ключ перевода. */
+export type TranslationKey = keyof typeof ENGLISH
 
 /** Словари по языкам. */
 export const DICTIONARIES: Readonly<Record<Language, Readonly<Record<TranslationKey, string>>>> = {
-  [LANGUAGE.Russian]: RUSSIAN,
   [LANGUAGE.English]: ENGLISH,
-}
-
-/** Названия языков на них самих: так их узнают, не зная текущего. */
-export const LANGUAGE_NAME: Readonly<Record<Language, string>> = {
-  [LANGUAGE.Russian]: 'Русский',
-  [LANGUAGE.English]: 'English',
-}
-
-/** Является ли строка поддерживаемым языком. */
-export function isLanguage(value: string): value is Language {
-  return value === LANGUAGE.Russian || value === LANGUAGE.English
 }

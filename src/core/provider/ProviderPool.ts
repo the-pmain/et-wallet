@@ -57,7 +57,7 @@ export class ProviderPool implements IProviderResolver {
    */
   async get(network: INetworkConfig): Promise<IProvider> {
     if (this.#destroyed) {
-      throw new Error('Пул соединений уже закрыт')
+      throw new Error('The connection pool is already closed')
     }
 
     const existing = this.#providers.get(network.chainId)
@@ -124,7 +124,7 @@ export class ProviderPool implements IProviderResolver {
     try {
       ;(await pending).destroy()
     } catch (error) {
-      this.#logger.warn('Соединение закрыто с ошибкой', {
+      this.#logger.warn('The connection closed with an error', {
         error: error instanceof Error ? error.message : String(error),
       })
     }

@@ -17,7 +17,7 @@ const rootElement = document.getElementById('root')
 /* Отсутствие корневого узла — неустранимая ошибка конфигурации index.html.
    Явная проверка лучше `!`: она даёт понятное сообщение вместо разыменования null. */
 if (rootElement === null) {
-  throw new Error('Не найден корневой элемент #root в index.html.')
+  throw new Error('The root element #root was not found in index.html.')
 }
 
 createRoot(rootElement).render(

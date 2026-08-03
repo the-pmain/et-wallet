@@ -14,7 +14,7 @@ export class WalletLockedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WalletLocked
 
   constructor(operation: string) {
-    super(`Операция "${operation}" недоступна: кошелёк заблокирован.`)
+    super(`The operation "${operation}" is unavailable: the wallet is locked.`)
   }
 }
 
@@ -23,7 +23,7 @@ export class WalletNotInitializedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WalletNotInitialized
 
   constructor() {
-    super('Кошелёк не инициализирован.')
+    super('The wallet has not been initialised.')
   }
 }
 
@@ -32,12 +32,12 @@ export class WalletAlreadyInitializedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WalletAlreadyInitialized
 
   constructor() {
-    super('Кошелёк уже инициализирован. Требуется явный сброс.')
+    super('The wallet is already initialised. An explicit reset is required.')
   }
 }
 
 /**
- * Неверный пароль.
+ * Wrong password.
  *
  * Сообщение намеренно не уточняет, что именно не сошлось. Отличие
  * «неверный пароль» от «хранилище повреждено» — это информация для
@@ -47,7 +47,7 @@ export class InvalidPasswordError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidPassword
 
   constructor() {
-    super('Неверный пароль.')
+    super('Wrong password.')
   }
 }
 
@@ -66,7 +66,7 @@ export class TooManyAttemptsError extends AppError {
   readonly retryAfterMs: number
 
   constructor(retryAfterMs: number) {
-    super(`Слишком много попыток. Повторите через ${String(Math.ceil(retryAfterMs / 1000))} с.`)
+    super(`Too many attempts. Try again in ${String(Math.ceil(retryAfterMs / 1000))} s.`)
     this.retryAfterMs = retryAfterMs
   }
 }
@@ -76,7 +76,7 @@ export class WeakPasswordError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WeakPassword
 
   constructor(reason: string) {
-    super(`Пароль не соответствует требованиям: ${reason}`)
+    super(`The password does not meet the requirements: ${reason}`)
   }
 }
 
@@ -108,10 +108,10 @@ export type MnemonicInvalidReason =
 
 /** Понятные пояснения к каждой причине. Секретов не содержат. */
 const MNEMONIC_REASON_MESSAGE: Readonly<Record<MnemonicInvalidReason, string>> = {
-  [MNEMONIC_INVALID_REASON.Empty]: 'фраза не введена',
-  [MNEMONIC_INVALID_REASON.WordCount]: 'недопустимое количество слов',
-  [MNEMONIC_INVALID_REASON.UnknownWord]: 'одно или несколько слов отсутствуют в словаре BIP-39',
-  [MNEMONIC_INVALID_REASON.Checksum]: 'не сходится контрольная сумма BIP-39',
+  [MNEMONIC_INVALID_REASON.Empty]: 'the phrase is empty',
+  [MNEMONIC_INVALID_REASON.WordCount]: 'the number of words is not allowed',
+  [MNEMONIC_INVALID_REASON.UnknownWord]: 'one or more words are missing from the BIP-39 word list',
+  [MNEMONIC_INVALID_REASON.Checksum]: 'the BIP-39 checksum does not match',
 }
 
 /**
@@ -128,7 +128,7 @@ export class InvalidMnemonicError extends AppError {
   readonly reason: MnemonicInvalidReason
 
   constructor(reason: MnemonicInvalidReason) {
-    super(`Мнемоническая фраза некорректна: ${MNEMONIC_REASON_MESSAGE[reason]}.`)
+    super(`The seed phrase is invalid: ${MNEMONIC_REASON_MESSAGE[reason]}.`)
     this.reason = reason
   }
 }
@@ -138,7 +138,7 @@ export class InvalidPrivateKeyError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidPrivateKey
 
   constructor() {
-    super('Приватный ключ некорректен.')
+    super('The private key is invalid.')
   }
 }
 
@@ -147,7 +147,7 @@ export class AccountNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AccountNotFound
 
   constructor(identifier: string) {
-    super(`Аккаунт не найден: ${identifier}`)
+    super(`Account was not found: ${identifier}`)
   }
 }
 
@@ -156,7 +156,7 @@ export class AccountAlreadyExistsError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AccountAlreadyExists
 
   constructor(address: string) {
-    super(`Аккаунт уже добавлен: ${address}`)
+    super(`The account has already been added: ${address}`)
   }
 }
 
@@ -175,7 +175,7 @@ export class AccountNotRemovableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AccountNotRemovable
 
   constructor(reason: string) {
-    super(`Аккаунт нельзя удалить: ${reason}`)
+    super(`The account cannot be removed: ${reason}`)
   }
 }
 
@@ -184,7 +184,7 @@ export class KeyringNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.KeyringNotFound
 
   constructor(keyringId: string) {
-    super(`Набор ключей не найден: ${keyringId}`)
+    super(`Keyring was not found: ${keyringId}`)
   }
 }
 
@@ -198,7 +198,7 @@ export class KeyringCannotSignError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.KeyringCannotSign
 
   constructor(reason: string) {
-    super(`Подпись невозможна: ${reason}`)
+    super(`Signing is not possible: ${reason}`)
   }
 }
 
@@ -212,6 +212,6 @@ export class ExportNotPermittedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.ExportNotPermitted
 
   constructor(reason: string) {
-    super(`Экспорт секрета запрещён: ${reason}`)
+    super(`Exporting the secret is not allowed: ${reason}`)
   }
 }

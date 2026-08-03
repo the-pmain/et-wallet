@@ -247,7 +247,7 @@ describe('Ускорение', () => {
   })
 })
 
-describe('Отмена', () => {
+describe('Cancel', () => {
   it('занимает номер переводом самому себе', async () => {
     await saveStuck()
 
@@ -303,6 +303,6 @@ describe('Замена невозможна', () => {
        с зависшим переводом. */
     await saveStuck({ status: TRANSACTION_STATUS.Confirmed })
 
-    await expect(service.prepareSpeedUp(HASH)).rejects.toThrow(/включена в блок/i)
+    await expect(service.prepareSpeedUp(HASH)).rejects.toThrow(/included in a block/i)
   })
 })

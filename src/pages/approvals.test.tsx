@@ -79,10 +79,10 @@ function renderApp() {
 async function openApprovals(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
-  await user.click(screen.getByRole('link', { name: 'Настройки' }))
-  await user.click(await screen.findByRole('link', { name: /Выданные разрешения/i }))
-  await screen.findByRole('heading', { level: 1, name: 'Разрешения' })
+  await screen.findByText('Account 1')
+  await user.click(screen.getByRole('link', { name: 'Settings' }))
+  await user.click(await screen.findByRole('link', { name: /Granted approvals/i }))
+  await screen.findByRole('heading', { level: 1, name: 'Approvals' })
 }
 
 beforeEach(async () => {
@@ -124,7 +124,7 @@ describe('Разрешения: список', () => {
     renderApp()
     await openApprovals()
 
-    expect(await screen.findByText('Действующих разрешений не найдено')).toBeInTheDocument()
+    expect(await screen.findByText('No active approvals found')).toBeInTheDocument()
   })
 
   it('неограниченное разрешение выделено как опасность', async () => {
@@ -140,7 +140,7 @@ describe('Разрешения: список', () => {
     renderApp()
     await openApprovals()
 
-    expect(await screen.findByText('Без ограничения суммы')).toBeInTheDocument()
+    expect(await screen.findByText('Unlimited amount')).toBeInTheDocument()
   })
 
   it('ограниченное разрешение показывает сумму в единицах токена', async () => {
@@ -170,7 +170,9 @@ describe('Разрешения: список', () => {
     renderApp()
     await openApprovals()
 
-    expect(await screen.findByText(/Вся коллекция, включая будущие предметы/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/The whole collection, including future items/i),
+    ).toBeInTheDocument()
   })
 
   it('объясняет, что разрешение не истекает само', async () => {
@@ -179,20 +181,20 @@ describe('Разрешения: список', () => {
     renderApp()
     await openApprovals()
 
-    expect(await screen.findByText(/не истекает\s+само/iu)).toBeInTheDocument()
+    expect(await screen.findByText(/does not\s+expire/iu)).toBeInTheDocument()
   })
 
   it('отказ узла не выдаётся за отсутствие разрешений', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
-      logsError: 'диапазон слишком широк',
+      logsError: 'the range is too wide',
     })
 
     renderApp()
     await openApprovals()
 
-    expect(await screen.findByText(/Проверить разрешения не удалось/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The approvals could not be checked/i)).toBeInTheDocument()
   })
 })
 
@@ -212,9 +214,9 @@ describe('Разрешения: отзыв', () => {
 
     renderApp()
     await openApprovals()
-    await user.click(await screen.findByRole('button', { name: 'Отозвать' }))
+    await user.click(await screen.findByRole('button', { name: 'Revoke' }))
 
-    await screen.findByRole('heading', { level: 1, name: 'Отзыв разрешения' })
+    await screen.findByRole('heading', { level: 1, name: 'Revoke the approval' })
 
     expect(screen.getByText(USDC)).toBeInTheDocument()
     expect(screen.getByText(EXCHANGE)).toBeInTheDocument()
@@ -225,10 +227,10 @@ describe('Разрешения: отзыв', () => {
 
     renderApp()
     await openApprovals()
-    await user.click(await screen.findByRole('button', { name: 'Отозвать' }))
+    await user.click(await screen.findByRole('button', { name: 'Revoke' }))
 
     expect(
-      await screen.findByText(/Уже выполненные им операции это не отменяет/i),
+      await screen.findByText(/Operations it has already carried out are not undone/i),
     ).toBeInTheDocument()
   })
 
@@ -237,11 +239,11 @@ describe('Разрешения: отзыв', () => {
 
     renderApp()
     await openApprovals()
-    await user.click(await screen.findByRole('button', { name: 'Отозвать' }))
-    await user.click(await screen.findByRole('button', { name: 'Отозвать разрешение' }))
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.click(await screen.findByRole('button', { name: 'Revoke' }))
+    await user.click(await screen.findByRole('button', { name: 'Revoke the approval' }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByText(/Отзыв отправлен/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The revocation has been sent/i)).toBeInTheDocument()
   })
 })

@@ -39,19 +39,19 @@ function withEns(records: readonly IFakeEnsRecord[]): void {
 async function openSend(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
-  await user.click(screen.getByRole('link', { name: /отправить/i }))
-  await screen.findByRole('heading', { name: 'Отправка' })
+  await screen.findByText('Account 1')
+  await user.click(screen.getByRole('link', { name: /send/i }))
+  await screen.findByRole('heading', { name: 'Send' })
 }
 
 /** Вводит получателя и дожидается окончания разбора. */
 async function typeRecipient(value: string): Promise<void> {
   const user = userEvent.setup()
 
-  await user.type(screen.getByLabelText(/Адрес получателя/), value)
+  await user.type(screen.getByLabelText(/Recipient address/), value)
 
   await waitFor(() => {
-    expect(screen.queryByText('Проверка…')).not.toBeInTheDocument()
+    expect(screen.queryByText('Checking…')).not.toBeInTheDocument()
   })
 }
 
@@ -93,8 +93,8 @@ describe('ENS: прямое разрешение в форме отправки'
     await openSend()
     await typeRecipient('nobody.eth')
 
-    expect(await screen.findByText(/Записи для этого имени нет/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(await screen.findByText(/There is no record for this name/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('имя с подменённой буквой отвергается с объяснением', async () => {
@@ -110,8 +110,8 @@ describe('ENS: прямое разрешение в форме отправки'
     await openSend()
     await typeRecipient(spoofed)
 
-    expect(await screen.findByText(/смешаны разные письменности/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(await screen.findByText(/mixes different scripts/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('имя с эмодзи разрешается и помечается как нелатинское', async () => {
@@ -125,7 +125,7 @@ describe('ENS: прямое разрешение в форме отправки'
     await typeRecipient('\u{1F600}.eth')
 
     expect(await screen.findByText(OUTSIDER)).toBeInTheDocument()
-    expect(screen.getByText(/Имя записано не латиницей/i)).toBeInTheDocument()
+    expect(screen.getByText(/The name is not written in Latin script/i)).toBeInTheDocument()
   })
 
   it('латинское имя оговоркой о письменности не сопровождается', async () => {
@@ -139,7 +139,7 @@ describe('ENS: прямое разрешение в форме отправки'
 
     await screen.findByText(OUTSIDER)
 
-    expect(screen.queryByText(/Имя записано не латиницей/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/The name is not written in Latin script/i)).not.toBeInTheDocument()
   })
 
   it('на подтверждении имя показывается вместе с адресом, а не вместо него', async () => {
@@ -150,9 +150,9 @@ describe('ENS: прямое разрешение в форме отправки'
     renderApp()
     await openSend()
     await typeRecipient('shop.eth')
-    await user.type(screen.getByLabelText(/Сумма/), '1')
+    await user.type(screen.getByLabelText(/Amount/), '1')
 
-    const next = screen.getByRole('button', { name: 'Далее' })
+    const next = screen.getByRole('button', { name: 'Next' })
 
     await waitFor(() => {
       expect(next).toBeEnabled()
@@ -160,11 +160,11 @@ describe('ENS: прямое разрешение в форме отправки'
 
     await user.click(next)
 
-    await screen.findByRole('heading', { name: 'Подтверждение' })
+    await screen.findByRole('heading', { name: 'Confirmation' })
 
     expect(screen.getByText('shop.eth')).toBeInTheDocument()
     expect(screen.getByText(OUTSIDER)).toBeInTheDocument()
-    expect(screen.getByText(/Адрес получен из имени ENS/i)).toBeInTheDocument()
+    expect(screen.getByText(/The address came from an ENS name/i)).toBeInTheDocument()
   })
 })
 
@@ -184,7 +184,7 @@ describe('ENS: обратное разрешение', () => {
     withEns([{ name: 'vitalik.eth', address: OUTSIDER, reverseFor: OWNER }])
 
     renderApp()
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
     /* Ждём завершения загрузки данных аккаунта: имя, если бы оно
        показывалось, появилось бы к этому моменту. */
@@ -202,7 +202,7 @@ describe('ENS: обратное разрешение', () => {
     await openSend()
     await typeRecipient(OUTSIDER)
 
-    expect(await screen.findByText(/Имя этого адреса/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The name of this address/i)).toBeInTheDocument()
   })
 })
 
@@ -216,23 +216,23 @@ describe('ENS: другие сети', () => {
     withEns([{ name: 'shop.eth', address: OUTSIDER }])
 
     renderApp()
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
     await services.session.switchNetwork(BUILT_IN_CHAIN_ID.Polygon)
     await openSend()
     await typeRecipient('shop.eth')
 
-    expect(await screen.findByText(/только в сети Ethereum/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(await screen.findByText(/only in the Ethereum network/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
 
     /* Адрес в той же сети принимается: ENS ограничивает разбор имён,
        а не отправку. */
-    await user.clear(screen.getByLabelText(/Адрес получателя/))
+    await user.clear(screen.getByLabelText(/Recipient address/))
     await typeRecipient(OUTSIDER)
-    await user.type(screen.getByLabelText(/Сумма/), '1')
+    await user.type(screen.getByLabelText(/Amount/), '1')
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Далее' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
     })
   })
 })

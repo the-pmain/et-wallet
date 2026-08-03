@@ -6,7 +6,7 @@ import type { ChainId } from '@/core/types'
 
 import { RPC_PROVIDER_ID, type IRpcEndpoint, type IRpcProvider } from './rpc-endpoint'
 
-const PROVIDER_NAME = 'Собственный узел'
+const PROVIDER_NAME = 'Your own node'
 
 /**
  * Предел числа адресов на сеть.
@@ -103,13 +103,16 @@ export class CustomRpcProvider implements IRpcProvider {
     const existing = this.listUrls(chainId)
 
     if (existing.includes(url)) {
-      throw new InvalidArgumentError('rpcUrl', 'этот адрес уже добавлен для данной сети')
+      throw new InvalidArgumentError(
+        'rpcUrl',
+        'this endpoint has already been added for this network',
+      )
     }
 
     if (existing.length >= MAX_ENDPOINTS_PER_NETWORK) {
       throw new InvalidArgumentError(
         'rpcUrl',
-        `для одной сети допускается не более ${String(MAX_ENDPOINTS_PER_NETWORK)} адресов`,
+        `at most ${String(MAX_ENDPOINTS_PER_NETWORK)} endpoints are allowed per network`,
       )
     }
 

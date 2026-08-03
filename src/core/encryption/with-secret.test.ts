@@ -52,9 +52,9 @@ describe('withSecret', () => {
 
     await expect(
       withSecret(secret, () => {
-        throw new Error('узел не ответил')
+        throw new Error('the node did not answer')
       }),
-    ).rejects.toThrow('узел не ответил')
+    ).rejects.toThrow('the node did not answer')
 
     expect(secret.wipeCalls).toBe(1)
   })
@@ -63,8 +63,8 @@ describe('withSecret', () => {
     const secret = createSecret()
 
     await expect(
-      withSecret(secret, () => Promise.reject(new Error('подпись не удалась'))),
-    ).rejects.toThrow('подпись не удалась')
+      withSecret(secret, () => Promise.reject(new Error('signing failed'))),
+    ).rejects.toThrow('signing failed')
 
     expect(secret.wipeCalls).toBe(1)
   })

@@ -54,13 +54,16 @@ export class RpcClientFactory implements IProviderFactory {
         lastError = error
 
         if (error instanceof ChainIdMismatchError) {
-          this.#logger.warn('Узел обслуживает другую сеть и исключён из перебора', {
-            rpcUrl,
-            expected: error.expected.toString(),
-            actual: error.actual.toString(),
-          })
+          this.#logger.warn(
+            'The node serves a different network and was excluded from the rotation',
+            {
+              rpcUrl,
+              expected: error.expected.toString(),
+              actual: error.actual.toString(),
+            },
+          )
         } else {
-          this.#logger.warn('Узел недоступен, переход к резервному', {
+          this.#logger.warn('The node is unavailable, switching to a backup', {
             rpcUrl,
             reason: error instanceof Error ? error.message : String(error),
           })

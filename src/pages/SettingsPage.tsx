@@ -31,9 +31,9 @@ import type { AccountId, ChainId } from '@/core'
 
 /** Доступные режимы оформления. */
 const THEME_OPTIONS: readonly { value: Theme; label: string; icon: typeof Sun }[] = [
-  { value: 'light', label: 'Светлая', icon: Sun },
-  { value: 'dark', label: 'Тёмная', icon: Moon },
-  { value: 'system', label: 'Системная', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
 ]
 
 /**
@@ -74,14 +74,12 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <header>
-        <h1 className="text-lg font-semibold">Настройки</h1>
+        <h1 className="text-lg font-semibold">Settings</h1>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">
-            Имя пользователя
-          </CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Your name</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {/* Имя показывается ровно там, где владелец его ищет, — рядом
@@ -91,7 +89,7 @@ export function SettingsPage() {
           <p className="text-sm">
             {username === null ? (
               <span className="text-muted-foreground">
-                Не задано — аккаунты называются «Аккаунт 1», «Аккаунт 2» и так далее.
+                Not set — accounts are called "Account 1", "Account 2" and so on.
               </span>
             ) : (
               <span className="font-medium">{username}</span>
@@ -99,15 +97,15 @@ export function SettingsPage() {
           </p>
 
           <p className="text-xs text-muted-foreground">
-            Хранится только на этом устройстве и никуда не отправляется. Учётной записью не
-            является: восстановить доступ по имени невозможно — это делает только seed-фраза.
+            Stored on this device only and never sent anywhere. It is not an account: access cannot
+            be restored by name — only the seed phrase does that.
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Оформление</CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Appearance</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-3 gap-2">
           {THEME_OPTIONS.map((option) => (
@@ -134,7 +132,7 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Подключения</CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Connections</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {/* Раздел не попал в нижнюю панель: пять пунктов — предел
@@ -143,53 +141,51 @@ export function SettingsPage() {
           <Button asChild variant="outline" className="w-full">
             <Link to="/wallet/connections">
               <Plug className="size-4" aria-hidden />
-              Приложения и сессии
+              Applications and sessions
             </Link>
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Подключённое приложение может присылать запросы на подпись. Каждый спрашивается
-            отдельно, но само подключение стоит закрывать, когда оно больше не нужно.
+            A connected application may send signing requests. Each one is asked separately, but the
+            connection itself is worth closing when it is no longer needed.
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Разрешения</CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Approvals</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           <Button asChild variant="outline" className="w-full">
             <Link to="/wallet/approvals">
               <ShieldAlert className="size-4" aria-hidden />
-              Выданные разрешения
+              Granted approvals
             </Link>
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Разрешение позволяет контракту забирать ваши токены без новой подписи и не истекает
-            само. Забытое разрешение — самый частый способ потерять средства при целом ключе.
+            An approval lets a contract take your tokens without a new signature, and it does not
+            expire. A forgotten approval is the most common way to lose funds with an intact key.
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">
-            Резервная копия
-          </CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Backup</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           <Button asChild variant="outline" className="w-full">
             <Link to="/wallet/backup">
               <ShieldCheck className="size-4" aria-hidden />
-              Seed-фраза и приватные ключи
+              Seed phrase and private keys
             </Link>
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Записанная на бумаге seed-фраза — единственный способ восстановить кошелёк при потере
-            устройства или очистке данных браузера.
+            A seed phrase written on paper is the only way to restore the wallet after losing the
+            device or clearing the browser data.
           </p>
 
           <StorageDurabilityAlert durability={storageDurability} />
@@ -237,7 +233,7 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Блокировка</CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Locking</CardTitle>
         </CardHeader>
         <CardContent>
           <Button
@@ -248,14 +244,14 @@ export function SettingsPage() {
             }}
           >
             <Lock className="size-4" aria-hidden />
-            Заблокировать кошелёк
+            Lock the wallet
           </Button>
         </CardContent>
       </Card>
 
       <Alert>
         <Info />
-        <AlertDescription>Версия {APP_CONFIG.version}.</AlertDescription>
+        <AlertDescription>Version {APP_CONFIG.version}.</AlertDescription>
       </Alert>
     </div>
   )
@@ -263,11 +259,11 @@ export function SettingsPage() {
 
 /** Подписи сроков автоблокировки. Ключ — значение в миллисекундах. */
 const AUTO_LOCK_LABEL: Readonly<Record<number, string>> = {
-  60_000: '1 мин',
-  300_000: '5 мин',
-  900_000: '15 мин',
-  1_800_000: '30 мин',
-  3_600_000: '60 мин',
+  60_000: '1 min',
+  300_000: '5 min',
+  900_000: '15 min',
+  1_800_000: '30 min',
+  3_600_000: '60 min',
 }
 
 /**
@@ -286,12 +282,12 @@ function SecuritySection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">Безопасность</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">Security</CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium">Блокировать после бездействия</legend>
+          <legend className="mb-1 text-sm font-medium">Lock after inactivity</legend>
 
           <div className="grid grid-cols-5 gap-2">
             {AUTO_LOCK_OPTIONS.map((value) => (
@@ -309,14 +305,14 @@ function SecuritySection() {
                     : 'border-border text-muted-foreground hover:bg-accent',
                 )}
               >
-                {AUTO_LOCK_LABEL[value] ?? `${String(Math.round(value / 60_000))} мин`}
+                {AUTO_LOCK_LABEL[value] ?? `${String(Math.round(value / 60_000))} min`}
               </button>
             ))}
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Разблокированный кошелёк держит ключи в памяти: до блокировки распоряжаться средствами
-            может любой, кто получил доступ к устройству.
+            An unlocked wallet keeps the keys in memory: until it locks, anyone with access to the
+            device can dispose of the funds.
           </p>
         </fieldset>
 
@@ -330,13 +326,13 @@ function SecuritySection() {
               }}
             />
             <span className="text-sm leading-snug font-normal">
-              Спрашивать пароль перед подписью транзакции
+              Ask for the password before signing a transaction
             </span>
           </Label>
 
           <p className="text-xs text-muted-foreground">
-            Отключение ускоряет отправку и снимает единственную преграду перед тем, кто получил
-            доступ к уже разблокированному кошельку.
+            Turning this off speeds up sending and removes the only barrier in front of whoever gets
+            access to an already unlocked wallet.
           </p>
         </div>
       </CardContent>

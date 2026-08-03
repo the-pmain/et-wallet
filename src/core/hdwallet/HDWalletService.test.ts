@@ -369,7 +369,7 @@ describe('HDWalletService: подпись', () => {
   it('отказывает в подписи после затирания', () => {
     wallet.wipe()
 
-    expect(() => wallet.signMessage(0, 'сообщение')).toThrow(NotInitializedError)
+    expect(() => wallet.signMessage(0, 'message')).toThrow(NotInitializedError)
   })
 })
 

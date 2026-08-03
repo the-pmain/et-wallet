@@ -49,7 +49,7 @@ export function NetworkList({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base font-medium text-muted-foreground">Сети</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">Networks</CardTitle>
 
         <Button
           variant="ghost"
@@ -61,12 +61,12 @@ export function NetworkList({
           {isAdding ? (
             <>
               <X className="size-4" aria-hidden />
-              Отменить
+              Cancel
             </>
           ) : (
             <>
               <Plus className="size-4" aria-hidden />
-              Добавить сеть
+              Add a network
             </>
           )}
         </Button>
@@ -100,10 +100,10 @@ export function NetworkList({
                       {network.isTestnet ? (
                         <FlaskConical
                           className="size-3 text-muted-foreground"
-                          aria-label="Тестовая сеть: средства в ней не имеют стоимости"
+                          aria-label="Test network: funds here have no value"
                         />
                       ) : null}
-                      {network.isBuiltIn ? null : <Badge variant="outline">своя</Badge>}
+                      {network.isBuiltIn ? null : <Badge variant="outline">custom</Badge>}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
                       chainId {network.chainId.toString()} · {network.nativeCurrency.symbol}
@@ -116,7 +116,7 @@ export function NetworkList({
                     variant="ghost"
                     size="sm"
                     disabled={isBusy}
-                    aria-label={`Удалить сеть ${network.name}`}
+                    aria-label={`Remove network ${network.name}`}
                     onClick={() => {
                       onRemove(network.chainId)
                     }}

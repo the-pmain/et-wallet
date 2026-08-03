@@ -44,10 +44,7 @@ function parseAmount(value: bigint | number | string, name: string): bigint {
     /* Отдельная проверка до преобразования: BigInt(1.5) выбрасывает
        RangeError, а BigInt(2**53 + 1) молча даёт уже потерявшее
        точность значение. Второй случай опаснее — он не заметен. */
-    throw new InvalidArgumentError(
-      name,
-      'значение типа number должно быть целым и в пределах безопасного диапазона',
-    )
+    throw new InvalidArgumentError(name, 'a number value must be an integer within the safe range')
   }
 
   let parsed: bigint
@@ -55,15 +52,15 @@ function parseAmount(value: bigint | number | string, name: string): bigint {
   try {
     parsed = BigInt(value)
   } catch {
-    throw new InvalidArgumentError(name, `значение "${String(value)}" не является целым числом`)
+    throw new InvalidArgumentError(name, `the value "${String(value)}" is not an integer`)
   }
 
   if (parsed < 0n) {
-    throw new InvalidArgumentError(name, 'сумма не может быть отрицательной')
+    throw new InvalidArgumentError(name, 'the amount cannot be negative')
   }
 
   if (parsed > MAX_UINT256) {
-    throw new InvalidArgumentError(name, 'сумма превышает максимум, представимый в EVM')
+    throw new InvalidArgumentError(name, 'the amount exceeds the maximum representable in the EVM')
   }
 
   return parsed

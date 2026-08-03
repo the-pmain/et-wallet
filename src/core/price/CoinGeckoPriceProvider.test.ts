@@ -19,7 +19,7 @@ const WBTC_REF: IPriceRef = { chainId: ETHEREUM, address: WBTC }
 /** Запрошенные адреса: позволяют проверить, что именно ушло наружу. */
 let requested: string[]
 
-/** Ответы по частям пути запроса. */
+/** Ответы по частям пути the time of every request. */
 let responder: (url: string) => { status: number; body: unknown }
 
 function createProvider(contractBatchSize = 10) {

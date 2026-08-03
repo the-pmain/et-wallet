@@ -16,24 +16,24 @@ export function parseAmount(input: string, decimals: number): bigint {
   const value = input.trim().replace(',', '.')
 
   if (value === '') {
-    throw new Error('Введите сумму')
+    throw new Error('Enter an amount')
   }
 
   if (!/^\d*\.?\d*$/u.test(value)) {
-    throw new Error('Сумма записывается цифрами, разделитель — точка либо запятая')
+    throw new Error('The amount is written in digits; use a dot or a comma as the separator')
   }
 
   const [whole = '', fraction = ''] = value.split('.')
 
   if (fraction.length > decimals) {
-    throw new Error(`Слишком много знаков после запятой: допустимо ${String(decimals)}`)
+    throw new Error(`Too many decimal places: at most ${String(decimals)} allowed`)
   }
 
   const normalized = `${whole === '' ? '0' : whole}${fraction.padEnd(decimals, '0')}`
   const parsed = BigInt(normalized)
 
   if (parsed <= 0n) {
-    throw new Error('Сумма должна быть больше нуля')
+    throw new Error('The amount must be greater than zero')
   }
 
   return parsed

@@ -47,18 +47,18 @@ describe('Экран приветствия', () => {
   it('предлагает создание кошелька', async () => {
     renderApp()
 
-    expect(await screen.findByRole('link', { name: /создать новый кошелёк/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
   })
 
   it('показывает вход по seed-фразе в соответствии с режимом', async () => {
     renderApp()
 
-    await screen.findByRole('link', { name: /создать новый кошелёк/i })
+    await screen.findByRole('link', { name: /create a new wallet/i })
 
     /* Временное послабление снимает вход по seed-фразе целиком.
        Тест следует за флагом, а не закрепляет одно из двух состояний:
        иначе возврат защиты обратно уронил бы набор. */
-    const importLink = screen.queryByRole('link', { name: /импортировать/i })
+    const importLink = screen.queryByRole('link', { name: /import/i })
 
     expect(importLink === null).toBe(TEST_MODE.hideSeedImport)
   })
@@ -66,14 +66,16 @@ describe('Экран приветствия', () => {
   it('предупреждает о невозможности восстановления', async () => {
     renderApp()
 
-    await screen.findByRole('link', { name: /создать новый кошелёк/i })
+    await screen.findByRole('link', { name: /create a new wallet/i })
 
     /* Проверяется суть, а не формулировка. При снятом входе по фразе
        предупреждение обязано стать ещё определённее: восстанавливать
        кошелёк сейчас нечем вообще. */
     expect(
       screen.getByText(
-        TEST_MODE.hideSeedImport ? /восстановить кошелёк.*нечем/i : /означает попытку кражи/i,
+        TEST_MODE.hideSeedImport
+          ? /восстановить кошелёк.*нечем/i
+          : /is an attempt to steal your funds/i,
       ),
     ).toBeInTheDocument()
   })
@@ -81,10 +83,10 @@ describe('Экран приветствия', () => {
 
 /** Заполняет первый шаг создания кошелька: имя и пароль. */
 async function fillCreationForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
-  await user.type(screen.getByLabelText(/имя пользователя/i), USERNAME)
-  await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-  await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
+  await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
+  await user.type(screen.getByLabelText(/Your name/i), USERNAME)
+  await user.type(screen.getByLabelText('Password'), PASSWORD)
+  await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 }
 
 describe('Создание кошелька', () => {
@@ -92,35 +94,35 @@ describe('Создание кошелька', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
+    await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
     /* Экран создания грузится отдельным чанком: до его появления
        поля в документе нет. */
-    await user.type(await screen.findByLabelText('Пароль'), '123')
+    await user.type(await screen.findByLabelText('Password'), '123')
 
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('не пускает дальше при несовпадении паролей', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.type(screen.getByLabelText('Повторите пароль'), 'Korova-7-Luna?')
+    await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.type(screen.getByLabelText('Repeat the password'), 'Korova-7-Luna?')
 
-    expect(screen.getByText('Пароли не совпадают')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(screen.getByText('The passwords do not match')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('не пускает дальше без имени пользователя', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
+    await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('не пускает дальше с непригодным именем', async () => {
@@ -129,12 +131,12 @@ describe('Создание кошелька', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
-    await user.type(await screen.findByLabelText(/имя пользователя/i), 'Д')
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
+    await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
+    await user.type(await screen.findByLabelText(/Your name/i), 'Д')
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 
-    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('называет имя меткой, а не учётной записью', async () => {
@@ -144,9 +146,9 @@ describe('Создание кошелька', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
+    await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
 
-    expect(await screen.findByText(/это не учётная запись/i)).toBeInTheDocument()
+    expect(await screen.findByText(/not an account/i)).toBeInTheDocument()
   })
 
   it('показывает фразу только после явного действия', async () => {
@@ -154,15 +156,15 @@ describe('Создание кошелька', () => {
     renderApp()
 
     await fillCreationForm(user)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
     /* Слова присутствуют в разметке, но скрыты до нажатия: случайный
        взгляд через плечо не раскроет фразу. */
-    expect(screen.getByRole('button', { name: /показать фразу/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Show the phrase/i })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /показать фразу/i }))
+    await user.click(screen.getByRole('button', { name: /Show the phrase/i }))
 
-    expect(screen.getByRole('button', { name: /скрыть/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Hide/i })).toBeInTheDocument()
   })
 
   it('требует отметки о записи фразы', async () => {
@@ -170,12 +172,12 @@ describe('Создание кошелька', () => {
     renderApp()
 
     await fillCreationForm(user)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
     /* Подпись кнопки зависит от режима: при снятой проверке она сразу
        создаёт кошелёк, при включённой ведёт к вопросам о словах.
        Отметка о записи фразы обязательна в обоих случаях. */
-    const submitName = TEST_MODE.skipSeedConfirmation ? 'Создать кошелёк' : 'Далее'
+    const submitName = TEST_MODE.skipSeedConfirmation ? 'Создать кошелёк' : 'Next'
 
     expect(screen.getByRole('button', { name: submitName })).toBeDisabled()
 
@@ -189,9 +191,9 @@ describe('Создание кошелька', () => {
     renderApp()
 
     await fillCreationForm(user)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect(screen.getByText(/не сохраняйте фразу в заметках/i)).toBeInTheDocument()
+    expect(screen.getByText(/do not save the phrase in notes/i)).toBeInTheDocument()
   })
 
   it('показывает фразу и при снятой проверке записи', async () => {
@@ -201,9 +203,9 @@ describe('Создание кошелька', () => {
     renderApp()
 
     await fillCreationForm(user)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect(screen.getByRole('button', { name: /показать фразу/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Show the phrase/i })).toBeInTheDocument()
   })
 
   it('предупреждает о снятой проверке, когда она снята', async () => {
@@ -211,9 +213,11 @@ describe('Создание кошелька', () => {
     renderApp()
 
     await fillCreationForm(user)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    const notice = screen.queryByText(/проверка записанной фразы временно отключена/i)
+    const notice = screen.queryByText(
+      /Seed phrase confirmation and restoring from it are disabled/i,
+    )
 
     expect(notice !== null).toBe(TEST_MODE.skipSeedConfirmation)
   })
@@ -223,7 +227,7 @@ describe('Создание кошелька', () => {
     renderApp()
 
     await fillCreationForm(user)
-    await user.click(screen.getByRole('button', { name: 'Далее' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('checkbox'))
 
     if (!TEST_MODE.skipSeedConfirmation) {
@@ -232,7 +236,7 @@ describe('Создание кошелька', () => {
       return
     }
 
-    await user.click(screen.getByRole('button', { name: 'Создать кошелёк' }))
+    await user.click(screen.getByRole('button', { name: 'Create the wallet' }))
 
     /* Вместо безликого «Аккаунт 1» в шапке стоит имя владельца. */
     expect(await screen.findByText(USERNAME)).toBeInTheDocument()
@@ -249,42 +253,39 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
-    await user.type(await screen.findByLabelText('Мнемоническая фраза'), 'abandon abandon about')
+    await user.click(await screen.findByRole('link', { name: /import/i }))
+    await user.type(await screen.findByLabelText('Seed phrase'), 'abandon abandon about')
 
-    expect(await screen.findByText(/допустимо 12, 15, 18, 21, 24 слов/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Allowed word counts: 12, 15, 18, 21, 24/i)).toBeInTheDocument()
   })
 
   it('указывает позиции слов вне словаря', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
-    await user.type(
-      screen.getByLabelText('Мнемоническая фраза'),
-      TEST_MNEMONIC.replace('about', 'xyzzy'),
-    )
+    await user.click(await screen.findByRole('link', { name: /import/i }))
+    await user.type(screen.getByLabelText('Seed phrase'), TEST_MNEMONIC.replace('about', 'xyzzy'))
 
-    expect(await screen.findByText(/проверьте слова на позициях: 12/i)).toBeInTheDocument()
+    expect(await screen.findByText(/check the words at positions: 12/i)).toBeInTheDocument()
   })
 
   it('подтверждает корректность фразы', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
-    await user.type(await screen.findByLabelText('Мнемоническая фраза'), TEST_MNEMONIC)
+    await user.click(await screen.findByRole('link', { name: /import/i }))
+    await user.type(await screen.findByLabelText('Seed phrase'), TEST_MNEMONIC)
 
-    expect(await screen.findByText('Фраза корректна')).toBeInTheDocument()
+    expect(await screen.findByText('The phrase is valid')).toBeInTheDocument()
   })
 
   it('предупреждает о фишинге', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
+    await user.click(await screen.findByRole('link', { name: /import/i }))
 
-    expect(await screen.findByText(/не имеет права её запрашивать/i)).toBeInTheDocument()
+    expect(await screen.findByText(/has the right to\s+ask for it/i)).toBeInTheDocument()
   })
 
   it('предупреждает об общеизвестной тестовой фразе', async () => {
@@ -294,10 +295,10 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
-    await user.type(await screen.findByLabelText('Мнемоническая фраза'), TEST_MNEMONIC)
+    await user.click(await screen.findByRole('link', { name: /import/i }))
+    await user.type(await screen.findByLabelText('Seed phrase'), TEST_MNEMONIC)
 
-    expect(await screen.findByText(/общеизвестная тестовая фраза/i)).toBeInTheDocument()
+    expect(await screen.findByText(/well-known test phrase/i)).toBeInTheDocument()
   })
 
   it('предупреждение не мешает импортировать', async () => {
@@ -306,28 +307,28 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
-    await user.type(await screen.findByLabelText('Мнемоническая фраза'), TEST_MNEMONIC)
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
+    await user.click(await screen.findByRole('link', { name: /import/i }))
+    await user.type(await screen.findByLabelText('Seed phrase'), TEST_MNEMONIC)
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 
-    expect(await screen.findByText(/общеизвестная тестовая фраза/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Импортировать' })).toBeEnabled()
+    expect(await screen.findByText(/well-known test phrase/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Import' })).toBeEnabled()
   })
 
   it('импортирует кошелёк и переводит в разблокированное состояние', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /импортировать/i }))
-    await user.type(await screen.findByLabelText('Мнемоническая фраза'), TEST_MNEMONIC)
-    await user.type(screen.getByLabelText('Пароль'), PASSWORD)
-    await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Импортировать' }))
+    await user.click(await screen.findByRole('link', { name: /import/i }))
+    await user.type(await screen.findByLabelText('Seed phrase'), TEST_MNEMONIC)
+    await user.type(screen.getByLabelText('Password'), PASSWORD)
+    await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Import' }))
 
     /* Признак разблокировки — появление панели кошелька с созданным
        из seed-фразы аккаунтом в шапке. */
-    expect(await screen.findByText('Аккаунт 1')).toBeInTheDocument()
+    expect(await screen.findByText('Account 1')).toBeInTheDocument()
   })
 })
 
@@ -340,12 +341,10 @@ describe('Скрытый вход по seed-фразе', () => {
     renderApp()
 
     if (TEST_MODE.hideSeedImport) {
-      expect(
-        await screen.findByRole('link', { name: /создать новый кошелёк/i }),
-      ).toBeInTheDocument()
-      expect(screen.queryByLabelText('Мнемоническая фраза')).not.toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
+      expect(screen.queryByLabelText('Seed phrase')).not.toBeInTheDocument()
     } else {
-      expect(await screen.findByLabelText('Мнемоническая фраза')).toBeInTheDocument()
+      expect(await screen.findByLabelText('Seed phrase')).toBeInTheDocument()
     }
   })
 })
@@ -358,8 +357,8 @@ describe('Разблокировка', () => {
 
   /** Заполняет форму входа. */
   async function signIn(user: ReturnType<typeof userEvent.setup>, password: string): Promise<void> {
-    await user.type(await screen.findByLabelText('Пароль'), password)
-    await user.click(screen.getByRole('button', { name: 'Разблокировать' }))
+    await user.type(await screen.findByLabelText('Password'), password)
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
   }
 
   it('открывается по верному паролю', async () => {
@@ -379,10 +378,10 @@ describe('Разблокировка', () => {
        впечатление второго фактора, которого нет. */
     renderApp()
 
-    await screen.findByLabelText('Пароль')
+    await screen.findByLabelText('Password')
 
-    expect(screen.queryByLabelText(/имя пользователя/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/электронной почты/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Your name/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
   })
 
   it('сообщает об ошибке при неверном пароле', async () => {
@@ -391,7 +390,7 @@ describe('Разблокировка', () => {
 
     await signIn(user, 'Nepravilnyy-1!')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/неверный пароль/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/wrong password/i)
   })
 
   it('не раскрывает, что именно не сошлось', async () => {
@@ -411,9 +410,9 @@ describe('Разблокировка', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('link', { name: /забыли пароль/i }))
+    await user.click(await screen.findByRole('link', { name: /forgot your password/i }))
 
-    expect(await screen.findByText('Стереть кошелёк с этого устройства')).toBeInTheDocument()
+    expect(await screen.findByText('Erase the wallet from this device')).toBeInTheDocument()
   })
 })
 
@@ -427,22 +426,22 @@ describe('Забыли пароль', () => {
   it('сразу сообщает, что восстановление невозможно', async () => {
     renderApp()
 
-    expect(await screen.findByText(/Восстановить его\s+нельзя/i)).toBeInTheDocument()
+    expect(await screen.findByText(/It cannot be\s+restored/i)).toBeInTheDocument()
 
-    expect(await screen.findByText('Стереть кошелёк с этого устройства')).toBeInTheDocument()
+    expect(await screen.findByText('Erase the wallet from this device')).toBeInTheDocument()
   })
 
   it('предупреждает о безвозвратной потере средств', async () => {
     renderApp()
 
-    expect(await screen.findByText(/средства будут потеряны безвозвратно/i)).toBeInTheDocument()
+    expect(await screen.findByText(/the\s+funds will be lost/i)).toBeInTheDocument()
   })
 
   it('требует двух подтверждений', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    const resetButton = await screen.findByRole('button', { name: 'Стереть кошелёк' })
+    const resetButton = await screen.findByRole('button', { name: 'Erase the wallet' })
 
     expect(resetButton).toBeDisabled()
 
@@ -452,7 +451,7 @@ describe('Забыли пароль', () => {
        проставление галочек не читая. */
     expect(resetButton).toBeDisabled()
 
-    await user.type(screen.getByLabelText(/введите слово/i), 'СТЕРЕТЬ')
+    await user.type(screen.getByLabelText(/Type the word/i), 'ERASE')
 
     expect(resetButton).toBeEnabled()
   })
@@ -460,7 +459,7 @@ describe('Забыли пароль', () => {
   it('не даёт ввести слово до отметки о наличии фразы', async () => {
     renderApp()
 
-    expect(await screen.findByLabelText(/введите слово/i)).toBeDisabled()
+    expect(await screen.findByLabelText(/Type the word/i)).toBeDisabled()
   })
 
   it('стирает кошелёк и возвращает к приветствию', async () => {
@@ -468,11 +467,11 @@ describe('Забыли пароль', () => {
     renderApp()
 
     await user.click(await screen.findByRole('checkbox'))
-    await user.type(screen.getByLabelText(/введите слово/i), 'СТЕРЕТЬ')
-    await user.click(screen.getByRole('button', { name: 'Стереть кошелёк' }))
+    await user.type(screen.getByLabelText(/Type the word/i), 'ERASE')
+    await user.click(screen.getByRole('button', { name: 'Erase the wallet' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /создать новый кошелёк/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
     })
   })
 })
@@ -481,7 +480,7 @@ describe('Маршрутизация по состоянию', () => {
   it('показывает приветствие для несозданного кошелька', async () => {
     renderApp()
 
-    expect(await screen.findByRole('link', { name: /создать новый кошелёк/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
   })
 
   it('перенаправляет на разблокировку для созданного кошелька', async () => {
@@ -492,7 +491,7 @@ describe('Маршрутизация по состоянию', () => {
 
     /* Заблокированный кошелёк не должен показывать экран создания:
        иначе пользователь создаст второй кошелёк поверх первого. */
-    expect(await screen.findByText('С возвращением')).toBeInTheDocument()
+    expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 })
 
@@ -518,7 +517,9 @@ describe('Путь к другому кошельку', () => {
     renderApp()
 
     expect(
-      await screen.findByRole('link', { name: /создать другой кошелёк|восстановить по seed/i }),
+      await screen.findByRole('link', {
+        name: /create another wallet|restore from a seed phrase/i,
+      }),
     ).toBeInTheDocument()
   })
 
@@ -527,11 +528,13 @@ describe('Путь к другому кошельку', () => {
 
     renderApp()
     await user.click(
-      await screen.findByRole('link', { name: /создать другой кошелёк|восстановить по seed/i }),
+      await screen.findByRole('link', {
+        name: /create another wallet|restore from a seed phrase/i,
+      }),
     )
 
-    expect(await screen.findByText(/Забыт пароль/i)).toBeInTheDocument()
-    expect(screen.getByText(/Нужен другой кошелёк/i)).toBeInTheDocument()
+    expect(await screen.findByText('A forgotten password.')).toBeInTheDocument()
+    expect(screen.getByText(/Another wallet is needed/i)).toBeInTheDocument()
   })
 
   it('называет главное ограничение: кошелёк на устройстве один', async () => {
@@ -540,9 +543,11 @@ describe('Путь к другому кошельку', () => {
 
     renderApp()
     await user.click(
-      await screen.findByRole('link', { name: /создать другой кошелёк|восстановить по seed/i }),
+      await screen.findByRole('link', {
+        name: /create another wallet|restore from a seed phrase/i,
+      }),
     )
 
-    expect(await screen.findByText(/На одном устройстве кошелёк один/i)).toBeInTheDocument()
+    expect(await screen.findByText(/A device\s+holds one wallet/i)).toBeInTheDocument()
   })
 })

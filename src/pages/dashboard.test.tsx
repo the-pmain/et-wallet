@@ -31,7 +31,7 @@ function renderApp() {
  * только после того, как сессия открыта и аккаунт выведен из seed-фразы.
  */
 async function findDashboard(): Promise<HTMLElement> {
-  return await screen.findByText('Аккаунт 1')
+  return await screen.findByText('Account 1')
 }
 
 beforeEach(async () => {
@@ -58,8 +58,10 @@ describe('Панель: баланс', () => {
     /* Прежняя оговорка «балансы ERC-20 не отслеживаются» устарела:
        токены отслеживаются. Предупреждение о несуществующем
        ограничении приучает не читать остальные. */
-    expect(await screen.findByText(/Показан баланс нативной валюты/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /портфель/i })).toBeInTheDocument()
+    expect(
+      await screen.findByText(/The native currency of the network is sent here/i),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /portfolio/i })).toBeInTheDocument()
   })
 
   it('не подменяет недоступный баланс нулём', async () => {
@@ -68,7 +70,7 @@ describe('Панель: баланс', () => {
     renderApp()
     await findDashboard()
 
-    expect(await screen.findByText(/это не означает, что\s+средств нет/i)).toBeInTheDocument()
+    expect(await screen.findByText(/that does not mean the funds\s+are gone/i)).toBeInTheDocument()
     expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 })
@@ -90,7 +92,7 @@ describe('Панель: шапка', () => {
 
     /* Отпечаток зависит от всех символов адреса: подменённый адрес меняет
        картинку целиком, и это заметно без вчитывания. */
-    expect(screen.getByRole('img', { name: 'Отпечаток адреса' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Address fingerprint' })).toBeInTheDocument()
   })
 
   it('называет активную сеть', async () => {
@@ -106,15 +108,15 @@ describe('Панель: операции', () => {
     renderApp()
     await findDashboard()
 
-    expect(await screen.findByText('Операций пока нет')).toBeInTheDocument()
-    expect(screen.getByText(/сведения об ограничениях\s+источника/i)).toBeInTheDocument()
+    expect(await screen.findByText('No operations yet')).toBeInTheDocument()
+    expect(screen.getByText(/the limits of the\s+source/i)).toBeInTheDocument()
   })
 
   it('ведёт на полную историю', async () => {
     renderApp()
     await findDashboard()
 
-    expect(screen.getByRole('link', { name: /вся история/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /full history/i })).toBeInTheDocument()
   })
 })
 
@@ -126,10 +128,7 @@ describe('Панель: быстрые действия', () => {
     /* `HashRouter` формирует адрес через хэш: путь без него означал бы
        переход, который в расширении привёл бы к попытке загрузить
        несуществующий файл. */
-    expect(screen.getByRole('link', { name: /отправить/i })).toHaveAttribute(
-      'href',
-      '#/wallet/send',
-    )
+    expect(screen.getByRole('link', { name: /send/i })).toHaveAttribute('href', '#/wallet/send')
   })
 
   it('называет, что отправляется нативная валюта, а не токены', async () => {
@@ -139,7 +138,7 @@ describe('Панель: быстрые действия', () => {
     /* При переводе ERC-20 получатель лежит в данных вызова, а не в поле
        получателя транзакции: сводить обе операции к одной форме значило бы
        показать пользователю не то, что он подписывает. */
-    expect(screen.getByText(/Отправляется нативная валюта сети/i)).toBeInTheDocument()
+    expect(screen.getByText(/The native currency of the network is sent here/i)).toBeInTheDocument()
   })
 
   it('показывает полный адрес для получения, а не усечённый', async () => {
@@ -148,12 +147,12 @@ describe('Панель: быстрые действия', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('button', { name: /получить/i }))
+    await user.click(screen.getByRole('button', { name: /Receive/i }))
 
     /* Усечённый адрес невозможно сверить посимвольно, а именно сверка
        защищает от подмены буфера обмена. */
     expect(screen.getByText(TEST_MNEMONIC_ADDRESSES[0] as string)).toBeInTheDocument()
-    expect(screen.getByText(/сверьте адрес посимвольно/i)).toBeInTheDocument()
+    expect(screen.getByText(/Check the address\s+character by character/i)).toBeInTheDocument()
   })
 
   it('блокирует кошелёк и возвращает экран ввода пароля', async () => {
@@ -162,8 +161,8 @@ describe('Панель: быстрые действия', () => {
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('button', { name: 'Заблокировать кошелёк' }))
+    await user.click(screen.getByRole('button', { name: 'Lock the wallet' }))
 
-    expect(await screen.findByText('С возвращением')).toBeInTheDocument()
+    expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 })

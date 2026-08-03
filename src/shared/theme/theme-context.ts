@@ -36,7 +36,7 @@ export function useTheme(): ThemeContextValue {
   const context = use(ThemeContext)
 
   if (context === null) {
-    throw new Error('useTheme должен вызываться внутри ThemeProvider.')
+    throw new Error('useTheme must be called inside ThemeProvider.')
   }
 
   return context

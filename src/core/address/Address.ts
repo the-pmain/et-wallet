@@ -145,7 +145,7 @@ export function addressToBytes(address: Address): Uint8Array {
 export function addressFromBytes(bytes: Uint8Array): Address {
   if (bytes.length !== ADDRESS_BYTE_LENGTH) {
     throw new InvalidAddressError(
-      `ожидалось ${String(ADDRESS_BYTE_LENGTH)} байт, получено ${String(bytes.length)}`,
+      `expected ${String(ADDRESS_BYTE_LENGTH)} bytes, received ${String(bytes.length)}`,
     )
   }
 
@@ -225,7 +225,7 @@ function toRawPublicKey(publicKey: Uint8Array): Uint8Array {
 
   if (publicKey.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH) {
     if (publicKey[0] !== 0x04) {
-      throw new InvalidPublicKeyError('несжатый ключ должен начинаться с байта 0x04')
+      throw new InvalidPublicKeyError('an uncompressed key must start with the byte 0x04')
     }
 
     return publicKey.slice(1)
@@ -238,13 +238,13 @@ function toRawPublicKey(publicKey: Uint8Array): Uint8Array {
          в адрес, к которому не существует приватного ключа. */
       return secp256k1.Point.fromBytes(publicKey).toBytes(false).slice(1)
     } catch (error) {
-      throw new InvalidPublicKeyError('точка не лежит на кривой secp256k1', { cause: error })
+      throw new InvalidPublicKeyError('the point is not on the secp256k1 curve', { cause: error })
     }
   }
 
   throw new InvalidPublicKeyError(
-    `допустимы длины ${String(COMPRESSED_PUBLIC_KEY_LENGTH)}, ` +
-      `${String(RAW_PUBLIC_KEY_LENGTH)} и ${String(UNCOMPRESSED_PUBLIC_KEY_LENGTH)} байт, ` +
-      `получено ${String(publicKey.length)}`,
+    `allowed lengths are ${String(COMPRESSED_PUBLIC_KEY_LENGTH)}, ` +
+      `${String(RAW_PUBLIC_KEY_LENGTH)} and ${String(UNCOMPRESSED_PUBLIC_KEY_LENGTH)} bytes, ` +
+      `received ${String(publicKey.length)}`,
   )
 }

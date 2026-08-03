@@ -20,7 +20,7 @@ import {
 } from '@/shared/ui'
 
 /** Слово, которое пользователь обязан ввести для подтверждения. */
-const CONFIRMATION_WORD = 'СТЕРЕТЬ'
+const CONFIRMATION_WORD = 'ERASE'
 
 /**
  * Экран «Забыли пароль».
@@ -62,7 +62,7 @@ export function ForgotPasswordPage() {
       await onboarding.reset()
       await navigate('/')
     } catch (caught) {
-      setError(isAppError(caught) ? caught.message : 'Не удалось стереть кошелёк')
+      setError(isAppError(caught) ? caught.message : 'The wallet could not be erased')
     } finally {
       setIsBusy(false)
     }
@@ -75,24 +75,24 @@ export function ForgotPasswordPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
             <Link to="/unlock">
               <ArrowLeft />
-              Назад
+              Back
             </Link>
           </Button>
 
-          <CardTitle>Стереть кошелёк с этого устройства</CardTitle>
+          <CardTitle>Erase the wallet from this device</CardTitle>
           <CardDescription>
-            Единственный путь и к забытому паролю, и к другому кошельку на этом устройстве
+            The only path both to a forgotten password and to another wallet on this device
           </CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-6">
           <Alert variant="danger">
             <TriangleAlert />
-            <AlertTitle>Сброс уничтожит данные на этом устройстве</AlertTitle>
+            <AlertTitle>The reset destroys the data on this device</AlertTitle>
             <AlertDescription>
-              Восстановить кошелёк можно будет только по seed-фразе из 12 или 24 слов. Если фраза не
-              записана, средства будут потеряны безвозвратно — ни мы, ни кто-либо другой не сможет
-              их вернуть.
+              The wallet can then be restored only from a seed phrase of 12 or 24 words. If the
+              phrase is not written down, the funds are lost for good — neither we nor anyone else
+              will be able to return them.
             </AlertDescription>
           </Alert>
 
@@ -101,29 +101,30 @@ export function ForgotPasswordPage() {
               который пароль помнит, но хочет другой кошелёк, не понимал,
               туда ли попал. */}
           <div className="flex flex-col gap-3">
-            <p className="text-sm font-medium">Зачем сюда приходят</p>
+            <p className="text-sm font-medium">Why people come here</p>
             <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
               <li>
-                <span className="font-medium text-foreground">Забыт пароль.</span> Восстановить его
-                нельзя: он никуда не отправляется и нигде не хранится, а из него выводится ключ
-                шифрования. Без пароля хранилище не открыть никому, включая разработчиков.
+                <span className="font-medium text-foreground">A forgotten password.</span> It cannot
+                be restored: it is never sent anywhere and never stored, and the encryption key is
+                derived from it. Without the password nobody can open the storage, developers
+                included.
               </li>
               <li>
-                <span className="font-medium text-foreground">Нужен другой кошелёк.</span> На одном
-                устройстве кошелёк один. Создать новый либо восстановить другую seed-фразу можно
-                только вместо нынешнего — поэтому путь тот же.
+                <span className="font-medium text-foreground">Another wallet is needed.</span> A
+                device holds one wallet. Creating a new one or restoring a different seed phrase is
+                possible only in place of the current one — hence the same path.
               </li>
             </ul>
           </div>
 
           <div className="flex flex-col gap-3">
-            <p className="text-sm font-medium">Как это работает</p>
+            <p className="text-sm font-medium">How it works</p>
             <ol className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <li>1. Кошелёк стирается с этого устройства вместе с зашифрованными ключами.</li>
+              <li>1. The wallet is erased from this device together with the encrypted keys.</li>
               <li>
-                2. Вы создаёте новый кошелёк либо вводите seed-фразу — свою прежнюю или другую.
+                2. You create a new wallet or enter a seed phrase — your previous one or another.
               </li>
-              <li>3. Придумываете новый пароль. Все аккаунты восстанавливаются из фразы.</li>
+              <li>3. You choose a new password. Every account is restored from the phrase.</li>
             </ol>
           </div>
 
@@ -137,14 +138,14 @@ export function ForgotPasswordPage() {
                 }}
               />
               <span className="text-sm leading-snug font-normal">
-                У меня есть записанная seed-фраза, и я понимаю, что без неё доступ к средствам будет
-                потерян
+                I have the seed phrase written down and understand that without it access to the
+                funds will be lost
               </span>
             </Label>
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="confirmation-word">
-                Введите слово {CONFIRMATION_WORD} для подтверждения
+                Type the word {CONFIRMATION_WORD} to confirm
               </Label>
               <Input
                 id="confirmation-word"
@@ -167,7 +168,7 @@ export function ForgotPasswordPage() {
 
           <div className="flex gap-3">
             <Button asChild variant="outline" className="flex-1">
-              <Link to="/unlock">Вернуться</Link>
+              <Link to="/unlock">Go back</Link>
             </Button>
 
             <Button
@@ -178,7 +179,7 @@ export function ForgotPasswordPage() {
                 void handleReset()
               }}
             >
-              {isBusy ? 'Удаление…' : 'Стереть кошелёк'}
+              {isBusy ? 'Erasing…' : 'Erase the wallet'}
             </Button>
           </div>
         </CardContent>

@@ -278,7 +278,7 @@ export class FailoverProvider implements IProvider {
        Alchemy содержит ключ API, а адрес собственного узла пользователя —
        ключ его учётной записи либо расположение машины. Журнал попадает
        в отчёты об ошибках и в консоль браузера. */
-    this.#logger.warn('Узел исключён из перебора', {
+    this.#logger.warn('The node was excluded from the rotation', {
       providerId: failed.providerId,
       hasReplacement: next !== null,
       reason,

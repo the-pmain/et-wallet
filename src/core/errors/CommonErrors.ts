@@ -17,7 +17,7 @@ export class InvalidArgumentError extends AppError {
   readonly argument: string
 
   constructor(argument: string, reason: string) {
-    super(`Некорректное значение аргумента "${argument}": ${reason}`)
+    super(`Invalid value for the argument "${argument}": ${reason}`)
     this.argument = argument
   }
 }
@@ -33,6 +33,6 @@ export class NotInitializedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NotInitialized
 
   constructor(serviceName: string) {
-    super(`Сервис "${serviceName}" не инициализирован. Требуется вызов init().`)
+    super(`The service "${serviceName}" is not initialised. A call to init() is required.`)
   }
 }

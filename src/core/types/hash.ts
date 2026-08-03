@@ -38,7 +38,7 @@ function normalizeHash(value: unknown, name: string): string {
   if (typeof value !== 'string' || !HASH_PATTERN.test(value)) {
     throw new InvalidArgumentError(
       name,
-      `ожидается 32 байта в шестнадцатеричном виде, получено "${String(value)}"`,
+      `expected 32 bytes in hexadecimal form, received "${String(value)}"`,
     )
   }
 

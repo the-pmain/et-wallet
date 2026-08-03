@@ -73,13 +73,13 @@ export function PortfolioPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" aria-label="Назад">
+        <Button asChild variant="ghost" size="icon" aria-label="Back">
           <Link to="/wallet">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
 
-        <h1 className="flex-1 text-lg font-semibold">Портфель</h1>
+        <h1 className="flex-1 text-lg font-semibold">Portfolio</h1>
 
         {snapshot.arePricesEnabled ? (
           <Button
@@ -92,7 +92,7 @@ export function PortfolioPage() {
               className={snapshot.isPortfolioLoading ? 'size-4 animate-spin' : 'size-4'}
               aria-hidden
             />
-            Обновить
+            Refresh
           </Button>
         ) : null}
       </header>
@@ -107,10 +107,10 @@ export function PortfolioPage() {
 
       {snapshot.priceError === null ? null : (
         <Alert variant="danger">
-          <AlertTitle>Курсы получить не удалось</AlertTitle>
+          <AlertTitle>Prices could not be fetched</AlertTitle>
           <AlertDescription>
-            Показаны только те позиции, курс которых известен. Это не означает, что остальные активы
-            ничего не стоят. Источник ответил: «{snapshot.priceError}».
+            Only the positions with a known price are shown. That does not mean the rest are
+            worthless. The source replied: "{snapshot.priceError}".
           </AlertDescription>
         </Alert>
       )}
@@ -129,11 +129,13 @@ export function PortfolioPage() {
           <CardContent className="p-0 sm:p-0">
             <EmptyState
               icon={ChartPie}
-              title={snapshot.isPortfolioLoading ? 'Считаем стоимость…' : 'Оценка недоступна'}
+              title={
+                snapshot.isPortfolioLoading ? 'Calculating the value…' : 'Valuation unavailable'
+              }
               description={
                 snapshot.isPortfolioLoading
-                  ? 'Запрашиваем курсы активов.'
-                  : 'В этой сети нет отслеживаемых активов либо их балансы ещё не получены. Пустая оценка не означает, что средств нет.'
+                  ? 'Fetching asset prices.'
+                  : 'This network holds no tracked assets, or their balances have not arrived yet. An empty valuation does not mean the funds are gone.'
               }
             />
           </CardContent>
@@ -160,38 +162,40 @@ function PriceConsent({ sourceName, isBusy, onEnable }: PriceConsentProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Стоимость портфеля выключена</CardTitle>
+        <CardTitle className="text-base">Portfolio value is turned off</CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">
-          Чтобы показать стоимость, кошелёк обратится к стороннему сервису курсов
+          To show the value, the wallet will contact a third-party price service
           {sourceName === '' ? '' : ` «${sourceName}»`}.
         </p>
 
         <div className="flex flex-col gap-2 rounded-xl border p-3 text-xs">
-          <p className="font-medium">Что узнает сервис</p>
+          <p className="font-medium">What the service learns</p>
           <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-            <li>адреса контрактов ваших токенов — то есть состав портфеля;</li>
-            <li>сеть, в которой вы работаете;</li>
-            <li>ваш IP-адрес.</li>
+            <li>
+              the contract addresses of your tokens — that is, the composition of the portfolio;
+            </li>
+            <li>the network you work in;</li>
+            <li>your IP address.</li>
           </ul>
 
-          <p className="mt-1 font-medium">Что сервис не узнает</p>
+          <p className="mt-1 font-medium">What the service does not learn</p>
           <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-            <li>адрес вашего кошелька — он не передаётся;</li>
-            <li>ваши балансы — они не покидают устройство;</li>
-            <li>seed-фразу и ключи — они не покидают устройство никогда.</li>
+            <li>your wallet address — it is never sent;</li>
+            <li>your balances — they never leave the device;</li>
+            <li>the seed phrase and the keys — they never leave the device at all.</li>
           </ul>
         </div>
 
         <Button size="lg" disabled={isBusy} onClick={onEnable}>
           <ChartPie className="size-4" aria-hidden />
-          Показывать стоимость
+          Show the value
         </Button>
 
         <p className="text-xs text-muted-foreground">
-          Решение отменяется в любой момент: балансы и история от него не зависят.
+          The decision can be reversed at any time: balances and history do not depend on it.
         </p>
       </CardContent>
     </Card>
@@ -218,7 +222,7 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
     <Card>
       <CardContent className="flex flex-col gap-2">
         <span className="text-xs text-muted-foreground">
-          Стоимость в сети {networkName === '' ? '—' : networkName}
+          Value in {networkName === '' ? '—' : networkName}
         </span>
 
         <span className="text-3xl font-semibold tabular-nums">
@@ -227,8 +231,8 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
 
         {hasValued ? null : (
           <span className="text-xs text-muted-foreground">
-            Курс не известен ни по одному активу, поэтому стоимость не посчитана. Это не означает,
-            что активы ничего не стоят.
+            No price is known for any asset, so the value was not calculated. That does not mean the
+            assets are worthless.
           </span>
         )}
 
@@ -240,8 +244,8 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
              сервис в том, чего он не делал. */
           <span className="text-xs text-muted-foreground">
             {portfolio.previousValue === null
-              ? 'Суточное изменение неизвестно: источник не сообщил его ни по одному активу.'
-              : 'Сутки назад портфель ничего не стоил, поэтому изменение в процентах не определено.'}
+              ? 'The 24-hour change is unknown: the source reported none for any asset.'
+              : 'A day ago the portfolio was worth nothing, so the change in percent is undefined.'}
           </span>
         ) : (
           <span
@@ -251,7 +255,7 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
             <ChangeIcon className="size-4" aria-hidden />
             {formatChangePercent(portfolio.change24hPercent)}
             <span className="text-muted-foreground">
-              ({formatFiat(portfolio.change24hValue)} за 24 ч)
+              ({formatFiat(portfolio.change24hValue)} over 24 h)
             </span>
           </span>
         )}
@@ -260,8 +264,8 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
             актива за сутки увеличивает стоимость портфеля, но это не рост
             курса, и приписывать его пользователю как доход нельзя. */}
         <p className="text-xs text-muted-foreground">
-          Изменение посчитано по курсам активов при неизменном составе. Покупки, продажи и переводы
-          за сутки в него не входят.
+          The change is computed from asset prices with an unchanged composition. Purchases, sales
+          and transfers made during the day are not part of it.
         </p>
       </CardContent>
     </Card>
@@ -286,14 +290,14 @@ function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">Распределение</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">Allocation</CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-col items-center gap-4">
         <DonutChart
           slices={slices}
           caption={String(valued.length)}
-          captionHint={valued.length === 1 ? 'актив' : 'активов'}
+          captionHint={valued.length === 1 ? 'asset' : 'assets'}
         />
 
         {/* Список обязателен: разница между 18 % и 22 % на кольце
@@ -325,7 +329,7 @@ function PositionsCard({ portfolio }: { readonly portfolio: IPortfolioSummary })
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">Активы</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">Assets</CardTitle>
       </CardHeader>
 
       <CardContent className="p-0 sm:p-0">
@@ -350,12 +354,12 @@ function PositionRow({ position }: { readonly position: IPortfolioPosition }) {
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium">{token.symbol}</span>
-          {token.isCustom ? <Badge variant="outline">непроверенный</Badge> : null}
+          {token.isCustom ? <Badge variant="outline">unverified</Badge> : null}
         </span>
 
         <span className="truncate text-xs text-muted-foreground tabular-nums">
           {balance === null
-            ? 'баланс не получен'
+            ? 'balance not received'
             : `${formatTokenAmount(balance, token.decimals)} ${token.symbol}`}
         </span>
       </span>
@@ -363,7 +367,7 @@ function PositionRow({ position }: { readonly position: IPortfolioPosition }) {
       <span className="flex shrink-0 flex-col items-end">
         <span className="text-sm tabular-nums">{formatFiat(value)}</span>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {quote === null ? 'курс неизвестен' : formatChangePercent(quote.change24hPercent)}
+          {quote === null ? 'price unknown' : formatChangePercent(quote.change24hPercent)}
         </span>
       </span>
     </li>
@@ -383,25 +387,25 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">Статистика</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">Statistics</CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-2 text-sm">
-        <StatRow label="Активов всего" value={String(portfolio.positions.length)} />
-        <StatRow label="Учтено в оценке" value={String(valued.length)} />
+        <StatRow label="Assets in total" value={String(portfolio.positions.length)} />
+        <StatRow label="Included in the valuation" value={String(valued.length)} />
 
         {/* Доля неизвестна, когда стоимость портфеля нулевая: делить
             не на что. Строка «наибольшая доля — прочерк» ничего
             не сообщает и занимает место, которое читают. */}
         {largest === null || largest.share === null ? null : (
           <StatRow
-            label="Наибольшая доля"
+            label="Largest share"
             value={`${largest.token.symbol} · ${formatShare(largest.share)}`}
           />
         )}
 
         <StatRow
-          label="Вчерашняя оценка"
+          label="Yesterday’s valuation"
           value={portfolio.previousValue === null ? '—' : formatFiat(portfolio.previousValue)}
         />
 
@@ -409,17 +413,17 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
           <Alert variant="warning" className="mt-2">
             <EyeOff />
             <AlertDescription>
-              В оценку не вошли:{' '}
+              Left out of the valuation:{' '}
               {portfolio.positionsWithoutPrice > 0
-                ? `${String(portfolio.positionsWithoutPrice)} без известного курса`
+                ? `${String(portfolio.positionsWithoutPrice)} without a known price`
                 : ''}
               {portfolio.positionsWithoutPrice > 0 && portfolio.positionsWithoutBalance > 0
                 ? ', '
                 : ''}
               {portfolio.positionsWithoutBalance > 0
-                ? `${String(portfolio.positionsWithoutBalance)} с неполученным балансом`
+                ? `${String(portfolio.positionsWithoutBalance)} with no balance received`
                 : ''}
-              . Это не означает, что они ничего не стоят.
+              . That does not mean they are worthless.
             </AlertDescription>
           </Alert>
         )}
@@ -427,9 +431,9 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
         <Alert className="mt-2">
           <Info />
           <AlertDescription>
-            Оценка получена от стороннего сервиса{sourceName === '' ? '' : ` «${sourceName}»`} и
-            приблизительна. Она никогда не участвует в формировании транзакции: суммы к отправке
-            считаются в минимальных единицах сети.
+            The valuation comes from a third-party service
+            {sourceName === '' ? '' : ` "${sourceName}"`} and is approximate. It never takes part in
+            building a transaction: amounts to send are counted in the minimal units of the network.
           </AlertDescription>
         </Alert>
       </CardContent>

@@ -109,7 +109,7 @@ export class HDWalletService implements IHDWalletService {
 
     if (bytes.length < MIN_SEED_LENGTH || bytes.length > MAX_SEED_LENGTH) {
       throw new InvalidExtendedKeyError(
-        `длина seed должна быть от ${String(MIN_SEED_LENGTH)} до ${String(MAX_SEED_LENGTH)} байт`,
+        `the seed length must be between ${String(MIN_SEED_LENGTH)} and ${String(MAX_SEED_LENGTH)} bytes`,
       )
     }
 
@@ -152,7 +152,9 @@ export class HDWalletService implements IHDWalletService {
     } catch (error) {
       /* Текст исключения библиотеки не пробрасывается: в него может попасть
          фрагмент разбираемого ключа, а xprv является секретом. */
-      throw new InvalidExtendedKeyError('строка не разбирается как ключ BIP-32', { cause: error })
+      throw new InvalidExtendedKeyError('the string cannot be parsed as a BIP-32 key', {
+        cause: error,
+      })
     }
 
     const changeNode = accountNode.derive(HDWalletService.#relativeChangePath(options))
@@ -205,7 +207,7 @@ export class HDWalletService implements IHDWalletService {
 
     if (!Number.isSafeInteger(count) || count <= 0 || count > MAX_ACCOUNTS_PER_CALL) {
       throw new InvalidExtendedKeyError(
-        `count должен быть целым числом от 1 до ${String(MAX_ACCOUNTS_PER_CALL)}`,
+        `count must be an integer between 1 and ${String(MAX_ACCOUNTS_PER_CALL)}`,
       )
     }
 
@@ -294,7 +296,7 @@ export class HDWalletService implements IHDWalletService {
 
     if (node.privateKey === null) {
       throw new KeyringCannotSignError(
-        'кошелёк создан из расширенного публичного ключа: приватного ключа нет',
+        'the wallet was created from an extended public key: there is no private key',
       )
     }
 
@@ -359,7 +361,7 @@ export class HDWalletService implements IHDWalletService {
 
     if (privateKey === null) {
       throw new KeyringCannotSignError(
-        'кошелёк создан из расширенного публичного ключа и работает в режиме наблюдения',
+        'the wallet was created from an extended public key and works in watch-only mode',
       )
     }
 
@@ -379,7 +381,9 @@ export class HDWalletService implements IHDWalletService {
   #consumePermit(permit: ExportPermit, kind: ExportKind, addressIndex: number | null): void {
     if (!permit.matches(kind, hdAccountScope(this.accountPath), addressIndex)) {
       throw new ExportNotPermittedError(
-        permit.isConsumed ? 'разрешение уже использовано' : 'разрешение выдано на другую операцию',
+        permit.isConsumed
+          ? 'the permit has already been used'
+          : 'the permit was issued for a different operation',
       )
     }
 
@@ -413,7 +417,7 @@ export class HDWalletService implements IHDWalletService {
     const publicKey = node.publicKey
 
     if (publicKey === null) {
-      throw new InvalidPublicKeyError('узел дерева не содержит публичного ключа')
+      throw new InvalidPublicKeyError('the tree node carries no public key')
     }
 
     return publicKey
@@ -426,7 +430,9 @@ export class HDWalletService implements IHDWalletService {
     }
 
     if (!path.startsWith(`${accountPath}/`)) {
-      throw new InvalidExtendedKeyError(`путь "${path}" лежит вне ветви аккаунта "${accountPath}"`)
+      throw new InvalidExtendedKeyError(
+        `the path "${path}" lies outside the account branch "${accountPath}"`,
+      )
     }
 
     return path.slice(accountPath.length + 1)

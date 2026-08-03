@@ -28,16 +28,16 @@ describe('parseAmount', () => {
 
   it('отвергает лишние знаки после запятой', () => {
     /* Округление означало бы отправку суммы, отличной от введённой. */
-    expect(() => parseAmount('1.1234567', 6)).toThrow(/знаков после запятой/)
+    expect(() => parseAmount('1.1234567', 6)).toThrow(/decimal places/)
   })
 
   it('отвергает ноль', () => {
-    expect(() => parseAmount('0', 18)).toThrow(/больше нуля/)
-    expect(() => parseAmount('0.0', 18)).toThrow(/больше нуля/)
+    expect(() => parseAmount('0', 18)).toThrow(/greater than zero/)
+    expect(() => parseAmount('0.0', 18)).toThrow(/greater than zero/)
   })
 
   it('отвергает пустую строку', () => {
-    expect(() => parseAmount('   ', 18)).toThrow(/Введите сумму/)
+    expect(() => parseAmount('   ', 18)).toThrow(/Enter an amount/)
   })
 
   it('отвергает текст и отрицательные значения', () => {

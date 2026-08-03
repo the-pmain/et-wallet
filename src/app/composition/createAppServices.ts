@@ -126,7 +126,7 @@ function createDappSessions(session: IWalletSession, logger: ConsoleLogger): Dap
       projectId,
       metadata: {
         name: APP_CONFIG.name,
-        description: 'Некастодиальный криптовалютный кошелёк',
+        description: 'Non-custodial crypto wallet',
         url: globalThis.location.origin,
         icons: [`${globalThis.location.origin}/icons/icon-128.png`],
       },

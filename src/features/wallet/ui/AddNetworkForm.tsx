@@ -93,7 +93,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           id={`${fieldId}-name`}
-          label="Название сети"
+          label="Network name"
           value={form.name}
           placeholder="My Network"
           onChange={(value) => {
@@ -103,7 +103,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
 
         <Field
           id={`${fieldId}-chain`}
-          label="Идентификатор сети"
+          label="Chain ID"
           value={form.chainId}
           placeholder="1"
           inputMode="numeric"
@@ -115,7 +115,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
 
       <Field
         id={`${fieldId}-rpc`}
-        label="RPC-адрес"
+        label="RPC endpoint"
         value={form.rpcUrl}
         placeholder="https://"
         onChange={(value) => {
@@ -126,7 +126,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           id={`${fieldId}-symbol`}
-          label="Символ валюты"
+          label="Currency symbol"
           value={form.symbol}
           placeholder="ETH"
           onChange={(value) => {
@@ -136,7 +136,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
 
         <Field
           id={`${fieldId}-decimals`}
-          label="Знаков после запятой"
+          label="Decimals"
           value={form.decimals}
           inputMode="numeric"
           onChange={(value) => {
@@ -147,7 +147,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
 
       <Field
         id={`${fieldId}-explorer`}
-        label="Обозреватель блоков (необязательно)"
+        label="Block explorer (optional)"
         value={form.explorerUrl}
         placeholder="https://"
         onChange={(value) => {
@@ -162,7 +162,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
             update('isTestnet', event.target.checked)
           }}
         />
-        Тестовая сеть
+        Test network
       </label>
 
       {error === null ? null : (
@@ -174,12 +174,12 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
       {impersonation === null ? null : (
         <Alert variant="danger">
           <ShieldAlert />
-          <AlertTitle>Сеть выдаёт себя за существующую</AlertTitle>
+          <AlertTitle>The network impersonates an existing one</AlertTitle>
           <AlertDescription className="flex flex-col gap-3">
             <span>{impersonation.message}</span>
             <span>
-              Если это подмена, добавленная сеть будет выглядеть в кошельке как настоящая, а
-              переводы уйдут в чужую цепь. Добавляйте только если точно понимаете, что делаете.
+              If this is a spoof, the added network will look genuine inside the wallet while
+              transfers go to a foreign chain. Add it only if you are certain of what you are doing.
             </span>
 
             <Button
@@ -191,7 +191,7 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
                 void submit(event, true)
               }}
             >
-              Всё равно добавить
+              Add anyway
             </Button>
           </AlertDescription>
         </Alert>
@@ -199,15 +199,15 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
 
       <Alert variant="warning">
         <AlertDescription>
-          Узел сети сообщает кошельку баланс, цену газа и результаты вызовов, а обозреватель — это
-          ссылка, по которой вы будете переходить из кошелька. И то и другое задаёт тот, кто
-          добавляет сеть. Добавляйте только проверенные значения.
+          The network node tells the wallet the balance, the gas price and the results of calls, and
+          the explorer is the link you will follow from the wallet. Both are supplied by whoever
+          adds the network. Add only values you have verified.
         </AlertDescription>
       </Alert>
 
       <Button type="submit" disabled={isBusy || !isComplete}>
         <Plus className="size-4" aria-hidden />
-        {isBusy ? 'Проверка узла…' : 'Добавить сеть'}
+        {isBusy ? 'Checking the node…' : 'Add network'}
       </Button>
     </form>
   )

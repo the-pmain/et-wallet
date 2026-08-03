@@ -85,7 +85,7 @@ export interface IParsedBip44Path {
  */
 export function toDerivationPath(value: string): DerivationPath {
   if (!PATH_PATTERN.test(value)) {
-    throw new InvalidDerivationPathError(value, "ожидается формат вида m/44'/60'/0'/0/0")
+    throw new InvalidDerivationPathError(value, "a path of the form m/44'/60'/0'/0/0 is expected")
   }
 
   const segments = value.split('/').slice(1)
@@ -96,7 +96,7 @@ export function toDerivationPath(value: string): DerivationPath {
     if (!Number.isSafeInteger(index) || index < 0 || index >= HARDENED_OFFSET) {
       throw new InvalidDerivationPathError(
         value,
-        `индекс "${segment}" вне диапазона 0..${String(HARDENED_OFFSET - 1)}`,
+        `the index "${segment}" is out of the range 0..${String(HARDENED_OFFSET - 1)}`,
       )
     }
   }
@@ -109,7 +109,7 @@ export function assertValidIndex(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0 || value >= HARDENED_OFFSET) {
     throw new InvalidDerivationPathError(
       String(value),
-      `${name} должен быть целым числом от 0 до ${String(HARDENED_OFFSET - 1)}`,
+      `${name} must be an integer between 0 and ${String(HARDENED_OFFSET - 1)}`,
     )
   }
 }
@@ -168,7 +168,7 @@ export function parseBip44Path(value: string): IParsedBip44Path {
   if (segments.length !== 5) {
     throw new InvalidDerivationPathError(
       value,
-      `путь BIP-44 состоит из пяти уровней, получено ${String(segments.length)}`,
+      `a BIP-44 path has five levels, received ${String(segments.length)}`,
     )
   }
 
@@ -182,10 +182,7 @@ export function parseBip44Path(value: string): IParsedBip44Path {
 
   for (const segment of [purpose, coinType, accountIndex]) {
     if (!segment.endsWith("'")) {
-      throw new InvalidDerivationPathError(
-        value,
-        'первые три уровня BIP-44 обязаны быть закалёнными',
-      )
+      throw new InvalidDerivationPathError(value, 'the first three BIP-44 levels must be hardened')
     }
   }
 
@@ -193,7 +190,7 @@ export function parseBip44Path(value: string): IParsedBip44Path {
     if (segment.endsWith("'")) {
       throw new InvalidDerivationPathError(
         value,
-        'уровни change и addressIndex не могут быть закалёнными',
+        'the change and addressIndex levels cannot be hardened',
       )
     }
   }

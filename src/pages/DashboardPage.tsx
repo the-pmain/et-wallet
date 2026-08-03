@@ -43,14 +43,14 @@ export function DashboardPage() {
     return (
       <div className="flex flex-col gap-4 py-8">
         <Alert variant="danger">
-          <AlertTitle>Не удалось открыть кошелёк</AlertTitle>
+          <AlertTitle>The wallet could not be opened</AlertTitle>
           <AlertDescription>
-            {snapshot.error ?? 'Причина неизвестна.'} Средства при этом не затронуты: seed-фраза
-            остаётся единственным источником ключей.
+            {snapshot.error ?? 'The reason is unknown.'} Your funds are not affected: the seed
+            phrase remains the only source of keys.
           </AlertDescription>
         </Alert>
 
-        <Button onClick={() => void session.open()}>Повторить</Button>
+        <Button onClick={() => void session.open()}>Try again</Button>
 
         <Button
           variant="outline"
@@ -58,7 +58,7 @@ export function DashboardPage() {
             onboarding.lock()
           }}
         >
-          Заблокировать
+          Lock
         </Button>
       </div>
     )
@@ -108,8 +108,8 @@ export function DashboardPage() {
             isLoading={snapshot.isHistoryLoading}
             emptyDescription={
               <>
-                За доступный период операций не найдено. Полный список и сведения об ограничениях
-                источника — в разделе «История».
+                No operations were found for the available period. The full list and the limits of
+                the source are in the History section.
               </>
             }
           />

@@ -60,7 +60,7 @@ export function addressToTopic(address: Address): HexString {
  */
 export function topicToAddress(topic: HexString): Address {
   if (topic.length !== TOPIC_LENGTH) {
-    throw new Error(`Тема журнала имеет неверную длину: ${String(topic.length)}`)
+    throw new Error(`The log topic has a wrong length: ${String(topic.length)}`)
   }
 
   /* Адрес — последние 20 байт темы, то есть 40 последних символов. */

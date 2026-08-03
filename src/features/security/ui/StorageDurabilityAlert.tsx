@@ -49,10 +49,10 @@ export function StorageDurabilityAlert({
     return (
       <Alert variant="danger">
         <TriangleAlert />
-        <AlertTitle>Кошелёк не переживёт закрытие вкладки</AlertTitle>
+        <AlertTitle>The wallet will not survive closing the tab</AlertTitle>
         <AlertDescription>
-          Данные хранятся только в памяти. После перезагрузки страницы восстановить доступ можно
-          будет исключительно по записанной seed-фразе.
+          The data is kept in memory only. After a page reload, access can be restored solely from
+          the seed phrase you wrote down.
         </AlertDescription>
       </Alert>
     )
@@ -62,12 +62,12 @@ export function StorageDurabilityAlert({
     return (
       <Alert variant="warning">
         <HardDriveDownload />
-        <AlertTitle>Браузер вправе удалить данные кошелька</AlertTitle>
+        <AlertTitle>The browser may delete the wallet data</AlertTitle>
         <AlertDescription>
-          Кошелёк сохраняется на устройстве и переживает перезагрузку, но разрешения на постоянное
-          хранение браузер не выдал: при нехватке места он может очистить данные сайта. Так бывает в
-          приватном окне и до того, как вы достаточно поработали с приложением. Записанная
-          seed-фраза — единственная защита, не зависящая от браузера.
+          The wallet is stored on the device and survives a reload, but the browser did not grant
+          persistent storage: when space runs low it may clear the site data. This happens in
+          private windows and before you have used the application enough. A seed phrase written
+          down is the only protection that does not depend on the browser.
         </AlertDescription>
       </Alert>
     )
@@ -80,11 +80,11 @@ export function StorageDurabilityAlert({
   return (
     <Alert>
       <ShieldCheck />
-      <AlertTitle>Браузер обещал не удалять данные кошелька</AlertTitle>
+      <AlertTitle>The browser promised not to delete the wallet data</AlertTitle>
       <AlertDescription>
-        Кошелёк сохраняется на устройстве, и браузер не станет вытеснять его при нехватке места. Это
-        не отменяет резервной копии: потеря устройства или очистка данных сайта вручную
-        восстанавливаются только по seed-фразе.
+        The wallet is stored on the device, and the browser will not evict it when space runs low.
+        That does not replace a backup: losing the device or clearing the site data by hand can only
+        be recovered from the seed phrase.
       </AlertDescription>
     </Alert>
   )

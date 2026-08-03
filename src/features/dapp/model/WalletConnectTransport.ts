@@ -106,8 +106,8 @@ export class WalletConnectTransport implements ISessionTransport {
 
     if (this.#options.projectId === '') {
       throw new Error(
-        'WalletConnect не настроен: не задан идентификатор проекта. ' +
-          'Подключение к приложениям недоступно, остальные возможности кошелька работают.',
+        'WalletConnect is not configured: the project identifier is missing. ' +
+          'Connecting to applications is unavailable; the rest of the wallet works.',
       )
     }
 
@@ -121,7 +121,7 @@ export class WalletConnectTransport implements ISessionTransport {
     this.#subscribe(client)
     this.#client = client
 
-    this.#logger.info('Транспорт подключений готов', { sessions: this.listSessions().length })
+    this.#logger.info('The connection transport is ready', { sessions: this.listSessions().length })
   }
 
   async pair(uri: string): Promise<void> {
@@ -141,7 +141,7 @@ export class WalletConnectTransport implements ISessionTransport {
     if (approval === null) {
       /* Отказ отправляется явно: приложение, не получившее ответа,
          висит в ожидании и подталкивает пользователя нажать ещё раз. */
-      await client.reject({ id, reason: { code: 5000, message: 'Отклонено пользователем' } })
+      await client.reject({ id, reason: { code: 5000, message: 'Rejected by the user' } })
 
       return
     }
@@ -193,7 +193,7 @@ export class WalletConnectTransport implements ISessionTransport {
   async disconnect(sessionId: string): Promise<void> {
     await this.#requireClient().disconnect({
       topic: sessionId,
-      reason: { code: 6000, message: 'Отключено пользователем' },
+      reason: { code: 6000, message: 'Disconnected by the user' },
     })
 
     this.#events.emit('session:disconnected', { sessionId })
@@ -214,7 +214,7 @@ export class WalletConnectTransport implements ISessionTransport {
     this.#client = null
   }
 
-  /** Переводит события библиотеки в события транспорта. */
+  /** Transferит события библиотеки в события транспорта. */
   #subscribe(client: WalletConnectClient): void {
     client.on('session_proposal', (event) => {
       this.#events.emit('session:proposal', {
@@ -239,7 +239,7 @@ export class WalletConnectTransport implements ISessionTransport {
            то, чего мы не разбираем, значит подписать вслепую. */
         void this.respondToRequest(`${event.topic}|${String(event.id)}`, {
           kind: 'rejected',
-          reason: 'Метод не поддерживается кошельком',
+          reason: 'The method is not supported by this wallet',
         })
 
         return
@@ -255,7 +255,7 @@ export class WalletConnectTransport implements ISessionTransport {
 
   #requireClient(): WalletConnectClient {
     if (this.#client === null) {
-      throw new Error('Транспорт подключений не инициализирован.')
+      throw new Error('The connection transport is not initialised.')
     }
 
     return this.#client
@@ -343,7 +343,7 @@ function readProposedChains(params: RawProposal['params']): readonly ChainId[] {
   return [...unique].map((chain) => parseCaip2(chain)).filter((chain) => chain !== null)
 }
 
-/** Переводит сессию библиотеки в сессию ядра. */
+/** Transferит сессию библиотеки в сессию ядра. */
 function toDappSession(session: RawSession): IDappSession {
   const accounts = session.namespaces[EVM_NAMESPACE]?.accounts ?? []
   const addresses: Address[] = []

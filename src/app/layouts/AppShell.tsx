@@ -6,7 +6,7 @@ import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Badge, Button, LanguageSwitch } from '@/shared/ui'
+import { Badge, Button } from '@/shared/ui'
 
 import { AmbientBackground } from './AmbientBackground'
 import { NAVIGATION } from './navigation'
@@ -66,8 +66,6 @@ export function AppShell() {
           )}
 
           <div className="ml-auto flex items-center gap-2">
-            <LanguageSwitch className="hidden sm:flex" />
-
             {snapshot.activeNetwork === null ? null : (
               <Badge variant={snapshot.activeNetwork.isTestnet ? 'warning' : 'default'}>
                 {snapshot.activeNetwork.name}
@@ -77,7 +75,7 @@ export function AppShell() {
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Заблокировать кошелёк"
+              aria-label="Lock the wallet"
               onClick={() => {
                 onboarding.lock()
               }}
@@ -113,7 +111,7 @@ export function AppShell() {
       </main>
 
       <nav
-        aria-label="Разделы кошелька"
+        aria-label="Wallet sections"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 backdrop-blur-md"
       >
         <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
@@ -161,7 +159,7 @@ export function AppShell() {
 function ShellPlaceholder() {
   return (
     <div className="flex min-h-[50svh] items-center justify-center text-sm text-muted-foreground">
-      Открытие кошелька…
+      Opening the wallet…
     </div>
   )
 }

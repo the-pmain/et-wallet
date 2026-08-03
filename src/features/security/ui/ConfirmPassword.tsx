@@ -55,10 +55,10 @@ export function ConfirmPassword({ action, onVerify, onConfirmed, onCancel }: Con
       if (isValid) {
         onConfirmed()
       } else {
-        setError('Неверный пароль.')
+        setError('Wrong password.')
       }
     } catch {
-      setError('Проверить пароль не удалось.')
+      setError('The password could not be checked.')
     } finally {
       setBusy(false)
     }
@@ -74,12 +74,12 @@ export function ConfirmPassword({ action, onVerify, onConfirmed, onCancel }: Con
       <div className="flex items-start gap-2">
         <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
         <p className="text-sm">
-          Подтвердите паролем: <span className="font-medium">{action}</span>
+          Confirm with your password: <span className="font-medium">{action}</span>
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={passwordId}>Пароль</Label>
+        <Label htmlFor={passwordId}>Password</Label>
         <Input
           id={passwordId}
           type="password"
@@ -111,11 +111,11 @@ export function ConfirmPassword({ action, onVerify, onConfirmed, onCancel }: Con
           disabled={isBusy}
           onClick={onCancel}
         >
-          Отмена
+          Cancel
         </Button>
 
         <Button type="submit" className="flex-1" disabled={isBusy || password.length === 0}>
-          {isBusy ? 'Проверка…' : 'Подтвердить'}
+          {isBusy ? 'Checking…' : 'Confirm'}
         </Button>
       </div>
     </form>

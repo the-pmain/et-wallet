@@ -165,7 +165,7 @@ export class TransactionService implements ITransactionService {
 
   readonly #events = new EventBus<TransactionEventMap>({
     onListenerError: (error, event) => {
-      this.#logger.error('Сбой обработчика транзакционного события', {
+      this.#logger.error('Transaction event listener failed', {
         event: String(event),
         error: error instanceof Error ? error.message : String(error),
       })
@@ -371,7 +371,7 @@ export class TransactionService implements ITransactionService {
 
         if (balance < amount) {
           throw new NftNotOwnedError(
-            `у вас ${balance.toString()} экз., а отправляется ${amount.toString()}`,
+            `you own ${balance.toString()}, while ${amount.toString()} is being sent`,
           )
         }
 
@@ -386,14 +386,14 @@ export class TransactionService implements ITransactionService {
       )
 
       if (!areAddressesEqual(holder, request.from)) {
-        throw new NftNotOwnedError('он принадлежит другому адресу')
+        throw new NftNotOwnedError('it belongs to a different address')
       }
     } catch (error) {
       if (error instanceof NftNotOwnedError) {
         throw error
       }
 
-      this.#logger.warn('Принадлежность предмета проверить не удалось', {
+      this.#logger.warn('Item ownership could not be verified', {
         reason: error instanceof Error ? error.message : String(error),
       })
     }
@@ -421,7 +421,7 @@ export class TransactionService implements ITransactionService {
         }),
       )
     } catch (error) {
-      this.#logger.warn('Баланс токена прочитать не удалось', {
+      this.#logger.warn('The token balance could not be read', {
         reason: error instanceof Error ? error.message : String(error),
       })
 
@@ -508,7 +508,7 @@ export class TransactionService implements ITransactionService {
 
     await this.#repository.save(record)
 
-    this.#logger.info('Транзакция опубликована', { chainId: signed.transaction.chainId })
+    this.#logger.info('Transaction published', { chainId: signed.transaction.chainId })
     this.#events.emit('transaction:submitted', { record })
 
     return hash
@@ -586,7 +586,7 @@ export class TransactionService implements ITransactionService {
          Восстановить их неоткуда, а догадка означала бы отправку
          другой операции под тем же номером. */
       throw new TransactionNotReplaceableError(
-        'параметры исходной транзакции не сохранены; отмена по-прежнему возможна',
+        'the parameters of the original transaction were not stored; cancelling is still possible',
       )
     }
 
@@ -656,17 +656,19 @@ export class TransactionService implements ITransactionService {
     }
 
     if (record.status === TRANSACTION_STATUS.Confirmed) {
-      throw new TransactionNotReplaceableError('она уже включена в блок')
+      throw new TransactionNotReplaceableError('it is already included in a block')
     }
 
     if (record.status === TRANSACTION_STATUS.Reverted) {
       throw new TransactionNotReplaceableError(
-        'она уже включена в блок, хотя и завершилась откатом',
+        'it is already included in a block, although it reverted',
       )
     }
 
     if (record.status === TRANSACTION_STATUS.Replaced) {
-      throw new TransactionNotReplaceableError('её место уже занято другой транзакцией')
+      throw new TransactionNotReplaceableError(
+        'its slot has already been taken by another transaction',
+      )
     }
 
     return record
@@ -786,7 +788,7 @@ export class TransactionService implements ITransactionService {
         } catch (error) {
           /* Недоступность одной сети не имеет права остановить слежение
              за остальными. */
-          this.#logger.warn('Состояние транзакции получить не удалось', {
+          this.#logger.warn('The transaction status could not be read', {
             chainId: record.chainId,
             reason: error instanceof Error ? error.message : String(error),
           })
@@ -839,7 +841,7 @@ export class TransactionService implements ITransactionService {
     if (confirmations >= CONFIRMATIONS_TO_STOP_TRACKING) {
       /* Глубина достаточна: в следующую выборку запись не попадёт,
          и опрос по ней прекратится сам. */
-      this.#logger.info('Транзакция подтверждена окончательно', {
+      this.#logger.info('Transaction settled', {
         chainId: record.chainId,
         confirmations,
       })
@@ -875,7 +877,7 @@ export class TransactionService implements ITransactionService {
     /* Запись была подтверждена, а квитанции больше нет: блок вытеснен
        реорганизацией цепи. Оставить её подтверждённой значило бы
        утверждать состоявшимся то, чего в цепи нет. */
-    this.#logger.warn('Транзакция вернулась в ожидание: блок вытеснен', {
+    this.#logger.warn('Transaction returned to pending: its block was reorganised away', {
       chainId: record.chainId,
     })
 

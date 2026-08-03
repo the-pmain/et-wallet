@@ -52,13 +52,13 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold">
               <UntrustedText
-                value={request.dapp.name === '' ? 'Приложение без имени' : request.dapp.name}
+                value={request.dapp.name === '' ? 'Application without a name' : request.dapp.name}
               />
             </span>
             <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
               <Globe className="size-3 shrink-0" aria-hidden />
               <UntrustedText
-                value={request.dapp.url === '' ? 'адрес не указан' : request.dapp.url}
+                value={request.dapp.url === '' ? 'no address given' : request.dapp.url}
               />
             </span>
           </div>
@@ -76,8 +76,9 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
 
         <Alert variant="warning">
           <AlertDescription>
-            Подпись отозвать невозможно. Проверьте, что понимаете, о чём просит приложение: подписи
-            предъявляются контракту позже и в истории операций кошелька не отражаются.
+            A signature cannot be revoked. Make sure you understand what the application is asking
+            for: signatures are presented to a contract later and never appear in the wallet
+            history.
           </AlertDescription>
         </Alert>
 
@@ -88,7 +89,7 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
             путь и не заметил второго. */}
         {isConfirming ? (
           <ConfirmPassword
-            action="подпись по запросу приложения"
+            action="signing on behalf of an application"
             onVerify={verifyPassword}
             onConfirmed={() => {
               setConfirming(false)
@@ -101,7 +102,7 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
         ) : (
           <div className="flex gap-2">
             <Button variant="default" className="flex-1" disabled={isBusy} onClick={onReject}>
-              Отклонить
+              Reject
             </Button>
 
             <Button
@@ -118,7 +119,7 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
                 onApprove()
               }}
             >
-              {isBusy ? 'Выполняем…' : 'Подтвердить'}
+              {isBusy ? 'Working…' : 'Confirm'}
             </Button>
           </div>
         )}
@@ -131,13 +132,13 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
 function describeKind(kind: IDappRequest['payload']['kind']): string {
   switch (kind) {
     case DAPP_REQUEST_KIND.SignMessage:
-      return 'Подпись сообщения'
+      return 'Message signature'
     case DAPP_REQUEST_KIND.SignTypedData:
-      return 'Подпись структуры'
+      return 'Typed data signature'
     case DAPP_REQUEST_KIND.SendTransaction:
-      return 'Отправка транзакции'
+      return 'Sending a transaction'
     case DAPP_REQUEST_KIND.SignTransaction:
-      return 'Подпись транзакции'
+      return 'Transaction signature'
   }
 }
 
@@ -148,7 +149,7 @@ function RequestBody({ request }: { readonly request: IDappRequest }) {
   if (payload.kind === DAPP_REQUEST_KIND.SignMessage) {
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Сообщение</span>
+        <span className="text-xs text-muted-foreground">Message</span>
         <pre className="max-h-48 overflow-auto rounded-xl border p-3 text-xs break-words whitespace-pre-wrap">
           {payload.message}
         </pre>
@@ -161,14 +162,14 @@ function RequestBody({ request }: { readonly request: IDappRequest }) {
 
     return (
       <div className="flex flex-col gap-2">
-        <Row label="Тип">{primaryType}</Row>
-        {domain.name === undefined ? null : <Row label="Домен">{domain.name}</Row>}
+        <Row label="Type">{primaryType}</Row>
+        {domain.name === undefined ? null : <Row label="Domain">{domain.name}</Row>}
         {domain.verifyingContract === undefined ? null : (
-          <Row label="Контракт">{domain.verifyingContract}</Row>
+          <Row label="Contract">{domain.verifyingContract}</Row>
         )}
-        <Row label="Сеть">{request.chainId.toString()}</Row>
+        <Row label="Network">{request.chainId.toString()}</Row>
 
-        <span className="text-xs text-muted-foreground">Поля структуры</span>
+        <span className="text-xs text-muted-foreground">Structure fields</span>
         <pre className="max-h-48 overflow-auto rounded-xl border p-3 text-xs break-words whitespace-pre-wrap">
           {formatMessage(message)}
         </pre>
@@ -180,14 +181,14 @@ function RequestBody({ request }: { readonly request: IDappRequest }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Row label="Получатель">{transaction.to ?? 'создание контракта'}</Row>
-      <Row label="Отправитель">{transaction.from}</Row>
-      <Row label="Сумма">{transaction.value.toString()}</Row>
-      <Row label="Сеть">{request.chainId.toString()}</Row>
+      <Row label="Recipient">{transaction.to ?? 'contract creation'}</Row>
+      <Row label="Sender">{transaction.from}</Row>
+      <Row label="Amount">{transaction.value.toString()}</Row>
+      <Row label="Network">{request.chainId.toString()}</Row>
 
       {transaction.data === null || transaction.data === '0x' ? null : (
         <>
-          <span className="text-xs text-muted-foreground">Данные вызова</span>
+          <span className="text-xs text-muted-foreground">Call data</span>
           <pre className="max-h-32 overflow-auto rounded-xl border p-3 text-xs break-all">
             {transaction.data}
           </pre>
@@ -241,59 +242,58 @@ const RISK_TEXT: Readonly<
   Record<DappRisk, { title: string; description: string; isCritical: boolean }>
 > = {
   [DAPP_RISK.TokenPermit]: {
-    title: 'Подпись отдаёт распоряжение токенами',
+    title: 'This signature hands over control of your tokens',
     description:
-      'Это не перевод: списания и комиссии не будет. Подпись позволит указанному адресу забрать ваши токены позже, и отменить её можно только отзывом разрешения в контракте.',
+      'This is not a transfer: nothing is charged and no fee is paid. The signature lets the named address take your tokens later, and it can only be undone by revoking the approval.',
     isCritical: true,
   },
   [DAPP_RISK.UnlimitedAllowance]: {
-    title: 'Сумма разрешения не ограничена',
+    title: 'The approved amount is unlimited',
     description:
-      'Получатель сможет забрать все ваши токены этого вида — сейчас и в любой момент в будущем.',
+      'The recipient will be able to take every token of this kind — now and at any point in the future.',
     isCritical: true,
   },
   [DAPP_RISK.ApprovalCall]: {
-    title: 'Транзакция выдаёт разрешение',
-    description:
-      'После неё указанный адрес получит право распоряжаться вашими токенами без отдельного подтверждения.',
+    title: 'This transaction grants an approval',
+    description: 'After it, the named address may dispose of your tokens without asking again.',
     isCritical: true,
   },
   [DAPP_RISK.ChainMismatch]: {
-    title: 'Запрошена другая сеть',
+    title: 'A different network is requested',
     description:
-      'Приложение просит действие в сети, отличной от выбранной в кошельке. Подпись, сделанная не в той сети, может оказаться действительной там, где вы её не ждёте.',
+      'The application asks for an action in a network other than the one selected in the wallet. A signature made in the wrong network may turn out to be valid where you do not expect it.',
     isCritical: false,
   },
   [DAPP_RISK.MissingVerifyingContract]: {
-    title: 'Подписывающий контракт не указан',
-    description: 'Невозможно определить, какому контракту предназначена подпись.',
+    title: 'The verifying contract is not specified',
+    description: 'There is no way to tell which contract the signature is meant for.',
     isCritical: false,
   },
   [DAPP_RISK.MessageLooksLikeTransaction]: {
-    title: 'Сообщение нечитаемо',
+    title: 'The message is unreadable',
     description:
-      'Вместо текста прислана шестнадцатеричная строка. Понять, что именно подписывается, по ней нельзя.',
+      'A hexadecimal string was sent instead of text. There is no way to tell what is being signed from it.',
     isCritical: false,
   },
   [DAPP_RISK.UnreadableMessage]: {
-    title: 'В сообщении скрытые символы',
-    description: 'Часть текста может быть не видна на экране.',
+    title: 'The message contains hidden characters',
+    description: 'Part of the text may be invisible on screen.',
     isCritical: false,
   },
   [DAPP_RISK.BurnRecipient]: {
-    title: 'Получатель — адрес сжигания',
-    description: 'Средства, отправленные туда, не получит никто.',
+    title: 'The recipient is a burn address',
+    description: 'Funds sent there will never reach anyone.',
     isCritical: true,
   },
   [DAPP_RISK.ContractDeployment]: {
-    title: 'Разворачивается контракт',
-    description: 'У транзакции нет получателя: она создаёт новый контракт в сети.',
+    title: 'A contract is being deployed',
+    description: 'The transaction has no recipient: it creates a new contract in the network.',
     isCritical: false,
   },
   [DAPP_RISK.OpaqueCallData]: {
-    title: 'Смысл вызова не распознан',
+    title: 'The meaning of the call was not recognised',
     description:
-      'Кошелёк не смог разобрать, что делает эта транзакция. Подтверждайте только если понимаете, о чём просит приложение.',
+      'The wallet could not work out what this transaction does. Confirm it only if you understand what the application is asking for.',
     isCritical: false,
   },
 }

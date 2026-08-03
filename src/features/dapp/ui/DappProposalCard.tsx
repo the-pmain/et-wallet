@@ -41,44 +41,46 @@ export function DappProposalCard({
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold">
               <UntrustedText
-                value={proposal.dapp.name === '' ? 'Приложение без имени' : proposal.dapp.name}
+                value={
+                  proposal.dapp.name === '' ? 'Application without a name' : proposal.dapp.name
+                }
               />
             </span>
             <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
               <Globe className="size-3 shrink-0" aria-hidden />
               <UntrustedText
-                value={proposal.dapp.url === '' ? 'адрес не указан' : proposal.dapp.url}
+                value={proposal.dapp.url === '' ? 'no address given' : proposal.dapp.url}
               />
             </span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 rounded-xl border p-3 text-xs">
-          <p className="font-medium">Приложение получит</p>
+          <p className="font-medium">The application will get</p>
           <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-            <li>адреса ваших аккаунтов ({addressCount});</li>
-            <li>возможность присылать запросы на подпись;</li>
-            <li>сведения о выбранной сети.</li>
+            <li>the addresses of your accounts ({addressCount});</li>
+            <li>the ability to send signing requests;</li>
+            <li>information about the selected network.</li>
           </ul>
 
-          <p className="mt-1 font-medium">Приложение не получит</p>
+          <p className="mt-1 font-medium">The application will not get</p>
           <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-            <li>seed-фразу и приватные ключи — они не покидают устройство;</li>
-            <li>права подписывать без вашего подтверждения;</li>
-            <li>доступ к средствам сам по себе.</li>
+            <li>the seed phrase or the private keys — they never leave the device;</li>
+            <li>the right to sign anything without your confirmation;</li>
+            <li>access to your funds by itself.</li>
           </ul>
         </div>
 
         <Alert variant="warning">
           <AlertDescription>
-            Имя и адрес приложения сообщило оно само. Назваться известным сервисом может кто угодно
-            — подключайтесь только к тому, что открыли сами.
+            The name and the address were supplied by the application itself. Anyone can claim to be
+            a well-known service — connect only to something you opened yourself.
           </AlertDescription>
         </Alert>
 
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" disabled={isBusy} onClick={onReject}>
-            Отклонить
+            Reject
           </Button>
 
           {/* Подпись отличается от кнопки формы нового подключения:
@@ -86,7 +88,7 @@ export function DappProposalCard({
               вспомогательные технологии их не различают, а глаз
               выбирает не ту. */}
           <Button className="flex-1" disabled={isBusy} onClick={onApprove}>
-            Разрешить подключение
+            Allow the connection
           </Button>
         </div>
       </CardContent>

@@ -39,7 +39,7 @@ describe('App', () => {
   it('предлагает создание кошелька', async () => {
     renderApp()
 
-    expect(await screen.findByRole('link', { name: /создать новый кошелёк/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
   })
 
   it('показывает вход по seed-фразе в соответствии с режимом', async () => {
@@ -48,9 +48,9 @@ describe('App', () => {
        обратно не должен ронять набор. */
     renderApp()
 
-    await screen.findByRole('link', { name: /создать новый кошелёк/i })
+    await screen.findByRole('link', { name: /create a new wallet/i })
 
-    const importLink = screen.queryByRole('link', { name: /импортировать/i })
+    const importLink = screen.queryByRole('link', { name: /import/i })
 
     expect(importLink === null).toBe(TEST_MODE.hideSeedImport)
   })

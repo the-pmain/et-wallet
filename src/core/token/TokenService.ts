@@ -86,7 +86,7 @@ export class TokenService implements ITokenService {
 
   readonly #events = new EventBus<TokenEventMap>({
     onListenerError: (error, event) => {
-      this.#logger.error('Сбой обработчика события токенов', {
+      this.#logger.error('Token event listener failed', {
         event: String(event),
         error: error instanceof Error ? error.message : String(error),
       })
@@ -164,7 +164,7 @@ export class TokenService implements ITokenService {
     }
 
     if (!isValidAddress(params.address)) {
-      throw new InvalidTokenContractError(params.address, 'значение не является адресом')
+      throw new InvalidTokenContractError(params.address, 'the value is not an address')
     }
 
     const metadata = await this.fetchMetadata(params.chainId, params.address)
@@ -175,8 +175,8 @@ export class TokenService implements ITokenService {
     if (params.decimals !== undefined && params.decimals !== metadata.decimals) {
       throw new InvalidTokenContractError(
         params.address,
-        `контракт сообщает ${String(metadata.decimals)} знаков, ` +
-          `а указано ${String(params.decimals)}`,
+        `the contract reports ${String(metadata.decimals)} decimals, ` +
+          `while ${String(params.decimals)} was provided`,
       )
     }
 
@@ -200,7 +200,7 @@ export class TokenService implements ITokenService {
       token,
     ])
 
-    this.#logger.info('Добавлен токен', { chainId: params.chainId })
+    this.#logger.info('Token added', { chainId: params.chainId })
     this.#events.emit('token:listChanged', { chainId: params.chainId })
 
     return token
@@ -339,7 +339,7 @@ export class TokenService implements ITokenService {
     try {
       raw = decodeUint(await provider.call({ to: address, data: encodeCall(DECIMALS_SELECTOR) }))
     } catch {
-      throw new InvalidTokenContractError(address, 'контракт не сообщает число десятичных знаков')
+      throw new InvalidTokenContractError(address, 'the contract does not report its decimals')
     }
 
     const decimals = Number(raw)
@@ -347,7 +347,7 @@ export class TokenService implements ITokenService {
     if (!Number.isInteger(decimals) || decimals < 0 || decimals > MAX_DECIMALS) {
       throw new InvalidTokenContractError(
         address,
-        `недопустимое число десятичных знаков: ${raw.toString()}`,
+        `the number of decimals is not allowed: ${raw.toString()}`,
       )
     }
 

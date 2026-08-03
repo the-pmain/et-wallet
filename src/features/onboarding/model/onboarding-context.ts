@@ -20,7 +20,7 @@ export function useOnboarding(): IOnboardingService {
   const service = use(OnboardingContext)
 
   if (service === null) {
-    throw new Error('useOnboarding должен вызываться внутри OnboardingProvider.')
+    throw new Error('useOnboarding must be called inside OnboardingProvider.')
   }
 
   return service

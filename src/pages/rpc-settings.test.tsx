@@ -31,9 +31,9 @@ function renderApp() {
 async function openSettings(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
-  await user.click(screen.getByRole('link', { name: 'Настройки' }))
-  await screen.findByRole('heading', { name: 'Настройки' })
+  await screen.findByText('Account 1')
+  await user.click(screen.getByRole('link', { name: 'Settings' }))
+  await screen.findByRole('heading', { name: 'Settings' })
 }
 
 beforeEach(async () => {
@@ -50,7 +50,7 @@ describe('Панель RPC: список узлов', () => {
     await openSettings()
 
     expect(screen.getByText('ethereum-rpc.publicnode.com')).toBeInTheDocument()
-    expect(screen.getAllByText(/Публичный узел/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Public node/).length).toBeGreaterThan(0)
   })
 
   it('отмечает действующий узел', async () => {
@@ -60,7 +60,7 @@ describe('Панель RPC: список узлов', () => {
     /* Пользователь обязан видеть, к чьему узлу обращается кошелёк:
        оператор узла видит его IP и все запрашиваемые адреса. */
     await waitFor(() => {
-      expect(screen.getByText(/используется сейчас/)).toBeInTheDocument()
+      expect(screen.getByText(/in use now/)).toBeInTheDocument()
     })
   })
 
@@ -81,10 +81,10 @@ describe('Панель RPC: проверка доступности', () => {
     renderApp()
     await openSettings()
 
-    await user.click(screen.getByRole('button', { name: /проверить/i }))
+    await user.click(screen.getByRole('button', { name: /Check/i }))
 
     await waitFor(() => {
-      expect(screen.getAllByLabelText('Доступен').length).toBeGreaterThan(0)
+      expect(screen.getAllByLabelText('Available').length).toBeGreaterThan(0)
     })
   })
 
@@ -95,10 +95,10 @@ describe('Панель RPC: проверка доступности', () => {
     await openSettings()
 
     services.providerFactory.configure({ unavailable: true })
-    await user.click(screen.getByRole('button', { name: /проверить/i }))
+    await user.click(screen.getByRole('button', { name: /Check/i }))
 
     await waitFor(() => {
-      expect(screen.getAllByLabelText('Недоступен').length).toBeGreaterThan(0)
+      expect(screen.getAllByLabelText('Unavailable').length).toBeGreaterThan(0)
     })
   })
 
@@ -112,10 +112,10 @@ describe('Панель RPC: проверка доступности', () => {
       reportedChainId: toChainId(137n),
       verifyChainIdOnCreate: true,
     })
-    await user.click(screen.getByRole('button', { name: /проверить/i }))
+    await user.click(screen.getByRole('button', { name: /Check/i }))
 
     await waitFor(() => {
-      expect(screen.getAllByText(/обслуживает другую сеть/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/serves a different network/).length).toBeGreaterThan(0)
     })
   })
 })
@@ -127,13 +127,13 @@ describe('Панель RPC: свой адрес', () => {
     renderApp()
     await openSettings()
 
-    await user.type(screen.getByLabelText('Свой RPC-адрес'), 'https://my-node.example')
-    await user.click(screen.getByRole('button', { name: /добавить узел/i }))
+    await user.type(screen.getByLabelText('Your own RPC endpoint'), 'https://my-node.example')
+    await user.click(screen.getByRole('button', { name: /Add the node/i }))
 
     await waitFor(() => {
       expect(screen.getByText('my-node.example')).toBeInTheDocument()
     })
-    expect(screen.getByText(/Собственный узел/)).toBeInTheDocument()
+    expect(screen.getByText(/Your own node/)).toBeInTheDocument()
   })
 
   it('показывает причину отказа узла чужой сети', async () => {
@@ -147,15 +147,15 @@ describe('Панель RPC: свой адрес', () => {
       verifyChainIdOnCreate: true,
     })
 
-    await user.type(screen.getByLabelText('Свой RPC-адрес'), 'https://wrong-chain.example')
-    await user.click(screen.getByRole('button', { name: /добавить узел/i }))
+    await user.type(screen.getByLabelText('Your own RPC endpoint'), 'https://wrong-chain.example')
+    await user.click(screen.getByRole('button', { name: /Add the node/i }))
 
-    /* «Узел обслуживает другую сеть» и «узел не отвечает» требуют
+    /* «The node serves a different network» и «узел не отвечает» требуют
        разных действий: подменять первое вторым — вводить в заблуждение. */
     /* Шаблон включает глагол: «chainId 137» встречается и в списке сетей
        строкой Polygon, и такой запрос нашёл бы оба совпадения. */
     await waitFor(() => {
-      expect(screen.getByText(/вернул chainId 137/)).toBeInTheDocument()
+      expect(screen.getByText(/returned chainId 137/)).toBeInTheDocument()
     })
     expect(screen.queryByText('wrong-chain.example')).not.toBeInTheDocument()
   })
@@ -164,7 +164,7 @@ describe('Панель RPC: свой адрес', () => {
     renderApp()
     await openSettings()
 
-    expect(screen.getByText(/недобросовестный узел покажет не то/i)).toBeInTheDocument()
+    expect(screen.getByText(/a dishonest node will show something other/i)).toBeInTheDocument()
   })
 
   it('удаляет добавленный узел', async () => {
@@ -173,14 +173,14 @@ describe('Панель RPC: свой адрес', () => {
     renderApp()
     await openSettings()
 
-    await user.type(screen.getByLabelText('Свой RPC-адрес'), 'https://my-node.example')
-    await user.click(screen.getByRole('button', { name: /добавить узел/i }))
+    await user.type(screen.getByLabelText('Your own RPC endpoint'), 'https://my-node.example')
+    await user.click(screen.getByRole('button', { name: /Add the node/i }))
 
     await waitFor(() => {
       expect(screen.getByText('my-node.example')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Удалить my-node.example' }))
+    await user.click(screen.getByRole('button', { name: 'Remove my-node.example' }))
 
     await waitFor(() => {
       expect(screen.queryByText('my-node.example')).not.toBeInTheDocument()

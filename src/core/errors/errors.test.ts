@@ -68,7 +68,7 @@ describe('InvalidPasswordError', () => {
   it('не раскрывает подробностей проверки', () => {
     const message = new InvalidPasswordError().message
 
-    expect(message).toBe('Неверный пароль.')
+    expect(message).toBe('Wrong password.')
   })
 })
 

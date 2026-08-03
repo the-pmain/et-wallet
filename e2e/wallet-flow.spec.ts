@@ -23,19 +23,19 @@ const FIRST_ADDRESS = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
 async function importWallet(page: Page): Promise<void> {
   await page.goto('/#/import')
 
-  await page.getByLabel('Мнемоническая фраза').fill(TEST_MNEMONIC)
-  await page.getByLabel('Пароль', { exact: true }).fill(PASSWORD)
-  await page.getByLabel('Повторите пароль').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Импортировать' }).click()
+  await page.getByLabel('Seed phrase').fill(TEST_MNEMONIC)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
+  await page.getByLabel('Repeat the password').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Import' }).click()
 
-  await expect(page.getByText('Аккаунт 1')).toBeVisible()
+  await expect(page.getByText('Account 1')).toBeVisible()
 }
 
 test.describe('Сквозной путь: создание и работа кошелька', () => {
   test('экран приветствия открывается собранным приложением', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: /создать новый кошелёк/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
   })
 
   test('кошелёк восстанавливается по seed-фразе', async ({ page }) => {
@@ -53,18 +53,18 @@ test.describe('Сквозной путь: создание и работа ко�
     await importWallet(page)
 
     for (const [hash, heading] of [
-      ['#/wallet/activity', 'История'],
-      ['#/wallet/assets', 'Активы'],
-      ['#/wallet/portfolio', 'Портфель'],
-      ['#/wallet/settings', 'Настройки'],
+      ['#/wallet/activity', 'History'],
+      ['#/wallet/assets', 'Assets'],
+      ['#/wallet/portfolio', 'Portfolio'],
+      ['#/wallet/settings', 'Settings'],
       ['#/wallet/nft', 'NFT'],
-      ['#/wallet/connections', 'Подключения'],
-      ['#/wallet/backup', 'Резервная копия'],
+      ['#/wallet/connections', 'Connections'],
+      ['#/wallet/backup', 'Backup'],
     ] as const) {
       await page.goto(`/${hash}`)
 
       /* Заголовок первого уровня, а не любой: на экране подключений
-         есть карточка «Действующие подключения», и нестрогий поиск
+         есть карточка «Active connections», и нестрогий поиск
          нашёл бы оба. */
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     }
@@ -76,11 +76,11 @@ test.describe('Сквозной путь: создание и работа ко�
     await importWallet(page)
 
     await page.goto('/#/wallet/settings')
-    await page.getByRole('button', { name: 'Заблокировать кошелёк' }).click()
+    await page.getByRole('button', { name: 'Lock the wallet' }).click()
 
     await page.goto('/#/wallet/settings')
 
-    await expect(page.getByRole('heading', { name: 'Настройки' })).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeHidden()
   })
 
   test('кошелёк переживает перезагрузку страницы', async ({ page }) => {
@@ -97,8 +97,8 @@ test.describe('Сквозной путь: создание и работа ко�
 
     await page.reload()
 
-    await expect(page.getByLabel('Пароль')).toBeVisible()
-    await expect(page.getByRole('link', { name: /создать новый кошелёк/i })).toBeHidden()
+    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeHidden()
   })
 
   test('подбор пароля упирается в растущую задержку', async ({ page }) => {
@@ -114,13 +114,13 @@ test.describe('Сквозной путь: создание и работа ко�
     await page.reload()
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await page.getByLabel('Пароль').fill('Sobaka-9-Solnce!')
-      await page.getByRole('button', { name: 'Разблокировать' }).click()
+      await page.getByLabel('Password').fill('Sobaka-9-Solnce!')
+      await page.getByRole('button', { name: 'Unlock' }).click()
       await page.waitForTimeout(150)
     }
 
-    await expect(page.getByText(/Слишком много попыток/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Разблокировать' })).toBeDisabled()
+    await expect(page.getByText(/Too many attempts/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Unlock' })).toBeDisabled()
   })
 
   test('задержка переживает перезагрузку страницы', async ({ page }) => {
@@ -130,24 +130,24 @@ test.describe('Сквозной путь: создание и работа ко�
     await page.reload()
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await page.getByLabel('Пароль').fill('Sobaka-9-Solnce!')
-      await page.getByRole('button', { name: 'Разблокировать' }).click()
+      await page.getByLabel('Password').fill('Sobaka-9-Solnce!')
+      await page.getByRole('button', { name: 'Unlock' }).click()
       await page.waitForTimeout(150)
     }
 
-    await expect(page.getByText(/Слишком много попыток/i)).toBeVisible()
+    await expect(page.getByText(/Too many attempts/i)).toBeVisible()
 
     await page.reload()
 
-    await expect(page.getByText(/Слишком много попыток/i)).toBeVisible()
+    await expect(page.getByText(/Too many attempts/i)).toBeVisible()
   })
 
   test('после перезагрузки кошелёк открывается тем же паролем', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
-    await page.getByLabel('Пароль').fill(PASSWORD)
-    await page.getByRole('button', { name: /разблокировать/i }).click()
+    await page.getByLabel('Password').fill(PASSWORD)
+    await page.getByRole('button', { name: /unlock/i }).click()
 
     /* Тот же адрес, что и до перезагрузки: расшифрована та же фраза. */
     await expect(page.getByText('0x9858…aEda94')).toBeVisible()
@@ -159,20 +159,20 @@ test.describe('Сквозной путь: отправка', () => {
     await importWallet(page)
     await page.goto('/#/wallet/send')
 
-    await page.getByLabel(/Адрес получателя/).fill('0x123')
-    await page.getByLabel(/Сумма/).fill('1')
+    await page.getByLabel(/Recipient address/).fill('0x123')
+    await page.getByLabel(/Amount/).fill('1')
 
-    await expect(page.getByRole('button', { name: 'Далее' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   test('получатель с верным адресом принимается', async ({ page }) => {
     await importWallet(page)
     await page.goto('/#/wallet/send')
 
-    await page.getByLabel(/Адрес получателя/).fill(FIRST_ADDRESS)
-    await page.getByLabel(/Сумма/).fill('0.0001')
+    await page.getByLabel(/Recipient address/).fill(FIRST_ADDRESS)
+    await page.getByLabel(/Amount/).fill('0.0001')
 
-    await expect(page.getByRole('button', { name: 'Далее' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled()
   })
 
   test('выбор актива предлагает нативную валюту', async ({ page }) => {
@@ -182,7 +182,7 @@ test.describe('Сквозной путь: отправка', () => {
     /* Список активов собирается из отслеживаемых токенов, и нативная
        валюта в нём есть всегда: её нельзя убрать. Пустой список означал
        бы, что отправить нечего вовсе. */
-    await expect(page.getByLabel('Что отправить')).toHaveValue('native')
+    await expect(page.getByLabel('What to send')).toHaveValue('native')
   })
 })
 
@@ -191,9 +191,9 @@ test.describe('Сквозной путь: резервная копия', () => 
     await importWallet(page)
     await page.goto('/#/wallet/backup')
 
-    await page.getByRole('button', { name: 'Показать seed-фразу' }).click()
+    await page.getByRole('button', { name: 'Show the seed phrase' }).click()
 
-    await expect(page.getByRole('button', { name: 'Показать фразу' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Show the phrase' })).toBeDisabled()
     await expect(page.getByText('about')).toBeHidden()
   })
 
@@ -201,12 +201,12 @@ test.describe('Сквозной путь: резервная копия', () => 
     await importWallet(page)
     await page.goto('/#/wallet/backup')
 
-    await page.getByRole('button', { name: 'Показать seed-фразу' }).click()
+    await page.getByRole('button', { name: 'Show the seed phrase' }).click()
     await page.getByRole('checkbox').check()
-    await page.getByRole('button', { name: 'Показать фразу' }).click()
+    await page.getByRole('button', { name: 'Show the phrase' }).click()
 
-    await page.getByLabel('Пароль').fill(PASSWORD)
-    await page.getByRole('button', { name: 'Подтвердить' }).click()
+    await page.getByLabel('Password').fill(PASSWORD)
+    await page.getByRole('button', { name: 'Confirm' }).click()
 
     await expect(page.getByText('about')).toBeVisible()
   })
@@ -215,14 +215,14 @@ test.describe('Сквозной путь: резервная копия', () => 
     await importWallet(page)
     await page.goto('/#/wallet/backup')
 
-    await page.getByRole('button', { name: 'Показать seed-фразу' }).click()
+    await page.getByRole('button', { name: 'Show the seed phrase' }).click()
     await page.getByRole('checkbox').check()
-    await page.getByRole('button', { name: 'Показать фразу' }).click()
+    await page.getByRole('button', { name: 'Show the phrase' }).click()
 
-    await page.getByLabel('Пароль').fill('Sobaka-9-Solnce!')
-    await page.getByRole('button', { name: 'Подтвердить' }).click()
+    await page.getByLabel('Password').fill('Sobaka-9-Solnce!')
+    await page.getByRole('button', { name: 'Confirm' }).click()
 
-    await expect(page.getByText('Неверный пароль.')).toBeVisible()
+    await expect(page.getByText('Wrong password.')).toBeVisible()
     await expect(page.getByText('about')).toBeHidden()
   })
 })

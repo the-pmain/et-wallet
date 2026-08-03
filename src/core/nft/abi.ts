@@ -56,11 +56,11 @@ export const SAFE_TRANSFER_1155_SELECTOR = functionSelector(
  */
 export function encodeUintWord(value: bigint): string {
   if (value < 0n) {
-    throw new RangeError('Значение не может быть отрицательным.')
+    throw new RangeError('The value cannot be negative.')
   }
 
   if (value > MAX_UINT256) {
-    throw new RangeError('Значение не помещается в uint256.')
+    throw new RangeError('The value does not fit into uint256.')
   }
 
   return value.toString(16).padStart(WORD_LENGTH, '0')
@@ -185,14 +185,14 @@ export function decodeAddress(data: HexString): Address {
   const body = data.startsWith('0x') ? data.slice(2) : data
 
   if (body.length < WORD_LENGTH) {
-    throw new Error('контракт вернул ответ короче слова')
+    throw new Error('the contract returned a response shorter than one word')
   }
 
   const word = body.slice(0, WORD_LENGTH)
   const padding = word.slice(0, WORD_LENGTH - ADDRESS_LENGTH)
 
   if (padding !== '0'.repeat(WORD_LENGTH - ADDRESS_LENGTH)) {
-    throw new Error('ответ не является адресом')
+    throw new Error('the response is not an address')
   }
 
   return toAddress(`0x${word.slice(WORD_LENGTH - ADDRESS_LENGTH)}`)

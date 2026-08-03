@@ -114,7 +114,7 @@ export class PriceService implements IPriceService {
     } catch (error) {
       this.#lastError = error instanceof Error ? error.message : String(error)
 
-      this.#logger.warn('Курсы получить не удалось', { reason: this.#lastError })
+      this.#logger.warn('Prices could not be fetched', { reason: this.#lastError })
 
       /* Устаревшие котировки лучше отсутствующих: стоимость минутной
          давности показывает порядок величины, а пустой экран

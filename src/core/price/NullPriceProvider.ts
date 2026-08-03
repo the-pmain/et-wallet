@@ -17,7 +17,7 @@ import type { FiatCurrency, IPriceRef, PriceMap } from './types'
  */
 export class NullPriceProvider implements IPriceProvider {
   readonly id = 'none'
-  readonly name = 'Источник курсов не подключён'
+  readonly name = 'No price source is connected'
 
   supports(_chainId: ChainId): boolean {
     return false

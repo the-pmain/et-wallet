@@ -114,7 +114,7 @@ export class BalanceService implements IBalanceService {
 
   readonly #events = new EventBus<BalanceEventMap>({
     onListenerError: (error, event) => {
-      this.#logger.error('Сбой обработчика события балансов', {
+      this.#logger.error('Balance event listener failed', {
         event: String(event),
         error: error instanceof Error ? error.message : String(error),
       })
@@ -262,7 +262,7 @@ export class BalanceService implements IBalanceService {
       }
 
       if (result.status === 'rejected') {
-        this.#logger.warn('Баланс токена недоступен', {
+        this.#logger.warn('Token balance is unavailable', {
           chainId,
           reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
         })
@@ -425,7 +425,7 @@ export class BalanceService implements IBalanceService {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
 
-      this.#logger.warn('Не удалось обновить баланс', { chainId, reason })
+      this.#logger.warn('The balance could not be refreshed', { chainId, reason })
       this.#events.emit('balance:refreshFailed', { owner, chainId, reason })
     }
   }

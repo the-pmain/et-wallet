@@ -182,20 +182,20 @@ export function BackupPage() {
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link to="/wallet/settings">
             <ArrowLeft />
-            Настройки
+            Settings
           </Link>
         </Button>
       </header>
 
-      <h1 className="text-lg font-semibold">Резервная копия</h1>
+      <h1 className="text-lg font-semibold">Backup</h1>
 
       <Alert>
         <ShieldAlert />
-        <AlertTitle>Копия — это способ восстановить кошелёк, а не хранить его</AlertTitle>
+        <AlertTitle>A backup is a way to restore the wallet, not to store it</AlertTitle>
         <AlertDescription>
-          Кто получил seed-фразу, тот получил кошелёк: без пароля, без этого устройства и без
-          возможности что-либо отменить. Записывайте её на бумагу и храните там, где вы храните
-          документы, — не в заметках, не в переписке и не в облаке.
+          Whoever obtains the seed phrase obtains the wallet: without a password, without this
+          device and without any way to undo it. Write it on paper and keep it where you keep
+          documents — not in notes, not in messages and not in the cloud.
         </AlertDescription>
       </Alert>
 
@@ -213,14 +213,14 @@ export function BackupPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base font-medium">
             <TextSelect className="size-4 text-muted-foreground" aria-hidden />
-            Seed-фраза
+            Seed phrase
           </CardTitle>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Двенадцать слов, из которых выведены все адреса кошелька — включая те, что вы ещё не
-            создали. Восстанавливает кошелёк целиком в любом приложении, поддерживающем BIP-39.
+            Twelve words from which every address of the wallet is derived — including those you
+            have not created yet. Restores the wallet fully in any BIP-39 compatible application.
           </p>
 
           {target === TARGET.Mnemonic ? (
@@ -243,7 +243,7 @@ export function BackupPage() {
                 void start(TARGET.Mnemonic)
               }}
             >
-              Показать seed-фразу
+              Show the seed phrase
             </Button>
           )}
         </CardContent>
@@ -253,15 +253,16 @@ export function BackupPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base font-medium">
             <KeyRound className="size-4 text-muted-foreground" aria-hidden />
-            Приватный ключ активного аккаунта
+            Private key of the active account
           </CardTitle>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Ключ одного адреса — {activeAccount === null ? 'аккаунт не выбран' : activeAccount.name}
-            . Нужен для переноса адреса в другой кошелёк. Остальные адреса он не открывает, и
-            кошелёк по нему не восстанавливается.
+            The key of a single address —{' '}
+            {activeAccount === null ? 'no account selected' : activeAccount.name}. Needed to move
+            the address to another wallet. It opens no other address, and the wallet cannot be
+            restored from it.
           </p>
 
           {target === TARGET.PrivateKey ? (
@@ -284,7 +285,7 @@ export function BackupPage() {
                 void start(TARGET.PrivateKey)
               }}
             >
-              Показать приватный ключ
+              Show the private key
             </Button>
           )}
         </CardContent>
@@ -313,10 +314,10 @@ function MnemonicFlow({
   if (stage === STAGE.Acknowledge && assessment !== null) {
     return (
       <DangerConfirm
-        title="Фраза открывает весь кошелёк"
+        title="The phrase opens the whole wallet"
         description={riskDescription(assessment, TARGET.Mnemonic)}
-        acknowledgement="Я понимаю, что любой, кто увидит эту фразу, сможет распоряжаться всеми средствами кошелька без пароля."
-        confirmLabel="Показать фразу"
+        acknowledgement="I understand that anyone who sees this phrase will be able to dispose of every asset in the wallet without a password."
+        confirmLabel="Show the phrase"
         onConfirm={onAcknowledged}
         onCancel={onClose}
       />
@@ -326,7 +327,7 @@ function MnemonicFlow({
   if (stage === STAGE.Password) {
     return (
       <ConfirmPassword
-        action="показ seed-фразы"
+        action="revealing the seed phrase"
         onVerify={onReveal}
         onConfirmed={() => {
           /* Переход выполняет сама выдача: форма подтверждает пароль,
@@ -356,10 +357,10 @@ function PrivateKeyFlow({
   if (stage === STAGE.Acknowledge && assessment !== null) {
     return (
       <DangerConfirm
-        title="Ключ передаёт адрес навсегда"
+        title="The key hands over the address for good"
         description={riskDescription(assessment, TARGET.PrivateKey)}
-        acknowledgement="Я понимаю, что выданный ключ нельзя отозвать: вернуть контроль над адресом можно только переводом средств на другой адрес."
-        confirmLabel="Показать ключ"
+        acknowledgement="I understand that a revealed key cannot be revoked: control over the address can only be regained by moving the funds to another address."
+        confirmLabel="Show the key"
         onConfirm={onAcknowledged}
         onCancel={onClose}
       />
@@ -369,7 +370,7 @@ function PrivateKeyFlow({
   if (stage === STAGE.Password) {
     return (
       <ConfirmPassword
-        action="показ приватного ключа"
+        action="revealing the private key"
         onVerify={onReveal}
         onConfirmed={() => {
           /* Переход выполняет сама выдача. */
@@ -382,10 +383,10 @@ function PrivateKeyFlow({
   if (stage === STAGE.Revealed && secret !== null) {
     return (
       <div className="flex flex-col gap-3">
-        <SecretReveal label="Приватный ключ" value={secret} />
+        <SecretReveal label="Private key" value={secret} />
 
         <Button variant="outline" onClick={onClose}>
-          Скрыть и закрыть
+          Hide and close
         </Button>
       </div>
     )
@@ -425,13 +426,13 @@ function RevealedMnemonic({
           фраза не проходит через общую для системы область. */}
       <Alert variant="warning">
         <AlertDescription>
-          Перепишите слова на бумагу в этом же порядке. Копирование в буфер обмена здесь не
-          предусмотрено: буфер читают другие приложения, а фраза открывает весь кошелёк.
+          Copy the words onto paper in the same order. Copying to the clipboard is deliberately not
+          offered here: the clipboard is read by other applications, and the phrase opens the
         </AlertDescription>
       </Alert>
 
       <Button variant="outline" onClick={onClose}>
-        Скрыть и закрыть
+        Hide and close
       </Button>
     </div>
   )
@@ -450,23 +451,23 @@ function riskDescription(assessment: IExportRiskAssessment, target: Target): str
 
   if (target === TARGET.Mnemonic) {
     parts.push(
-      'Фраза восстанавливает кошелёк целиком: все адреса, включая ещё не созданные. Пароль этого устройства её не защищает — он остаётся здесь.',
+      'The phrase restores the whole wallet: every address, including those not yet created. The password of this device does not protect it — the password stays here.',
     )
   } else {
     parts.push(
-      'Ключ даёт полное распоряжение адресом. Отозвать его невозможно: получивший ключ распоряжается адресом наравне с вами, пока на нём остаются средства.',
+      'The key gives full control over the address. It cannot be revoked: whoever receives it controls the address on equal terms with you for as long as funds remain there.',
     )
   }
 
   if (assessment.closesCompromisePair) {
     parts.push(
-      'Из этого аккаунта уже выдавался расширенный публичный ключ. Вместе с ним выдаваемый сейчас приватный ключ позволяет вычислить приватные ключи всех адресов аккаунта — это свойство BIP-32, а не предположение.',
+      'An extended public key has already been revealed for this account. Together with it, the private key being revealed now allows every address of the account to be computed.',
     )
   }
 
   if (assessment.risk === EXPORT_RISK.Elevated && !assessment.closesCompromisePair) {
     parts.push(
-      'После этой выдачи запрос расширенного публичного ключа того же аккаунта станет опасным: пара «публичный ключ аккаунта плюс приватный ключ адреса» раскрывает аккаунт целиком.',
+      'After this reveal, requesting the extended public key of the same account becomes dangerous: the pair of account public key and address private key exposes the whole account.',
     )
   }
 
@@ -475,7 +476,7 @@ function riskDescription(assessment: IExportRiskAssessment, target: Target): str
 
 /** Сообщение об отказе. Причина называется, если она известна. */
 function describeError(caught: unknown): string {
-  return isAppError(caught) ? caught.message : 'Не удалось выполнить операцию.'
+  return isAppError(caught) ? caught.message : 'The operation could not be completed.'
 }
 
 /**
@@ -487,7 +488,7 @@ function describeError(caught: unknown): string {
  */
 function requireAccountId<TId>(id: TId | undefined): TId {
   if (id === undefined) {
-    throw new Error('Активный аккаунт не выбран.')
+    throw new Error('No active account is selected.')
   }
 
   return id

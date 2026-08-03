@@ -15,6 +15,6 @@ export class NotImplementedError extends AppError {
    * @param member Полное имя операции в формате `ServiceName.methodName`.
    */
   constructor(member: string) {
-    super(`Операция "${member}" не реализована на текущем этапе разработки.`)
+    super(`The operation "${member}" is not implemented at this stage of development.`)
   }
 }

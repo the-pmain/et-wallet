@@ -63,7 +63,7 @@ export function TransferList({
   transfers,
   network,
   isLoading,
-  emptyTitle = 'Операций пока нет',
+  emptyTitle = 'No operations yet',
   emptyDescription,
   onReplace,
 }: TransferListProps) {
@@ -83,7 +83,7 @@ export function TransferList({
     return (
       <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
         <RefreshCw className="size-4 animate-spin" aria-hidden />
-        Загрузка истории…
+        Loading the history…
       </div>
     )
   }

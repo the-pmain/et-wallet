@@ -84,10 +84,10 @@ export function RpcSettings({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base font-medium text-muted-foreground">RPC-узлы</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">RPC nodes</CardTitle>
         <Button variant="ghost" size="sm" onClick={() => void check()} disabled={isBusy}>
           <Activity className="size-4" aria-hidden />
-          Проверить
+          Check
         </Button>
       </CardHeader>
 
@@ -104,9 +104,9 @@ export function RpcSettings({
               >
                 <span className="flex size-4 shrink-0 items-center justify-center">
                   {status === undefined ? null : status.isHealthy ? (
-                    <CheckCircle2 className="size-4 text-muted-foreground" aria-label="Доступен" />
+                    <CheckCircle2 className="size-4 text-muted-foreground" aria-label="Available" />
                   ) : (
-                    <XCircle className="size-4 text-destructive" aria-label="Недоступен" />
+                    <XCircle className="size-4 text-destructive" aria-label="Unavailable" />
                   )}
                 </span>
 
@@ -114,15 +114,15 @@ export function RpcSettings({
                   <span className="truncate font-mono text-xs">{endpointHost(endpoint.url)}</span>
                   <span className="text-xs text-muted-foreground">
                     {endpoint.providerName}
-                    {isActive ? ' · используется сейчас' : ''}
+                    {isActive ? ' · in use now' : ''}
                     {status?.latencyMs === null || status?.latencyMs === undefined
                       ? ''
-                      : ` · ${String(status.latencyMs)} мс`}
+                      : ` · ${String(status.latencyMs)} ms`}
                   </span>
                   {status?.isChainMismatch === true ? (
                     <span className="flex items-center gap-1 text-xs text-destructive">
                       <ShieldAlert className="size-3" aria-hidden />
-                      Узел обслуживает другую сеть
+                      The node serves a different network
                     </span>
                   ) : null}
                 </span>
@@ -133,7 +133,7 @@ export function RpcSettings({
                     size="sm"
                     disabled={isBusy}
                     onClick={() => void onRemove(endpoint.url)}
-                    aria-label={`Удалить ${endpointHost(endpoint.url)}`}
+                    aria-label={`Remove ${endpointHost(endpoint.url)}`}
                   >
                     <Trash2 className="size-4" aria-hidden />
                   </Button>
@@ -144,7 +144,7 @@ export function RpcSettings({
         </ul>
 
         <form className="flex flex-col gap-2" onSubmit={(event) => void submit(event)}>
-          <Label htmlFor="rpc-url">Свой RPC-адрес</Label>
+          <Label htmlFor="rpc-url">Your own RPC endpoint</Label>
           <div className="flex gap-2">
             <Input
               id="rpc-url"
@@ -157,7 +157,7 @@ export function RpcSettings({
             />
             <Button type="submit" disabled={isBusy || url.trim() === ''}>
               <Plus className="size-4" aria-hidden />
-              Добавить узел
+              Add the node
             </Button>
           </div>
 
@@ -169,9 +169,9 @@ export function RpcSettings({
 
           <Alert variant="warning">
             <AlertDescription>
-              Узел сообщает кошельку баланс, цену газа и результаты вызовов. Добавляйте только тот,
-              которому доверяете: недобросовестный узел покажет не то, что вы подписываете. Адрес
-              сохраняется в зашифрованном виде и используется раньше остальных.
+              A node tells the wallet the balance, the gas price and the results of calls. Add only
+              one you trust: a dishonest node will show something other than what you sign. The
+              endpoint is stored encrypted and is used before the others.
             </AlertDescription>
           </Alert>
         </form>

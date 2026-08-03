@@ -206,7 +206,7 @@ export class RpcManager implements IProviderResolver {
        выбор пользователя до перезапуска. */
     await this.release(network.chainId)
 
-    this.#logger.info('Добавлен пользовательский RPC-адрес', {
+    this.#logger.info('Custom RPC endpoint added', {
       chainId: network.chainId,
     })
   }
@@ -360,7 +360,7 @@ export class RpcManager implements IProviderResolver {
     if (custom === undefined) {
       throw new InvalidArgumentError(
         'providers',
-        'источник пользовательских адресов не подключён к менеджеру',
+        'the custom endpoint source is not connected to the manager',
       )
     }
 
@@ -381,7 +381,7 @@ export class RpcManager implements IProviderResolver {
     try {
       ;(await pending).destroy()
     } catch (error) {
-      this.#logger.warn('Соединение закрыто с ошибкой', {
+      this.#logger.warn('The connection closed with an error', {
         error: error instanceof Error ? error.message : String(error),
       })
     }

@@ -36,9 +36,9 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
   const searchId = useId()
 
   const categories: readonly { value: TransferCategory; label: string }[] = [
-    { value: TRANSFER_CATEGORY.All, label: 'Все' },
-    { value: TRANSFER_CATEGORY.Native, label: nativeSymbol ?? 'Валюта' },
-    { value: TRANSFER_CATEGORY.Erc20, label: 'Токены' },
+    { value: TRANSFER_CATEGORY.All, label: 'All' },
+    { value: TRANSFER_CATEGORY.Native, label: nativeSymbol ?? 'Currency' },
+    { value: TRANSFER_CATEGORY.Erc20, label: 'Tokens' },
     { value: TRANSFER_CATEGORY.Nft, label: 'NFT' },
   ]
 
@@ -47,16 +47,16 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
      быть различимым: две кнопки с именем «Все» неразличимы для того,
      кто слушает страницу, а не смотрит на неё. */
   const directions: readonly { value: DirectionFilter; label: string; name?: string }[] = [
-    { value: DIRECTION_FILTER.All, label: 'Все', name: 'Все направления' },
-    { value: DIRECTION_FILTER.Incoming, label: 'Входящие' },
-    { value: DIRECTION_FILTER.Outgoing, label: 'Исходящие' },
+    { value: DIRECTION_FILTER.All, label: 'All', name: 'All directions' },
+    { value: DIRECTION_FILTER.Incoming, label: 'Incoming' },
+    { value: DIRECTION_FILTER.Outgoing, label: 'Outgoing' },
   ]
 
   return (
     <div className="flex flex-col gap-3">
       <div className="relative">
         <Label htmlFor={searchId} className="sr-only">
-          Поиск по истории
+          Search the history
         </Label>
 
         <Search
@@ -67,7 +67,7 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
         <Input
           id={searchId}
           value={filter.query}
-          placeholder="Адрес, хэш, символ токена"
+          placeholder="Address, hash, token symbol"
           autoComplete="off"
           className="pr-10 pl-9"
           onChange={(event) => {
@@ -80,7 +80,7 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Очистить поиск"
+            aria-label="Clear the search"
             className="absolute top-1/2 right-1 size-8 -translate-y-1/2"
             onClick={() => {
               onChange({ ...filter, query: '' })
@@ -92,7 +92,7 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
       </div>
 
       <fieldset>
-        <legend className="sr-only">Вид имущества</legend>
+        <legend className="sr-only">Kind of asset</legend>
         <div className="grid grid-cols-4 gap-2">
           {categories.map((item) => (
             <SegmentButton
@@ -108,7 +108,7 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
       </fieldset>
 
       <fieldset>
-        <legend className="sr-only">Направление перевода</legend>
+        <legend className="sr-only">Transfer direction</legend>
         <div className="grid grid-cols-3 gap-2">
           {directions.map((item) => (
             <SegmentButton

@@ -35,7 +35,7 @@ export function UntrustedText({ value, className }: UntrustedTextProps) {
       {safe.text}
       <EyeOff
         className="size-3.5 shrink-0"
-        aria-label="Строка содержала скрытые символы — возможна подделка"
+        aria-label="The string contained hidden characters — it may be a forgery"
       />
     </span>
   )

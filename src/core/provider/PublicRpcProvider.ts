@@ -3,7 +3,7 @@ import type { ChainId } from '@/core/types'
 
 import { RPC_PROVIDER_ID, type IRpcEndpoint, type IRpcProvider } from './rpc-endpoint'
 
-const PROVIDER_NAME = 'Публичный узел'
+const PROVIDER_NAME = 'Public node'
 
 /**
  * Публичные адреса из конфигурации сети.

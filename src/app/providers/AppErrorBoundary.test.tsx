@@ -23,11 +23,11 @@ describe('Перехват сбоя отрисовки', () => {
   it('исправное дерево показывается без изменений', () => {
     render(
       <AppErrorBoundary>
-        <p>Баланс</p>
+        <p>Balance</p>
       </AppErrorBoundary>,
     )
 
-    expect(screen.getByText('Баланс')).toBeInTheDocument()
+    expect(screen.getByText('Balance')).toBeInTheDocument()
   })
 
   it('сбой не оставляет пустой экран', () => {
@@ -38,7 +38,7 @@ describe('Перехват сбоя отрисовки', () => {
       </AppErrorBoundary>,
     )
 
-    expect(screen.getByRole('heading', { name: 'Приложение остановилось' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'The application stopped' })).toBeInTheDocument()
   })
 
   it('прямо говорит, что средства целы', () => {
@@ -50,8 +50,8 @@ describe('Перехват сбоя отрисовки', () => {
       </AppErrorBoundary>,
     )
 
-    expect(screen.getByText(/Средства на месте/i)).toBeInTheDocument()
-    expect(screen.getByText(/ни ключи, ни/i)).toBeInTheDocument()
+    expect(screen.getByText(/Your funds are safe/i)).toBeInTheDocument()
+    expect(screen.getByText(/neither the/i)).toBeInTheDocument()
   })
 
   it('называет причину дословно', () => {
@@ -73,8 +73,8 @@ describe('Перехват сбоя отрисовки', () => {
       </AppErrorBoundary>,
     )
 
-    expect(screen.getByRole('button', { name: 'Перезагрузить' })).toBeInTheDocument()
-    expect(screen.getByText(/Seed-фраза при перезагрузке не потребуется/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
+    expect(screen.getByText(/The seed phrase is not needed to reload/i)).toBeInTheDocument()
   })
 
   it('сведения о сбое попадают в консоль', () => {

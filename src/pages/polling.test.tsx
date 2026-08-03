@@ -64,7 +64,7 @@ beforeEach(async () => {
 describe('Фоновый опрос баланса', () => {
   it('идёт, пока вкладка на виду', async () => {
     renderApp()
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
     await waitFor(() => {
       expect(services.session.getSnapshot().balance).not.toBeNull()
@@ -84,7 +84,7 @@ describe('Фоновый опрос баланса', () => {
        сообщать его оператору, что кошелёк с этим адресом открыт, пока
        пользователь занят другим. */
     renderApp()
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
     await waitFor(() => {
       expect(services.session.getSnapshot().balance).not.toBeNull()
@@ -103,7 +103,7 @@ describe('Фоновый опрос баланса', () => {
     /* Показанный баланс к моменту возврата заведомо устарел, и ждать
        ещё период опроса незачем. */
     renderApp()
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
     await waitFor(() => {
       expect(services.session.getSnapshot().balance).not.toBeNull()

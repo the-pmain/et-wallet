@@ -1,0 +1,177 @@
+src/features/dapp/model/DappSessionService.ts	Транспорт подключений недоступен
+src/features/dapp/model/DappSessionService.ts	Отклонено пользователем
+src/features/dapp/model/DappSessionService.ts	Запрос приложения выполнить не удалось
+src/features/dapp/model/DappSessionService.ts	Кошелёк занят другим запросом
+src/features/dapp/model/DappSessionService.ts	Запрос адресован аккаунту, которого нет в этом кошельке
+src/features/dapp/model/WalletConnectTransport.ts	WalletConnect не настроен: не задан идентификатор проекта. 
+src/features/dapp/model/WalletConnectTransport.ts	Подключение к приложениям недоступно, остальные возможности кошелька работают.
+src/features/dapp/model/WalletConnectTransport.ts	Транспорт подключений готов
+src/features/dapp/model/WalletConnectTransport.ts	Отклонено пользователем
+src/features/dapp/model/WalletConnectTransport.ts	Отключено пользователем
+src/features/dapp/model/WalletConnectTransport.ts	Метод не поддерживается кошельком
+src/features/dapp/model/WalletConnectTransport.ts	Транспорт подключений не инициализирован.
+src/features/dapp/ui/DappProposalCard.tsx	Приложение без имени
+src/features/dapp/ui/DappProposalCard.tsx	адрес не указан
+src/features/dapp/ui/DappRequestCard.tsx	Приложение без имени
+src/features/dapp/ui/DappRequestCard.tsx	адрес не указан
+src/features/dapp/ui/DappRequestCard.tsx	подпись по запросу приложения
+src/features/dapp/ui/DappRequestCard.tsx	Выполняем…
+src/features/dapp/ui/DappRequestCard.tsx	Подтвердить
+src/features/dapp/ui/DappRequestCard.tsx	Подпись сообщения
+src/features/dapp/ui/DappRequestCard.tsx	Подпись структуры
+src/features/dapp/ui/DappRequestCard.tsx	Отправка транзакции
+src/features/dapp/ui/DappRequestCard.tsx	Подпись транзакции
+src/features/dapp/ui/DappRequestCard.tsx	Тип
+src/features/dapp/ui/DappRequestCard.tsx	Домен
+src/features/dapp/ui/DappRequestCard.tsx	Контракт
+src/features/dapp/ui/DappRequestCard.tsx	Сеть
+src/features/dapp/ui/DappRequestCard.tsx	Получатель
+src/features/dapp/ui/DappRequestCard.tsx	создание контракта
+src/features/dapp/ui/DappRequestCard.tsx	Отправитель
+src/features/dapp/ui/DappRequestCard.tsx	Сумма
+src/features/dapp/ui/DappRequestCard.tsx	Сеть
+src/features/dapp/ui/DappRequestCard.tsx	Подпись отдаёт распоряжение токенами
+src/features/dapp/ui/DappRequestCard.tsx	Это не перевод: списания и комиссии не будет. Подпись позволит указанному адресу забрать ваши токены позже, и отменить её можно только отзывом разрешения в контракте.
+src/features/dapp/ui/DappRequestCard.tsx	Сумма разрешения не ограничена
+src/features/dapp/ui/DappRequestCard.tsx	Получатель сможет забрать все ваши токены этого вида — сейчас и в любой момент в будущем.
+src/features/dapp/ui/DappRequestCard.tsx	Транзакция выдаёт разрешение
+src/features/dapp/ui/DappRequestCard.tsx	После неё указанный адрес получит право распоряжаться вашими токенами без отдельного подтверждения.
+src/features/dapp/ui/DappRequestCard.tsx	Запрошена другая сеть
+src/features/dapp/ui/DappRequestCard.tsx	Приложение просит действие в сети, отличной от выбранной в кошельке. Подпись, сделанная не в той сети, может оказаться действительной там, где вы её не ждёте.
+src/features/dapp/ui/DappRequestCard.tsx	Подписывающий контракт не указан
+src/features/dapp/ui/DappRequestCard.tsx	Невозможно определить, какому контракту предназначена подпись.
+src/features/dapp/ui/DappRequestCard.tsx	Сообщение нечитаемо
+src/features/dapp/ui/DappRequestCard.tsx	Вместо текста прислана шестнадцатеричная строка. Понять, что именно подписывается, по ней нельзя.
+src/features/dapp/ui/DappRequestCard.tsx	В сообщении скрытые символы
+src/features/dapp/ui/DappRequestCard.tsx	Часть текста может быть не видна на экране.
+src/features/dapp/ui/DappRequestCard.tsx	Получатель — адрес сжигания
+src/features/dapp/ui/DappRequestCard.tsx	Средства, отправленные туда, не получит никто.
+src/features/dapp/ui/DappRequestCard.tsx	Разворачивается контракт
+src/features/dapp/ui/DappRequestCard.tsx	У транзакции нет получателя: она создаёт новый контракт в сети.
+src/features/dapp/ui/DappRequestCard.tsx	Смысл вызова не распознан
+src/features/dapp/ui/DappRequestCard.tsx	Кошелёк не смог разобрать, что делает эта транзакция. Подтверждайте только если понимаете, о чём просит приложение.
+src/features/dapp/ui/SessionList.tsx	Подключений нет
+src/features/dapp/ui/SessionList.tsx	Ни одно приложение сейчас не подключено к кошельку. Подключение начинается на стороне приложения — оно покажет код или ссылку.
+src/features/dapp/ui/SessionList.tsx	Приложение без имени
+src/features/dapp/ui/SessionList.tsx	адрес не указан
+src/features/dapp/ui/SessionList.tsx	сетей: ${String(session.chainIds.length)}
+src/features/dapp/ui/SessionList.tsx	Отключить ${session.dapp.name}
+src/features/onboarding/model/OnboardingService.ts	имя не подходит
+src/features/onboarding/model/onboarding-context.ts	useOnboarding должен вызываться внутри OnboardingProvider.
+src/features/onboarding/ui/PasswordFields.tsx	не короче ${String(MIN_PASSWORD_LENGTH)} символов
+src/features/onboarding/ui/PasswordFields.tsx	слишком длинный
+src/features/onboarding/ui/PasswordFields.tsx	смешайте строчные, заглавные, цифры и знаки
+src/features/onboarding/ui/PasswordFields.tsx	слишком распространённый
+src/features/onboarding/ui/PasswordFields.tsx	состоит из повторяющегося фрагмента
+src/features/onboarding/ui/PasswordFields.tsx	слабый
+src/features/onboarding/ui/PasswordFields.tsx	приемлемый
+src/features/onboarding/ui/PasswordFields.tsx	хороший
+src/features/onboarding/ui/SeedPhraseInput.tsx	Введите фразу
+src/features/onboarding/ui/SeedPhraseInput.tsx	Некоторых слов нет в словаре — проверьте написание
+src/features/onboarding/ui/SeedPhraseInput.tsx	Слова верные, но контрольная сумма не сходится — вероятно, перепутан порядок
+src/features/onboarding/ui/SeedPhraseInput.tsx	Введите 12 или 24 слова через пробел
+src/features/security/model/SecuritySettings.ts	Недопустимый срок автоблокировки.
+src/features/security/ui/AutoLockWarning.tsx	Вы бездействовали, и сессия закроется.
+src/features/security/ui/AutoLockWarning.tsx	Вы бездействовали. Сессия закроется примерно через ${String(seconds)} с.
+src/features/security/ui/ConfirmPassword.tsx	Неверный пароль.
+src/features/security/ui/ConfirmPassword.tsx	Проверить пароль не удалось.
+src/features/security/ui/ConfirmPassword.tsx	Проверка…
+src/features/security/ui/ConfirmPassword.tsx	Подтвердить
+src/features/security/ui/SecretReveal.tsx	Скрыть
+src/features/security/ui/SecretReveal.tsx	Показать
+src/features/security/ui/SecretReveal.tsx	Скопировано
+src/features/security/ui/SecretReveal.tsx	Копировать
+src/features/security/ui/UntrustedText.tsx	Строка содержала скрытые символы — возможна подделка
+src/features/wallet/lib/amount-input.ts	Введите сумму
+src/features/wallet/lib/amount-input.ts	Сумма записывается цифрами, разделитель — точка либо запятая
+src/features/wallet/lib/amount-input.ts	Слишком много знаков после запятой: допустимо ${String(decimals)}
+src/features/wallet/lib/amount-input.ts	Сумма должна быть больше нуля
+src/features/wallet/lib/transfer-display.ts	ед.
+src/features/wallet/lib/transfer-display.ts	ед.
+src/features/wallet/lib/transfer-display.ts	Перевод
+src/features/wallet/lib/transfer-display.ts	Токен
+src/features/wallet/model/WalletSession.ts	Имя ENS разрешить не удалось
+src/features/wallet/model/WalletSession.ts	Отправитель не принадлежит этому кошельку.
+src/features/wallet/model/WalletSession.ts	Запрос адресован аккаунту, которого нет в этом кошельке.
+src/features/wallet/model/WalletSession.ts	Запрос адресован аккаунту, которого нет в этом кошельке.
+src/features/wallet/model/WalletSession.ts	Сессия кошелька закрыта.
+src/features/wallet/model/WalletSession.ts	Не удалось открыть сессию кошелька
+src/features/wallet/model/WalletSession.ts	Имя ENS получить не удалось
+src/features/wallet/model/WalletSession.ts	Баланс токена недоступен
+src/features/wallet/model/WalletSession.ts	Сессия кошелька закрыта.
+src/features/wallet/model/WalletSession.ts	История переводов недоступна
+src/features/wallet/model/WalletSession.ts	Баланс недоступен
+src/features/wallet/model/WalletSession.ts	Сессия кошелька закрыта.
+src/features/wallet/model/WalletSession.ts	Сессия кошелька закрыта.
+src/features/wallet/model/WalletSession.ts	Сессия кошелька закрыта.
+src/features/wallet/model/WalletSession.ts	Активная сеть не выбрана.
+src/features/wallet/model/wallet-context.ts	useWallet должен вызываться внутри WalletProvider.
+src/features/wallet/ui/AccountAvatar.tsx	Отпечаток адреса
+src/features/wallet/ui/AccountList.tsx	Импортированный ключ: не восстанавливается из seed-фразы
+src/features/wallet/ui/AddNetworkForm.tsx	Название сети
+src/features/wallet/ui/AddNetworkForm.tsx	Идентификатор сети
+src/features/wallet/ui/AddNetworkForm.tsx	RPC-адрес
+src/features/wallet/ui/AddNetworkForm.tsx	Символ валюты
+src/features/wallet/ui/AddNetworkForm.tsx	Знаков после запятой
+src/features/wallet/ui/AddNetworkForm.tsx	Обозреватель блоков (необязательно)
+src/features/wallet/ui/AddNetworkForm.tsx	Проверка узла…
+src/features/wallet/ui/AddNetworkForm.tsx	Добавить сеть
+src/features/wallet/ui/BalanceCard.tsx	Обновить баланс
+src/features/wallet/ui/BalanceCard.tsx	Загрузка…
+src/features/wallet/ui/ImportTokenForm.tsx	Чтение…
+src/features/wallet/ui/ImportTokenForm.tsx	Проверить
+src/features/wallet/ui/NetworkList.tsx	Тестовая сеть: средства в ней не имеют стоимости
+src/features/wallet/ui/NetworkList.tsx	Удалить сеть ${network.name}
+src/features/wallet/ui/NftTransferCard.tsx	Получатель не разобран: введите адрес либо имя ENS, которое существует.
+src/features/wallet/ui/NftTransferCard.tsx	Коллекция без названия
+src/features/wallet/ui/NftTransferCard.tsx	 · ${amount} экз.
+src/features/wallet/ui/NftTransferCard.tsx	передачу предмета
+src/features/wallet/ui/NftTransferCard.tsx	Отправка…
+src/features/wallet/ui/NftTransferCard.tsx	Передать предмет
+src/features/wallet/ui/NftTransferCard.tsx	Коллекция без названия
+src/features/wallet/ui/NftTransferCard.tsx	0x… или имя.eth
+src/features/wallet/ui/NftTransferCard.tsx	Оценка комиссии…
+src/features/wallet/ui/NftTransferCard.tsx	Далее
+src/features/wallet/ui/QuickActions.tsx	Скопировано
+src/features/wallet/ui/QuickActions.tsx	Копировать
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Отмена транзакции
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Ускорение транзакции
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Кошелёк отправит перевод самому себе на нулевую сумму с тем же номером и большей комиссией. Если сеть примет его первым, исходная операция не состоится.
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Кошелёк повторит ту же операцию с тем же номером и большей комиссией. Сеть заменит прежнюю транзакцию новой.
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Номер (nonce)
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Получатель
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Сумма
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Максимальная комиссия
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Лимит газа
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Исходная транзакция может попасть в блок раньше отменяющей — тогда перевод состоится, а отмена просто не будет принята. Следите за историей до тех пор, пока одна из них не подтвердится.
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Узлы принимают замену только при заметно большей комиссии и не обязаны это делать. Если замену отклонят, исходная транзакция останется в очереди.
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Отменить не удалось
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Ускорить не удалось
+src/features/wallet/ui/ReplaceTransactionCard.tsx	отмену транзакции
+src/features/wallet/ui/ReplaceTransactionCard.tsx	ускорение транзакции
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Отправка…
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Отправить отмену
+src/features/wallet/ui/ReplaceTransactionCard.tsx	Отправить ускорение
+src/features/wallet/ui/RpcSettings.tsx	Доступен
+src/features/wallet/ui/RpcSettings.tsx	Недоступен
+src/features/wallet/ui/RpcSettings.tsx	 · используется сейчас
+src/features/wallet/ui/RpcSettings.tsx	 · ${String(status.latencyMs)} мс
+src/features/wallet/ui/RpcSettings.tsx	Удалить ${endpointHost(endpoint.url)}
+src/features/wallet/ui/TokenList.tsx	Убрать токен ${entry.token.symbol}
+src/features/wallet/ui/TransferFilterBar.tsx	Все
+src/features/wallet/ui/TransferFilterBar.tsx	Валюта
+src/features/wallet/ui/TransferFilterBar.tsx	Токены
+src/features/wallet/ui/TransferFilterBar.tsx	Все
+src/features/wallet/ui/TransferFilterBar.tsx	Все направления
+src/features/wallet/ui/TransferFilterBar.tsx	Входящие
+src/features/wallet/ui/TransferFilterBar.tsx	Исходящие
+src/features/wallet/ui/TransferFilterBar.tsx	Адрес, хэш, символ токена
+src/features/wallet/ui/TransferFilterBar.tsx	Очистить поиск
+src/features/wallet/ui/TransferList.tsx	Операций пока нет
+src/features/wallet/ui/TransferRow.tsx	Блок ${record.blockNumber.toString()}
+src/features/wallet/ui/TransferRow.tsx	Ускорить
+src/features/wallet/ui/TransferRow.tsx	Повторить ту же операцию с большей комиссией
+src/features/wallet/ui/TransferRow.tsx	Отменить
+src/features/wallet/ui/TransferRow.tsx	Занять номер транзакции переводом самому себе
+src/features/wallet/ui/TransferRow.tsx	Отправлено, ждёт блока
+src/features/wallet/ui/TransferRow.tsx	Ждёт блока

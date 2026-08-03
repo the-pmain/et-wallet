@@ -158,7 +158,7 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
     }
 
     if (attempts > 0 && failures === attempts && firstError !== null) {
-      throw new Error(`Курсы получить не удалось: ${firstError.message}`, { cause: firstError })
+      throw new Error(`Prices could not be fetched: ${firstError.message}`, { cause: firstError })
     }
 
     return quotes
@@ -248,13 +248,13 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
     })
 
     if (!response.ok) {
-      throw new Error(`Источник курсов ответил ${String(response.status)}.`)
+      throw new Error(`The price source responded with ${String(response.status)}.`)
     }
 
     const payload: unknown = await response.json()
 
     if (typeof payload !== 'object' || payload === null) {
-      throw new Error('Источник курсов вернул неожиданный ответ.')
+      throw new Error('The price source returned an unexpected response.')
     }
 
     const record = payload as Record<string, unknown>
@@ -284,7 +284,7 @@ function readErrorMessage(payload: Record<string, unknown>): string {
     }
   }
 
-  return 'Источник курсов отказал в запросе.'
+  return 'The price source refused the request.'
 }
 
 /**

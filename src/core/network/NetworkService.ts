@@ -56,7 +56,7 @@ export class NetworkService implements INetworkService {
      выглядеть как отказ ядра. */
   readonly #events = new EventBus<NetworkEventMap>({
     onListenerError: (error, event) => {
-      this.#logger.error('Сбой обработчика события сети', {
+      this.#logger.error('Network event listener failed', {
         event: String(event),
         error: error instanceof Error ? error.message : String(error),
       })
@@ -99,7 +99,7 @@ export class NetworkService implements INetworkService {
 
     for (const network of stored) {
       if (this.#isBuiltIn(network.chainId)) {
-        this.#logger.warn('Сохранённая копия встроенной сети проигнорирована', {
+        this.#logger.warn('The stored copy of a built-in network was ignored', {
           chainId: network.chainId.toString(),
         })
         continue
@@ -118,7 +118,7 @@ export class NetworkService implements INetworkService {
 
     this.#initialized = true
 
-    this.#logger.info('Сети загружены', {
+    this.#logger.info('Networks loaded', {
       total: this.#networks.size,
       activeChainId: this.#activeChainId.toString(),
     })
@@ -163,7 +163,7 @@ export class NetworkService implements INetworkService {
     await this.#repository.setActiveChainId(chainId)
     this.#activeChainId = chainId
 
-    this.#logger.info('Активная сеть изменена', { chainId: chainId.toString() })
+    this.#logger.info('Active network changed', { chainId: chainId.toString() })
     this.#events.emit('network:changed', { chainId })
   }
 
@@ -218,7 +218,7 @@ export class NetworkService implements INetworkService {
     await this.#repository.save(candidate)
     this.#networks.set(candidate.chainId, candidate)
 
-    this.#logger.info('Добавлена пользовательская сеть', {
+    this.#logger.info('Custom network added', {
       chainId: candidate.chainId.toString(),
     })
     this.#emitListChanged()
@@ -242,7 +242,7 @@ export class NetworkService implements INetworkService {
     await this.#repository.delete(chainId)
     this.#networks.delete(chainId)
 
-    this.#logger.info('Пользовательская сеть удалена', { chainId: chainId.toString() })
+    this.#logger.info('Custom network removed', { chainId: chainId.toString() })
     this.#emitListChanged()
 
     /* Удаление активной сети обязано оставить приложение в рабочем
@@ -332,7 +332,7 @@ export class NetworkService implements INetworkService {
       const actual = parseChainIdFromHex(response)
 
       if (actual !== candidate.chainId) {
-        this.#logger.warn('Узел сообщил чужой chainId', {
+        this.#logger.warn('The node reported a foreign chainId', {
           expected: candidate.chainId.toString(),
           actual: actual.toString(),
         })

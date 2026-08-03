@@ -147,8 +147,8 @@ describe('AccountManager: создание аккаунтов', () => {
   })
 
   it('назначает имя по умолчанию', async () => {
-    expect((await manager.create()).name).toBe('Аккаунт 1')
-    expect((await manager.create()).name).toBe('Аккаунт 2')
+    expect((await manager.create()).name).toBe('Account 1')
+    expect((await manager.create()).name).toBe('Account 2')
   })
 
   it('принимает заданное имя', async () => {

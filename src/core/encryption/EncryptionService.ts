@@ -87,7 +87,7 @@ export class EncryptionService implements IEncryptionService {
     if (params.algorithm !== KDF_ALGORITHM.Pbkdf2) {
       throw new InvalidArgumentError(
         'kdf.algorithm',
-        `алгоритм "${params.algorithm}" не поддержан текущей сборкой`,
+        `the algorithm "${params.algorithm}" is not supported by this build`,
       )
     }
 
@@ -222,7 +222,7 @@ export class EncryptionService implements IEncryptionService {
          Работать в таком режиме кошелёк не должен вовсе: без него
          невозможны ни шифрование, ни криптостойкая случайность. */
       throw new RandomnessUnavailableError(
-        'crypto.subtle недоступен — требуется защищённый контекст (https либо localhost)',
+        'crypto.subtle is unavailable — a secure context is required (https or localhost)',
       )
     }
 

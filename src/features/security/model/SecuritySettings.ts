@@ -68,7 +68,7 @@ export class SecuritySettingsRepository {
 
   async setAutoLockTimeout(timeoutMs: number): Promise<void> {
     if (!isAllowedTimeout(timeoutMs)) {
-      throw new Error('Недопустимый срок автоблокировки.')
+      throw new Error('The auto-lock timeout is not allowed.')
     }
 
     await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.AutoLockTimeoutMs, timeoutMs)

@@ -17,7 +17,6 @@ import {
   CardTitle,
   Input,
   Label,
-  LanguageSwitch,
 } from '@/shared/ui'
 
 /**
@@ -147,8 +146,6 @@ export function UnlockWalletPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
-      <LanguageSwitch className="absolute top-4 right-4" />
-
       <Card className="w-full max-w-md animate-in duration-500 fade-in slide-in-from-bottom-3">
         <CardHeader className="items-center gap-4 text-center">
           {/* Знак приложения, а не отвлечённый замок: экран ввода пароля —

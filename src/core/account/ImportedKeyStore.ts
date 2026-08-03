@@ -71,7 +71,7 @@ export class ImportedKeyStore {
     try {
       bytes = hexToBytes(stored)
     } catch (error) {
-      throw new VaultCorruptedError('приватный ключ аккаунта повреждён', { cause: error })
+      throw new VaultCorruptedError('the private key of the account is corrupted', { cause: error })
     }
 
     /* Проверка диапазона выполняется и при чтении: запись могла быть

@@ -59,7 +59,7 @@ export function BalanceCard({
           size="sm"
           onClick={onRefresh}
           disabled={isLoading}
-          aria-label="Обновить баланс"
+          aria-label="Refresh the balance"
         >
           <RefreshCw className={isLoading ? 'size-4 animate-spin' : 'size-4'} aria-hidden />
         </Button>
@@ -68,7 +68,7 @@ export function BalanceCard({
       <CardContent className="flex flex-col gap-2">
         {balance === null ? (
           <p className="text-3xl font-semibold text-muted-foreground tabular-nums">
-            {isLoading ? 'Загрузка…' : '—'}
+            {isLoading ? 'Loading…' : '—'}
           </p>
         ) : (
           <p className="text-3xl font-semibold tabular-nums">
@@ -79,8 +79,7 @@ export function BalanceCard({
 
         {balance !== null && balance.isStale && error === null ? (
           <p className="text-xs text-muted-foreground">
-            Значение из кэша, идёт обновление. Не принимайте решение об отправке по устаревшей
-            сумме.
+            A cached value, refresh in progress. Do not decide to send based on a stale amount.
           </p>
         ) : null}
 
@@ -88,8 +87,8 @@ export function BalanceCard({
           <p className="flex items-start gap-2 text-xs text-destructive">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             <span>
-              Узел не ответил. Показанное значение может быть устаревшим — это не означает, что
-              средств нет.
+              The node did not answer. The value shown may be stale — that does not mean the funds
+              are gone.
             </span>
           </p>
         ) : null}

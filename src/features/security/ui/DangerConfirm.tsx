@@ -69,7 +69,7 @@ export function DangerConfirm({
 
       <div className="flex gap-2">
         <Button variant="default" className="flex-1" disabled={isBusy} onClick={onCancel}>
-          Отмена
+          Cancel
         </Button>
 
         <Button

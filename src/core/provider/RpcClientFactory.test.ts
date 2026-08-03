@@ -42,7 +42,7 @@ class TestableFactory extends RpcClientFactory {
 function network(rpcUrls: readonly string[]): INetworkConfig {
   return {
     chainId: CHAIN_ID,
-    name: 'Тестовая сеть',
+    name: 'Test network',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls,
     blockExplorerUrls: [],

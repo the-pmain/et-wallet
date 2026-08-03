@@ -81,11 +81,11 @@ export function encodeCallWithAddress(functionSelector: string, address: Address
  */
 export function encodeTransfer(to: Address, amount: bigint): HexString {
   if (amount < 0n) {
-    throw new RangeError('Сумма перевода не может быть отрицательной.')
+    throw new RangeError('The transfer amount cannot be negative.')
   }
 
   if (amount > MAX_UINT256) {
-    throw new RangeError('Сумма перевода не помещается в uint256.')
+    throw new RangeError('The transfer amount does not fit into uint256.')
   }
 
   const recipient = to.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')
@@ -150,7 +150,7 @@ export function decodeUint(data: HexString): bigint {
   const body = strip(data)
 
   if (body === '') {
-    throw new Error('контракт вернул пустой ответ')
+    throw new Error('the contract returned an empty response')
   }
 
   return BigInt(`0x${body.slice(0, WORD_LENGTH)}`)
@@ -177,7 +177,7 @@ export function decodeString(data: HexString): string {
   const body = strip(data)
 
   if (body === '') {
-    throw new Error('контракт вернул пустой ответ')
+    throw new Error('the contract returned an empty response')
   }
 
   /* Одно слово — это `bytes32`: значение лежит прямо в нём, дополненное
@@ -202,7 +202,7 @@ function decodeDynamicString(body: string): string {
   const lengthEnd = lengthStart + WORD_LENGTH
 
   if (lengthEnd > body.length) {
-    throw new Error('ответ короче объявленного смещения')
+    throw new Error('the response is shorter than the declared offset')
   }
 
   const length = Number(BigInt(`0x${body.slice(lengthStart, lengthEnd)}`)) * 2

@@ -24,7 +24,7 @@ export function SeedPhraseConfirmation({
     <div className="flex flex-col gap-5">
       {challenge.positions.map((position, questionIndex) => (
         <div key={position} className="flex flex-col gap-2">
-          <Label>Слово номер {position + 1}</Label>
+          <Label>Word number {position + 1}</Label>
 
           <div className="grid grid-cols-2 gap-2">
             {(challenge.options[questionIndex] ?? []).map((option) => (

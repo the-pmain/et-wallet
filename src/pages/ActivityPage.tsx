@@ -169,7 +169,7 @@ export function ActivityPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">История</h1>
+        <h1 className="text-lg font-semibold">History</h1>
 
         <Button
           variant="ghost"
@@ -181,18 +181,18 @@ export function ActivityPage() {
             className={snapshot.isHistoryLoading ? 'size-4 animate-spin' : 'size-4'}
             aria-hidden
           />
-          Обновить
+          Refresh
         </Button>
       </header>
 
       {limits?.sourceUnavailable === true ? (
         <Alert variant="danger">
           <AlertDescription>
-            Историю получить не удалось, поэтому показаны только отправки, сделанные из этого
-            кошелька. Это не означает, что других операций не было.
-            {limits.reason === null ? null : <> Узел ответил: «{limits.reason}».</>} Многие
-            публичные узлы отказывают в поиске по всем контрактам сразу. Подключите собственный узел
-            в настройках либо укажите ключ индексатора.
+            The history could not be fetched, so only the sends made from this wallet are shown.
+            That does not mean there were no other operations.
+            {limits.reason === null ? null : <> The node replied: "{limits.reason}".</>} Many public
+            nodes refuse to search across every contract at once. Connect your own node in the
+            settings or provide an indexer key.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -200,9 +200,9 @@ export function ActivityPage() {
       {limits?.nativeTransfersUnavailable === true ? (
         <Alert variant="warning">
           <AlertDescription>
-            Переводы {nativeSymbol ?? 'нативной валюты'} здесь не показаны. Кошелёк читает историю
-            из журналов узла, а такие переводы событий не порождают и в журналах отсутствуют. Полная
-            история требует индексатора — он получит ваш адрес и всю историю операций по нему.
+            {nativeSymbol ?? 'Native currency'} transfers are not shown here. The wallet reads the
+            history from node logs, and such transfers emit no events and are absent from the logs.
+            A full history needs an indexer — it receives your address and every operation on it.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -211,8 +211,8 @@ export function ActivityPage() {
         <Alert>
           <Info />
           <AlertDescription>
-            Просмотрены последние {limits.scannedBlocks.toLocaleString('ru-RU')} блоков. Более
-            ранние операции узел по одному запросу не отдаёт.
+            The last {limits.scannedBlocks.toLocaleString('en-GB')} blocks were scanned. Earlier
+            operations are not returned by a single node query.
           </AlertDescription>
         </Alert>
       )}
@@ -221,7 +221,7 @@ export function ActivityPage() {
 
       {hasFilter && transfers.length > 0 ? (
         <p className="text-xs text-muted-foreground" role="status">
-          Показано {visible.length} из {transfers.length}
+          Showing {visible.length} of {transfers.length}
         </p>
       ) : null}
 
@@ -232,26 +232,27 @@ export function ActivityPage() {
             network={network}
             isLoading={snapshot.isHistoryLoading}
             onReplace={startReplacement}
-            emptyTitle={hasFilter ? 'Под условия ничего не подошло' : 'Операций пока нет'}
+            emptyTitle={hasFilter ? 'Nothing matched the filter' : 'No operations yet'}
             emptyDescription={
               hasFilter ? (
                 <>
-                  Отбор применяется к уже полученным записям и не запрашивает историю заново.
+                  The filter applies to records already fetched and does not query the history
+                  again.
                   {isNativeBlindSpot ? (
                     <>
                       {' '}
-                      Переводы {nativeSymbol ?? 'нативной валюты'} этому источнику недоступны в
-                      принципе, поэтому пустой список здесь ничего не говорит о том, были такие
-                      операции или нет.
+                      {nativeSymbol ?? 'Native currency'} transfers are unavailable to this source
+                      in principle, so an empty list here says nothing about whether such operations
+                      happened.
                     </>
                   ) : null}{' '}
-                  Снимите условия, чтобы увидеть всё, что удалось получить.
+                  Clear the filter to see everything that could be fetched.
                 </>
               ) : (
                 <>
-                  За доступный период операций не найдено. Кошелёк показывает переводы нативной
-                  валюты, токенов ERC-20 и коллекционных токенов — в объёме, который отдаёт
-                  подключённый источник.
+                  No operations were found for the available period. The wallet shows transfers of
+                  the native currency, ERC-20 tokens and collectible tokens — as far as the
+                  connected source reports them.
                 </>
               )
             }
@@ -290,23 +291,23 @@ function ReplacementScreen({
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-lg font-semibold">
-          {isCancel ? 'Отмена транзакции' : 'Ускорение транзакции'}
+          {isCancel ? 'Cancelling a transaction' : 'Speeding up a transaction'}
         </h1>
 
         {state.error === null ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
             <RefreshCw className="size-4 animate-spin" aria-hidden />
-            Готовим замену…
+            Preparing the replacement…
           </div>
         ) : (
           <Alert variant="danger">
-            <AlertTitle>Заменить транзакцию не получится</AlertTitle>
+            <AlertTitle>The transaction cannot be replaced</AlertTitle>
             <AlertDescription>{state.error}</AlertDescription>
           </Alert>
         )}
 
         <Button variant="outline" onClick={onRetryClose}>
-          Вернуться к истории
+          Back to the history
         </Button>
       </div>
     )

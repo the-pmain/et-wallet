@@ -27,8 +27,8 @@ export function SessionList({ sessions, isBusy, onDisconnect }: SessionListProps
     return (
       <EmptyState
         icon={Plug}
-        title="Подключений нет"
-        description="Ни одно приложение сейчас не подключено к кошельку. Подключение начинается на стороне приложения — оно покажет код или ссылку."
+        title="No connections"
+        description="No application is connected to the wallet right now. A connection starts on the application side — it shows a code or a link."
       />
     )
   }
@@ -40,26 +40,26 @@ export function SessionList({ sessions, isBusy, onDisconnect }: SessionListProps
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate text-sm font-medium">
               <UntrustedText
-                value={session.dapp.name === '' ? 'Приложение без имени' : session.dapp.name}
+                value={session.dapp.name === '' ? 'Application without a name' : session.dapp.name}
               />
             </span>
 
             <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
               <Globe className="size-3 shrink-0" aria-hidden />
               <UntrustedText
-                value={session.dapp.url === '' ? 'адрес не указан' : session.dapp.url}
+                value={session.dapp.url === '' ? 'no address given' : session.dapp.url}
               />
             </span>
 
             <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Badge variant="outline">
                 {session.chainIds.length === 1
-                  ? `сеть ${session.chainIds[0]?.toString() ?? ''}`
-                  : `сетей: ${String(session.chainIds.length)}`}
+                  ? `network ${session.chainIds[0]?.toString() ?? ''}`
+                  : `networks: ${String(session.chainIds.length)}`}
               </Badge>
 
               {session.expiresAt === null ? null : (
-                <span>действует до {new Date(session.expiresAt).toLocaleDateString('ru-RU')}</span>
+                <span>valid until {new Date(session.expiresAt).toLocaleDateString('en-GB')}</span>
               )}
             </span>
           </span>
@@ -68,13 +68,13 @@ export function SessionList({ sessions, isBusy, onDisconnect }: SessionListProps
             variant="ghost"
             size="sm"
             disabled={isBusy}
-            aria-label={`Отключить ${session.dapp.name}`}
+            aria-label={`Disconnect ${session.dapp.name}`}
             onClick={() => {
               onDisconnect(session.id)
             }}
           >
             <Link2Off className="size-4" aria-hidden />
-            Отключить
+            Disconnect
           </Button>
         </li>
       ))}

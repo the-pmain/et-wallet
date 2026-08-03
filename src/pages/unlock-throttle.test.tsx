@@ -25,11 +25,11 @@ function renderApp() {
 /** Вводит пароль и нажимает разблокировку. */
 async function attempt(password: string): Promise<void> {
   const user = userEvent.setup()
-  const field = await screen.findByLabelText('Пароль')
+  const field = await screen.findByLabelText('Password')
 
   await user.clear(field)
   await user.type(field, password)
-  await user.click(screen.getByRole('button', { name: 'Разблокировать' }))
+  await user.click(screen.getByRole('button', { name: 'Unlock' }))
 }
 
 /** Открывает экран входа: создаёт кошелёк и блокирует его. */
@@ -53,10 +53,10 @@ describe('Ограничение попыток входа', () => {
     await attempt(WRONG_PASSWORD)
 
     await waitFor(() => {
-      expect(screen.getByText(/Неверный пароль/i)).toBeInTheDocument()
+      expect(screen.getByText(/Wrong password/i)).toBeInTheDocument()
     })
 
-    expect(screen.getByRole('button', { name: 'Разблокировать' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
   it('показывает, сколько попыток осталось до задержки', async () => {
@@ -66,7 +66,7 @@ describe('Ограничение попыток входа', () => {
 
     await attempt(WRONG_PASSWORD)
 
-    expect(await screen.findByText(/Осталось попыток до задержки/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Attempts left before a delay/i)).toBeInTheDocument()
   })
 
   it('закрывает ввод после исчерпания запаса', async () => {
@@ -76,8 +76,8 @@ describe('Ограничение попыток входа', () => {
       await attempt(WRONG_PASSWORD)
     }
 
-    expect(await screen.findByText(/Слишком много попыток/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Разблокировать' })).toBeDisabled()
+    expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeDisabled()
   })
 
   it('показывает обратный отсчёт, а не молчаливый отказ', async () => {
@@ -98,7 +98,7 @@ describe('Ограничение попыток входа', () => {
       await attempt(WRONG_PASSWORD)
     }
 
-    await screen.findByText(/Слишком много попыток/i)
+    await screen.findByText(/Too many attempts/i)
 
     /* Управляемые часы двигают время вперёд: ждать пять секунд
        по-настоящему означало бы замедлить весь набор. */
@@ -108,12 +108,12 @@ describe('Ограничение попыток входа', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Разблокировать' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
     })
 
     await attempt(PASSWORD)
 
-    expect(await screen.findByText('Аккаунт 1')).toBeInTheDocument()
+    expect(await screen.findByText('Account 1')).toBeInTheDocument()
   })
 
   it('успешный вход обнуляет счётчик', async () => {
@@ -122,7 +122,7 @@ describe('Ограничение попыток входа', () => {
     await attempt(WRONG_PASSWORD)
     await attempt(PASSWORD)
 
-    await screen.findByText('Аккаунт 1')
+    await screen.findByText('Account 1')
 
     await expect(services.onboarding.getUnlockThrottleState()).resolves.toEqual({
       failedAttempts: 0,
@@ -143,7 +143,7 @@ describe('Ограничитель переживает перезагрузку
 
     renderApp()
 
-    expect(await screen.findByText(/Слишком много попыток/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()
   })
 })
 
@@ -155,6 +155,6 @@ describe('Ограничитель общий с подтверждением п
       await services.onboarding.verifyPassword(WRONG_PASSWORD)
     }
 
-    await expect(services.onboarding.unlock(PASSWORD)).rejects.toThrow(/Слишком много попыток/i)
+    await expect(services.onboarding.unlock(PASSWORD)).rejects.toThrow(/Too many attempts/i)
   })
 })

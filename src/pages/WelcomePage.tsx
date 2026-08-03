@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 
 import { APP_CONFIG, TEST_MODE } from '@/shared/config'
 import { useTranslation } from '@/shared/i18n'
-import { Alert, AlertDescription, BrandMark, Button, LanguageSwitch } from '@/shared/ui'
+import { Alert, AlertDescription, BrandMark, Button } from '@/shared/ui'
 
 /**
  * Первый экран приложения.
@@ -35,7 +35,6 @@ export function WelcomePage() {
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 px-5 py-6">
       {/* Переключатель языка стоит на первом экране: выбрать язык нужно
           раньше, чем читать предупреждения о рисках. */}
-      <LanguageSwitch className="absolute top-4 right-4" />
 
       <header className="flex w-full max-w-xl flex-col items-center gap-4 text-center">
         <BrandMark className="size-14 animate-in drop-shadow-xl duration-700 zoom-in-90 fade-in" />

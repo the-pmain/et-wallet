@@ -173,7 +173,7 @@ export class HistoryService {
            индексатора либо узел, не принимающий выборку журналов. */
         lastReason = error instanceof Error ? error.message : String(error)
 
-        this.#logger.warn('Источник истории недоступен', {
+        this.#logger.warn('The history source is unavailable', {
           providerId: provider.id,
           reason: lastReason,
         })

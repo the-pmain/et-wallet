@@ -25,7 +25,7 @@ export function AssetsPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Активы</h1>
+        <h1 className="text-lg font-semibold">Assets</h1>
 
         <div className="flex items-center gap-1">
           <Button
@@ -38,7 +38,7 @@ export function AssetsPage() {
               className={snapshot.isTokensLoading ? 'size-4 animate-spin' : 'size-4'}
               aria-hidden
             />
-            Обновить
+            Refresh
           </Button>
 
           <Button
@@ -51,12 +51,12 @@ export function AssetsPage() {
             {isImporting ? (
               <>
                 <X className="size-4" aria-hidden />
-                Отменить
+                Cancel
               </>
             ) : (
               <>
                 <Plus className="size-4" aria-hidden />
-                Импорт токена
+                Import a token
               </>
             )}
           </Button>
@@ -92,8 +92,8 @@ export function AssetsPage() {
       {snapshot.balanceError === null ? null : (
         <Alert variant="danger">
           <AlertDescription>
-            Узел не ответил. Показанные значения могут быть устаревшими — это не означает, что
-            средств нет.
+            The node did not answer. The values shown may be stale — that does not mean the funds
+            are gone.
           </AlertDescription>
         </Alert>
       )}
@@ -101,8 +101,8 @@ export function AssetsPage() {
       <Alert>
         <Info />
         <AlertDescription>
-          Стоимость активов в валюте не показывается: для этого нужен внешний источник курсов,
-          который получит ваши адреса. Выбор такого источника — решение владельца кошелька.
+          Asset value in fiat is not shown: that needs an external price source, which would receive
+          your addresses. Choosing such a source is the wallet owner’s decision.
         </AlertDescription>
       </Alert>
     </div>

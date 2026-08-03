@@ -10,7 +10,7 @@ export class NftNotOwnedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NftNotOwned
 
   constructor(reason: string) {
-    super(`Отправить предмет нельзя: ${reason}.`)
+    super(`The item cannot be sent: ${reason}.`)
   }
 }
 
@@ -32,7 +32,7 @@ export class InsufficientTokenBalanceError extends AppError {
   readonly available: bigint
 
   constructor(required: bigint, available: bigint) {
-    super('Токенов на балансе меньше, чем указано в переводе.')
+    super('The token balance is lower than the amount being sent.')
     this.required = required
     this.available = available
   }
@@ -50,7 +50,7 @@ export class TransactionNotReplaceableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TransactionNotReplaceable
 
   constructor(reason: string) {
-    super(`Заменить транзакцию нельзя: ${reason}.`)
+    super(`The transaction cannot be replaced: ${reason}.`)
   }
 }
 import { AppError } from './AppError'
@@ -75,7 +75,7 @@ export class InsufficientFundsError extends AppError {
   readonly available: bigint
 
   constructor(required: bigint, available: bigint) {
-    super('Недостаточно средств для проведения операции.')
+    super('There are not enough funds for this operation.')
     this.required = required
     this.available = available
   }
@@ -92,7 +92,7 @@ export class GasEstimationFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.GasEstimationFailed
 
   constructor(reason: string, options?: ErrorOptions) {
-    super(`Не удалось оценить лимит газа: ${reason}`, options)
+    super(`The gas limit could not be estimated: ${reason}`, options)
   }
 }
 
@@ -107,7 +107,7 @@ export class NonceTooLowError extends AppError {
   readonly expected: number
 
   constructor(provided: number, expected: number) {
-    super(`Nonce ${String(provided)} уже использован. Ожидается ${String(expected)}.`)
+    super(`Nonce ${String(provided)} has already been used. Expected ${String(expected)}.`)
     this.provided = provided
     this.expected = expected
   }
@@ -118,7 +118,7 @@ export class TransactionNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TransactionNotFound
 
   constructor(hash: string) {
-    super(`Транзакция не найдена: ${hash}`)
+    super(`Transaction was not found: ${hash}`)
   }
 }
 
@@ -132,7 +132,7 @@ export class TransactionUnderpricedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TransactionUnderpriced
 
   constructor() {
-    super('Предложенная цена газа слишком низкая для замещения транзакции.')
+    super('The offered gas price is too low to replace the transaction.')
   }
 }
 
@@ -150,7 +150,7 @@ export class UserRejectedError extends AppError {
   static readonly EIP1193_CODE = 4001
 
   constructor(operation: string) {
-    super(`Пользователь отклонил операцию: ${operation}`)
+    super(`The operation was rejected: ${operation}`)
   }
 }
 
@@ -159,7 +159,7 @@ export class TokenNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TokenNotFound
 
   constructor(address: string) {
-    super(`Токен не найден: ${address}`)
+    super(`Token was not found: ${address}`)
   }
 }
 
@@ -168,7 +168,7 @@ export class InvalidTokenContractError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidTokenContract
 
   constructor(address: string, reason: string) {
-    super(`Контракт ${address} непригоден: ${reason}`)
+    super(`Contract ${address} is unusable: ${reason}`)
   }
 }
 
@@ -177,6 +177,6 @@ export class UnsupportedTokenStandardError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.UnsupportedTokenStandard
 
   constructor(standard: string) {
-    super(`Стандарт токена не поддерживается: ${standard}`)
+    super(`Token standard is not supported: ${standard}`)
   }
 }

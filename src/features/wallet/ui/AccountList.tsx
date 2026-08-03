@@ -51,13 +51,13 @@ export function AccountList({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base font-medium text-muted-foreground">Аккаунты</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">Accounts</CardTitle>
         {/* Имя действия полное, а не «Добавить»: на экране есть вторая
             кнопка добавления — для RPC-узла. Одинаковые имена неразличимы
             в экранном дикторе и в списке элементов управления. */}
         <Button variant="ghost" size="sm" onClick={onCreate} disabled={isBusy}>
           <Plus className="size-4" aria-hidden />
-          Добавить аккаунт
+          Add an account
         </Button>
       </CardHeader>
 
@@ -87,7 +87,7 @@ export function AccountList({
                       {account.source === KEYRING_TYPE.PrivateKey ? (
                         <KeyRound
                           className="size-3 text-muted-foreground"
-                          aria-label="Импортированный ключ: не восстанавливается из seed-фразы"
+                          aria-label="Imported key: not restored from the seed phrase"
                         />
                       ) : null}
                     </span>

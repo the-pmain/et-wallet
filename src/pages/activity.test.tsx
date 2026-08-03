@@ -114,9 +114,9 @@ function renderApp() {
 async function openActivity(): Promise<void> {
   const user = userEvent.setup()
 
-  await screen.findByText('Аккаунт 1')
-  await user.click(screen.getByRole('link', { name: /вся история/i }))
-  await screen.findByRole('heading', { name: 'История' })
+  await screen.findByText('Account 1')
+  await user.click(screen.getByRole('link', { name: /full history/i }))
+  await screen.findByRole('heading', { name: 'History' })
 }
 
 /** Список записей истории. Заголовки и предупреждения в него не входят. */
@@ -157,7 +157,7 @@ describe('История: содержимое', () => {
 
     const list = within(transferList())
 
-    expect(list.getAllByText('Токен')).toHaveLength(2)
+    expect(list.getAllByText('Token')).toHaveLength(2)
     expect(list.getByText('NFT')).toBeInTheDocument()
     expect(list.getByText('NFT (ERC-1155)')).toBeInTheDocument()
   })
@@ -169,7 +169,7 @@ describe('История: содержимое', () => {
     /* Журнал не содержит `decimals`. Подстановка привычных восемнадцати
        знаков исказила бы сумму на порядки, поэтому показаны необработанные
        единицы с пометкой. */
-    expect(within(transferList()).getAllByText('единицы контракта').length).toBeGreaterThan(0)
+    expect(within(transferList()).getAllByText('contract units').length).toBeGreaterThan(0)
   })
 
   it('предупреждает, что переводы нативной валюты этому источнику недоступны', async () => {
@@ -178,14 +178,14 @@ describe('История: содержимое', () => {
 
     /* Разбор журналов их не видит физически: такие переводы не порождают
        событий. Умолчать значило бы утверждать, что их не было. */
-    expect(screen.getByText(/такие переводы событий не порождают/i)).toBeInTheDocument()
+    expect(screen.getByText(/such transfers emit no events/i)).toBeInTheDocument()
   })
 
   it('называет глубину просмотра в блоках', async () => {
     renderApp()
     await openActivity()
 
-    expect(screen.getByText(/Просмотрены последние/i)).toBeInTheDocument()
+    expect(screen.getByText(/The last/i)).toBeInTheDocument()
   })
 })
 
@@ -195,7 +195,7 @@ describe('История: фильтрация', () => {
 
     renderApp()
     await openActivity()
-    await user.click(screen.getByRole('button', { name: 'Токены' }))
+    await user.click(screen.getByRole('button', { name: 'Tokens' }))
 
     expect(visibleCount()).toBe(2)
   })
@@ -219,7 +219,7 @@ describe('История: фильтрация', () => {
 
     renderApp()
     await openActivity()
-    await user.click(screen.getByRole('button', { name: 'Исходящие' }))
+    await user.click(screen.getByRole('button', { name: 'Outgoing' }))
 
     expect(visibleCount()).toBe(1)
   })
@@ -229,9 +229,9 @@ describe('История: фильтрация', () => {
 
     renderApp()
     await openActivity()
-    await user.click(screen.getByRole('button', { name: 'Исходящие' }))
+    await user.click(screen.getByRole('button', { name: 'Outgoing' }))
 
-    expect(screen.getByText('Показано 1 из 4')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1 of 4')).toBeInTheDocument()
   })
 
   it('пустой результат отбора не выдаётся за пустую историю', async () => {
@@ -244,8 +244,8 @@ describe('История: фильтрация', () => {
     /* «Операций не было» и «под условия ничего не подошло» — разные
        утверждения, и первое, показанное вместо второго, читается
        владельцем средств как пропажа. */
-    expect(screen.getByText('Под условия ничего не подошло')).toBeInTheDocument()
-    expect(screen.queryByText('Операций пока нет')).not.toBeInTheDocument()
+    expect(screen.getByText('Nothing matched the filter')).toBeInTheDocument()
+    expect(screen.queryByText('No operations yet')).not.toBeInTheDocument()
   })
 
   it('объясняет, что источник не видит нативных переводов, при отборе по ним', async () => {
@@ -257,7 +257,7 @@ describe('История: фильтрация', () => {
 
     /* Пустой список под этим отбором не говорит ничего о том, были такие
        операции или нет: источник их не видит в принципе. */
-    expect(screen.getByText(/недоступны\s+в принципе/i)).toBeInTheDocument()
+    expect(screen.getByText(/unavailable to this source in\s+principle/i)).toBeInTheDocument()
   })
 
   it('возвращает полный список после снятия условий', async () => {
@@ -265,14 +265,14 @@ describe('История: фильтрация', () => {
 
     renderApp()
     await openActivity()
-    await user.click(screen.getByRole('button', { name: 'Токены' }))
+    await user.click(screen.getByRole('button', { name: 'Tokens' }))
 
     expect(visibleCount()).toBe(2)
 
     /* Кнопка «Все» есть и у направления, но её доступное имя —
        «Все направления»: два одинаковых имени неразличимы для того,
        кто слушает страницу, а не смотрит на неё. */
-    await user.click(screen.getByRole('button', { name: 'Все' }))
+    await user.click(screen.getByRole('button', { name: 'All' }))
 
     expect(visibleCount()).toBe(4)
   })
@@ -284,7 +284,7 @@ describe('История: поиск', () => {
 
     renderApp()
     await openActivity()
-    await user.type(screen.getByLabelText('Поиск по истории'), COLLECTION)
+    await user.type(screen.getByLabelText('Search the history'), COLLECTION)
 
     expect(visibleCount()).toBe(2)
   })
@@ -294,7 +294,7 @@ describe('История: поиск', () => {
 
     renderApp()
     await openActivity()
-    await user.type(screen.getByLabelText('Поиск по истории'), INCOMING_NFT.transactionHash)
+    await user.type(screen.getByLabelText('Search the history'), INCOMING_NFT.transactionHash)
 
     expect(visibleCount()).toBe(1)
   })
@@ -307,7 +307,7 @@ describe('История: поиск', () => {
 
     /* Именно они видны в усечённой записи адреса в списке: поиск
        по началу строки такой запрос не нашёл бы. */
-    await user.type(screen.getByLabelText('Поиск по истории'), USDC.slice(-6))
+    await user.type(screen.getByLabelText('Search the history'), USDC.slice(-6))
 
     expect(visibleCount()).toBe(2)
   })
@@ -317,7 +317,7 @@ describe('История: поиск', () => {
 
     renderApp()
     await openActivity()
-    await user.type(screen.getByLabelText('Поиск по истории'), USDC.toLowerCase())
+    await user.type(screen.getByLabelText('Search the history'), USDC.toLowerCase())
 
     expect(visibleCount()).toBe(2)
   })
@@ -327,11 +327,11 @@ describe('История: поиск', () => {
 
     renderApp()
     await openActivity()
-    await user.type(screen.getByLabelText('Поиск по истории'), COLLECTION)
+    await user.type(screen.getByLabelText('Search the history'), COLLECTION)
 
     expect(visibleCount()).toBe(2)
 
-    await user.click(screen.getByRole('button', { name: 'Очистить поиск' }))
+    await user.click(screen.getByRole('button', { name: 'Clear the search' }))
 
     expect(visibleCount()).toBe(4)
   })
@@ -341,7 +341,7 @@ describe('История: поиск', () => {
 
     renderApp()
     await openActivity()
-    await user.type(screen.getByLabelText('Поиск по истории'), PEER)
+    await user.type(screen.getByLabelText('Search the history'), PEER)
 
     /* Запрос содержит адрес контрагента. Адресная строка сохраняется
        в истории браузера и доступна расширениям. */
@@ -356,7 +356,7 @@ describe('История: отказ источника', () => {
     renderApp()
     await openActivity()
 
-    expect(await screen.findByText(/Историю получить не удалось/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The history could not be fetched/i)).toBeInTheDocument()
   })
 })
 
@@ -400,9 +400,9 @@ describe('История: замена зависшей отправки', () =>
     /* Пять записей: четыре чужих из журналов и одна своя.
        Кнопки появляются ровно у последней: чужую транзакцию заменить
        невозможно — замена подписывается ключом отправителя. */
-    expect(await screen.findByRole('button', { name: 'Ускорить' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Ускорить' })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'Отменить' })).toHaveLength(1)
+    expect(await screen.findByRole('button', { name: 'Speed up' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Speed up' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1)
   })
 
   it('показывает номер исходной транзакции в подтверждении ускорения', async () => {
@@ -412,13 +412,13 @@ describe('История: замена зависшей отправки', () =>
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+    await user.click(await screen.findByRole('button', { name: 'Speed up' }))
 
     /* Совпадение номера — это и есть механизм замены. Пользователь
        должен видеть, что отправляет замену, а не вторую транзакцию
        вдобавок к застрявшей. */
-    await screen.findByRole('heading', { name: 'Ускорение транзакции' })
-    expect(screen.getByText('Номер (nonce)').nextElementSibling).toHaveTextContent('3')
+    await screen.findByRole('heading', { name: 'Speeding up a transaction' })
+    expect(screen.getByText('Nonce').nextElementSibling).toHaveTextContent('3')
   })
 
   it('отмена уходит на собственный адрес с нулевой суммой', async () => {
@@ -428,11 +428,11 @@ describe('История: замена зависшей отправки', () =>
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Отменить' }))
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
 
-    await screen.findByRole('heading', { name: 'Отмена транзакции' })
-    expect(screen.getByText('Получатель').nextElementSibling).toHaveTextContent(OWNER)
-    expect(screen.getByText('Сумма').nextElementSibling).toHaveTextContent('0 ETH')
+    await screen.findByRole('heading', { name: 'Cancelling a transaction' })
+    expect(screen.getByText('Recipient').nextElementSibling).toHaveTextContent(OWNER)
+    expect(screen.getByText('Amount').nextElementSibling).toHaveTextContent('0 ETH')
   })
 
   it('не обещает, что отмена сработает', async () => {
@@ -442,28 +442,28 @@ describe('История: замена зависшей отправки', () =>
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Отменить' }))
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
 
     /* Исходная транзакция может попасть в блок первой. Обещание
        «перевод отменён» там, где отмена лишь вероятна, заставит
        владельца перестать следить за исходом. */
-    expect(await screen.findByText('Успех не гарантирован')).toBeInTheDocument()
+    expect(await screen.findByText('Success is not guaranteed')).toBeInTheDocument()
   })
 
   it('называет причину, по которой ускорение невозможно', async () => {
     const user = userEvent.setup()
 
     /* Запись сделана версией без сохранения параметров: повторить ту же
-       операцию неоткуда. Отмена при этом остаётся доступной, и сказать
+       операцию неоткуда. Cancel при этом остаётся доступной, и сказать
        об этом обязаны. */
     await saveStuckTransfer({ data: null, gasLimit: null })
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
+    await user.click(await screen.findByRole('button', { name: 'Speed up' }))
 
     expect(
-      await screen.findByText(/параметры исходной транзакции не сохранены/i),
+      await screen.findByText(/the parameters of the original transaction were not stored/i),
     ).toBeInTheDocument()
   })
 
@@ -474,10 +474,10 @@ describe('История: замена зависшей отправки', () =>
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
-    await user.click(await screen.findByRole('button', { name: 'Вернуться к истории' }))
+    await user.click(await screen.findByRole('button', { name: 'Speed up' }))
+    await user.click(await screen.findByRole('button', { name: 'Back to the history' }))
 
-    expect(await screen.findByRole('heading', { name: 'История' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
   })
 })
 
@@ -514,13 +514,15 @@ describe('История: отправка замены', () => {
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
-    await user.click(await screen.findByRole('button', { name: 'Отправить ускорение' }))
+    await user.click(await screen.findByRole('button', { name: 'Speed up' }))
+    await user.click(await screen.findByRole('button', { name: 'Send the speed-up' }))
 
     /* Замена — такая же транзакция с подписью, и защита от того, кто
        получил доступ к разблокированному кошельку, здесь та же. */
-    expect(await screen.findByLabelText('Пароль')).toBeInTheDocument()
-    expect(screen.getByText(/Подтвердите паролем/i)).toHaveTextContent('ускорение транзакции')
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByText(/Confirm with your password/i)).toHaveTextContent(
+      'speeding up the transaction',
+    )
   })
 
   it('отправляет замену с номером исходной транзакции', async () => {
@@ -528,13 +530,13 @@ describe('История: отправка замены', () => {
 
     renderApp()
     await openActivity()
-    await user.click(await screen.findByRole('button', { name: 'Ускорить' }))
-    await user.click(await screen.findByRole('button', { name: 'Отправить ускорение' }))
-    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+    await user.click(await screen.findByRole('button', { name: 'Speed up' }))
+    await user.click(await screen.findByRole('button', { name: 'Send the speed-up' }))
+    await user.type(await screen.findByLabelText('Password'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     /* После отправки экран возвращается к истории. */
-    expect(await screen.findByRole('heading', { name: 'История' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
 
     /* Замена сохранена с номером исходной транзакции. Возьми она
        следующий свободный номер — в сети оказались бы две транзакции

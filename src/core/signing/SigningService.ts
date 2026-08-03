@@ -128,20 +128,20 @@ export class SigningService implements ISigningService {
     if (transaction.chainId <= 0n) {
       throw new InvalidArgumentError(
         'transaction.chainId',
-        'транзакция без идентификатора сети действительна во всех сетях одновременно',
+        'a transaction without a chain identifier is valid in every network at once',
       )
     }
 
     if (!Number.isSafeInteger(transaction.nonce) || transaction.nonce < 0) {
-      throw new InvalidArgumentError('transaction.nonce', 'ожидается неотрицательное целое число')
+      throw new InvalidArgumentError('transaction.nonce', 'a non-negative integer is expected')
     }
 
     if (transaction.gasLimit <= 0n) {
-      throw new InvalidArgumentError('transaction.gasLimit', 'лимит газа должен быть положительным')
+      throw new InvalidArgumentError('transaction.gasLimit', 'the gas limit must be positive')
     }
 
     if (transaction.value < 0n) {
-      throw new InvalidArgumentError('transaction.value', 'сумма не может быть отрицательной')
+      throw new InvalidArgumentError('transaction.value', 'the amount cannot be negative')
     }
 
     SigningService.#assertFeeFieldsMatchType(transaction)
@@ -160,7 +160,7 @@ export class SigningService implements ISigningService {
       if (transaction.maxFeePerGas === null || transaction.maxPriorityFeePerGas === null) {
         throw new InvalidArgumentError(
           'transaction.maxFeePerGas',
-          'для транзакции EIP-1559 требуются maxFeePerGas и maxPriorityFeePerGas',
+          'an EIP-1559 transaction requires maxFeePerGas and maxPriorityFeePerGas',
         )
       }
 
@@ -170,7 +170,7 @@ export class SigningService implements ISigningService {
            подтвердил бы комиссию, которой не существует. */
         throw new InvalidArgumentError(
           'transaction.maxPriorityFeePerGas',
-          'приоритетная надбавка не может превышать maxFeePerGas',
+          'the priority fee cannot exceed maxFeePerGas',
         )
       }
 
@@ -180,7 +180,7 @@ export class SigningService implements ISigningService {
     if (transaction.gasPrice === null) {
       throw new InvalidArgumentError(
         'transaction.gasPrice',
-        `для транзакции типа "${transaction.type}" требуется gasPrice`,
+        `a transaction of type "${transaction.type}" requires gasPrice`,
       )
     }
   }
@@ -197,7 +197,7 @@ export class SigningService implements ISigningService {
     if (derived !== from) {
       throw new InvalidArgumentError(
         'transaction.from',
-        `ключ соответствует адресу ${derived}, а транзакция отправляется с ${from}`,
+        `the key belongs to ${derived}, while the transaction is sent from ${from}`,
       )
     }
   }
@@ -222,7 +222,7 @@ export class SigningService implements ISigningService {
     const type = ETHERS_TRANSACTION_TYPE[transaction.type]
 
     if (type === undefined) {
-      throw new InvalidArgumentError('transaction.type', `неизвестный тип "${transaction.type}"`)
+      throw new InvalidArgumentError('transaction.type', `unknown type "${transaction.type}"`)
     }
 
     return Transaction.from({

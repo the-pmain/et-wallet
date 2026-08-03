@@ -32,11 +32,11 @@ export function SeedPhraseDisplay({ words, onCopy }: SeedPhraseDisplayProps) {
   return (
     <div className="flex flex-col gap-4">
       <Alert variant="danger">
-        <AlertTitle>Запишите фразу на бумаге</AlertTitle>
+        <AlertTitle>Write the phrase down on paper</AlertTitle>
         <AlertDescription>
-          Это единственный способ восстановить кошелёк. Мы не храним её копию и не сможем
-          восстановить доступ. Не фотографируйте экран и не сохраняйте фразу в заметках — они
-          синхронизируются в облако.
+          This is the only way to restore the wallet. We keep no copy of it and cannot restore
+          access. Do not photograph the screen and do not save the phrase in notes — they sync to
+          the cloud.
         </AlertDescription>
       </Alert>
 
@@ -70,7 +70,7 @@ export function SeedPhraseDisplay({ words, onCopy }: SeedPhraseDisplayProps) {
               }}
             >
               <Eye />
-              Показать фразу
+              Show the phrase
             </Button>
           </div>
         )}
@@ -86,13 +86,13 @@ export function SeedPhraseDisplay({ words, onCopy }: SeedPhraseDisplayProps) {
             }}
           >
             <EyeOff />
-            Скрыть
+            Hide
           </Button>
 
           {onCopy !== undefined && (
             <Button variant="ghost" size="sm" onClick={onCopy}>
               <Copy />
-              Копировать
+              Copy
             </Button>
           )}
         </div>
@@ -100,8 +100,8 @@ export function SeedPhraseDisplay({ words, onCopy }: SeedPhraseDisplayProps) {
 
       {isRevealed && onCopy !== undefined && (
         <p className="text-xs text-muted-foreground">
-          Буфер обмена доступен другим приложениям и может сохраняться в истории. Надёжнее
-          переписать фразу вручную.
+          The clipboard is available to other applications and may be kept in history. Copying the
+          phrase by hand is safer.
         </p>
       )}
     </div>

@@ -193,8 +193,8 @@ export class EnsService implements IEnsService {
       /* Имя не прошло ENSIP-15: смешение письменностей, запрещённый
          символ либо метка `xn--`. Показать его непроверенным — значит
          показать ровно ту строку, которую подделывают. */
-      this.#logger.warn('Обратная запись ENS не прошла нормализацию', {
-        note: 'имя не показано, вместо него остаётся адрес',
+      this.#logger.warn('The ENS reverse record failed normalisation', {
+        note: 'the name is not shown; the address is displayed instead',
       })
 
       return null
@@ -203,8 +203,8 @@ export class EnsService implements IEnsService {
     const forward = await this.resolveName(normalized)
 
     if (forward === null || !areAddressesEqual(forward.address, address)) {
-      this.#logger.warn('Обратная запись ENS не подтвердилась прямым разрешением', {
-        note: 'имя не показано: владелец адреса вправе объявить любое имя',
+      this.#logger.warn('The ENS reverse record was not confirmed by forward resolution', {
+        note: 'the name is not shown: the owner of an address may claim any name',
       })
 
       return null

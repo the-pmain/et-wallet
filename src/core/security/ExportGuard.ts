@@ -135,7 +135,7 @@ export class ExportGuard implements IExportGuard {
        не получит. Без этого шага оценка риска осталась бы декоративной. */
     if (riskLevel(acknowledgedRisk) < riskLevel(assessment.risk)) {
       throw new ExportNotPermittedError(
-        `подтверждён уровень риска "${acknowledgedRisk}", фактический — "${assessment.risk}"`,
+        `the acknowledged risk level is "${acknowledgedRisk}", actual: "${assessment.risk}"`,
       )
     }
 

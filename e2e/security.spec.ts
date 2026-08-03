@@ -142,7 +142,7 @@ test.describe('Секреты в собранном приложении', () =>
        на старте. Появление экрана приветствия означает, что флаг снят. */
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: /создать новый кошелёк/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
   })
 
   test('вход по seed-фразе доступен', async ({ page }) => {
@@ -150,7 +150,7 @@ test.describe('Секреты в собранном приложении', () =>
        восстановление кошелька целиком. */
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: /импортировать/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /import/i })).toBeVisible()
   })
 
   test('приложение не встраивается во фрейм со стороннего адреса', async ({ page }) => {

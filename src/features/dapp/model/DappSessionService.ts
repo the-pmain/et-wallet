@@ -147,7 +147,7 @@ export class DappSessionService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      this.#logger.warn('Транспорт подключений недоступен', { reason: message })
+      this.#logger.warn('The connection transport is unavailable', { reason: message })
       this.#publish({ ...this.#snapshot, isReady: false, error: message })
     }
   }
@@ -203,7 +203,7 @@ export class DappSessionService {
     if (!isApproved) {
       await this.#transport.respondToRequest(pending.request.id, {
         kind: 'rejected',
-        reason: 'Отклонено пользователем',
+        reason: 'Rejected by the user',
       })
 
       return
@@ -219,7 +219,7 @@ export class DappSessionService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      this.#logger.warn('Запрос приложения выполнить не удалось', { reason: message })
+      this.#logger.warn('The application request could not be carried out', { reason: message })
 
       /* Приложению отправляется отказ, а не молчание: иначе оно ждёт
          ответа и подталкивает пользователя нажать ещё раз. */
@@ -280,7 +280,7 @@ export class DappSessionService {
       /* Второй экран поверх первого — способ подписать не то. */
       await this.#transport.respondToRequest(request.id, {
         kind: 'rejected',
-        reason: 'Кошелёк занят другим запросом',
+        reason: 'The wallet is busy with another request',
       })
 
       return
@@ -298,7 +298,7 @@ export class DappSessionService {
          нажимать «подтвердить», не читая. */
       await this.#transport.respondToRequest(request.id, {
         kind: 'rejected',
-        reason: 'Запрос адресован аккаунту, которого нет в этом кошельке',
+        reason: 'The request targets an account that does not exist in this wallet',
       })
 
       return

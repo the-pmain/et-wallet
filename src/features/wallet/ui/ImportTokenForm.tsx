@@ -85,7 +85,7 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
       }}
     >
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${fieldId}-address`}>Адрес контракта</Label>
+        <Label htmlFor={`${fieldId}-address`}>Contract address</Label>
         <div className="flex gap-2">
           <Input
             id={`${fieldId}-address`}
@@ -98,7 +98,7 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
           />
           <Button type="submit" variant="outline" disabled={isBusy || !isAddressValid}>
             <Search className="size-4" aria-hidden />
-            {isBusy ? 'Чтение…' : 'Проверить'}
+            {isBusy ? 'Reading…' : 'Check'}
           </Button>
         </div>
       </div>
@@ -117,13 +117,13 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-medium">{preview.name}</span>
               <span className="text-xs text-muted-foreground">
-                {preview.symbol} · {String(preview.decimals)} знаков
+                {preview.symbol} · {String(preview.decimals)} decimals
               </span>
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${fieldId}-symbol`}>Обозначение в кошельке</Label>
+            <Label htmlFor={`${fieldId}-symbol`}>Symbol shown in the wallet</Label>
             <Input
               id={`${fieldId}-symbol`}
               value={symbol}
@@ -137,9 +137,9 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
           <Alert variant="warning">
             <ShieldAlert />
             <AlertDescription>
-              Имя, обозначение и число знаков сообщил сам контракт. Выпустить токен с обозначением
-              известного проекта может кто угодно — сверьте адрес контракта с источником, которому
-              доверяете.
+              The name, the symbol and the number of decimals were reported by the contract itself.
+              Anyone can issue a token bearing the symbol of a well-known project — check the
+              contract address against a source you trust.
             </AlertDescription>
           </Alert>
 
@@ -151,7 +151,7 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
             }}
           >
             <Plus className="size-4" aria-hidden />
-            Добавить токен
+            Add the token
           </Button>
         </div>
       )}

@@ -58,7 +58,7 @@ const WORDLIST_SET = new Set(wordlist)
 export class MnemonicService implements IMnemonicService {
   generate(strength: MnemonicStrength = MNEMONIC_STRENGTH.Words12): ISecretBuffer {
     if (strength !== MNEMONIC_STRENGTH.Words12 && strength !== MNEMONIC_STRENGTH.Words24) {
-      throw new InvalidArgumentError('strength', 'допустимы только значения 128 и 256')
+      throw new InvalidArgumentError('strength', 'only the values 128 and 256 are allowed')
     }
 
     /* Энтропия берётся собственной функцией, а не встроенным
@@ -175,7 +175,7 @@ export class MnemonicService implements IMnemonicService {
     if (!VALID_ENTROPY_LENGTHS.includes(entropy.length)) {
       throw new InvalidArgumentError(
         'entropy',
-        `допустимы длины ${VALID_ENTROPY_LENGTHS.join(', ')} байт, получено ${String(entropy.length)}`,
+        `allowed lengths are ${VALID_ENTROPY_LENGTHS.join(', ')} bytes, received ${String(entropy.length)}`,
       )
     }
 

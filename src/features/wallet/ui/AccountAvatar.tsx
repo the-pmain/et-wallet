@@ -41,7 +41,7 @@ export function AccountAvatar({ address, className }: AccountAvatarProps) {
       viewBox={`0 0 ${String(GRID)} ${String(GRID)}`}
       className={cn('size-9 shrink-0 rounded-full', className)}
       role="img"
-      aria-label="Отпечаток адреса"
+      aria-label="Address fingerprint"
     >
       <rect width={GRID} height={GRID} fill={`oklch(0.3 0.09 ${String(hue)})`} />
 

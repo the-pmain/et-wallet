@@ -205,7 +205,7 @@ export class SecureStorage implements ISecureStorage {
       /* Запись есть, но она не зашифрована этим слоем. Молча вернуть её
          нельзя: это означало бы, что секрет когда-то был записан в обход
          шифрования, и такое состояние обязано быть замечено. */
-      throw new VaultCorruptedError(`запись "${key}" не зашифрована`)
+      throw new VaultCorruptedError(`the record "${key}" is not encrypted`)
     }
 
     const plaintext = await this.#encryption.decryptWithKey(decodePayload(stored.payload), session)
@@ -379,7 +379,7 @@ export class SecureStorage implements ISecureStorage {
 
   #requireUnlocked(): EncryptionKey {
     if (this.#sessionKey === null) {
-      throw new WalletLockedError('доступ к зашифрованному хранилищу')
+      throw new WalletLockedError('access to the encrypted storage')
     }
 
     return this.#sessionKey
@@ -387,7 +387,7 @@ export class SecureStorage implements ISecureStorage {
 
   #requireKdfParams(): IKdfParams {
     if (this.#kdfParams === null) {
-      throw new WalletLockedError('доступ к параметрам шифрования')
+      throw new WalletLockedError('access to the encryption parameters')
     }
 
     return this.#kdfParams
