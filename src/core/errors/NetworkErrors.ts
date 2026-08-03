@@ -119,14 +119,37 @@ export class NetworkImpersonationError extends AppError {
   /** Идентификатор подлинной встроенной сети с таким именем. */
   readonly impersonatedChainId: bigint
 
-  constructor(impersonatedName: string, impersonatedChainId: bigint, actualChainId: bigint) {
+  /**
+   * Имя записано буквами других алфавитов.
+   *
+   * ОТЛИЧИЕ, КОТОРОЕ ОБЯЗАНО ДОЙТИ ДО ЧЕЛОВЕКА. При совпадении
+   * по буквам он видит два одинаковых названия и понимает сообщение
+   * сразу. При подмене похожими символами он видит два ВИЗУАЛЬНО
+   * ОДИНАКОВЫХ названия и сообщение «имя занято» — без объяснения оно
+   * выглядит ошибкой кошелька, то есть поводом нажать «добавить
+   * всё равно».
+   */
+  readonly foreignCharacters: readonly string[]
+
+  constructor(
+    impersonatedName: string,
+    impersonatedChainId: bigint,
+    actualChainId: bigint,
+    foreignCharacters: readonly string[] = [],
+  ) {
     super(
-      `A network named "${impersonatedName}" already exists and has chainId ` +
-        `${impersonatedChainId.toString()}, while the one being added has ${actualChainId.toString()}. ` +
-        'A matching name with a different identifier is a common network spoofing trick.',
+      foreignCharacters.length === 0
+        ? `A network named "${impersonatedName}" already exists and has chainId ` +
+            `${impersonatedChainId.toString()}, while the one being added has ${actualChainId.toString()}. ` +
+            'A matching name with a different identifier is a common network spoofing trick.'
+        : `The name is written with letters from another alphabet (${foreignCharacters.join(' ')}) ` +
+            `so that it looks exactly like "${impersonatedName}", which has chainId ` +
+            `${impersonatedChainId.toString()} — the one being added has ${actualChainId.toString()}. ` +
+            'The two names are indistinguishable on screen, and that is the whole point of the trick.',
     )
     this.impersonatedName = impersonatedName
     this.impersonatedChainId = impersonatedChainId
+    this.foreignCharacters = foreignCharacters
   }
 }
 

@@ -195,6 +195,7 @@ export class NetworkService implements INetworkService {
         impersonation.name,
         impersonation.impersonated.chainId,
         params.chainId,
+        impersonation.foreignCharacters,
       )
     }
 

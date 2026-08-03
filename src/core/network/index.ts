@@ -1,6 +1,12 @@
 export { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, DEFAULT_CHAIN_ID } from './built-in'
 export type { INetworkRepository, INetworkService } from './contracts'
-export { findImpersonation, type IImpersonation } from './impersonation'
+export {
+  IMPERSONATION_KIND,
+  findImpersonation,
+  type IImpersonation,
+  type ImpersonationKind,
+} from './impersonation'
+export { findForeignCharacters, toNameSkeleton } from './confusable'
 export { NetworkRepository } from './NetworkRepository'
 export { NetworkService, type INetworkServiceDependencies } from './NetworkService'
 export { assertValidExplorerUrl, assertValidRpcUrl, assertValidRpcUrls } from './rpc-url'
