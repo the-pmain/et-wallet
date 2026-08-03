@@ -11,7 +11,7 @@ import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-const EMAIL = 'owner@example.com'
+const USERNAME = 'Дмитрий'
 
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -79,10 +79,10 @@ describe('Экран приветствия', () => {
   })
 })
 
-/** Заполняет первый шаг создания кошелька: адрес и пароль. */
+/** Заполняет первый шаг создания кошелька: имя и пароль. */
 async function fillCreationForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
-  await user.type(screen.getByLabelText(/адрес электронной почты/i), EMAIL)
+  await user.type(screen.getByLabelText(/имя пользователя/i), USERNAME)
   await user.type(screen.getByLabelText('Пароль'), PASSWORD)
   await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
 }
@@ -112,7 +112,7 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
   })
 
-  it('не пускает дальше без адреса электронной почты', async () => {
+  it('не пускает дальше без имени пользователя', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -123,22 +123,24 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
   })
 
-  it('не пускает дальше с испорченным адресом', async () => {
+  it('не пускает дальше с непригодным именем', async () => {
+    /* Один символ именем не считается: подпись кошелька из единственной
+       буквы не отличает его ни от чего. */
     const user = userEvent.setup()
     renderApp()
 
     await user.click(await screen.findByRole('link', { name: /создать новый кошелёк/i }))
-    await user.type(await screen.findByLabelText(/адрес электронной почты/i), 'не-адрес')
+    await user.type(await screen.findByLabelText(/имя пользователя/i), 'Д')
     await user.type(screen.getByLabelText('Пароль'), PASSWORD)
     await user.type(screen.getByLabelText('Повторите пароль'), PASSWORD)
 
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled()
   })
 
-  it('называет адрес меткой, а не учётной записью', async () => {
-    /* Человек, привыкший к обычным сервисам, ждёт восстановления
-       по почте. Узнать, что писать некому, он обязан здесь, а не после
-       потери средств. */
+  it('называет имя меткой, а не учётной записью', async () => {
+    /* Человек, привыкший к обычным сервисам, принимает имя за учётную
+       запись и ждёт восстановления доступа. Узнать, что восстанавливать
+       некому, он обязан здесь, а не после потери средств. */
     const user = userEvent.setup()
     renderApp()
 
@@ -216,7 +218,7 @@ describe('Создание кошелька', () => {
     expect(notice !== null).toBe(TEST_MODE.skipSeedConfirmation)
   })
 
-  it('создаёт кошелёк и подписывает его адресом почты', async () => {
+  it('создаёт кошелёк и подписывает его именем пользователя', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -232,8 +234,8 @@ describe('Создание кошелька', () => {
 
     await user.click(screen.getByRole('button', { name: 'Создать кошелёк' }))
 
-    /* Вместо безликого «Аккаунт 1» в шапке стоит адрес владельца. */
-    expect(await screen.findByText(EMAIL)).toBeInTheDocument()
+    /* Вместо безликого «Аккаунт 1» в шапке стоит имя владельца. */
+    expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 })
 
@@ -350,72 +352,59 @@ describe('Скрытый вход по seed-фразе', () => {
 
 describe('Разблокировка', () => {
   beforeEach(async () => {
-    await service.importWallet(TEST_MNEMONIC, PASSWORD, EMAIL)
+    await service.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
     service.lock()
   })
 
-  /** Заполняет форму входа заданными значениями. */
-  async function signIn(
-    user: ReturnType<typeof userEvent.setup>,
-    email: string,
-    password: string,
-  ): Promise<void> {
-    await user.type(await screen.findByLabelText(/адрес электронной почты/i), email)
-    await user.type(screen.getByLabelText('Пароль'), password)
+  /** Заполняет форму входа. */
+  async function signIn(user: ReturnType<typeof userEvent.setup>, password: string): Promise<void> {
+    await user.type(await screen.findByLabelText('Пароль'), password)
     await user.click(screen.getByRole('button', { name: 'Разблокировать' }))
   }
 
-  it('открывается по верному адресу и паролю', async () => {
+  it('открывается по верному паролю', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await signIn(user, EMAIL, PASSWORD)
+    await signIn(user, PASSWORD)
 
     /* Признак разблокировки — появление панели кошелька, подписанной
-       адресом владельца. */
-    expect(await screen.findByText(EMAIL)).toBeInTheDocument()
+       именем владельца. */
+    expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 
-  it('не различает регистр адреса', async () => {
-    /* Иначе вход зависел бы от нажатого Caps Lock. */
-    const user = userEvent.setup()
+  it('вход не требует ничего, кроме пароля', async () => {
+    /* Имя лежит в том же зашифрованном хранилище и сверяться может лишь
+       после того, как пароль уже подошёл. Второе поле создавало бы
+       впечатление второго фактора, которого нет. */
     renderApp()
 
-    await signIn(user, EMAIL.toUpperCase(), PASSWORD)
+    await screen.findByLabelText('Пароль')
 
-    expect(await screen.findByText(EMAIL)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/имя пользователя/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/электронной почты/i)).not.toBeInTheDocument()
   })
 
   it('сообщает об ошибке при неверном пароле', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await signIn(user, EMAIL, 'Nepravilnyy-1!')
+    await signIn(user, 'Nepravilnyy-1!')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/неверный пароль/i)
   })
 
-  it('отказывает при чужом адресе с верным паролем', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await signIn(user, 'someone-else@example.com', PASSWORD)
-
-    expect(await screen.findByRole('alert')).toBeInTheDocument()
-    expect(screen.queryByText(EMAIL)).not.toBeInTheDocument()
-  })
-
   it('не раскрывает, что именно не сошлось', async () => {
-    /* Отличие «неверный пароль» от «неверный адрес» и «хранилище
-       повреждено» — информация для подбирающего, а не для владельца. */
+    /* Отличие «неверный пароль» от «хранилище повреждено» — информация
+       для подбирающего, а не для владельца. */
     const user = userEvent.setup()
     renderApp()
 
-    await signIn(user, 'someone-else@example.com', PASSWORD)
+    await signIn(user, 'Nepravilnyy-1!')
 
     const alert = await screen.findByRole('alert')
 
-    expect(alert.textContent).not.toMatch(/повреждено|контрольная сумма|тег|адрес/i)
+    expect(alert.textContent).not.toMatch(/повреждено|контрольная сумма|тег/i)
   })
 
   it('ведёт на страницу сброса', async () => {

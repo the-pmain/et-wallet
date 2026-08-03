@@ -1,5 +1,5 @@
 import { Info, Lock, Monitor, Moon, Plug, ShieldAlert, ShieldCheck, Sun } from 'lucide-react'
-import { useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 
 import { APP_CONFIG } from '@/shared/config'
@@ -51,11 +51,59 @@ export function SettingsPage() {
   const { storageDurability } = useSecurity()
   const { theme, setTheme } = useTheme()
 
+  /* Имя читается из зашифрованного хранилища, то есть асинхронно.
+     Отдельного поля в снимке кошелька ему не заведено: оно относится
+     к онбордингу, а не к состоянию сессии, и меняться во время работы
+     не может. */
+  const [username, setUsername] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isCurrent = true
+
+    void onboarding.getUsername().then((value) => {
+      if (isCurrent) {
+        setUsername(value)
+      }
+    })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [onboarding])
+
   return (
     <div className="flex flex-col gap-4">
       <header>
         <h1 className="text-lg font-semibold">Настройки</h1>
       </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium text-muted-foreground">
+            Имя пользователя
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {/* Имя показывается ровно там, где владелец его ищет, — рядом
+              с остальными сведениями о кошельке. Оно же подписывает
+              первый аккаунт, поэтому строка отвечает на вопрос «почему
+              мой аккаунт называется так». */}
+          <p className="text-sm">
+            {username === null ? (
+              <span className="text-muted-foreground">
+                Не задано — аккаунты называются «Аккаунт 1», «Аккаунт 2» и так далее.
+              </span>
+            ) : (
+              <span className="font-medium">{username}</span>
+            )}
+          </p>
+
+          <p className="text-xs text-muted-foreground">
+            Хранится только на этом устройстве и никуда не отправляется. Учётной записью не
+            является: восстановить доступ по имени невозможно — это делает только seed-фраза.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -59,10 +59,8 @@ export function UnlockWalletPage() {
   const { clock } = useSecurity()
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const emailId = useId()
   const passwordId = useId()
 
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
@@ -132,7 +130,7 @@ export function UnlockWalletPage() {
     setIsBusy(true)
 
     try {
-      await onboarding.unlock(password, email)
+      await onboarding.unlock(password)
       setThrottle({ failedAttempts: 0, retryAfterMs: 0 })
       /* Пароль удаляется из состояния сразу после использования.
          Строку это не затирает — в JavaScript такой возможности нет, —
@@ -171,30 +169,6 @@ export function UnlockWalletPage() {
               void handleSubmit(event)
             }}
           >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={emailId}>{t('unlock.email')}</Label>
-              <Input
-                id={emailId}
-                type="email"
-                value={email}
-                disabled={isBusy || isBlocked}
-                autoComplete="username"
-                autoCapitalize="off"
-                autoCorrect="off"
-                aria-invalid={error !== null}
-                onChange={(event) => {
-                  setEmail(event.target.value)
-                  setError(null)
-                }}
-              />
-              {/* Адрес необязателен, и сказать об этом обязательно.
-                  Кошелёк, восстановленный по seed-фразе, адреса не имеет
-                  вовсе: экран импорта его не собирает. Форма, требующая
-                  адрес всегда, не пускала бы владельца в собственный
-                  кошелёк — вход был бы невозможен. */}
-              <p className="text-xs text-muted-foreground">{t('unlock.emailOptional')}</p>
-            </div>
-
             <div className="flex flex-col gap-2">
               <Label htmlFor={passwordId}>{t('unlock.password')}</Label>
               <Input

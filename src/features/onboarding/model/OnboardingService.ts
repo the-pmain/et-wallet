@@ -1,15 +1,13 @@
 import {
   InvalidArgumentError,
-  InvalidPasswordError,
   MnemonicService,
   SETTINGS_KEY,
   STORAGE_NAMESPACE,
   VAULT_KEY,
-  areEmailsEqual,
   assertAcceptablePassword,
   checkMnemonic,
-  isValidEmail,
-  normalizeEmail,
+  isValidUsername,
+  normalizeUsername,
   type IMnemonicCheck,
   type ISecretBuffer,
   type ISecureStorage,
@@ -46,19 +44,19 @@ export interface IOnboardingServiceDependencies {
 }
 
 /**
- * Отвергает адрес, составленный неверно.
+ * Отвергает непригодное имя.
  *
- * Пустое значение допустимо: адрес необязателен, кошелёк работает
- * и без него. Отвергается именно опечатка — адрес, который пользователь
- * ввёл, но который адресом не является.
+ * Пустое значение допустимо: имя необязательно, кошелёк работает
+ * и без него — аккаунты тогда называются «Аккаунт 1». Отвергается
+ * только то, что ломает интерфейс либо позволяет подделку.
  */
-function assertAcceptableEmail(email: string | undefined): void {
-  if (email === undefined || email.trim() === '') {
+function assertAcceptableUsername(username: string | undefined): void {
+  if (username === undefined || username.trim() === '') {
     return
   }
 
-  if (!isValidEmail(email)) {
-    throw new InvalidArgumentError('email', 'адрес электронной почты составлен неверно')
+  if (!isValidUsername(username)) {
+    throw new InvalidArgumentError('username', 'имя не подходит')
   }
 }
 
@@ -127,23 +125,23 @@ export class OnboardingService implements IOnboardingService {
     return this.#mnemonicService.findWordsByPrefix(prefix, limit)
   }
 
-  async createWallet(mnemonic: ISecretBuffer, password: string, email?: string): Promise<void> {
-    /* Пароль и адрес проверяются до создания хранилища: иначе слабый
-       пароль либо опечатка в адресе обнаружились бы после того, как
-       ключи уже записаны, и кошелёк остался бы наполовину созданным. */
+  async createWallet(mnemonic: ISecretBuffer, password: string, username?: string): Promise<void> {
+    /* Пароль и имя проверяются до создания хранилища: иначе слабый
+       пароль либо непригодное имя обнаружились бы после того, как ключи
+       уже записаны, и кошелёк остался бы наполовину созданным. */
     assertAcceptablePassword(password)
-    assertAcceptableEmail(email)
+    assertAcceptableUsername(username)
 
     await this.#secureStorage.initialize(password)
     await this.#storeMnemonic(mnemonic)
-    await this.#storeEmail(email)
+    await this.#storeUsername(username)
 
     this.#setState(ONBOARDING_STATE.Unlocked)
   }
 
-  async importWallet(phrase: string, password: string, email?: string): Promise<void> {
+  async importWallet(phrase: string, password: string, username?: string): Promise<void> {
     assertAcceptablePassword(password)
-    assertAcceptableEmail(email)
+    assertAcceptableUsername(username)
 
     /* Фраза проверяется до создания хранилища по той же причине:
        непригодная фраза не должна оставлять после себя пустой кошелёк. */
@@ -152,7 +150,7 @@ export class OnboardingService implements IOnboardingService {
     try {
       await this.#secureStorage.initialize(password)
       await this.#storeMnemonic(mnemonic)
-      await this.#storeEmail(email)
+      await this.#storeUsername(username)
 
       this.#setState(ONBOARDING_STATE.Unlocked)
     } finally {
@@ -163,15 +161,13 @@ export class OnboardingService implements IOnboardingService {
   /**
    * Снимает блокировку.
    *
-   * ПОРЯДОК ПРОВЕРОК ОБРАТЕН ПРИВЫЧНОМУ, И ЭТО НЕИЗБЕЖНО. Сохранённый
-   * адрес лежит в зашифрованном хранилище, поэтому сверить его можно
-   * только после успешной расшифровки. Значит, защиту даёт пароль,
-   * а адрес лишь помогает не перепутать кошельки.
-   *
-   * ПРИ НЕСОВПАДЕНИИ ХРАНИЛИЩЕ ЗАКРЫВАЕТСЯ ОБРАТНО. Оставить его
-   * открытым значило бы, что сверка не значит ничего.
+   * ВХОД ТРЕБУЕТ ТОЛЬКО ПАРОЛЯ, И ЭТО СОЗНАТЕЛЬНО. Имя пользователя
+   * лежит в том же зашифрованном хранилище, поэтому сверить его можно
+   * лишь после успешной расшифровки — то есть после того, как пароль
+   * уже подошёл. Такая сверка ничего не защищает, а второе поле в форме
+   * создавало бы впечатление второго фактора, которого нет.
    */
-  async unlock(password: string, email?: string): Promise<void> {
+  async unlock(password: string): Promise<void> {
     /* Проверка ДО вывода ключа: иначе каждая закрытая попытка всё равно
        обходилась бы в 600 000 итераций PBKDF2, и ограничитель превратился
        бы в способ нагрузить процессор владельца. */
@@ -185,25 +181,29 @@ export class OnboardingService implements IOnboardingService {
       throw error
     }
 
-    if (email !== undefined && email.trim() !== '') {
-      const stored = await this.getEmail()
-
-      if (stored !== null && !areEmailsEqual(stored, email)) {
-        this.#secureStorage.lock()
-        await this.#unlockThrottle?.recordFailure()
-
-        /* Та же ошибка, что и при неверном пароле: сообщение,
-           различающее «пароль верен, адрес нет», подсказывало бы
-           подбирающему, что половина пары угадана. */
-        throw new InvalidPasswordError()
-      }
-    }
-
     await this.#unlockThrottle?.recordSuccess()
     this.#setState(ONBOARDING_STATE.Unlocked)
   }
 
-  async getEmail(): Promise<string | null> {
+  /**
+   * Имя пользователя, если оно задано.
+   *
+   * ЧИТАЕТСЯ И ПРЕЖНИЙ КЛЮЧ С ПОЧТОЙ. Кошельки, созданные до замены,
+   * хранят подпись там; без этого запаса их владельцы увидели бы
+   * безликое «Аккаунт 1» вместо того, что вводили сами. Значение
+   * при этом никуда не переписывается: миграция, выполняемая при
+   * каждом чтении, — источник неожиданных записей в хранилище.
+   */
+  async getUsername(): Promise<string | null> {
+    const username = await this.#secureStorage.get<string>(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.UserName,
+    )
+
+    if (username !== null) {
+      return username
+    }
+
     return await this.#secureStorage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UserEmail)
   }
 
@@ -265,21 +265,21 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Сохраняет адрес электронной почты.
+   * Сохраняет имя пользователя.
    *
-   * Записывается через защищённое хранилище: это персональные данные,
-   * связывающие устройство с личностью, и лежать рядом с открытыми
-   * настройками они не должны.
+   * Записывается через защищённое хранилище: имя связывает устройство
+   * с тем, как владелец себя называет, и лежать рядом с открытыми
+   * настройками не должно.
    */
-  async #storeEmail(email: string | undefined): Promise<void> {
-    if (email === undefined || email.trim() === '') {
+  async #storeUsername(username: string | undefined): Promise<void> {
+    if (username === undefined || username.trim() === '') {
       return
     }
 
     await this.#secureStorage.set(
       STORAGE_NAMESPACE.Settings,
-      SETTINGS_KEY.UserEmail,
-      normalizeEmail(email),
+      SETTINGS_KEY.UserName,
+      normalizeUsername(username),
     )
   }
 

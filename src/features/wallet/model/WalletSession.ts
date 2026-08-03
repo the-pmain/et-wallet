@@ -1040,9 +1040,9 @@ export class WalletSession implements IWalletSession {
          человеку, у которого кошельков несколько. Последующие аккаунты
          нумеруются как раньше — они принадлежат тому же владельцу
          и одинаковой подписью не различались бы. */
-      const email = await this.#readUserEmail()
+      const username = await this.#readUserName()
 
-      await this.#accounts.create(email === null ? {} : { name: email })
+      await this.#accounts.create(username === null ? {} : { name: username })
     }
 
     this.#transactions = new TransactionRepository(this.#secureStorage)
@@ -1175,7 +1175,23 @@ export class WalletSession implements IWalletSession {
    * сессии. `null` означает, что кошелёк создан без адреса, — обычное
    * состояние, а не ошибка.
    */
-  async #readUserEmail(): Promise<string | null> {
+  /**
+   * Имя пользователя для подписи первого аккаунта.
+   *
+   * Читается и прежний ключ с почтой: кошельки, созданные до замены,
+   * хранят подпись там, и без запаса их владельцы увидели бы безликое
+   * «Аккаунт 1» вместо того, что вводили сами.
+   */
+  async #readUserName(): Promise<string | null> {
+    const username = await this.#secureStorage.get<string>(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.UserName,
+    )
+
+    if (username !== null) {
+      return username
+    }
+
     return await this.#secureStorage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UserEmail)
   }
 

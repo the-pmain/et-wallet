@@ -64,32 +64,30 @@ export interface IOnboardingService {
   /**
    * Создаёт кошелёк из показанной пользователю фразы.
    *
-   * @param email Адрес электронной почты как подпись кошелька.
+   * @param username Имя пользователя как подпись кошелька.
    *        Необязателен: кошелёк работает и без него. Учётной записью
    *        он не является — сервера, который сверял бы пару
    *        «адрес — пароль», не существует.
    * @throws WeakPasswordError, WalletAlreadyInitializedError,
    *         InvalidArgumentError если адрес задан и составлен неверно.
    */
-  createWallet(mnemonic: ISecretBuffer, password: string, email?: string): Promise<void>
+  createWallet(mnemonic: ISecretBuffer, password: string, username?: string): Promise<void>
 
   /**
    * Импортирует существующий кошелёк.
    *
    * @throws InvalidMnemonicError, WeakPasswordError, WalletAlreadyInitializedError
    */
-  importWallet(phrase: string, password: string, email?: string): Promise<void>
+  importWallet(phrase: string, password: string, username?: string): Promise<void>
 
   /**
    * Снимает блокировку.
    *
-   * @param email Адрес для сверки с сохранённым. Проверяется ПОСЛЕ
-   *        успешной расшифровки: до неё сохранённый адрес недоступен,
-   *        он лежит в зашифрованном хранилище. Защиты от подбора это
-   *        не добавляет — только помогает не перепутать кошельки.
-   * @throws InvalidPasswordError, WalletNotInitializedError
+   * Требует только пароля: имя пользователя лежит в том же
+   * зашифрованном хранилище и сверяться может лишь после успешной
+   * расшифровки — то есть после того, как пароль уже подошёл.
    */
-  unlock(password: string, email?: string): Promise<void>
+  unlock(password: string): Promise<void>
 
   /**
    * Возвращает сохранённый адрес электронной почты.
@@ -97,7 +95,7 @@ export interface IOnboardingService {
    * Доступен только после разблокировки: адрес хранится зашифрованным.
    * `null` означает, что кошелёк создан без него.
    */
-  getEmail(): Promise<string | null>
+  getUsername(): Promise<string | null>
 
   /**
    * Проверяет пароль, не меняя состояния блокировки.

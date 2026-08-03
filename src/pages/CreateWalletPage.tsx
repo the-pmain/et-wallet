@@ -2,7 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
-import { MNEMONIC_STRENGTH, isAppError, isValidEmail, type ISecretBuffer } from '@/core'
+import { MNEMONIC_STRENGTH, isAppError, isValidUsername, type ISecretBuffer } from '@/core'
 import {
   PasswordFields,
   SeedPhraseConfirmation,
@@ -71,10 +71,10 @@ export function CreateWalletPage() {
   const onboarding = useOnboarding()
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const emailId = useId()
+  const usernameId = useId()
 
   const [step, setStep] = useState<Step>(STEP.Password)
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [isAcknowledged, setIsAcknowledged] = useState(false)
@@ -123,7 +123,7 @@ export function CreateWalletPage() {
     setIsBusy(true)
 
     try {
-      await onboarding.createWallet(mnemonic, password, email)
+      await onboarding.createWallet(mnemonic, password, username)
 
       mnemonic.wipe()
       mnemonicRef.current = null
@@ -160,26 +160,25 @@ export function CreateWalletPage() {
           {step === STEP.Password && (
             <>
               <div className="flex flex-col gap-2">
-                <Label htmlFor={emailId}>{t('create.email')}</Label>
+                <Label htmlFor={usernameId}>{t('create.username')}</Label>
                 <Input
-                  id={emailId}
-                  type="email"
-                  value={email}
-                  placeholder="you@example.com"
-                  autoComplete="username"
-                  autoCapitalize="off"
+                  id={usernameId}
+                  value={username}
+                  placeholder={t('create.usernamePlaceholder')}
+                  autoComplete="off"
+                  autoCapitalize="words"
                   autoCorrect="off"
-                  aria-invalid={email !== '' && !isValidEmail(email)}
+                  aria-invalid={username !== '' && !isValidUsername(username)}
                   onChange={(event) => {
-                    setEmail(event.target.value)
+                    setUsername(event.target.value)
                   }}
                 />
                 {/* Прямое предупреждение против главного заблуждения:
-                    человек, привыкший к обычным сервисам, ждёт, что
-                    забытый пароль восстановят по почте. Здесь писать
-                    некому, и узнать об этом он должен сейчас, а не после
-                    потери средств. */}
-                <p className="text-xs text-muted-foreground">{t('create.emailNotice')}</p>
+                    человек, привыкший к обычным сервисам, принимает имя
+                    за учётную запись и ждёт, что забытый пароль
+                    восстановят. Здесь восстанавливать некому, и узнать
+                    об этом он должен сейчас, а не после потери средств. */}
+                <p className="text-xs text-muted-foreground">{t('create.usernameNotice')}</p>
               </div>
 
               <PasswordFields
@@ -197,8 +196,8 @@ export function CreateWalletPage() {
                 size="lg"
                 disabled={
                   !isPasswordPairValid(password, confirmation) ||
-                  email.trim() === '' ||
-                  !isValidEmail(email)
+                  username.trim() === '' ||
+                  !isValidUsername(username)
                 }
                 onClick={goToPhrase}
               >

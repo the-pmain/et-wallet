@@ -6,7 +6,13 @@ export {
   type IAutoLockOptions,
 } from './AutoLockService'
 export { safeText, toSafeText, type ISafeText } from './display-safety'
-export { areEmailsEqual, isValidEmail, normalizeEmail } from './email'
+export {
+  MAX_USERNAME_LENGTH,
+  MIN_USERNAME_LENGTH,
+  areUsernamesEqual,
+  isValidUsername,
+  normalizeUsername,
+} from './username'
 export {
   CHARACTER_CLASS,
   MAX_PASSWORD_LENGTH,

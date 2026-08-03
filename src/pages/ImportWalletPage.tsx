@@ -1,8 +1,8 @@
 import { ArrowLeft } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
-import { isAppError } from '@/core'
+import { isAppError, isValidUsername } from '@/core'
 import {
   PasswordFields,
   SeedPhraseInput,
@@ -18,6 +18,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Input,
+  Label,
 } from '@/shared/ui'
 
 /**
@@ -35,7 +37,10 @@ export function ImportWalletPage() {
   const onboarding = useOnboarding()
   const navigate = useNavigate()
 
+  const usernameId = useId()
+
   const [phrase, setPhrase] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -54,7 +59,7 @@ export function ImportWalletPage() {
     setIsBusy(true)
 
     try {
-      await onboarding.importWallet(phrase, password)
+      await onboarding.importWallet(phrase, password, username)
 
       setPhrase('')
       setPassword('')
@@ -117,6 +122,32 @@ export function ImportWalletPage() {
               права её запрашивать.
             </AlertDescription>
           </Alert>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={usernameId}>Имя пользователя</Label>
+            <Input
+              id={usernameId}
+              value={username}
+              placeholder="Например, Дмитрий"
+              disabled={isBusy}
+              autoComplete="off"
+              autoCapitalize="words"
+              autoCorrect="off"
+              aria-invalid={username !== '' && !isValidUsername(username)}
+              onChange={(event) => {
+                setUsername(event.target.value)
+                setError(null)
+              }}
+            />
+            {/* Имя необязательно: восстановленный кошелёк работает и без
+                него, аккаунты тогда называются «Аккаунт 1». Требовать
+                его здесь значило бы придумывать препятствие человеку,
+                который восстанавливает доступ к своим средствам. */}
+            <p className="text-xs text-muted-foreground">
+              Необязательно. Имя хранится только на этом устройстве и подписывает кошелёк в
+              интерфейсе — учётной записью оно не является.
+            </p>
+          </div>
 
           <PasswordFields
             password={password}

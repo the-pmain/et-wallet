@@ -49,14 +49,15 @@ const RUSSIAN = {
 
   /* Создание кошелька */
   'create.title': 'Создайте кошелёк',
-  'create.description': 'Адрес почты подписывает кошелёк, пароль его шифрует',
+  'create.description': 'Имя подписывает кошелёк, пароль его шифрует',
   'create.phraseTitle': 'Сохраните seed-фразу',
   'create.phraseDescription': 'Двенадцать слов, восстанавливающих доступ',
   'create.confirmTitle': 'Проверим, что вы записали',
   'create.confirmDescription': 'Выберите слова, которые стоят на указанных местах',
-  'create.email': 'Адрес электронной почты',
-  'create.emailNotice':
-    'Адрес хранится только на этом устройстве и подписывает кошелёк в интерфейсе. Это не учётная запись: письмо для восстановления доступа отправить некому.',
+  'create.username': 'Имя пользователя',
+  'create.usernamePlaceholder': 'Например, Дмитрий',
+  'create.usernameNotice':
+    'Имя хранится только на этом устройстве и подписывает кошелёк в интерфейсе. Это не учётная запись: восстановить доступ по имени невозможно, и обращаться за этим некуда.',
   'create.passwordNotice':
     'Пароль защищает кошелёк только на этом устройстве. Он не восстанавливает доступ и не заменяет seed-фразу.',
   'create.acknowledge':
@@ -70,10 +71,7 @@ const RUSSIAN = {
 
   /* Разблокировка */
   'unlock.title': 'С возвращением',
-  'unlock.description': 'Введите адрес и пароль, чтобы разблокировать кошелёк',
-  'unlock.email': 'Адрес электронной почты',
-  'unlock.emailOptional':
-    'Необязательно. Заполните, если указывали адрес при создании кошелька: он сверяется после расшифровки и помогает не перепутать кошельки.',
+  'unlock.description': 'Введите пароль, чтобы разблокировать кошелёк',
   'unlock.password': 'Пароль',
   'unlock.submit': 'Разблокировать',
   'unlock.decrypting': 'Расшифровка…',
@@ -130,14 +128,15 @@ const ENGLISH: Readonly<Record<TranslationKey, string>> = {
     'Seed phrase sign-in is temporarily disabled for testing. There is currently no way to restore the wallet if you forget the password: save the phrase shown during creation.',
 
   'create.title': 'Create a wallet',
-  'create.description': 'The email labels the wallet, the password encrypts it',
+  'create.description': 'The name labels the wallet, the password encrypts it',
   'create.phraseTitle': 'Save your seed phrase',
   'create.phraseDescription': 'Twelve words that restore access',
   'create.confirmTitle': 'Let us check what you wrote down',
   'create.confirmDescription': 'Pick the words that belong in the listed positions',
-  'create.email': 'Email address',
-  'create.emailNotice':
-    'The address is stored on this device only and labels the wallet in the interface. This is not an account: there is nobody to send a recovery email.',
+  'create.username': 'Your name',
+  'create.usernamePlaceholder': 'For example, Alex',
+  'create.usernameNotice':
+    'The name is stored on this device only and labels the wallet in the interface. This is not an account: access cannot be restored by name, and there is nobody to ask.',
   'create.passwordNotice':
     'The password protects the wallet on this device only. It does not restore access and does not replace the seed phrase.',
   'create.acknowledge':
@@ -150,10 +149,7 @@ const ENGLISH: Readonly<Record<TranslationKey, string>> = {
   'create.failed': 'Could not create the wallet',
 
   'unlock.title': 'Welcome back',
-  'unlock.description': 'Enter your address and password to unlock the wallet',
-  'unlock.email': 'Email address',
-  'unlock.emailOptional':
-    'Optional. Fill it in if you set an address when creating the wallet: it is checked after decryption and helps you not to confuse wallets.',
+  'unlock.description': 'Enter your password to unlock the wallet',
   'unlock.password': 'Password',
   'unlock.submit': 'Unlock',
   'unlock.decrypting': 'Decrypting…',
