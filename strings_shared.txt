@@ -1,5 +1,0 @@
-src/shared/config/test-mode.ts	Сборка собрана с временными послаблениями безопасности (IS_TEST_MODE). 
-src/shared/config/test-mode.ts	Проверка записи seed-фразы и восстановление по ней отключены. 
-src/shared/config/test-mode.ts	Верните IS_TEST_MODE в false в src/shared/config/test-mode.ts.
-src/shared/theme/theme-context.ts	useTheme должен вызываться внутри ThemeProvider.
-src/shared/ui/donut-chart.tsx	${slice.label} ${(slice.share * 100).toFixed(1)} процента

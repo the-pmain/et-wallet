@@ -42,3 +42,6 @@ Thumbs.db
 # Сквозные проверки
 playwright-report
 test-results
+
+# Выгрузки строк, создаваемые при переводе интерфейса.
+strings_*.txt
