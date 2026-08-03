@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { toAddress } from '@/core/address'
 import { SecureStorage } from '@/core/encryption'
-import { MemoryStorageService } from '@/core/storage'
+import { MemoryStorageService, STORAGE_NAMESPACE, toStorageKey } from '@/core/storage'
 import { toChainId, type Address, type Timestamp, type TxHash, type Wei } from '@/core/types'
 import { FastEncryptionService } from '@/test/doubles'
 
@@ -204,5 +204,118 @@ describe('TransactionRepository: шифрование', () => {
        контрагентов. Заблокированный кошелёк не должен этого сообщать. */
     expect(JSON.stringify(stored)).not.toContain(OWNER)
     expect(JSON.stringify(stored)).not.toContain(OTHER)
+  })
+})
+
+describe('TransactionRepository: индекс', () => {
+  it('запись, сохранённая в обход индекса, всё равно находится', async () => {
+    /* Индекс — ускоритель, а не источник истины. Записи, сделанные
+       прежней версией приложения, лежат в хранилище без него,
+       и потерять их нельзя. */
+    const stored = { ...record(), hash: `0x${'ab'.repeat(32)}` as TxHash }
+
+    await storage.set(
+      STORAGE_NAMESPACE.Transactions,
+      toStorageKey(`tx.${stored.hash.toLowerCase()}`),
+      {
+        hash: stored.hash,
+        chainId: stored.chainId.toString(),
+        from: stored.from,
+        to: stored.to,
+        value: stored.value.toString(),
+        nonce: stored.nonce,
+        status: stored.status,
+        type: stored.type,
+        submittedAt: stored.submittedAt,
+        confirmedAt: null,
+        blockNumber: null,
+        gasUsed: null,
+        effectiveGasPrice: null,
+        replacedBy: null,
+      },
+    )
+
+    expect(await repository.findByAddress(stored.from, stored.chainId)).toHaveLength(1)
+  })
+
+  it('повреждённый индекс перестраивается, а не роняет чтение', async () => {
+    await repository.save(record())
+
+    /* Формат сменился либо запись испорчена: единственный правильный
+       ответ — перестроить её полным чтением. */
+    await storage.set(STORAGE_NAMESPACE.Transactions, toStorageKey('index.v1'), {
+      version: 999,
+      byOwner: {},
+      unsettled: [],
+    })
+
+    expect(await repository.findByAddress(record().from, record().chainId)).toHaveLength(1)
+  })
+
+  it('сама запись индекса не попадает в историю', async () => {
+    /* Индекс лежит в том же пространстве и записью транзакции
+       не является: попав в выборку, он превратился бы в строку
+       с пустыми полями. */
+    await repository.save(record())
+
+    const history = await repository.findByAddress(record().from, record().chainId)
+
+    expect(history).toHaveLength(1)
+    expect(history[0]?.hash).toBe(record().hash)
+  })
+
+  it('удаление адреса вычищает его из индекса', async () => {
+    await repository.save(record())
+    await repository.deleteByAddress(record().from)
+
+    expect(await repository.findByAddress(record().from, record().chainId)).toHaveLength(0)
+    expect(await repository.findUnsettled(3)).toHaveLength(0)
+  })
+
+  it('глубоко подтверждённая запись уходит из слежения', async () => {
+    /* Иначе индекс слежения совпал бы со всей историей, и выигрыш
+       от него исчез бы. */
+    await repository.save({
+      ...record(),
+      status: TRANSACTION_STATUS.Confirmed,
+      confirmations: 12,
+    })
+
+    expect(await repository.findUnsettled(3)).toHaveLength(0)
+  })
+
+  it('неглубоко подтверждённая остаётся под наблюдением', async () => {
+    /* Блок с ней может быть вытеснен реорганизацией цепи. */
+    await repository.save({
+      ...record(),
+      status: TRANSACTION_STATUS.Confirmed,
+      confirmations: 1,
+    })
+
+    expect(await repository.findUnsettled(3)).toHaveLength(1)
+  })
+
+  it('замещённая уходит из слежения сразу', async () => {
+    await repository.save({ ...record(), status: TRANSACTION_STATUS.Replaced })
+
+    expect(await repository.findUnsettled(3)).toHaveLength(0)
+  })
+
+  it('смена статуса убирает запись из слежения', async () => {
+    const initial = record()
+
+    await repository.save(initial)
+    expect(await repository.findUnsettled(3)).toHaveLength(1)
+
+    await repository.save({ ...initial, status: TRANSACTION_STATUS.Confirmed, confirmations: 20 })
+
+    expect(await repository.findUnsettled(3)).toHaveLength(0)
+  })
+
+  it('история одного адреса не содержит чужих записей', async () => {
+    await repository.save(record())
+    await repository.save({ ...record(), hash: `0x${'cd'.repeat(32)}` as TxHash, from: OTHER })
+
+    expect(await repository.findByAddress(record().from, record().chainId)).toHaveLength(1)
   })
 })
