@@ -424,3 +424,76 @@ describe('IndexedDbStorageService: база прежней сборки', () => 
     await expect(обновлённое.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('старое значение')
   })
 })
+
+describe('IndexedDbStorageService: повторное открытие после починки', () => {
+  it('второй запуск после починки схемы открывается', async () => {
+    /*
+      ЭТО ВТОРАЯ ЧАСТЬ ТОЙ ЖЕ ОШИБКИ, И ОДНА ПРОВЕРКА ЕЁ НЕ ЛОВИЛА.
+      Починка недостающего хранилища повышает версию базы. Собственная
+      версия схемы выводится из числа миграций и остаётся прежней,
+      поэтому следующий запуск просил версию меньше существующей —
+      а такой запрос браузер отвергает целиком. Первый запуск лечился,
+      второй переставал открываться.
+    */
+    const имя = `починенная-база-${String(Date.now())}`
+
+    await new Promise<void>((resolve, reject) => {
+      const request = globalThis.indexedDB.open(имя, 1)
+
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore(STORAGE_NAMESPACE.Settings)
+      }
+
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+
+      request.onerror = () => {
+        reject(request.error ?? new Error('база не открылась'))
+      }
+    })
+
+    /* Первый запуск: недостающие хранилища создаются, версия растёт. */
+    const первый = new IndexedDbStorageService({ databaseName: имя })
+
+    await первый.set(STORAGE_NAMESPACE.NetworksEncrypted, KEY, 'значение')
+
+    /* Второй запуск — новый экземпляр, как после перезагрузки страницы. */
+    const второй = new IndexedDbStorageService({ databaseName: имя })
+
+    await expect(второй.get(STORAGE_NAMESPACE.NetworksEncrypted, KEY)).resolves.toBe('значение')
+  })
+
+  it('база более новой версии открывается без понижения', async () => {
+    /* Версия могла уйти вперёд и по другой причине — например, сборкой,
+       которая новее установленной. Понизить её нельзя, а работать
+       с ней можно. */
+    const имя = `будущая-база-${String(Date.now())}`
+
+    await new Promise<void>((resolve, reject) => {
+      const request = globalThis.indexedDB.open(имя, 7)
+
+      request.onupgradeneeded = () => {
+        for (const namespace of Object.values(STORAGE_NAMESPACE)) {
+          request.result.createObjectStore(namespace)
+        }
+      }
+
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+
+      request.onerror = () => {
+        reject(request.error ?? new Error('база не открылась'))
+      }
+    })
+
+    const storage = new IndexedDbStorageService({ databaseName: имя })
+
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'работает')
+
+    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('работает')
+  })
+})

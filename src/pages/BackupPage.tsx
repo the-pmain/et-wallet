@@ -16,6 +16,7 @@ import {
   DangerConfirm,
   SecretReveal,
   StorageDurabilityAlert,
+  VerifyBackupCard,
   useSecurity,
 } from '@/features/security'
 import { useWallet, useWalletSnapshot } from '@/features/wallet'
@@ -248,6 +249,13 @@ export function BackupPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Проверка копии идёт СРАЗУ ЗА ФРАЗОЙ и до приватного ключа:
+          она относится к тому же секрету и выполняется тем же человеком
+          в тот же заход — записал, проверил. */}
+      <VerifyBackupCard
+        onVerify={(phrase, password) => session.getBackup().verifyMnemonicBackup(phrase, password)}
+      />
 
       <Card>
         <CardHeader>

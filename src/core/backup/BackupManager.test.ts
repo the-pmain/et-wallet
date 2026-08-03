@@ -324,3 +324,71 @@ function firstAccountId(): AccountId {
 
   return account.id
 }
+
+describe('BackupManager: проверка записанной копии', () => {
+  it('верно переписанная фраза признаётся совпадающей', async () => {
+    await expect(backup.verifyMnemonicBackup(TEST_MNEMONIC, PASSWORD)).resolves.toBe(true)
+  })
+
+  it('фраза с одним изменённым словом не совпадает', async () => {
+    /* Ровно эта ошибка и приводит к потере: одно слово мимо — другой
+       кошелёк, и узнаётся это при восстановлении. */
+    const wrong = TEST_MNEMONIC.replace('about', 'above')
+
+    await expect(backup.verifyMnemonicBackup(wrong, PASSWORD)).resolves.toBe(false)
+  })
+
+  it('пропущенное слово не совпадает', async () => {
+    const short = TEST_MNEMONIC.split(' ').slice(0, 11).join(' ')
+
+    await expect(backup.verifyMnemonicBackup(short, PASSWORD)).resolves.toBe(false)
+  })
+
+  it('лишние пробелы и регистр совпадению не мешают', async () => {
+    /* Переписывают с бумаги столбцом и набирают с мобильной клавиатуры,
+       которая ставит заглавную букву. Отказ по этой причине выглядел бы
+       как «фраза записана неверно» — то есть ложной тревогой
+       о невосполнимой потере. */
+    const messy = `  ${TEST_MNEMONIC.toUpperCase().split(' ').join('\n')}  `
+
+    await expect(backup.verifyMnemonicBackup(messy, PASSWORD)).resolves.toBe(true)
+  })
+
+  it('без верного пароля не отвечает вовсе', async () => {
+    /* Иначе экран превращается в оракул: нашедший бумагу с несколькими
+       смазанными словами перебирал бы остаток, получая «да/нет»
+       на каждую догадку. */
+    await expect(backup.verifyMnemonicBackup(TEST_MNEMONIC, 'не тот пароль')).rejects.toThrow(
+      InvalidPasswordError,
+    )
+  })
+
+  it('неверный пароль не отличается по ответу от неверной фразы', async () => {
+    /* Оба случая обязаны кончаться отказом, а не «фраза не совпала»:
+       второе сообщало бы, что пароль угадан. */
+    await expect(backup.verifyMnemonicBackup('abandon abandon', 'не тот пароль')).rejects.toThrow(
+      InvalidPasswordError,
+    )
+  })
+
+  it('фраза наружу не выдаётся ни при совпадении, ни при расхождении', async () => {
+    /* Метод возвращает признак, а не текст: второй путь выдачи фразы
+       обошёл бы и подтверждение риска, и журнал экспортов. */
+    const matched = await backup.verifyMnemonicBackup(TEST_MNEMONIC, PASSWORD)
+    const missed = await backup.verifyMnemonicBackup('abandon abandon abandon', PASSWORD)
+
+    expect(typeof matched).toBe('boolean')
+    expect(typeof missed).toBe('boolean')
+  })
+
+  it('проверка не пишется в журнал экспортов', async () => {
+    /* Записи «фраза выгружена» здесь нет, потому что выгрузки не было.
+       Запись завышала бы оценку риска последующих настоящих выгрузок,
+       то есть учила бы не читать предупреждения. */
+    const before = await backup.assessMnemonicExport()
+
+    await backup.verifyMnemonicBackup(TEST_MNEMONIC, PASSWORD)
+
+    expect((await backup.assessMnemonicExport()).risk).toBe(before.risk)
+  })
+})

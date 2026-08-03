@@ -197,6 +197,9 @@ test.describe('Сквозной путь: резервная копия', () => 
     await expect(page.getByText('about')).toBeHidden()
   })
 
+  /* Поле уточняется точным совпадением: на экране копии есть второе
+     поле пароля — у проверки записанного, — и подстрока совпадает
+     с обоими. */
   test('фраза выдаётся после отметки и верного пароля', async ({ page }) => {
     await importWallet(page)
     await page.goto('/#/wallet/backup')
@@ -205,7 +208,7 @@ test.describe('Сквозной путь: резервная копия', () => 
     await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: 'Show the phrase' }).click()
 
-    await page.getByLabel('Password').fill(PASSWORD)
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
     await page.getByRole('button', { name: 'Confirm' }).click()
 
     await expect(page.getByText('about')).toBeVisible()
@@ -219,7 +222,7 @@ test.describe('Сквозной путь: резервная копия', () => 
     await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: 'Show the phrase' }).click()
 
-    await page.getByLabel('Password').fill('Sobaka-9-Solnce!')
+    await page.getByLabel('Password', { exact: true }).fill('Sobaka-9-Solnce!')
     await page.getByRole('button', { name: 'Confirm' }).click()
 
     await expect(page.getByText('Wrong password.')).toBeVisible()

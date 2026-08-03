@@ -8,7 +8,7 @@ import {
 } from '@/core/errors'
 import type { IHDWalletService } from '@/core/hdwallet'
 import { KEYRING_TYPE } from '@/core/keyring'
-import type { IMnemonicService } from '@/core/mnemonic'
+import { normalizeMnemonicInput, type IMnemonicService } from '@/core/mnemonic'
 import type { ILogger } from '@/core/platform'
 import {
   EXPORT_KIND,
@@ -132,6 +132,62 @@ export class BackupManager implements IBackupManager {
     return this.#mnemonicService.fromPhrase(phrase)
   }
 
+  /**
+   * Сверяет переписанную фразу с хранимой.
+   *
+   * ЗАЧЕМ ЭТО ОТДЕЛЬНЫЙ МЕТОД, А НЕ ПОВТОРНЫЙ ПОКАЗ ФРАЗЫ. Единственным
+   * способом убедиться в правильности записи был показ фразы и сверка
+   * глазами — то есть лишнее раскрытие ровно того, что мы защищаем,
+   * ради проверки, которую можно выполнить не раскрывая ничего.
+   * Ошибка при переписывании не гипотетична: обнаруживается она при
+   * восстановлении, когда исправить уже нечего.
+   *
+   * ПАРОЛЬ ОБЯЗАТЕЛЕН. Без него метод превращается в оракул: нашедший
+   * бумагу с несколькими смазанными словами перебирал бы остаток,
+   * получая ответ «да/нет» на каждую догадку. Владельцу требование
+   * не стоит ничего — у него пароль есть, — а постороннему, у которого
+   * пароль есть, метод не даёт ничего нового: фразу он и так получит
+   * выгрузкой.
+   *
+   * СРАВНЕНИЕ БЕЗ ДОСРОЧНОГО ВЫХОДА. Обычное сравнение строк
+   * возвращается на первом различии, и время ответа выдаёт число
+   * совпавших символов — подбирать фразу можно было бы по одному слову.
+   * Здесь просматриваются все байты независимо от результата.
+   *
+   * ОТВЕТ — ОДИН БИТ. Указание, какое слово отличается, помогло бы
+   * и владельцу, и подбирающему, но владельцу есть куда посмотреть:
+   * у него бумага. Замечания о самой введённой фразе (слова нет
+   * в словаре, контрольная сумма не сходится) выдаёт `checkMnemonic`
+   * и они о хранимой фразе не говорят ничего.
+   *
+   * В ЖУРНАЛ ЭКСПОРТОВ НЕ ПИШЕТСЯ: секрет не выдан, а запись завышала бы
+   * оценку риска последующих настоящих выгрузок.
+   *
+   * @throws InvalidPasswordError, WalletNotInitializedError
+   */
+  async verifyMnemonicBackup(phrase: string, password: string): Promise<boolean> {
+    await this.#requirePassword(password)
+
+    const stored = await this.#secureStorage.get<string>(
+      STORAGE_NAMESPACE.Vault,
+      VAULT_KEY.Mnemonic,
+    )
+
+    if (stored === null) {
+      throw new WalletNotInitializedError()
+    }
+
+    const matches = equalInConstantTime(
+      normalizeMnemonicInput(stored),
+      normalizeMnemonicInput(phrase),
+    )
+
+    /* Содержимое в журнал не попадает: ни фраза, ни её часть, ни длина. */
+    this.#logger.info('The written copy of the seed phrase was checked', { matches })
+
+    return matches
+  }
+
   async assessPrivateKeyExport(id: AccountId): Promise<IExportRiskAssessment> {
     return await this.#exportGuard.assess(this.#privateKeyRequest(id))
   }
@@ -205,4 +261,24 @@ export class BackupManager implements IBackupManager {
   static #mnemonicRequest(): IExportRequest {
     return accountExportRequest(EXPORT_KIND.Mnemonic, WALLET_SCOPE)
   }
+}
+
+/**
+ * Сравнивает две строки, не выходя на первом различии.
+ *
+ * Разница в длине скрыта быть не может — она видна и по времени ввода, —
+ * зато позиция первого различия не выдаётся ничем: просматриваются все
+ * символы более длинной строки.
+ */
+function equalInConstantTime(left: string, right: string): boolean {
+  const length = Math.max(left.length, right.length)
+  let difference = left.length ^ right.length
+
+  for (let index = 0; index < length; index += 1) {
+    /* Выход за границы даёт NaN у `charCodeAt`, поэтому берётся
+       заведомо отсутствующий в тексте код. */
+    difference |= (left.codePointAt(index) ?? -1) ^ (right.codePointAt(index) ?? -2)
+  }
+
+  return difference === 0
 }

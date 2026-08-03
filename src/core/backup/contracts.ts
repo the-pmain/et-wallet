@@ -96,6 +96,17 @@ export interface IBackupManager {
   ): Promise<ISecretBuffer>
 
   /**
+   * Сверяет переписанную фразу с хранимой, не показывая хранимую.
+   *
+   * Отвечает одним битом: указание на отличающееся слово помогло бы
+   * не только владельцу. Пароль обязателен — без него метод
+   * превращается в оракул для перебора чужих догадок.
+   *
+   * @throws InvalidPasswordError, WalletNotInitializedError
+   */
+  verifyMnemonicBackup(phrase: string, password: string): Promise<boolean>
+
+  /**
    * Проверяет фразу перед импортом.
    *
    * Не бросает исключений: форма ввода вызывает эту проверку на каждое

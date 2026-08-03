@@ -75,7 +75,7 @@ export interface IIndexedDbStorageOptions {
 export class IndexedDbStorageService implements IStorageService {
   readonly #databaseName: string
   readonly #migrations: readonly IStorageMigration[]
-  #schemaVersion: number
+  readonly #schemaVersion: number
 
   #opening: Promise<IDBDatabase> | null = null
 
@@ -278,8 +278,41 @@ export class IndexedDbStorageService implements IStorageService {
 
     await this.#requestPersistence()
 
+    try {
+      return await this.#openAtVersion(this.#schemaVersion)
+    } catch (error) {
+      if (!isVersionTooLow(error)) {
+        throw error
+      }
+
+      /*
+        ДЕЙСТВИТЕЛЬНАЯ ВЕРСИЯ УШЛА ВПЕРЁД НАШЕЙ.
+
+        Собственная версия выводится из числа миграций, а база могла
+        подняться выше — например, при создании хранилища, добавленного
+        без миграции, либо после работы более новой сборки. Запрос
+        меньшей версии браузер отвергает целиком, и кошелёк переставал
+        открываться: первый запуск чинил схему и поднимал версию,
+        второй просил прежнюю и получал отказ.
+
+        Понизить версию нельзя и не нужно: база с лишними хранилищами
+        работоспособна. Открываем ту, что есть.
+      */
+      return await this.#openAtVersion(null)
+    }
+  }
+
+  /**
+   * Открывает базу заданной версии.
+   *
+   * @param version `null` — открыть с существующей версией.
+   */
+  async #openAtVersion(version: number | null): Promise<IDBDatabase> {
     return await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = globalThis.indexedDB.open(this.#databaseName, this.#schemaVersion)
+      const request =
+        version === null
+          ? globalThis.indexedDB.open(this.#databaseName)
+          : globalThis.indexedDB.open(this.#databaseName, version)
 
       request.onupgradeneeded = (event) => {
         const database = request.result
@@ -333,20 +366,22 @@ export class IndexedDbStorageService implements IStorageService {
           обычным путём. Полагаться на то, что о версии не забудут,
           нельзя — забывают именно так.
         */
-        const missing = [...Object.values(STORAGE_NAMESPACE)].filter(
-          (namespace) => !database.objectStoreNames.contains(namespace),
+        const hasAllStores = [...Object.values(STORAGE_NAMESPACE)].every((namespace) =>
+          database.objectStoreNames.contains(namespace),
         )
 
-        if (missing.length > 0) {
-          database.close()
-          this.#schemaVersion = database.version + 1
-
-          this.#openOnce().then(resolve, reject)
+        if (hasAllStores && database.version >= this.#schemaVersion) {
+          resolve(database)
 
           return
         }
 
-        resolve(database)
+        /* Версия только растёт: понизить её нельзя, а забрать
+           существующую и прибавить единицу можно всегда. */
+        const target = Math.max(database.version + 1, this.#schemaVersion)
+
+        database.close()
+        this.#openAtVersion(target).then(resolve, reject)
       }
 
       request.onerror = () => {
@@ -526,4 +561,17 @@ function wrapTransaction(transaction: IDBTransaction): IStorageTransaction {
       await promisify(store(namespace).clear())
     },
   }
+}
+
+/**
+ * Отказ «запрошенная версия меньше существующей».
+ *
+ * Отдельный случай, а не общая неудача открытия: он означает базу,
+ * созданную более новой сборкой либо уже починенную, и работать с ней
+ * можно — в отличие от повреждённой или недоступной.
+ */
+function isVersionTooLow(error: unknown): boolean {
+  const cause = error instanceof StorageUnavailableError ? error.cause : error
+
+  return cause instanceof DOMException && cause.name === 'VersionError'
 }
