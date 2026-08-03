@@ -8,6 +8,7 @@ import {
   type IDappRiskFinding,
   type IDappSession,
   type ILogger,
+  type IPreflightResult,
   type ISessionTransport,
   type Unsubscribe,
 } from '@/core'
@@ -23,6 +24,16 @@ export interface IPendingProposal {
 export interface IPendingRequest {
   readonly request: IDappRequest
   readonly risks: readonly IDappRiskFinding[]
+
+  /**
+   * Итог прогона вызова на узле.
+   *
+   * `null` — прогон ещё идёт. ЭКРАН НЕ ЖДЁТ ЕГО: подтверждение
+   * показывается сразу, а итог доходит отдельным обновлением. Задержись
+   * экран на время ответа узла — человек решил бы, что кошелёк
+   * не откликнулся, и нажал бы в приложении ещё раз.
+   */
+  readonly preflight: IPreflightResult | null
 }
 
 /** Снимок состояния подключений для интерфейса. */
@@ -65,6 +76,14 @@ export interface IDappSessionServiceDependencies {
 
   /** Выполняет одобренный запрос и возвращает результат для приложения. */
   readonly execute: (request: IDappRequest) => Promise<string>
+
+  /**
+   * Прогоняет транзакцию запроса на узле до подписи.
+   *
+   * Необязательна: подключения работают и там, где узла нет. Её
+   * отсутствие означает «не проверялось» и показывается именно так.
+   */
+  readonly preflight?: (request: IDappRequest) => Promise<IPreflightResult>
 }
 
 /**
@@ -309,8 +328,47 @@ export class DappSessionService {
       request: {
         request,
         risks: findDappRisks(request, this.#dependencies.getActiveChainId()),
+        preflight: null,
       },
     })
+
+    void this.#runPreflight(request)
+  }
+
+  /**
+   * Прогоняет вызов запроса и дописывает итог к показанному экрану.
+   *
+   * ИТОГ ПРИКЛАДЫВАЕТСЯ ТОЛЬКО К ТОМУ ЖЕ ЗАПРОСУ. Пока узел отвечал,
+   * пользователь мог отклонить запрос, а приложение — прислать другой;
+   * итог проверки чужого вызова, показанный рядом с новым, был бы
+   * прямым обманом.
+   */
+  async #runPreflight(request: IDappRequest): Promise<void> {
+    const preflight = this.#dependencies.preflight
+
+    if (preflight === undefined || request.payload.kind !== DAPP_REQUEST_KIND.SendTransaction) {
+      return
+    }
+
+    let result: IPreflightResult
+
+    try {
+      result = await preflight(request)
+    } catch (error) {
+      this.#dependencies.logger.warn('The dapp call could not be checked before signing', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+
+      return
+    }
+
+    const pending = this.#snapshot.request
+
+    if (pending === null || pending.request.id !== request.id) {
+      return
+    }
+
+    this.#publish({ ...this.#snapshot, request: { ...pending, preflight: result } })
   }
 
   #publish(snapshot: IDappSnapshot): void {

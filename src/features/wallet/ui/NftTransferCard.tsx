@@ -19,6 +19,8 @@ import {
   Label,
 } from '@/shared/ui'
 
+import { PreflightNotice } from './PreflightNotice'
+
 import { formatTokenAmount, shortenAddress } from '../lib/format'
 import type { IPreparedTransfer } from '../model/contracts'
 import { useWallet, useWalletSnapshot } from '../model/wallet-context'
@@ -181,6 +183,8 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
             </dl>
           </CardContent>
         </Card>
+
+        <PreflightNotice preflight={prepared.preflight} />
 
         <Alert variant="danger">
           <AlertTitle>The transfer cannot be undone</AlertTitle>

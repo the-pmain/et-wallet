@@ -54,6 +54,12 @@ export function mapProviderError(error: unknown, chainId: ChainId): Error {
        а операция не выполнится. */
     return new GasEstimationFailedError(error.reason ?? 'the call reverted', {
       cause: error,
+      /* Данные отката доходят до вызывающего кода. Библиотека
+         раскрывает только стандартную причину `Error(string)`;
+         собственные ошибки контрактов остаются четырёхбайтовым
+         признаком, и потеряй мы его — сказать о причине отказа было
+         бы нечего. */
+      revertData: readRevertData(error),
     })
   }
 
@@ -79,6 +85,18 @@ export function mapProviderError(error: unknown, chainId: ChainId): Error {
   }
 
   return error instanceof Error ? error : new Error(String(error))
+}
+
+/**
+ * Данные отката из ошибки библиотеки.
+ *
+ * Поле необязательное и недоверенное: узел мог не вернуть данных,
+ * а библиотека — не заполнить поле. Проверяется и наличие, и тип.
+ */
+function readRevertData(error: unknown): string | null {
+  const data = (error as { data?: unknown }).data
+
+  return typeof data === 'string' && data.startsWith('0x') ? data : null
 }
 
 function isEthersError(error: unknown): error is EthersError {

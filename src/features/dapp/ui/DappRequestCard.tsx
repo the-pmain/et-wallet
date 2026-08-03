@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { DAPP_REQUEST_KIND, DAPP_RISK, type DappRisk, type IDappRequest } from '@/core'
 import { ConfirmPassword, UntrustedText, useSecurity } from '@/features/security'
+import { PreflightNotice } from '@/features/wallet'
 import { Alert, AlertDescription, AlertTitle, Badge, Button, Card, CardContent } from '@/shared/ui'
 
 import type { IPendingRequest } from '../model/DappSessionService'
@@ -37,7 +38,7 @@ interface DappRequestCardProps {
  * где опаснее.
  */
 export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRequestCardProps) {
-  const { request, risks } = pending
+  const { request, risks, preflight } = pending
   const { settings, verifyPassword } = useSecurity()
   const [isConfirming, setConfirming] = useState(false)
 
@@ -73,6 +74,15 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
         ))}
 
         <RequestBody request={request} />
+
+        {/* ИТОГ ПРОГОНА ИДЁТ ПОСЛЕ СОДЕРЖИМОГО И ЗАМЕЧАНИЙ. Он отвечает
+            на вопрос «состоится ли вызов», тогда как выше сказано, что
+            именно подписывается, — и это важнее.
+
+            Пока узла нет ответа, здесь не показывается ничего:
+            крутящееся ожидание рядом с кнопкой «подтвердить» торопит
+            нажать, не дождавшись. */}
+        {preflight === null ? null : <PreflightNotice preflight={preflight} />}
 
         <Alert variant="warning">
           <AlertDescription>

@@ -4,6 +4,8 @@ import type { INetworkConfig } from '@/core'
 import { ConfirmPassword, useSecurity } from '@/features/security'
 import { Alert, AlertDescription, AlertTitle, Button, Card, CardContent } from '@/shared/ui'
 
+import { PreflightNotice } from './PreflightNotice'
+
 import { formatTokenAmount } from '../lib/format'
 import { REPLACEMENT_KIND, type ReplacementKind } from '../lib/replacement'
 import type { IPreparedTransfer } from '../model/contracts'
@@ -87,6 +89,8 @@ export function ReplaceTransactionCard({
           </p>
         </CardContent>
       </Card>
+
+      <PreflightNotice preflight={prepared.preflight} />
 
       <Alert variant="warning">
         <AlertTitle>Success is not guaranteed</AlertTitle>

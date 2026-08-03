@@ -9,6 +9,7 @@ import type {
   IDappRequest,
   IHistoryCursor,
   IHistoryLimits,
+  IPreflightResult,
   INetworkConfig,
   IFeeEstimate,
   IApprovalLimits,
@@ -50,6 +51,15 @@ export interface ITokenBalance {
 export interface IPreparedTransfer {
   readonly transaction: ISignableTransaction
   readonly fees: readonly IFeeEstimate[]
+
+  /**
+   * Итог прогона вызова на узле до подписи.
+   *
+   * ПОКАЗЫВАЕТСЯ ВСЕГДА, включая случай «проверить не удалось».
+   * Молчание кошелька о непроведённой проверке читается как её
+   * успешное прохождение.
+   */
+  readonly preflight: IPreflightResult
 }
 
 /** Итог поиска занятых адресов. */
@@ -387,6 +397,15 @@ export interface IWalletSession {
    * сообщать его оператору, что кошелёк открыт.
    */
   setBackgroundRefreshEnabled(enabled: boolean): void
+
+  /**
+   * Прогоняет вызов приложения на узле до показа подтверждения.
+   *
+   * Возвращает «проверить не удалось», а не выбрасывает исключение:
+   * недоступность узла не должна мешать пользователю принять решение
+   * самому.
+   */
+  checkDappRequest(request: IDappRequest): Promise<IPreflightResult>
 
   /** Перезапрашивает историю переводов активного аккаунта с начала. */
   refreshHistory(): Promise<void>

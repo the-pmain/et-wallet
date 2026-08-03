@@ -22,3 +22,11 @@ export {
   type TransactionStatus,
   type TransactionType,
 } from './types'
+export {
+  PREFLIGHT_OUTCOME,
+  decodeRevertReason,
+  preflightCall,
+  type IPreflightRequest,
+  type IPreflightResult,
+  type PreflightOutcome,
+} from './preflight'

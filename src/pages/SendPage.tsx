@@ -30,6 +30,7 @@ import {
   addressLabel,
   formatTokenAmount,
   parseAmount,
+  PreflightNotice,
   useWallet,
   useWalletSnapshot,
   type IPreparedTransfer,
@@ -793,6 +794,11 @@ function ConfirmTransfer({
       {risks.map((risk) => (
         <RiskAlert key={risk} risk={risk} />
       ))}
+
+      {/* Итог прогона идёт ПОСЛЕ замечаний о получателе: те говорят
+          о том, кому уйдут средства, и важнее. Прогон отвечает
+          на другой вопрос — состоится ли вызов вообще. */}
+      <PreflightNotice preflight={prepared.preflight} />
 
       {error === null ? null : (
         <Alert variant="danger">

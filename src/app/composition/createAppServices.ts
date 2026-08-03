@@ -149,6 +149,7 @@ function createDappSessions(session: IWalletSession, logger: ConsoleLogger): Dap
     getActiveChainId: () => session.getSnapshot().activeNetwork?.chainId ?? null,
     getAvailableChainIds: () => session.getSnapshot().networks.map((network) => network.chainId),
     execute: (request) => session.executeDappRequest(request),
+    preflight: (request) => session.checkDappRequest(request),
   })
 }
 

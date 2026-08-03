@@ -65,6 +65,11 @@ import {
   type ITokenMetadata,
   type ITokenTransferRequest,
   type ITransferRecord,
+  type HexString,
+  type IPreflightRequest,
+  type IPreflightResult,
+  PREFLIGHT_OUTCOME,
+  preflightCall,
   type ITransactionRequest,
   type TxHash,
   type Unsubscribe,
@@ -91,6 +96,13 @@ const SESSION_NAME = 'WalletSession'
  * перерисовку без изменения данных.
  */
 const EMPTY_ENS_NAMES: ReadonlyMap<string, string> = new Map()
+
+/** Итог непроведённого прогона. Отдельная константа ради стабильности ссылки. */
+const UNCHECKED_PREFLIGHT: IPreflightResult = {
+  outcome: PREFLIGHT_OUTCOME.Unavailable,
+  reason: null,
+  revertData: null,
+}
 
 /** Снимок закрытой сессии. Один экземпляр: пересоздание вызывало бы перерисовку. */
 const CLOSED_SNAPSHOT: IWalletSnapshot = {
@@ -724,10 +736,7 @@ export class WalletSession implements IWalletSession {
    * ввод, — на экране отправки.
    */
   async prepareTransfer(request: ITransactionRequest): Promise<IPreparedTransfer> {
-    const transactions = this.#requireTransactions()
-    const transaction = await transactions.prepare(request)
-
-    return { transaction, fees: await transactions.estimateFees(transaction) }
+    return await this.#describePrepared(await this.#requireTransactions().prepare(request))
   }
 
   /**
@@ -898,10 +907,9 @@ export class WalletSession implements IWalletSession {
 
   /** Готовит отзыв выданного разрешения. */
   async prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<IPreparedTransfer> {
-    const transactions = this.#requireTransactions()
-    const transaction = await transactions.prepareRevokeApproval(request)
-
-    return { transaction, fees: await transactions.estimateFees(transaction) }
+    return await this.#describePrepared(
+      await this.#requireTransactions().prepareRevokeApproval(request),
+    )
   }
 
   /**
@@ -952,10 +960,9 @@ export class WalletSession implements IWalletSession {
    * за адрес человека.
    */
   async prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer> {
-    const transactions = this.#requireTransactions()
-    const transaction = await transactions.prepareTokenTransfer(request)
-
-    return { transaction, fees: await transactions.estimateFees(transaction) }
+    return await this.#describePrepared(
+      await this.#requireTransactions().prepareTokenTransfer(request),
+    )
   }
 
   /**
@@ -965,10 +972,9 @@ export class WalletSession implements IWalletSession {
    * лежит в данных вызова. Экран подтверждения показывает оба адреса.
    */
   async prepareNftTransfer(request: INftTransferRequest): Promise<IPreparedTransfer> {
-    const transactions = this.#requireTransactions()
-    const transaction = await transactions.prepareNftTransfer(request)
-
-    return { transaction, fees: await transactions.estimateFees(transaction) }
+    return await this.#describePrepared(
+      await this.#requireTransactions().prepareNftTransfer(request),
+    )
   }
 
   /**
@@ -980,18 +986,12 @@ export class WalletSession implements IWalletSession {
    * можно было бы обойти.
    */
   async prepareSpeedUp(hash: TxHash): Promise<IPreparedTransfer> {
-    const transactions = this.#requireTransactions()
-    const transaction = await transactions.prepareSpeedUp(hash)
-
-    return { transaction, fees: await transactions.estimateFees(transaction) }
+    return await this.#describePrepared(await this.#requireTransactions().prepareSpeedUp(hash))
   }
 
   /** Готовит отмену зависшей транзакции. */
   async prepareCancel(hash: TxHash): Promise<IPreparedTransfer> {
-    const transactions = this.#requireTransactions()
-    const transaction = await transactions.prepareCancel(hash)
-
-    return { transaction, fees: await transactions.estimateFees(transaction) }
+    return await this.#describePrepared(await this.#requireTransactions().prepareCancel(hash))
   }
 
   /**
@@ -1826,6 +1826,93 @@ export class WalletSession implements IWalletSession {
     }
 
     return network
+  }
+
+  /**
+   * Достраивает подготовленную транзакцию до того, что видит человек.
+   *
+   * ЕДИНАЯ ТОЧКА ДЛЯ ВСЕХ ПУТЕЙ ПОДПИСИ. Перевод, токен, предмет,
+   * отзыв разрешения, ускорение и отмена приходят сюда одинаково:
+   * иначе проверка, добавленная к одному пути, обошла бы остальные.
+   *
+   * ПРОГОН НЕ ПРЕРЫВАЕТ ПОДГОТОВКУ. Недоступный узел означает
+   * «проверить не удалось», и это состояние показывается отдельно
+   * от «проверено и всё хорошо».
+   */
+  async #describePrepared(transaction: ISignableTransaction): Promise<IPreparedTransfer> {
+    const transactions = this.#requireTransactions()
+
+    return {
+      transaction,
+      fees: await transactions.estimateFees(transaction),
+      preflight: await this.#preflight(transaction),
+    }
+  }
+
+  /**
+   * Прогоняет вызов приложения на узле до показа подтверждения.
+   *
+   * ЗДЕСЬ ПРОВЕРКА НУЖНЕЕ ВСЕГО. Собственная отправка составлена самим
+   * владельцем и понятна ему; вызов приложения — набор байтов, о котором
+   * известно только имя приложения, а имя это ничем не подтверждено.
+   *
+   * Проверяются только запросы на отправку: подпись сообщения и
+   * структурированных данных ничего в цепи не выполняет, и прогонять
+   * там нечего.
+   */
+  async checkDappRequest(request: IDappRequest): Promise<IPreflightResult> {
+    const payload = request.payload
+
+    if (
+      payload.kind === DAPP_REQUEST_KIND.SignMessage ||
+      payload.kind === DAPP_REQUEST_KIND.SignTypedData
+    ) {
+      return UNCHECKED_PREFLIGHT
+    }
+
+    const transaction = payload.transaction
+
+    return await this.#preflightCall({
+      from: transaction.from,
+      to: transaction.to,
+      data: transaction.data ?? ('0x' as HexString),
+      value: toWei(transaction.value),
+    })
+  }
+
+  /**
+   * Прогоняет транзакцию на узле до подписи.
+   *
+   * Отказ самого прогона не выбрасывается наружу: он ничего не говорит
+   * о транзакции и не должен мешать её подписать. Итог «проверить
+   * не удалось» честнее отказа в подготовке.
+   */
+  async #preflight(transaction: ISignableTransaction): Promise<IPreflightResult> {
+    return await this.#preflightCall({
+      from: transaction.from,
+      to: transaction.to,
+      data: transaction.data,
+      value: transaction.value,
+    })
+  }
+
+  /** Общий прогон: сеть и узел берутся из текущего состояния сессии. */
+  async #preflightCall(request: IPreflightRequest): Promise<IPreflightResult> {
+    const network = this.#snapshot.activeNetwork
+
+    if (network === null || this.#providers === null) {
+      return UNCHECKED_PREFLIGHT
+    }
+
+    try {
+      return await preflightCall(await this.#providers.get(network), request)
+    } catch (error) {
+      this.#logger.warn('The call could not be checked before signing', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+
+      return UNCHECKED_PREFLIGHT
+    }
   }
 
   #publish(snapshot: IWalletSnapshot): void {

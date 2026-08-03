@@ -9,6 +9,7 @@ import {
   ENS_REGISTRY_ADDRESS,
   ENS_RESOLVER_SELECTOR,
   EventBus,
+  GasEstimationFailedError,
   IS_APPROVED_FOR_ALL_SELECTOR,
   NAME_SELECTOR,
   OWNER_OF_SELECTOR,
@@ -16,6 +17,7 @@ import {
   ProviderUnavailableError,
   areAddressesEqual,
   chainIdToHex,
+  functionSelector,
   namehash,
   reverseNode,
   toAddress,
@@ -66,6 +68,8 @@ class FakeProvider implements IProvider {
   readonly #readCollections: () => IFakeCollections
   readonly #readApprovals: () => IFakeApprovals
   readonly #readLogsError: () => string | null
+  readonly #readCallRevert: () => { readonly to: string; readonly reason: string } | null
+  readonly #readCallFails: () => boolean
   readonly #events = new EventBus<ProviderEventMap>()
 
   constructor(
@@ -83,6 +87,8 @@ class FakeProvider implements IProvider {
     readCollections: () => IFakeCollections,
     readApprovals: () => IFakeApprovals,
     readLogsError: () => string | null,
+    readCallRevert: () => { readonly to: string; readonly reason: string } | null,
+    readCallFails: () => boolean,
   ) {
     this.chainId = chainId
     this.#reportedChainId = reportedChainId
@@ -98,6 +104,8 @@ class FakeProvider implements IProvider {
     this.#readCollections = readCollections
     this.#readApprovals = readApprovals
     this.#readLogsError = readLogsError
+    this.#readCallRevert = readCallRevert
+    this.#readCallFails = readCallFails
   }
 
   request<TResult>(request: { readonly method: string }): Promise<TResult> {
@@ -170,9 +178,34 @@ class FakeProvider implements IProvider {
 
     const answer = answerEnsCall(request, this.#readEnsRecords())
 
-    return answer === null
-      ? Promise.reject(new Error('Не поддержано дублёром.'))
-      : Promise.resolve(answer)
+    if (answer !== null) {
+      return Promise.resolve(answer)
+    }
+
+    if (this.#readCallFails()) {
+      return Promise.reject(new Error('the node did not answer'))
+    }
+
+    const revert = this.#readCallRevert()
+
+    if (revert !== null && areAddressesEqual(toAddress(revert.to), request.to)) {
+      /* Настоящий узел отвечает на откат ошибкой с данными причины,
+         и разбор этих данных — то, ради чего существует проверка. */
+      return Promise.reject(
+        new GasEstimationFailedError(revert.reason, {
+          revertData: encodeErrorString(revert.reason),
+        }),
+      )
+    }
+
+    /* ПЕРЕВОД БЕЗ ДАННЫХ ВЫЗОВА УЗЕЛ ВЫПОЛНЯЕТ И ВОЗВРАЩАЕТ ПУСТО.
+       Дублёр, отказывающий здесь, превратил бы обычную отправку
+       в «проверить не удалось» во всех проверках разом. */
+    if (request.data === undefined || request.data === '0x') {
+      return Promise.resolve('0x' as HexString)
+    }
+
+    return Promise.reject(new Error('Не поддержано дублёром.'))
   }
 
   /**
@@ -343,6 +376,22 @@ export interface IFakeProviderOptions {
 
   /** Журнальные записи, доступные выборке. По умолчанию их нет. */
   readonly logs?: readonly ILogEntry[]
+
+  /**
+   * Адрес, вызовы к которому откатываются с заданной причиной.
+   *
+   * Нужен проверкам предварительного прогона: без отката проверить,
+   * что причина контракта доходит до экрана, нечем.
+   */
+  readonly callRevert?: { readonly to: string; readonly reason: string }
+
+  /**
+   * Узел не отвечает на `eth_call`.
+   *
+   * Отличается от отката: там вызов выполнен и отвергнут, здесь —
+   * не выполнен вовсе, и говорить о нём нечего.
+   */
+  readonly callFails?: boolean
 
   /**
    * Номер последнего блока.
@@ -577,6 +626,8 @@ export class FakeProviderFactory implements IProviderFactory {
         operators: this.#options.operatorApprovals ?? [],
       }),
       () => this.#options.logsError ?? null,
+      () => this.#options.callRevert ?? null,
+      () => this.#options.callFails ?? false,
     )
 
     this.createdCount += 1
@@ -584,6 +635,21 @@ export class FakeProviderFactory implements IProviderFactory {
 
     return Promise.resolve(provider)
   }
+}
+
+/**
+ * Кодирует `Error(string)` так, как это делает виртуальная машина.
+ *
+ * Дублёр обязан отвечать в том же виде, что и узел: разбор именно этих
+ * данных и проверяется.
+ */
+function encodeErrorString(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  const body = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  const offset = 32n.toString(16).padStart(64, '0')
+  const length = BigInt(bytes.length).toString(16).padStart(64, '0')
+
+  return `0x${functionSelector('Error(string)')}${offset}${length}${body.padEnd(Math.ceil(body.length / 64) * 64, '0')}`
 }
 
 /**

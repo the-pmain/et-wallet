@@ -62,7 +62,7 @@ async function fillAndContinue(recipient: string, amount: string): Promise<void>
  * Проходит подтверждение отправки целиком, включая повторный ввод пароля.
  *
  * Пароль спрашивается по умолчанию: он защищает от того, кто получил
- * access to an already unlocked wallet.
+ * доступ к уже разблокированному кошельку.
  */
 async function confirmAndSend(): Promise<void> {
   const user = userEvent.setup()
@@ -552,5 +552,61 @@ describe('Отправка: получатель — контракт самог
     await screen.findByRole('heading', { name: 'Confirmation' })
 
     expect(screen.queryByText(/recipient is the token contract itself/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('Проверка вызова до подписи', () => {
+  it('пройденная проверка названа проверкой текущего состояния, а не обещанием', async () => {
+    /* «Транзакция пройдёт» — обещание, которого кошелёк выполнить
+       не может: между проверкой и включением в блок состояние
+       меняется. */
+    renderApp()
+    await openSend()
+    await fillAndContinue(RECIPIENT, '1')
+
+    expect(await screen.findByText(/ran this call without an error/i)).toBeInTheDocument()
+    expect(screen.getByText(/It is not a promise/i)).toBeInTheDocument()
+  })
+
+  it('откат показывается до подписи вместе с причиной контракта', async () => {
+    /* Отправив такую транзакцию, человек сжёг бы газ и не получил
+       ничего. Причина словами контракта указывает, что исправить. */
+    services.providerFactory.configure({
+      balance: BALANCE,
+      callRevert: { to: RECIPIENT, reason: 'the recipient is on a deny list' },
+    })
+
+    renderApp()
+    await openSend()
+    await fillAndContinue(RECIPIENT, '1')
+
+    expect(await screen.findByText(/The call would fail/i)).toBeInTheDocument()
+    expect(screen.getByText(/the recipient is on a deny list/i)).toBeInTheDocument()
+  })
+
+  it('отказ проверки не выдаётся за успешную проверку', async () => {
+    /* Молчание узла не подтверждает ничего, и молчание кошелька
+       об этом читается как «проверено». */
+    services.providerFactory.configure({ balance: BALANCE, callFails: true })
+
+    renderApp()
+    await openSend()
+    await fillAndContinue(RECIPIENT, '1')
+
+    expect(await screen.findByText(/could not be checked/i)).toBeInTheDocument()
+    expect(screen.getByText(/not the same as a successful check/i)).toBeInTheDocument()
+  })
+
+  it('отказ проверки отправку не запрещает', async () => {
+    /* Решение остаётся за владельцем средств: он мог знать
+       о встречной транзакции, которой узел ещё не видит. */
+    services.providerFactory.configure({ balance: BALANCE, callFails: true })
+
+    renderApp()
+    await openSend()
+    await fillAndContinue(RECIPIENT, '1')
+    await screen.findByText(/could not be checked/i)
+
+    expect(screen.getByRole('button', { name: 'Confirm and send' })).toBeEnabled()
   })
 })

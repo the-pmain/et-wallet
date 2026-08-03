@@ -91,8 +91,35 @@ export class InsufficientFundsError extends AppError {
 export class GasEstimationFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.GasEstimationFailed
 
-  constructor(reason: string, options?: ErrorOptions) {
+  /**
+   * Данные отката, возвращённые контрактом.
+   *
+   * СОХРАНЯЮТСЯ СЫРЫМИ, потому что разобрать их можно не всегда.
+   * Стандартную причину `Error(string)` библиотека раскрывает сама,
+   * но собственные ошибки контрактов — это четырёхбайтовый признак,
+   * смысл которого без описания контракта неизвестен. Показать
+   * пользователю сам признак честнее, чем заменить его словами
+   * «вызов отклонён»: по признаку можно найти причину, по общей
+   * фразе — нельзя.
+   *
+   * `null` — узел данных не вернул.
+   */
+  readonly revertData: string | null
+
+  /**
+   * Причина отдельно от текста ошибки.
+   *
+   * Текст описывает неудачу оценки газа, а причина принадлежит вызову
+   * и годится там, где об оценке речи нет: при проверке вызова до
+   * подписи фраза «не удалось оценить газ» ввела бы в заблуждение.
+   */
+  readonly reason: string
+
+  constructor(reason: string, options?: ErrorOptions & { readonly revertData?: string | null }) {
     super(`The gas limit could not be estimated: ${reason}`, options)
+
+    this.reason = reason
+    this.revertData = options?.revertData ?? null
   }
 }
 
