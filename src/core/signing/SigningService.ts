@@ -63,7 +63,7 @@ export class SigningService implements ISigningService {
        пользователю, и отменить это невозможно. */
     SigningService.#assertKeyMatchesSender(signingKey, transaction.from)
 
-    const unsigned = SigningService.#toEthersTransaction(transaction)
+    const unsigned = toEthersTransaction(transaction)
     const signature = signingKey.sign(unsigned.unsignedHash)
 
     unsigned.signature = signature
@@ -217,30 +217,6 @@ export class SigningService implements ISigningService {
     return new SigningKey(`0x${bytesToHex(bytes)}`)
   }
 
-  /** Собирает транзакцию ethers из доменной структуры. */
-  static #toEthersTransaction(transaction: ISignableTransaction): Transaction {
-    const type = ETHERS_TRANSACTION_TYPE[transaction.type]
-
-    if (type === undefined) {
-      throw new InvalidArgumentError('transaction.type', `unknown type "${transaction.type}"`)
-    }
-
-    return Transaction.from({
-      type,
-      chainId: transaction.chainId,
-      to: transaction.to,
-      nonce: transaction.nonce,
-      gasLimit: transaction.gasLimit,
-      value: transaction.value,
-      data: transaction.data,
-      ...(transaction.gasPrice === null ? {} : { gasPrice: transaction.gasPrice }),
-      ...(transaction.maxFeePerGas === null ? {} : { maxFeePerGas: transaction.maxFeePerGas }),
-      ...(transaction.maxPriorityFeePerGas === null
-        ? {}
-        : { maxPriorityFeePerGas: transaction.maxPriorityFeePerGas }),
-    })
-  }
-
   static #hexToBytes(value: string): Uint8Array {
     const body = value.startsWith('0x') ? value.slice(2) : value
     const bytes = new Uint8Array(body.length / 2)
@@ -251,4 +227,35 @@ export class SigningService implements ISigningService {
 
     return bytes
   }
+}
+
+/**
+ * Собирает транзакцию ethers из доменной структуры.
+ *
+ * ВЫНЕСЕНА ИЗ КЛАССА, потому что тем же преобразованием пользуется
+ * подпись на аппаратном устройстве: ей нужны те же самые байты,
+ * которые уходят в подпись здесь. Два преобразования означали бы два
+ * представления об одной транзакции, и разойтись они могли бы молча.
+ */
+export function toEthersTransaction(transaction: ISignableTransaction): Transaction {
+  const type = ETHERS_TRANSACTION_TYPE[transaction.type]
+
+  if (type === undefined) {
+    throw new InvalidArgumentError('transaction.type', `unknown type "${transaction.type}"`)
+  }
+
+  return Transaction.from({
+    type,
+    chainId: transaction.chainId,
+    to: transaction.to,
+    nonce: transaction.nonce,
+    gasLimit: transaction.gasLimit,
+    value: transaction.value,
+    data: transaction.data,
+    ...(transaction.gasPrice === null ? {} : { gasPrice: transaction.gasPrice }),
+    ...(transaction.maxFeePerGas === null ? {} : { maxFeePerGas: transaction.maxFeePerGas }),
+    ...(transaction.maxPriorityFeePerGas === null
+      ? {}
+      : { maxPriorityFeePerGas: transaction.maxPriorityFeePerGas }),
+  })
 }

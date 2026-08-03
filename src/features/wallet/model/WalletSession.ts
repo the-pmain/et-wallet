@@ -66,6 +66,8 @@ import {
   type ITokenTransferRequest,
   type ITransferRecord,
   type HexString,
+  type IAddHardwareAccountParams,
+  type IHardwareDevice,
   type IPreflightRequest,
   type IPreflightResult,
   PREFLIGHT_OUTCOME,
@@ -184,6 +186,9 @@ export interface IWalletSessionDependencies {
    */
   readonly historyProviders?: readonly IHistoryProvider[]
 
+  /** Подключение аппаратного кошелька по требованию. */
+  readonly connectHardware?: () => Promise<IHardwareDevice>
+
   /**
    * Источник курсов.
    *
@@ -219,6 +224,15 @@ export class WalletSession implements IWalletSession {
   readonly #customRpc: CustomRpcProvider
   readonly #rpcProviders: readonly IRpcProvider[]
   readonly #historyProviders: readonly IHistoryProvider[]
+
+  /**
+   * Соединение с аппаратным кошельком.
+   *
+   * Внедряется снаружи: WebHID существует только в браузере, и сессия
+   * о нём знать не обязана. Отсутствие означает сборку без поддержки
+   * устройств.
+   */
+  readonly #connectHardware: (() => Promise<IHardwareDevice>) | null
   readonly #priceProvider: IPriceProvider
   readonly #listeners = new Set<() => void>()
 
@@ -283,6 +297,7 @@ export class WalletSession implements IWalletSession {
       existingCustom === undefined ? [this.#customRpc, ...configured] : configured
 
     this.#historyProviders = dependencies.historyProviders ?? [new LogScanHistoryProvider()]
+    this.#connectHardware = dependencies.connectHardware ?? null
     this.#priceProvider = dependencies.priceProvider ?? new NullPriceProvider()
   }
 
@@ -1190,6 +1205,7 @@ export class WalletSession implements IWalletSession {
       secureStorage: this.#secureStorage,
       clock: this.#clock,
       logger: this.#logger,
+      ...(this.#connectHardware === null ? {} : { connectHardware: this.#connectHardware }),
     })
 
     await this.#accounts.init()
@@ -1847,6 +1863,21 @@ export class WalletSession implements IWalletSession {
       fees: await transactions.estimateFees(transaction),
       preflight: await this.#preflight(transaction),
     }
+  }
+
+  /**
+   * Добавляет аккаунт аппаратного кошелька.
+   *
+   * Секрета здесь нет: сохраняются адрес и путь, ключ остаётся
+   * в устройстве.
+   */
+  async addHardwareAccount(params: IAddHardwareAccountParams): Promise<IAccount> {
+    const accounts = this.#requireAccounts()
+    const account = await accounts.addHardwareAccount(params)
+
+    this.#publish({ ...this.#snapshot, accounts: accounts.listVisible() })
+
+    return account
   }
 
   /**

@@ -7,6 +7,7 @@ import type {
   IBackupManager,
   IBalance,
   IDappRequest,
+  IAddHardwareAccountParams,
   IHistoryCursor,
   IHistoryLimits,
   IPreflightResult,
@@ -397,6 +398,15 @@ export interface IWalletSession {
    * сообщать его оператору, что кошелёк открыт.
    */
   setBackgroundRefreshEnabled(enabled: boolean): void
+
+  /**
+   * Добавляет аккаунт аппаратного кошелька.
+   *
+   * Адрес обязан быть подтверждён на экране устройства до вызова:
+   * страница загружается с сервера и может показать не то, что
+   * выведено ключом.
+   */
+  addHardwareAccount(params: IAddHardwareAccountParams): Promise<IAccount>
 
   /**
    * Прогоняет вызов приложения на узле до показа подтверждения.

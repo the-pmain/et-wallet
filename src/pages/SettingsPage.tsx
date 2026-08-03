@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 
 import { APP_CONFIG } from '@/shared/config'
+import { HardwareAccountForm } from '@/features/hardware'
 import { useOnboarding } from '@/features/onboarding'
 import { AUTO_LOCK_OPTIONS, StorageDurabilityAlert, useSecurity } from '@/features/security'
 import {
@@ -265,6 +266,10 @@ export function SettingsPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Аппаратный кошелёк идёт после списка аккаунтов: это способ
+          добавить ещё один, а не отдельный раздел настроек. */}
+      <HardwareAccountForm />
 
       <NetworkList
         networks={snapshot.networks}

@@ -7,11 +7,13 @@ import {
   CustomRpcProvider,
   EncryptionService,
   IndexedDbStorageService,
+  LedgerDevice,
   PublicRpcProvider,
   SecureStorage,
   SystemClock,
   UnlockThrottle,
   type IClock,
+  type IHardwareDevice,
   type IStorageService,
 } from '@/core'
 import { DappSessionService, WalletConnectTransport } from '@/features/dapp'
@@ -96,6 +98,7 @@ export function createAppServices(): IAppServices {
     rpcProviders: createRpcProviders(secureStorage),
     historyProviders: createHistoryProviders(),
     priceProvider: createPriceProvider(),
+    connectHardware: connectLedger,
   })
 
   const broadcast = new WalletBroadcast()
@@ -231,4 +234,22 @@ function createRpcProviders(secureStorage: SecureStorage) {
     new AlchemyProvider({ apiKey }),
     new PublicRpcProvider(),
   ]
+}
+
+/**
+ * Подключение аппаратного кошелька.
+ *
+ * СОЕДИНЕНИЕ ОТКРЫВАЕТСЯ НА КАЖДУЮ ОПЕРАЦИЮ И НЕ КЭШИРУЕТСЯ. Устройство
+ * вынимают из разъёма когда угодно, а разрешение браузера действует
+ * на выбранное устройство, а не навсегда: держать соединение открытым
+ * значило бы обещать доступ, которого может уже не быть, и узнавать
+ * об этом в середине подписи.
+ *
+ * Библиотека соединения загружается отдельным модулем: она нужна
+ * единицам, а весит достаточно, чтобы её не тащить всем.
+ */
+async function connectLedger(): Promise<IHardwareDevice> {
+  const { WebHidTransport } = await import('@/features/hardware')
+
+  return new LedgerDevice(await WebHidTransport.connect())
 }

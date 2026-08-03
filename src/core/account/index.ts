@@ -22,6 +22,7 @@ export { ImportedKeyStore } from './ImportedKeyStore'
 export type {
   AccountEventMap,
   IAccount,
+  IAddHardwareAccountParams,
   ICreateAccountParams,
   IImportPrivateKeyParams,
 } from './types'

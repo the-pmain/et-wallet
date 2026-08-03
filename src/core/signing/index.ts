@@ -1,5 +1,5 @@
 export type { ISigningService, SignableMessage } from './contracts'
-export { SigningService } from './SigningService'
+export { SigningService, toEthersTransaction } from './SigningService'
 export {
   assertTypedDataMatchesChain,
   hashTypedData,

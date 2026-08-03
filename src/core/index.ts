@@ -435,6 +435,7 @@ export {
   type IAccountManager,
   type IAccountManagerDependencies,
   type IAccountRepository,
+  type IAddHardwareAccountParams,
   type ICreateAccountParams,
   type IDiscoveryResult,
   type IImportPrivateKeyParams,
@@ -653,6 +654,19 @@ export {
   type TransactionStatus,
   type TransactionType,
 } from './transaction'
+
+/* --- Аппаратные кошельки --- */
+export {
+  HardwareDeviceError,
+  LedgerDevice,
+  USER_REJECTED_ON_DEVICE,
+  buildSignature,
+  encodeDerivationPath,
+  hashTypedDataParts,
+  type IApduTransport,
+  type IHardwareAddress,
+  type IHardwareDevice,
+} from './hardware'
 
 /* --- Фасад и внедрение зависимостей --- */
 export type { IWalletCoreConfig, IWalletManager, WalletCoreEventMap } from './manager'

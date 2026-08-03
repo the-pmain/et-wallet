@@ -1,5 +1,5 @@
 import type { ISecretBuffer } from '@/core/encryption'
-import type { KeyringType } from '@/core/keyring'
+import type { KEYRING_TYPE, KeyringType } from '@/core/keyring'
 import type { AccountId, Address, DerivationPath, KeyringId, Timestamp } from '@/core/types'
 
 /**
@@ -103,4 +103,22 @@ export interface AccountEventMap {
 
   /** Активный аккаунт изменён. */
   'account:activeChanged': { readonly address: Address }
+}
+
+/**
+ * Параметры добавления аккаунта аппаратного кошелька.
+ *
+ * Секрета среди них нет: адрес и путь — публичные сведения, а ключ
+ * остаётся в устройстве.
+ */
+export interface IAddHardwareAccountParams {
+  readonly type: typeof KEYRING_TYPE.Ledger | typeof KEYRING_TYPE.Trezor
+
+  /** Адрес, прочитанный с устройства и подтверждённый пользователем. */
+  readonly address: Address
+
+  /** Путь, по которому устройство его вывело. */
+  readonly path: DerivationPath
+
+  readonly name?: string
 }

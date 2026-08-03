@@ -1,3 +1,5 @@
+import { keccak256, toUtf8Bytes } from 'ethers'
+
 import { areAddressesEqual, privateKeyToAddress } from '@/core/address'
 import { withSecretSync, type ISecretBuffer, type ISecureStorage } from '@/core/encryption'
 import { EventBus, type EventListener } from '@/core/events'
@@ -11,13 +13,28 @@ import {
   KeyringCannotSignError,
   NotInitializedError,
 } from '@/core/errors'
+import { HardwareDeviceError, type IHardwareDevice } from '@/core/hardware'
 import type { IHDWalletService } from '@/core/hdwallet'
-import { KEYRING_TYPE } from '@/core/keyring'
+import { KEYRING_TYPE, type KeyringType } from '@/core/keyring'
 import type { IClock, ILogger } from '@/core/platform'
 import { EXPORT_KIND, importedKeyScope, type ExportPermit } from '@/core/security'
-import { SigningService, type ISigningService, type SignableMessage } from '@/core/signing'
+import {
+  SigningService,
+  assertTypedDataMatchesChain,
+  type ISigningService,
+  type SignableMessage,
+} from '@/core/signing'
 import type { ISignableTransaction, ISignedTransaction, ITypedData } from '@/core/transaction'
-import type { AccountId, Address, ChainId, HexString, KeyringId, Unsubscribe } from '@/core/types'
+import type {
+  AccountId,
+  Address,
+  ChainId,
+  DerivationPath,
+  HexString,
+  KeyringId,
+  Unsubscribe,
+} from '@/core/types'
+import { toTxHash } from '@/core/types'
 
 import { AccountRepository } from './AccountRepository'
 import type { IAccountManager, IAccountRepository } from './contracts'
@@ -25,12 +42,14 @@ import {
   HD_KEYRING_ID,
   createAccountId,
   defaultAccountName,
+  hardwareKeyringId,
   normalizeAccountName,
 } from './identity'
 import { ImportedKeyStore } from './ImportedKeyStore'
 import type {
   AccountEventMap,
   IAccount,
+  IAddHardwareAccountParams,
   ICreateAccountParams,
   IImportPrivateKeyParams,
 } from './types'
@@ -60,6 +79,19 @@ export interface IAccountManagerDependencies {
 
   readonly clock: IClock
   readonly logger: ILogger
+
+  /**
+   * Соединение с аппаратным кошельком по требованию.
+   *
+   * ФУНКЦИЯ, А НЕ ГОТОВЫЙ ОБЪЕКТ. Устройство подключают к разъёму
+   * и отключают когда угодно, а браузер выдаёт доступ к нему только
+   * по явному действию человека. Держать соединение открытым между
+   * операциями значило бы обещать доступ, которого может уже не быть.
+   *
+   * Отсутствие означает сборку без поддержки устройств: подпись
+   * аппаратным аккаунтом в ней отвергается с внятной причиной.
+   */
+  readonly connectHardware?: () => Promise<IHardwareDevice>
 }
 
 /**
@@ -79,6 +111,7 @@ export class AccountManager implements IAccountManager {
   readonly #repository: IAccountRepository
   readonly #hdWallet: IHDWalletService
   readonly #secureStorage: ISecureStorage
+  readonly #connectHardware: (() => Promise<IHardwareDevice>) | null
   readonly #importedKeys: ImportedKeyStore
 
   /* Подпись импортированным ключом выполняется здесь же: ключ не должен
@@ -106,6 +139,7 @@ export class AccountManager implements IAccountManager {
     this.#repository = dependencies.repository
     this.#hdWallet = dependencies.hdWallet
     this.#secureStorage = dependencies.secureStorage
+    this.#connectHardware = dependencies.connectHardware ?? null
     this.#importedKeys = new ImportedKeyStore(dependencies.secureStorage)
     this.#clock = dependencies.clock
     this.#logger = dependencies.logger.child(SERVICE_NAME)
@@ -382,6 +416,16 @@ export class AccountManager implements IAccountManager {
       )
     }
 
+    if (isHardware(account.source)) {
+      return await this.#signOnDevice(account, (device, path) =>
+        device.signTransaction(path, transaction),
+      ).then((raw) => ({
+        raw,
+        hash: toTxHash(keccak256(raw)),
+        transaction,
+      }))
+    }
+
     if (account.addressIndex === null) {
       throw new KeyringCannotSignError(account.keyringId)
     }
@@ -404,6 +448,12 @@ export class AccountManager implements IAccountManager {
     if (account.source === KEYRING_TYPE.PrivateKey) {
       return withSecretSync(await this.#importedKeys.load(id), (key) =>
         this.#signing.signMessage(message, key),
+      )
+    }
+
+    if (isHardware(account.source)) {
+      return await this.#signOnDevice(account, (device, path) =>
+        device.signMessage(path, toMessageBytes(message)),
       )
     }
 
@@ -439,11 +489,94 @@ export class AccountManager implements IAccountManager {
       )
     }
 
+    if (isHardware(account.source)) {
+      /* Сеть сверяется здесь: устройство получит два готовых хэша и
+         проверить домен уже не сможет. */
+      assertTypedDataMatchesChain(data, expectedChainId)
+
+      return await this.#signOnDevice(account, (device, path) => device.signTypedData(path, data))
+    }
+
     if (account.addressIndex === null) {
       throw new KeyringCannotSignError(account.keyringId)
     }
 
     return this.#hdWallet.signTypedData(account.addressIndex, data, expectedChainId)
+  }
+
+  /**
+   * Выполняет операцию подписи на устройстве.
+   *
+   * АДРЕС СВЕРЯЕТСЯ ДО ПОДПИСИ. Устройство подписывает тем ключом,
+   * который лежит по указанному пути; путь хранится у нас, а связь
+   * пути с адресом установлена при добавлении аккаунта. Подключи
+   * человек другое устройство — по тому же пути окажется другой ключ,
+   * и подпись ушла бы от чужого имени. Проверка стоит одного обращения
+   * и снимает этот случай целиком.
+   */
+  async #signOnDevice<TResult>(
+    account: IAccount,
+    operation: (device: IHardwareDevice, path: DerivationPath) => Promise<TResult>,
+  ): Promise<TResult> {
+    if (this.#connectHardware === null) {
+      throw new KeyringCannotSignError(account.keyringId)
+    }
+
+    const path = account.derivationPath
+
+    if (path === null) {
+      throw new KeyringCannotSignError(account.keyringId)
+    }
+
+    const device = await this.#connectHardware()
+    const onDevice = await device.getAddress(path)
+
+    if (!areAddressesEqual(onDevice.address, account.address)) {
+      throw new HardwareDeviceError(
+        'the connected device holds a different address at this path: it is not the device this account was added from',
+      )
+    }
+
+    return await operation(device, path)
+  }
+
+  /**
+   * Добавляет аккаунт аппаратного кошелька.
+   *
+   * СЕКРЕТА ЗДЕСЬ НЕТ И БЫТЬ НЕ МОЖЕТ. Сохраняются только адрес и путь;
+   * ключ остаётся в устройстве, и без него аккаунт не подпишет ничего.
+   * Поэтому такой аккаунт можно удалить по-настоящему, в отличие
+   * от выведенного из seed-фразы.
+   */
+  async addHardwareAccount(params: IAddHardwareAccountParams): Promise<IAccount> {
+    this.#assertInitialized()
+
+    const existing = this.getByAddress(params.address)
+
+    if (existing !== null) {
+      throw new AccountAlreadyExistsError(params.address)
+    }
+
+    const order = this.#accounts.size
+    const account: IAccount = {
+      id: createAccountId(),
+      address: params.address,
+      name: normalizeAccountName(params.name ?? defaultAccountName(order)),
+      source: params.type,
+      keyringId: hardwareKeyringId(params.type),
+      derivationPath: params.path,
+      /* Индекса в нашем дереве у него нет: дерево живёт в устройстве. */
+      addressIndex: null,
+      order,
+      hidden: false,
+      createdAt: this.#clock.now(),
+    }
+
+    await this.#persist(account)
+
+    this.#logger.info('A hardware wallet account was added', { path: params.path })
+
+    return account
   }
 
   async exportPrivateKey(
@@ -569,4 +702,26 @@ export class AccountManager implements IAccountManager {
       throw new NotInitializedError(SERVICE_NAME)
     }
   }
+}
+
+/**
+ * Живёт ли ключ аккаунта в отдельном устройстве.
+ *
+ * Проверка по типу источника, а не по отсутствию индекса: у наблюдаемого
+ * аккаунта индекса тоже нет, но подписать он не может ничем.
+ */
+function isHardware(source: KeyringType): boolean {
+  return source === KEYRING_TYPE.Ledger || source === KEYRING_TYPE.Trezor
+}
+
+/**
+ * Приводит сообщение к байтам.
+ *
+ * Строка кодируется UTF-8 — тем же способом, что и внутри `personal_sign`.
+ * Иначе подпись пришлась бы на другие байты, чем при подписи
+ * программным ключом, и два аккаунта одного кошелька давали бы разные
+ * подписи одного сообщения.
+ */
+function toMessageBytes(message: SignableMessage): Uint8Array {
+  return typeof message === 'string' ? toUtf8Bytes(message) : Uint8Array.from(message)
 }
