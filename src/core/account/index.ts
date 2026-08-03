@@ -1,3 +1,11 @@
+export {
+  DEFAULT_GAP_LIMIT,
+  MAX_SCANNED_ADDRESSES,
+  discoverUsedAccounts,
+  type AddressAt,
+  type IDiscoveryOptions,
+  type IDiscoveryResult,
+} from './AccountDiscovery'
 export { AccountManager, type IAccountManagerDependencies } from './AccountManager'
 export { AccountRepository } from './AccountRepository'
 export type { IAccountManager, IAccountRepository } from './contracts'

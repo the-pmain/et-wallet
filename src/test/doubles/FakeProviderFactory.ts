@@ -52,6 +52,10 @@ class FakeProvider implements IProvider {
      Соединения переиспользуются пулом, и тест, меняющий настройки
      после первого запроса, иначе не увидел бы нового значения. */
   readonly #readBalance: () => Wei | null
+  readonly #readBalancesByAddress: () => readonly {
+    readonly address: string
+    readonly balance: Wei
+  }[]
   readonly #readFeeData: () => IFeeData | null
   readonly #readSendError: () => string | null
   readonly #readLogs: () => readonly ILogEntry[]
@@ -68,6 +72,7 @@ class FakeProvider implements IProvider {
     chainId: ChainId,
     reportedChainId: ChainId,
     readBalance: () => Wei | null,
+    readBalancesByAddress: () => readonly { readonly address: string; readonly balance: Wei }[],
     readFeeData: () => IFeeData | null,
     readSendError: () => string | null,
     readLogs: () => readonly ILogEntry[],
@@ -82,6 +87,7 @@ class FakeProvider implements IProvider {
     this.chainId = chainId
     this.#reportedChainId = reportedChainId
     this.#readBalance = readBalance
+    this.#readBalancesByAddress = readBalancesByAddress
     this.#readFeeData = readFeeData
     this.#readSendError = readSendError
     this.#readLogs = readLogs
@@ -114,7 +120,15 @@ class FakeProvider implements IProvider {
     return Promise.resolve(this.#readLatestBlock())
   }
 
-  getBalance(): Promise<Wei> {
+  getBalance(address: Address): Promise<Wei> {
+    const perAddress = this.#readBalancesByAddress().find((entry) =>
+      areAddressesEqual(entry.address, address),
+    )
+
+    if (perAddress !== undefined) {
+      return Promise.resolve(perAddress.balance)
+    }
+
     const balance = this.#readBalance()
 
     /* Отказ по умолчанию намеренный: тест, забывший задать баланс,
@@ -297,6 +311,15 @@ export interface IFakeProviderOptions {
 
   /** Баланс, возвращаемый `getBalance`. Без него метод отвечает отказом. */
   readonly balance?: Wei
+
+  /**
+   * Балансы отдельных адресов.
+   *
+   * Нужны поиску занятых адресов: он отличает использованный адрес
+   * от пустого, и общий баланс на все адреса сделал бы проверку
+   * бессмысленной.
+   */
+  readonly balancesByAddress?: readonly { readonly address: string; readonly balance: Wei }[]
 
   /**
    * Проверять chainId при создании, как это делает `RpcClientFactory`.
@@ -536,6 +559,7 @@ export class FakeProviderFactory implements IProviderFactory {
       network.chainId,
       reportedChainId,
       () => this.#options.balance ?? null,
+      () => this.#options.balancesByAddress ?? [],
       () => this.#options.feeData ?? null,
       () => this.#options.sendError ?? null,
       () => this.#options.logs ?? [],

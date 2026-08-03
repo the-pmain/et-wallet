@@ -1,4 +1,4 @@
-import { Check, KeyRound, Plus } from 'lucide-react'
+import { Check, KeyRound, Plus, Search } from 'lucide-react'
 
 import { KEYRING_TYPE, type AccountId, type IAccount } from '@/core'
 import { cn } from '@/shared/lib/utils'
@@ -14,6 +14,17 @@ interface AccountListProps {
   readonly activeAccount: IAccount | null
   readonly onSelect: (id: AccountId) => void
   readonly onCreate: () => void
+
+  /**
+   * Запускает поиск адресов, которыми уже пользовались.
+   *
+   * Необязателен: список используется и там, где искать нечем.
+   */
+  readonly onDiscover?: (() => void) | undefined
+
+  /** Идёт поиск: кнопка занята, а не исчезает. */
+  readonly isDiscovering?: boolean
+
   readonly isBusy: boolean
 
   /**
@@ -45,6 +56,8 @@ export function AccountList({
   activeAccount,
   onSelect,
   onCreate,
+  onDiscover,
+  isDiscovering = false,
   isBusy,
   ensNames = EMPTY_ENS_NAMES,
 }: AccountListProps) {
@@ -55,10 +68,28 @@ export function AccountList({
         {/* Имя действия полное, а не «Добавить»: на экране есть вторая
             кнопка добавления — для RPC-узла. Одинаковые имена неразличимы
             в экранном дикторе и в списке элементов управления. */}
-        <Button variant="ghost" size="sm" onClick={onCreate} disabled={isBusy}>
-          <Plus className="size-4" aria-hidden />
-          Add an account
-        </Button>
+        <div className="flex items-center gap-1">
+          {/* ПОИСК ОТДЕЛЬНОЙ КНОПКОЙ, А НЕ САМ ПО СЕБЕ. Он сообщает
+              оператору узла два десятка адресов разом и связывает их
+              между собой; делать это без спроса при каждом открытии
+              настроек значило бы раскрывать больше, чем нужно. */}
+          {onDiscover === undefined ? null : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDiscover}
+              disabled={isBusy || isDiscovering}
+            >
+              <Search className="size-4" aria-hidden />
+              {isDiscovering ? 'Searching…' : 'Find my accounts'}
+            </Button>
+          )}
+
+          <Button variant="ghost" size="sm" onClick={onCreate} disabled={isBusy}>
+            <Plus className="size-4" aria-hidden />
+            Add an account
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent>

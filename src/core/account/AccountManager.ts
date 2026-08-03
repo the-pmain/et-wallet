@@ -200,7 +200,10 @@ export class AccountManager implements IAccountManager {
        а не как число аккаунтов. Удалить HD-аккаунт нельзя, но можно
        скрыть, и подсчёт по количеству дал бы повторный индекс — два
        аккаунта с одним адресом. */
-    const addressIndex = this.#nextAddressIndex()
+    /* Явный номер приходит от восстановления: там адреса найдены
+       в дереве, и между ними бывают пропуски. Без него берётся
+       следующий свободный. */
+    const addressIndex = params.addressIndex ?? this.#nextAddressIndex()
     const order = this.#accounts.size
     const account: IAccount = {
       id: createAccountId(),

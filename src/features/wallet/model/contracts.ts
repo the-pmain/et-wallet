@@ -51,6 +51,23 @@ export interface IPreparedTransfer {
   readonly fees: readonly IFeeEstimate[]
 }
 
+/** Итог поиска занятых адресов. */
+export interface IAccountDiscoverySummary {
+  /** Сколько аккаунтов добавлено. */
+  readonly added: number
+
+  /** Сколько адресов проверено. Нужно, чтобы честно назвать глубину. */
+  readonly scanned: number
+
+  /**
+   * Поиск прекращён пределом, а не промежутком пустых адресов.
+   *
+   * Значит, дальше могли остаться занятые, и говорить «это все ваши
+   * аккаунты» нельзя.
+   */
+  readonly stoppedByLimit: boolean
+}
+
 /**
  * Итог разбора того, что введено в поле получателя.
  *
@@ -307,6 +324,14 @@ export interface IWalletSession {
 
   /** Создаёт следующий аккаунт HD-дерева. */
   createAccount(name?: string): Promise<void>
+
+  /**
+   * Ищет адреса, которыми уже пользовались, и добавляет недостающие.
+   *
+   * Нужен восстановленному кошельку: адреса выводятся из seed-фразы,
+   * но кошелёк о них не знает, пока не выведет.
+   */
+  discoverAccounts(): Promise<IAccountDiscoverySummary>
 
   /** Переключает активную сеть. */
   switchNetwork(chainId: ChainId): Promise<void>

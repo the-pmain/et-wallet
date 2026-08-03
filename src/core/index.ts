@@ -418,6 +418,9 @@ export {
 /* --- Аккаунты --- */
 export {
   AccountManager,
+  DEFAULT_GAP_LIMIT,
+  MAX_SCANNED_ADDRESSES,
+  discoverUsedAccounts,
   AccountRepository,
   HD_KEYRING_ID,
   ImportedKeyStore,
@@ -433,6 +436,7 @@ export {
   type IAccountManagerDependencies,
   type IAccountRepository,
   type ICreateAccountParams,
+  type IDiscoveryResult,
   type IImportPrivateKeyParams,
 } from './account'
 

@@ -4,6 +4,7 @@ import {
   BalanceService,
   BUILT_IN_NETWORKS,
   CustomRpcProvider,
+  discoverUsedAccounts,
   DEFAULT_CHAIN_ID,
   EnsService,
   ExportAuditLog,
@@ -74,6 +75,7 @@ import {
   SESSION_STATE,
   type IPreparedTransfer,
   type IRecipientResolution,
+  type IAccountDiscoverySummary,
   type ITokenBalance,
   type IWalletSession,
   type IWalletSnapshot,
@@ -701,6 +703,103 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
+   * Ищет адреса, которыми уже пользовались, и добавляет недостающие.
+   *
+   * ЗАПУСКАЕТСЯ ВЛАДЕЛЬЦЕМ. Поиск сообщает оператору узла два десятка
+   * адресов разом и связывает их между собой; делать это без спроса
+   * при каждом запуске значило бы раскрывать больше, чем нужно.
+   * Исключение — первое открытие восстановленного кошелька: там цена
+   * молчания выше, и поиск выполняется сам, один раз.
+   *
+   * @returns Сколько аккаунтов добавлено.
+   */
+  async discoverAccounts(): Promise<IAccountDiscoverySummary> {
+    const accounts = this.#requireAccounts()
+    const hdWallet = this.#hdWallet
+
+    /* Сеть берётся у сервиса, а не из снимка: при первом открытии
+       поиск выполняется раньше, чем снимок заполнен, и по снимку
+       он молча не находил бы ничего. */
+    const network = this.#networks?.getActive() ?? null
+
+    if (network === null || hdWallet === null || this.#providers === null) {
+      return { added: 0, scanned: 0, stoppedByLimit: false }
+    }
+
+    const provider = await this.#providers.get(network)
+
+    const result = await discoverUsedAccounts(
+      provider,
+      (addressIndex: number) => hdWallet.getAddress(addressIndex),
+      this.#logger,
+    )
+
+    /* УПЁРЛИСЬ В ПРЕДЕЛ — ЗНАЧИТ, УЗЕЛ ОТВЕЧАЕТ НЕДОСТОВЕРНО.
+       Занятыми оказались все проверенные адреса подряд, чего у живого
+       кошелька не бывает: так выглядит либо узел-обманка, либо
+       неисправность. Создать по такому ответу две сотни аккаунтов
+       значило бы засорить кошелёк мусором, который нельзя удалить —
+       HD-аккаунты только скрываются. */
+    if (result.stoppedByLimit) {
+      this.#logger.warn(
+        'Account discovery stopped at the limit: the node answers for every address',
+      )
+
+      return { added: 0, scanned: result.scanned, stoppedByLimit: true }
+    }
+
+    /* Уже существующие адреса пропускаются: поиск повторяем,
+       а создание аккаунта — нет. */
+    const known = new Set(accounts.list().map((account) => account.address.toLowerCase()))
+
+    let added = 0
+
+    for (const addressIndex of result.usedIndexes) {
+      if (known.has(hdWallet.getAddress(addressIndex).toLowerCase())) {
+        continue
+      }
+
+      await accounts.create({ addressIndex })
+      added += 1
+    }
+
+    if (added > 0) {
+      this.#publish({ ...this.#snapshot, accounts: accounts.listVisible() })
+    }
+
+    return { added, scanned: result.scanned, stoppedByLimit: result.stoppedByLimit }
+  }
+
+  /**
+   * Выполняет поиск один раз за жизнь кошелька.
+   *
+   * Отказ не мешает открытию сессии: кошелёк с одним аккаунтом
+   * работоспособен, а поиск повторяется по кнопке в настройках.
+   */
+  async #discoverAccountsOnce(): Promise<void> {
+    const done = await this.#storage.get<boolean>(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.AccountsDiscovered,
+    )
+
+    if (done === true) {
+      return
+    }
+
+    try {
+      await this.discoverAccounts()
+    } catch (error) {
+      this.#logger.warn('Account discovery failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+
+      return
+    }
+
+    await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.AccountsDiscovered, true)
+  }
+
+  /**
    * Ищет разрешения, выданные активным аккаунтом.
    *
    * ЗАПРОС ИДЁТ ТОЛЬКО ПО ТРЕБОВАНИЮ — как и поиск предметов: это
@@ -1048,6 +1147,17 @@ export class WalletSession implements IWalletSession {
 
       await this.#accounts.create(username === null ? {} : { name: username })
     }
+
+    /* ВОССТАНОВЛЕННЫЙ КОШЕЛЁК ОБЯЗАН НАЙТИ СВОИ АККАУНТЫ. Адреса
+       выводятся из фразы, но кошелёк о них не знает, пока не выведет:
+       у человека, у которого их было пять, четыре просто не появятся,
+       и он увидит вместо своих средств пустой кошелёк.
+
+       ПОИСК НЕ ЗАДЕРЖИВАЕТ ОТКРЫТИЕ. Это два десятка пар запросов
+       к узлу; ожидание их в критическом пути означало бы, что кошелёк
+       открывается минуту на медленной сети. Найденное добавляется
+       к списку по мере готовности. */
+    void this.#discoverAccountsOnce()
 
     this.#transactions = new TransactionRepository(this.#secureStorage)
 

@@ -28,6 +28,7 @@ export {
 export {
   RECIPIENT_STATUS,
   SESSION_STATE,
+  type IAccountDiscoverySummary,
   type IPreparedTransfer,
   type IRecipientResolution,
   type ITokenBalance,

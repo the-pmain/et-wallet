@@ -12,6 +12,7 @@ import {
   RpcSettings,
   useWallet,
   useWalletSnapshot,
+  type IAccountDiscoverySummary,
 } from '@/features/wallet'
 import { cn } from '@/shared/lib/utils'
 import { useTheme, type Theme } from '@/shared/theme'
@@ -56,6 +57,10 @@ export function SettingsPage() {
      к онбордингу, а не к состоянию сессии, и меняться во время работы
      не может. */
   const [username, setUsername] = useState<string | null>(null)
+
+  /* Итог поиска аккаунтов. `null` — поиск не запускали в этот заход. */
+  const [discovery, setDiscovery] = useState<IAccountDiscoverySummary | null>(null)
+  const [isDiscovering, setDiscovering] = useState(false)
 
   useEffect(() => {
     let isCurrent = true
@@ -199,13 +204,48 @@ export function SettingsPage() {
         activeAccount={snapshot.activeAccount}
         ensNames={snapshot.ensNames}
         isBusy={false}
+        isDiscovering={isDiscovering}
         onSelect={(id: AccountId) => {
           void session.selectAccount(id)
         }}
         onCreate={() => {
           void session.createAccount()
         }}
+        onDiscover={() => {
+          setDiscovering(true)
+          setDiscovery(null)
+
+          void session.discoverAccounts().then(
+            (summary) => {
+              setDiscovering(false)
+              setDiscovery(summary)
+            },
+            () => {
+              setDiscovering(false)
+              setDiscovery(null)
+            },
+          )
+        }}
       />
+
+      {discovery === null ? null : (
+        <Alert variant={discovery.added > 0 ? 'default' : undefined}>
+          <AlertDescription>
+            {discovery.added > 0
+              ? `Found and added ${String(discovery.added)} account${discovery.added === 1 ? '' : 's'} that had been used before.`
+              : 'No previously used addresses were found beyond the accounts you already have.'}{' '}
+            {/* ГЛУБИНА НАЗЫВАЕТСЯ ВСЕГДА. «Ничего не найдено» без неё
+                читается как «у вас больше ничего нет» — утверждение,
+                которого поиск не делает: он смотрит ограниченное число
+                адресов и не видит те, где лежат только токены. */}
+            {String(discovery.scanned)} addresses were checked
+            {discovery.stoppedByLimit
+              ? ', and the search stopped at the limit — there may be more'
+              : ''}
+            . Addresses holding only tokens or collectibles are not found this way.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <NetworkList
         networks={snapshot.networks}
