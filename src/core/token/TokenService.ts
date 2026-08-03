@@ -13,6 +13,8 @@ import type { IClock, ILogger } from '@/core/platform'
 import type { IProvider, IProviderResolver } from '@/core/provider'
 import type { Address, ChainId, Timestamp, Unsubscribe, Wei } from '@/core/types'
 
+import { findVerifiedToken, isVerifiedToken } from './verified'
+
 import type { ITokenRepository, ITokenService } from './contracts'
 import {
   BALANCE_OF_SELECTOR,
@@ -111,7 +113,13 @@ export class TokenService implements ITokenService {
     this.#tokens.clear()
 
     for (const network of this.#networks.list()) {
-      this.#tokens.set(network.chainId, await this.#repository.findAll(network.chainId))
+      const stored = await this.#repository.findAll(network.chainId)
+
+      /* Проверенность пересчитывается при каждом чтении: список живёт
+         в коде и меняется вместе с приложением, а запись, помеченная
+         год назад, осталась бы проверенной навсегда — в том числе
+         после исключения контракта из списка. */
+      this.#tokens.set(network.chainId, stored.map(withVerification))
     }
 
     this.#initialized = true
@@ -144,6 +152,7 @@ export class TokenService implements ITokenService {
       /* Нативная валюта — часть конфигурации сети, а не пользовательская
          добавка: помечать её как непроверенную было бы неверно. */
       isCustom: false,
+      isVerified: true,
       addedAt: 0 as Timestamp,
     }
 
@@ -180,6 +189,26 @@ export class TokenService implements ITokenService {
       )
     }
 
+    const verified = findVerifiedToken(params.chainId, params.address)
+
+    /* РАСХОЖДЕНИЕ СО СПИСКОМ НЕ ЗАМАЛЧИВАЕТСЯ. Контракт с обновляемой
+       реализацией вправе изменить символ — так уже произошло с мостом
+       Tether, — а список в коде мог устареть. Помечать такую запись
+       проверенной значило бы поручиться за то, что изменилось
+       без нашего ведома. */
+    const matchesList =
+      verified !== null &&
+      verified.symbol === metadata.symbol &&
+      verified.decimals === metadata.decimals
+
+    if (verified !== null && !matchesList) {
+      this.#logger.warn('Verified contract answered differently than the built-in list', {
+        chainId: params.chainId,
+        listSymbol: verified.symbol,
+        contractSymbol: metadata.symbol,
+      })
+    }
+
     const override = params.symbol?.trim() ?? ''
     const token: IToken = {
       chainId: params.chainId,
@@ -190,6 +219,7 @@ export class TokenService implements ITokenService {
       decimals: metadata.decimals,
       logoUri: null,
       isCustom: true,
+      isVerified: matchesList,
       addedAt: this.#clock.now(),
     }
 
@@ -430,4 +460,19 @@ function matches(token: IToken, ref: ITokenRef): boolean {
 /** Усечённый адрес как запасное имя токена. */
 function shortAddress(address: Address): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
+}
+
+/**
+ * Проставляет признак проверенности прочитанной записи.
+ *
+ * Сверяется только адрес: символ и число знаков в хранилище — те,
+ * что вернул контракт при добавлении, и повторная сверка с ними
+ * потребовала бы обращения к узлу при каждом чтении списка.
+ */
+function withVerification(token: IToken): IToken {
+  if (token.address === null) {
+    return token
+  }
+
+  return { ...token, isVerified: isVerifiedToken(token.chainId, token.address) }
 }

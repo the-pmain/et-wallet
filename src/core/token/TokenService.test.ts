@@ -423,3 +423,45 @@ async function createServiceWith(storage: SecureStorage): Promise<TokenService> 
     logger,
   })
 }
+
+describe('Проверенные контракты', () => {
+  /* `TOKEN` — адрес USDC в Ethereum, он входит во встроенный список.
+     Дублёр отвечает теми же символом и числом знаков, что записаны
+     в списке. */
+  const UNKNOWN = toAddress('0x1111111111111111111111111111111111111111')
+
+  it('токен из списка помечается проверенным', async () => {
+    expect((await service.add({ chainId: CHAIN_ID, address: TOKEN })).isVerified).toBe(true)
+  })
+
+  it('признаки независимы: добавлен вручную и при этом проверен', async () => {
+    /* «Добавлен вручную» говорит о том, как токен попал в список,
+       «проверен» — о том, известен ли адрес. */
+    const token = await service.add({ chainId: CHAIN_ID, address: TOKEN })
+
+    expect(token.isCustom).toBe(true)
+    expect(token.isVerified).toBe(true)
+  })
+
+  it('незнакомый контракт проверенным не считается', async () => {
+    /* Это не обвинение в подделке: список заведомо неполон. */
+    expect((await service.add({ chainId: CHAIN_ID, address: UNKNOWN })).isVerified).toBe(false)
+  })
+
+  it('расхождение с контрактом снимает пометку', async () => {
+    /* Контракт с обновляемой реализацией вправе изменить символ,
+       а список в коде мог устареть. Помечать такую запись проверенной
+       значило бы поручиться за то, что изменилось без нашего ведома. */
+    node.responses.symbol = encodeText('USDX')
+
+    expect((await service.add({ chainId: CHAIN_ID, address: TOKEN })).isVerified).toBe(false)
+  })
+
+  it('нативная валюта проверена всегда', () => {
+    /* Она часть конфигурации сети, а не пользовательская добавка. */
+    const native = service.list(CHAIN_ID)[0]
+
+    expect(native?.address).toBeNull()
+    expect(native?.isVerified).toBe(true)
+  })
+})

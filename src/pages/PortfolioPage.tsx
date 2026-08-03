@@ -13,6 +13,7 @@ import { Link } from 'react-router'
 import type { IPortfolioPosition, IPortfolioSummary } from '@/core'
 import {
   TokenAvatar,
+  TokenTrustBadge,
   formatChangePercent,
   formatFiat,
   formatShare,
@@ -26,7 +27,6 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
-  Badge,
   Button,
   Card,
   CardContent,
@@ -354,7 +354,7 @@ function PositionRow({ position }: { readonly position: IPortfolioPosition }) {
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium">{token.symbol}</span>
-          {token.isCustom ? <Badge variant="outline">unverified</Badge> : null}
+          <TokenTrustBadge token={token} />
         </span>
 
         <span className="truncate text-xs text-muted-foreground tabular-nums">

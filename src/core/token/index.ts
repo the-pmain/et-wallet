@@ -24,3 +24,9 @@ export {
   type TokenEventMap,
   type TokenStandard,
 } from './types'
+export {
+  findVerifiedToken,
+  isVerifiedToken,
+  listVerifiedTokens,
+  type IVerifiedToken,
+} from './verified'

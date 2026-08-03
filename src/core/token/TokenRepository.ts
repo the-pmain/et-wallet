@@ -119,6 +119,10 @@ function decode(stored: IStoredToken): IToken {
     decimals: stored.decimals,
     logoUri: stored.logoUri,
     isCustom: stored.isCustom,
+    /* Проверенность в хранилище не пишется: она свойство встроенного
+       списка, а не записи. Значение проставляет `TokenService`
+       при чтении. */
+    isVerified: false,
     addedAt: stored.addedAt as Timestamp,
   }
 }

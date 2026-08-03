@@ -22,6 +22,7 @@ function token(symbol: string, decimals: number, address: string | null): IToken
     decimals,
     logoUri: null,
     isCustom: false,
+    isVerified: true,
     addedAt: NOW,
   }
 }

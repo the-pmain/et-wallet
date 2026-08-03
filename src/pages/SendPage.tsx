@@ -424,7 +424,11 @@ export function SendPage() {
                     value={item.token.address ?? NATIVE_ASSET_VALUE}
                   >
                     {item.token.symbol}
-                    {item.token.isCustom ? ' — added by hand' : ''}
+                    {item.token.isVerified
+                      ? ' — verified'
+                      : item.token.isCustom
+                        ? ' — added by hand'
+                        : ''}
                   </option>
                 ))}
               </select>
@@ -715,7 +719,7 @@ function ConfirmTransfer({
             {token === null ? null : (
               <span className="text-xs text-muted-foreground">
                 Token {token.name}
-                {token.isCustom ? ', added by hand' : ''}
+                {token.isVerified ? ', verified contract' : token.isCustom ? ', added by hand' : ''}
               </span>
             )}
           </div>

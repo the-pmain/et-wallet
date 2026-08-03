@@ -2,11 +2,12 @@ import { RefreshCw, Trash2 } from 'lucide-react'
 
 import type { Address } from '@/core'
 import { UntrustedText } from '@/features/security'
-import { Badge, Button } from '@/shared/ui'
+import { Button } from '@/shared/ui'
 
 import { formatTokenAmount, shortenAddress } from '../lib/format'
 import type { ITokenBalance } from '../model/contracts'
 import { TokenAvatar } from './TokenAvatar'
+import { TokenTrustBadge } from './TokenTrustBadge'
 
 interface TokenListProps {
   readonly tokens: readonly ITokenBalance[]
@@ -42,7 +43,7 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
                 делающие подделку визуально неотличимой от оригинала. */}
             <span className="flex items-center gap-1.5 truncate text-sm font-medium">
               <UntrustedText value={entry.token.symbol} />
-              {entry.token.isCustom ? <Badge variant="outline">unverified</Badge> : null}
+              <TokenTrustBadge token={entry.token} />
             </span>
             <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
               <UntrustedText value={entry.token.name} />
