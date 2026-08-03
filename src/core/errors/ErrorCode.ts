@@ -62,6 +62,7 @@ export const ERROR_CODE = {
   NetworkAlreadyExists: 'NETWORK_ALREADY_EXISTS',
   BuiltInNetworkImmutable: 'BUILT_IN_NETWORK_IMMUTABLE',
   NetworkImpersonation: 'NETWORK_IMPERSONATION',
+  TokenImpersonation: 'TOKEN_IMPERSONATION',
   InsecureRpcUrl: 'INSECURE_RPC_URL',
   InvalidRpcUrl: 'INVALID_RPC_URL',
   ChainIdMismatch: 'CHAIN_ID_MISMATCH',

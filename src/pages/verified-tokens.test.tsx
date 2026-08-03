@@ -66,10 +66,14 @@ describe('Пометка проверенного контракта', () => {
 
   it('незнакомый контракт помечен непроверенным', async () => {
     /* Это не обвинение в подделке: список заведомо неполон, и почти
-       все законные токены в него не входят. */
+       все законные токены в него не входят.
+
+       Символ намеренно НЕ совпадает ни с одним проверенным: иначе
+       проверялось бы не отсутствие пометки, а отказ в добавлении
+       подделки — это соседняя и другая проверка. */
     services.providerFactory.configure({
       balance: BALANCE,
-      tokens: [{ address: UNKNOWN, symbol: 'USDC', name: 'USD Coin', decimals: 6, balance: 0n }],
+      tokens: [{ address: UNKNOWN, symbol: 'MYTKN', name: 'My Token', decimals: 6, balance: 0n }],
     })
 
     await services.session.open()
@@ -84,7 +88,7 @@ describe('Пометка проверенного контракта', () => {
     expect(list.queryByText('verified')).not.toBeInTheDocument()
   })
 
-  it('подделка под известный символ проверенной не становится', async () => {
+  it('подделка под известный символ без согласия не добавляется', async () => {
     /* Тот же символ, другой адрес — ровно так выглядит подмена. */
     services.providerFactory.configure({
       balance: BALANCE,
@@ -92,7 +96,20 @@ describe('Пометка проверенного контракта', () => {
     })
 
     await services.session.open()
-    await services.session.addToken(UNKNOWN)
+
+    await expect(services.session.addToken(UNKNOWN)).rejects.toThrow(/impersonat|calls itself/i)
+  })
+
+  it('подделка, добавленная по согласию, проверенной не становится', async () => {
+    /* Владелец вправе добавить подделку осознанно — например, чтобы
+       следить за ней. Пометка «проверен» при этом не выдаётся. */
+    services.providerFactory.configure({
+      balance: BALANCE,
+      tokens: [{ address: UNKNOWN, symbol: 'USDC', name: 'USD Coin', decimals: 6, balance: 0n }],
+    })
+
+    await services.session.open()
+    await services.session.addToken(UNKNOWN, undefined, true)
 
     renderApp()
     await openAssets()

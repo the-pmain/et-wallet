@@ -84,6 +84,22 @@ export interface ISafeText {
 
   /** Строка была усечена по длине. */
   readonly isTruncated: boolean
+
+  /**
+   * Внутри одного слова смешаны письменности.
+   *
+   * ПРИЗНАК ПОДДЕЛКИ, НЕ ТРЕБУЮЩИЙ ЭТАЛОНА. Имя сети сравнивается
+   * со встроенными, символ токена — с проверенным списком; у имени
+   * приложения сравнивать не с чем, его никто не заверял. Но слово,
+   * в котором латиница соседствует с кириллицей, законным не бывает:
+   * так пишут `Аave` и `USDС`, а не настоящие имена.
+   *
+   * СЧИТАЕТСЯ ПОСЛОВНО. Строка «Aave — Займы» письменности смешивает,
+   * но в разных словах, и это обычный двуязычный текст. Тревога
+   * на нём была бы ложной, а ложная тревога приучает не читать
+   * предупреждения.
+   */
+  readonly hasMixedScripts: boolean
 }
 
 /**
@@ -111,7 +127,45 @@ export function toSafeText(value: string): ISafeText {
     text: isTruncated ? `${collapsed.slice(0, MAX_DISPLAY_LENGTH)}…` : collapsed,
     hasHiddenCharacters,
     isTruncated,
+    hasMixedScripts: hasMixedScripts(collapsed),
   }
+}
+
+/**
+ * Письменности, различаемые проверкой.
+ *
+ * Перечислены те, из которых берут буквы, неотличимые от латинских.
+ * Письменность, не похожая на латиницу ни одной буквой, для подделки
+ * бесполезна, и включать её значило бы поднимать тревогу на обычном
+ * двуязычном тексте.
+ */
+const SCRIPTS: readonly { readonly name: string; readonly pattern: RegExp }[] = [
+  { name: 'latin', pattern: /\p{Script=Latin}/u },
+  { name: 'cyrillic', pattern: /\p{Script=Cyrillic}/u },
+  { name: 'greek', pattern: /\p{Script=Greek}/u },
+  { name: 'armenian', pattern: /\p{Script=Armenian}/u },
+]
+
+/**
+ * Смешаны ли письменности внутри хотя бы одного слова.
+ *
+ * Цифры и знаки препинания письменности не имеют и не учитываются:
+ * `USDC-2` смешением не является.
+ */
+function hasMixedScripts(value: string): boolean {
+  for (const word of value.split(/[\s\p{P}\p{S}]+/u)) {
+    if (word === '') {
+      continue
+    }
+
+    const found = SCRIPTS.filter((script) => script.pattern.test(word))
+
+    if (found.length > 1) {
+      return true
+    }
+  }
+
+  return false
 }
 
 /**

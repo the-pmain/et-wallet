@@ -30,3 +30,4 @@ export {
   listVerifiedTokens,
   type IVerifiedToken,
 } from './verified'
+export { findTokenImpersonation, type ITokenImpersonation } from './impersonation'

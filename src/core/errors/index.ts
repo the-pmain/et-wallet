@@ -41,6 +41,7 @@ export {
   NftNotOwnedError,
   InvalidTokenContractError,
   NonceTooLowError,
+  TokenImpersonationError,
   TokenNotFoundError,
   TransactionNotFoundError,
   TransactionNotReplaceableError,

@@ -1,6 +1,7 @@
 import type { ChainId } from '@/core/types'
 
-import { findForeignCharacters, toNameSkeleton } from './confusable'
+import { findForeignCharacters, toNameSkeleton } from '@/core/security'
+
 import type { INetworkConfig } from './types'
 
 /**

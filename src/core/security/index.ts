@@ -59,3 +59,4 @@ export {
   type IExportRequest,
   type IExportRiskAssessment,
 } from './types'
+export { findForeignCharacters, toNameSkeleton } from './confusable'

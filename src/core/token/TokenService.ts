@@ -2,6 +2,7 @@ import { decodeUint, encodeCall, encodeCallWithAddress } from '@/core/abi'
 import { areAddressesEqual, isValidAddress } from '@/core/address'
 import {
   InvalidTokenContractError,
+  TokenImpersonationError,
   NetworkNotFoundError,
   NotInitializedError,
   TokenNotFoundError,
@@ -14,6 +15,7 @@ import type { IClock, ILogger } from '@/core/platform'
 import type { IProvider, IProviderResolver } from '@/core/provider'
 import type { Address, ChainId, Timestamp, Unsubscribe, Wei } from '@/core/types'
 
+import { findTokenImpersonation } from './impersonation'
 import { findVerifiedToken, isVerifiedToken } from './verified'
 
 import type { ITokenRepository, ITokenService } from './contracts'
@@ -184,6 +186,30 @@ export class TokenService implements ITokenService {
         params.address,
         `the contract reports ${String(metadata.decimals)} decimals, ` +
           `while ${String(params.decimals)} was provided`,
+      )
+    }
+
+    /*
+      ПРОВЕРКА НА ПОДДЕЛКУ ВЫПОЛНЯЕТСЯ ПОСЛЕ ЧТЕНИЯ КОНТРАКТА И ДО
+      СОХРАНЕНИЯ. Сравнивать до чтения нечего: символ и имя сообщает
+      сам контракт, и заявленные пользователем значения к делу
+      не относятся.
+    */
+    const impersonation = findTokenImpersonation({
+      chainId: params.chainId,
+      address: params.address,
+      symbol: metadata.symbol,
+      name: metadata.name,
+    })
+
+    if (impersonation !== null && params.allowImpersonation !== true) {
+      throw new TokenImpersonationError(
+        impersonation.field === 'symbol'
+          ? impersonation.verified.symbol
+          : impersonation.verified.name,
+        impersonation.verified.address,
+        params.address,
+        impersonation.foreignCharacters,
       )
     }
 

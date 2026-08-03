@@ -199,6 +199,46 @@ export class InvalidTokenContractError extends AppError {
   }
 }
 
+/**
+ * Контракт выдаёт себя за проверенный токен.
+ *
+ * Символ и имя токена задаёт автор контракта: это строка, которую
+ * контракт возвращает по запросу, а не свойство сети. Назваться `USDC`
+ * может любой, и владелец, увидев в списке привычный символ, отправит
+ * на него средства либо выдаст разрешение.
+ *
+ * Обработка: показать, за какой токен выдаёт себя контракт, назвать
+ * подлинный адрес и добавить только по явному согласию.
+ */
+export class TokenImpersonationError extends AppError {
+  readonly code: ErrorCode = ERROR_CODE.TokenImpersonation
+
+  /** Подлинный адрес токена, за который выдаёт себя контракт. */
+  readonly genuineAddress: string
+
+  /** Символы вне латиницы и цифр. Пусто при совпадении по буквам. */
+  readonly foreignCharacters: readonly string[]
+
+  constructor(
+    impersonatedSymbol: string,
+    genuineAddress: string,
+    actualAddress: string,
+    foreignCharacters: readonly string[] = [],
+  ) {
+    super(
+      (foreignCharacters.length === 0
+        ? `The contract ${actualAddress} calls itself "${impersonatedSymbol}", `
+        : `The contract ${actualAddress} calls itself "${impersonatedSymbol}" using letters ` +
+          `from another alphabet (${foreignCharacters.join(' ')}), `) +
+        `but the verified token with that name is ${genuineAddress}. ` +
+        'Naming a contract after a well-known token is the usual way to make someone ' +
+        'send funds to a worthless one.',
+    )
+    this.genuineAddress = genuineAddress
+    this.foreignCharacters = foreignCharacters
+  }
+}
+
 /** Стандарт токена не поддерживается текущей версией приложения. */
 export class UnsupportedTokenStandardError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.UnsupportedTokenStandard

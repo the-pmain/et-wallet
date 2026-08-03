@@ -447,7 +447,16 @@ export interface IWalletSession {
    *
    * @throws InvalidTokenContractError, UnsupportedTokenStandardError
    */
-  addToken(address: Address, symbolOverride?: string): Promise<void>
+  addToken(
+    address: Address,
+    symbolOverride?: string,
+
+    /**
+     * Согласие добавить контракт, называющийся именем проверенного
+     * токена. Без него такое добавление отвергается.
+     */
+    allowImpersonation?: boolean,
+  ): Promise<void>
 
   /** Убирает токен из отслеживаемых. */
   removeToken(address: Address): Promise<void>

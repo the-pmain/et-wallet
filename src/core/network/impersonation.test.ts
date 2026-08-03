@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { toChainId } from '@/core/types'
 
 import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS } from './built-in'
-import { findForeignCharacters, toNameSkeleton } from './confusable'
+import { findForeignCharacters, toNameSkeleton } from '@/core/security'
 import { IMPERSONATION_KIND, findImpersonation } from './impersonation'
 
 const FOREIGN_CHAIN = toChainId(777_777n)

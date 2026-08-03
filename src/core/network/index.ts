@@ -6,7 +6,6 @@ export {
   type IImpersonation,
   type ImpersonationKind,
 } from './impersonation'
-export { findForeignCharacters, toNameSkeleton } from './confusable'
 export { NetworkRepository } from './NetworkRepository'
 export { NetworkService, type INetworkServiceDependencies } from './NetworkService'
 export { assertValidExplorerUrl, assertValidRpcUrl, assertValidRpcUrls } from './rpc-url'

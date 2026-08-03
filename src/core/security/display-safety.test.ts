@@ -109,3 +109,42 @@ describe('safeText', () => {
     expect(safeText('')).toBe('')
   })
 })
+
+describe('Смешение письменностей', () => {
+  it('латиница с кириллицей внутри слова помечается', () => {
+    /* `Аave` с кириллической `А` выглядит безупречно: скрытых символов
+       нет, буквы обычные и видимые. */
+    expect(toSafeText('\u0410ave').hasMixedScripts).toBe(true)
+  })
+
+  it('греческая буква в латинском слове помечается', () => {
+    expect(toSafeText('Uniswa\u03c1').hasMixedScripts).toBe(true)
+  })
+
+  it('однородное имя не помечается', () => {
+    expect(toSafeText('Uniswap').hasMixedScripts).toBe(false)
+    expect(toSafeText('Кошелёк').hasMixedScripts).toBe(false)
+  })
+
+  it('двуязычная строка из разных слов не помечается', () => {
+    /* Смешение считается пословно: «Aave — Займы» это обычный текст,
+       а не подделка. Ложная тревога приучает не читать
+       предупреждения. */
+    expect(toSafeText('Aave — Займы').hasMixedScripts).toBe(false)
+  })
+
+  it('цифры и знаки письменности не образуют', () => {
+    expect(toSafeText('USDC-2').hasMixedScripts).toBe(false)
+    expect(toSafeText('1inch').hasMixedScripts).toBe(false)
+  })
+
+  it('признак отличается от скрытых символов', () => {
+    /* Разные признаки требуют разных объяснений: в одном случае
+       в строке есть невидимое, в другом — всё видимо, но не из того
+       алфавита. */
+    const mixed = toSafeText('\u0410ave')
+
+    expect(mixed.hasMixedScripts).toBe(true)
+    expect(mixed.hasHiddenCharacters).toBe(false)
+  })
+})

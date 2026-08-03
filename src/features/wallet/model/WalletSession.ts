@@ -590,13 +590,18 @@ export class WalletSession implements IWalletSession {
     return await this.#requireTokens().fetchMetadata(network.chainId, address)
   }
 
-  async addToken(address: Address, symbolOverride?: string): Promise<void> {
+  async addToken(
+    address: Address,
+    symbolOverride?: string,
+    allowImpersonation?: boolean,
+  ): Promise<void> {
     const network = this.#requireActiveNetwork()
 
     await this.#requireTokens().add({
       chainId: network.chainId,
       address,
       ...(symbolOverride === undefined ? {} : { symbol: symbolOverride }),
+      ...(allowImpersonation === true ? { allowImpersonation: true } : {}),
     })
 
     await this.refreshTokens()

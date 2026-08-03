@@ -1,14 +1,24 @@
 import { Plus, Search, ShieldAlert } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 
-import { isValidAddress, toAddress, type Address, type ITokenMetadata } from '@/core'
-import { Alert, AlertDescription, Button, Input, Label } from '@/shared/ui'
+import {
+  TokenImpersonationError,
+  isValidAddress,
+  toAddress,
+  type Address,
+  type ITokenMetadata,
+} from '@/core'
+import { Alert, AlertDescription, AlertTitle, Button, Input, Label } from '@/shared/ui'
 
 import { TokenAvatar } from './TokenAvatar'
 
 interface ImportTokenFormProps {
   readonly onPreview: (address: Address) => Promise<ITokenMetadata>
-  readonly onAdd: (address: Address, symbolOverride?: string) => Promise<void>
+  readonly onAdd: (
+    address: Address,
+    symbolOverride?: string,
+    allowImpersonation?: boolean,
+  ) => Promise<void>
 }
 
 /**
@@ -34,6 +44,7 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
   const [symbol, setSymbol] = useState('')
   const [preview, setPreview] = useState<ITokenMetadata | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [impersonation, setImpersonation] = useState<TokenImpersonationError | null>(null)
   const [isBusy, setBusy] = useState(false)
 
   const trimmed = address.trim()
@@ -43,6 +54,9 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
     setAddress(nextAddress)
     setPreview(null)
     setError(null)
+    /* Согласие сбрасывается вместе с адресом: оно давалось
+       на конкретный контракт, а не на форму вообще. */
+    setImpersonation(null)
     setSymbol('')
   }
 
@@ -63,15 +77,19 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
     }
   }
 
-  async function confirm(): Promise<void> {
+  async function confirm(allowImpersonation = false): Promise<void> {
     setBusy(true)
     setError(null)
 
     try {
-      await onAdd(toAddress(trimmed), symbol.trim())
+      await onAdd(toAddress(trimmed), symbol.trim(), allowImpersonation)
       reset('')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
+      if (caught instanceof TokenImpersonationError) {
+        setImpersonation(caught)
+      } else {
+        setError(caught instanceof Error ? caught.message : String(caught))
+      }
     } finally {
       setBusy(false)
     }
@@ -143,16 +161,41 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
             </AlertDescription>
           </Alert>
 
-          <Button
-            type="button"
-            disabled={isBusy}
-            onClick={() => {
-              void confirm()
-            }}
-          >
-            <Plus className="size-4" aria-hidden />
-            Add the token
-          </Button>
+          {impersonation === null ? (
+            <Button
+              type="button"
+              disabled={isBusy}
+              onClick={() => {
+                void confirm()
+              }}
+            >
+              <Plus className="size-4" aria-hidden />
+              Add the token
+            </Button>
+          ) : (
+            /* ОТКАЗ ПОКАЗЫВАЕТСЯ ВМЕСТО КНОПКИ, А НЕ РЯДОМ С НЕЙ.
+               Кнопка «добавить», оставшаяся на месте, нажимается
+               по привычке — раньше, чем прочитано предупреждение. */
+            <Alert variant="danger">
+              <ShieldAlert />
+              <AlertTitle>The contract impersonates a known token</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3">
+                <span>{impersonation.message}</span>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => {
+                    void confirm(true)
+                  }}
+                >
+                  Add anyway
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       )}
     </form>
