@@ -79,7 +79,14 @@ export class LogScanHistoryProvider implements IHistoryProvider {
 
   async fetch(query: IHistoryQuery, provider: IProvider): Promise<IHistoryPage> {
     const latest = await provider.getBlockNumber()
-    const fromBlock = latest > BigInt(this.#scanBlocks) ? latest - BigInt(this.#scanBlocks) : 0n
+    /* ОКНО СОДЕРЖИТ РОВНО `scanBlocks` БЛОКОВ, ВКЛЮЧАЯ ПОСЛЕДНИЙ.
+       Вычитание всей глубины давало окно на блок шире объявленного,
+       и узлы с пределом ровно в десять тысяч отвечали отказом
+       «диапазон слишком широк». Проверено живьём: узел Polygon
+       отвергал именно наш запрос, хотя предел совпадал с нашей
+       глубиной. */
+    const span = BigInt(this.#scanBlocks) - 1n
+    const fromBlock = latest > span ? latest - span : 0n
     const ownerTopic = addressToTopic(query.owner)
 
     /* Шесть выборок: отправленное и полученное, отдельно для трёх

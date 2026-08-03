@@ -161,7 +161,21 @@ describe('LogScanHistoryProvider: ограничения', () => {
     await source.fetch(query, node)
 
     expect(node.requestedFilters[0]?.toBlock).toBe(LATEST_BLOCK)
-    expect(node.requestedFilters[0]?.fromBlock).toBe(LATEST_BLOCK - 10_000n)
+    expect(node.requestedFilters[0]?.fromBlock).toBe(LATEST_BLOCK - 9_999n)
+  })
+
+  it('окно содержит ровно объявленное число блоков', async () => {
+    /* Вычитание всей глубины давало окно на блок шире объявленного,
+       и узлы с пределом ровно в десять тысяч отвечали отказом
+       «диапазон слишком широк». Проверено живьём: узел Polygon
+       отвергал именно наш запрос, хотя его предел совпадал с нашей
+       глубиной. */
+    await source.fetch(query, node)
+
+    const filter = node.requestedFilters[0]
+    const width = (filter?.toBlock ?? 0n) - (filter?.fromBlock ?? 0n) + 1n
+
+    expect(width).toBe(10_000n)
   })
 
   it('не уходит ниже нулевого блока в молодой сети', async () => {

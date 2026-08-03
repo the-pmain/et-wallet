@@ -41,14 +41,47 @@ export const BUILT_IN_CHAIN_ID = {
   Avalanche: toChainId(43114),
 } as const
 
+/**
+ * ПОРЯДОК УЗЛОВ ЗАДАН ИЗМЕРЕНИЕМ, А НЕ ПРЕДПОЧТЕНИЕМ.
+ *
+ * Кошельку нужны от узла две разные вещи: чтение состояния (баланс,
+ * газ, вызовы) и выборка журналов (`eth_getLogs`) — без второй не
+ * работает история переводов. Публичные узлы почти всегда умеют первое
+ * и почти никогда второе, поэтому список отсортирован по журналам.
+ *
+ * Проверено обращением к живым узлам 3 августа 2026, окно 10 000 блоков
+ * с фильтром по адресу — ровно так, как запрашивает кошелёк:
+ *
+ * | Сеть      | `eth_getLogs` у первого узла         |
+ * | --------- | ------------------------------------ |
+ * | Ethereum  | работает                             |
+ * | Optimism  | работает                             |
+ * | Base      | работает                             |
+ * | Avalanche | работает                             |
+ * | Polygon   | отказ: бесплатный доступ не отдаёт   |
+ * | Arbitrum  | временный отказ узла                 |
+ * | BNB Chain | не ответил: предел частоты запросов  |
+ *
+ * ЧТО УБРАНО. `eth.llamarpc.com` и `cloudflare-eth.com` не отвечают
+ * из браузера вовсе — первый обрывает соединение, второй отказывает
+ * даже в номере блока. Держать в списке мёртвые адреса значит тратить
+ * время пользователя на перебор, который заведомо не даст результата.
+ *
+ * ЭТО НЕ ЗАМЕНА СВОЕМУ УЗЛУ. Публичный узел видит IP и все адреса,
+ * чьи балансы запрашиваются, а его пределы меняются без предупреждения.
+ * Владелец, которому история нужна во всех сетях, указывает собственный
+ * адрес в настройках.
+ */
 const ETHEREUM: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Ethereum,
   name: 'Ethereum',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: [
+    /* Первым идёт узел, у которого работает выборка журналов: без неё
+       кошелёк не показывает историю переводов. Проверено обращением
+       к живым узлам — см. пояснение к списку ниже. */
+    'https://eth.drpc.org',
     'https://ethereum-rpc.publicnode.com',
-    'https://eth.llamarpc.com',
-    'https://cloudflare-eth.com',
   ],
   blockExplorerUrls: ['https://etherscan.io'],
   isTestnet: false,
@@ -69,7 +102,11 @@ const BNB_CHAIN: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.BnbChain,
   name: 'BNB Chain',
   nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-  rpcUrls: ['https://bsc-rpc.publicnode.com', 'https://bsc-dataseed.bnbchain.org'],
+  rpcUrls: [
+    'https://bsc.drpc.org',
+    'https://bsc-rpc.publicnode.com',
+    'https://bsc-dataseed.bnbchain.org',
+  ],
   blockExplorerUrls: ['https://bscscan.com'],
   isTestnet: false,
   isBuiltIn: true,
@@ -86,7 +123,11 @@ const POLYGON: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Polygon,
   name: 'Polygon',
   nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-  rpcUrls: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon-rpc.com'],
+  rpcUrls: [
+    'https://polygon.drpc.org',
+    'https://polygon-bor-rpc.publicnode.com',
+    'https://polygon-rpc.com',
+  ],
   blockExplorerUrls: ['https://polygonscan.com'],
   isTestnet: false,
   isBuiltIn: true,
@@ -97,7 +138,11 @@ const ARBITRUM: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Arbitrum,
   name: 'Arbitrum One',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://arbitrum-one-rpc.publicnode.com', 'https://arb1.arbitrum.io/rpc'],
+  rpcUrls: [
+    'https://arbitrum.drpc.org',
+    'https://arbitrum-one-rpc.publicnode.com',
+    'https://arb1.arbitrum.io/rpc',
+  ],
   blockExplorerUrls: ['https://arbiscan.io'],
   isTestnet: false,
   isBuiltIn: true,
@@ -108,7 +153,11 @@ const OPTIMISM: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Optimism,
   name: 'OP Mainnet',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://optimism-rpc.publicnode.com', 'https://mainnet.optimism.io'],
+  rpcUrls: [
+    'https://optimism.drpc.org',
+    'https://optimism-rpc.publicnode.com',
+    'https://mainnet.optimism.io',
+  ],
   blockExplorerUrls: ['https://optimistic.etherscan.io'],
   isTestnet: false,
   isBuiltIn: true,
@@ -119,7 +168,7 @@ const BASE: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Base,
   name: 'Base',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://base-rpc.publicnode.com', 'https://mainnet.base.org'],
+  rpcUrls: ['https://base.drpc.org', 'https://base-rpc.publicnode.com', 'https://mainnet.base.org'],
   blockExplorerUrls: ['https://basescan.org'],
   isTestnet: false,
   isBuiltIn: true,
@@ -131,6 +180,7 @@ const AVALANCHE: INetworkConfig = {
   name: 'Avalanche C-Chain',
   nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
   rpcUrls: [
+    'https://avalanche.drpc.org',
     'https://avalanche-c-chain-rpc.publicnode.com',
     'https://api.avax.network/ext/bc/C/rpc',
   ],
