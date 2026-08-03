@@ -13,6 +13,7 @@ import {
 } from '@/core'
 
 import { parseCaip2, toCaip2, toCaip10 } from './caip'
+import type { IKeyValueStorage } from './SessionStorage'
 import { toDappRequest } from './request-mapping'
 import { TransportEvents } from './TransportEvents'
 
@@ -62,6 +63,16 @@ export interface IWalletConnectOptions {
   }
 
   readonly logger: ILogger
+
+  /**
+   * Хранилище состояния подключений.
+   *
+   * Необязательно: без него библиотека берёт `localStorage`, и сессии
+   * не переживают перезагрузку — записать туда мы не можем, этот путь
+   * закрыт правилом линтера. Передаётся из состава приложения, чтобы
+   * транспорт не знал, чем именно шифруется хранимое.
+   */
+  readonly storage?: IKeyValueStorage
 }
 
 /**
@@ -113,9 +124,16 @@ export class WalletConnectTransport implements ISessionTransport {
 
     const { default: SignClient } = await import('@walletconnect/sign-client')
 
+    const storage = this.#options.storage
+
     const client = (await SignClient.init({
       projectId: this.#options.projectId,
       metadata: { ...this.#options.metadata, icons: [...this.#options.metadata.icons] },
+      /* БЕЗ ЭТОГО БИБЛИОТЕКА ПИШЕТ В `localStorage`. Он запрещён
+         правилом линтера и не шифруется: ключи сессии лежали бы там
+         открытым текстом. Отсутствие хранилища означало бы подключения,
+         живущие до первой перезагрузки. */
+      ...(storage === undefined ? {} : { storage }),
     })) as unknown as WalletConnectClient
 
     this.#subscribe(client)

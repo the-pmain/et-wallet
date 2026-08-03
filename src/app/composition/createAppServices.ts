@@ -16,7 +16,7 @@ import {
   type IHardwareDevice,
   type IStorageService,
 } from '@/core'
-import { DappSessionService, WalletConnectTransport } from '@/features/dapp'
+import { DappSessionService, SecureSessionStorage, WalletConnectTransport } from '@/features/dapp'
 import { OnboardingService, WalletBroadcast, type IOnboardingService } from '@/features/onboarding'
 import { SecuritySettingsRepository } from '@/features/security'
 import { WalletSession, type IWalletSession } from '@/features/wallet'
@@ -116,7 +116,7 @@ export function createAppServices(): IAppServices {
     broadcast,
     clock,
     securitySettings: new SecuritySettingsRepository(storage),
-    dappSessions: createDappSessions(session, logger),
+    dappSessions: createDappSessions(session, secureStorage, logger),
     storage,
   }
 }
@@ -133,7 +133,11 @@ export function createAppServices(): IAppServices {
  * Пользователь меняет аккаунт и сеть на ходу; снимок, взятый при
  * сборке, выдал бы приложению устаревшие значения.
  */
-function createDappSessions(session: IWalletSession, logger: ConsoleLogger): DappSessionService {
+function createDappSessions(
+  session: IWalletSession,
+  secureStorage: SecureStorage,
+  logger: ConsoleLogger,
+): DappSessionService {
   const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? ''
 
   return new DappSessionService({
@@ -146,6 +150,10 @@ function createDappSessions(session: IWalletSession, logger: ConsoleLogger): Dap
         icons: [`${globalThis.location.origin}/icons/icon-128.png`],
       },
       logger,
+      /* Состояние подключений содержит ключи шифрования обмена
+         с приложениями, поэтому хранится зашифрованным и исчезает
+         вместе с кошельком. */
+      storage: new SecureSessionStorage(secureStorage, logger),
     }),
     logger,
     getAddresses: () => session.getSnapshot().accounts.map((account) => account.address),
