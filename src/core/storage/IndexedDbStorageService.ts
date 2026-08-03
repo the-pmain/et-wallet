@@ -75,7 +75,7 @@ export interface IIndexedDbStorageOptions {
 export class IndexedDbStorageService implements IStorageService {
   readonly #databaseName: string
   readonly #migrations: readonly IStorageMigration[]
-  readonly #schemaVersion: number
+  #schemaVersion: number
 
   #opening: Promise<IDBDatabase> | null = null
 
@@ -315,6 +315,35 @@ export class IndexedDbStorageService implements IStorageService {
         database.onversionchange = () => {
           database.close()
           this.#opening = null
+        }
+
+        /*
+          БАЗА, СОЗДАННАЯ ПРЕЖНЕЙ СБОРКОЙ, МОЖЕТ НЕ ИМЕТЬ НОВЫХ ХРАНИЛИЩ.
+
+          Список хранилищ выводится из перечня областей, а версия схемы —
+          из числа миграций. Добавление области без миграции оставляло
+          версию прежней, и `onupgradeneeded` у существующей базы
+          не срабатывал: хранилище не создавалось, а чтение из него
+          отказывало. Кошелёк переставал открываться у всех, кто
+          пользовался им до обновления, — и только у них, поэтому
+          на новой базе всё выглядело исправным.
+
+          Здесь недостача обнаруживается и исправляется сама: база
+          переоткрывается со следующей версией, и хранилища создаются
+          обычным путём. Полагаться на то, что о версии не забудут,
+          нельзя — забывают именно так.
+        */
+        const missing = [...Object.values(STORAGE_NAMESPACE)].filter(
+          (namespace) => !database.objectStoreNames.contains(namespace),
+        )
+
+        if (missing.length > 0) {
+          database.close()
+          this.#schemaVersion = database.version + 1
+
+          this.#openOnce().then(resolve, reject)
+
+          return
         }
 
         resolve(database)

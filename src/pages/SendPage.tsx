@@ -359,8 +359,7 @@ export function SendPage() {
               и получить расхождение между ними. */}
           <p className="text-xs text-muted-foreground">
             The network and the account are changed in the settings. The transfer leaves the{' '}
-            {network?.name ?? '—'}
-            network from the address shown above.
+            {network?.name ?? '—'} network from the address shown above.
           </p>
 
           <div className="flex items-baseline justify-between text-xs">

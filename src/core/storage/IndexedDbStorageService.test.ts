@@ -341,8 +341,86 @@ describe('IndexedDbStorageService: открытие', () => {
   it('работает без явного init', async () => {
     /* Требование «вызвать init раньше всех» нарушается при добавлении
        нового потребителя, и нарушение выглядит как пустое хранилище —
-       то есть как funds will be lostный кошелёк. */
+       то есть как кошелёк, потерявший данные. */
     await expect(storage.set(STORAGE_NAMESPACE.Settings, KEY, 'без init')).resolves.toBeUndefined()
     await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('без init')
+  })
+})
+
+describe('IndexedDbStorageService: база прежней сборки', () => {
+  it('недостающее хранилище создаётся, а не приводит к отказу', async () => {
+    /*
+      ЭТО СЛУЧИЛОСЬ ЖИВЬЁМ. Область была добавлена в перечень, а версия
+      схемы выводится из числа миграций и осталась прежней: у базы,
+      созданной предыдущей сборкой, `onupgradeneeded` не срабатывал,
+      хранилище не появлялось, и кошелёк переставал открываться —
+      у всех, кто пользовался им раньше, и только у них. На новой базе
+      всё выглядело исправным, поэтому ни один прежний тест этого
+      не показывал.
+    */
+    const имя = `старая-база-${String(Date.now())}`
+
+    /* База предыдущей сборки: одно хранилище из многих. */
+    await new Promise<void>((resolve, reject) => {
+      const request = globalThis.indexedDB.open(имя, 1)
+
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore(STORAGE_NAMESPACE.Settings)
+      }
+
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+
+      request.onerror = () => {
+        reject(request.error ?? new Error('база не открылась'))
+      }
+    })
+
+    const обновлённое = new IndexedDbStorageService({ databaseName: имя })
+
+    await обновлённое.set(STORAGE_NAMESPACE.NetworksEncrypted, KEY, 'значение')
+
+    await expect(обновлённое.get(STORAGE_NAMESPACE.NetworksEncrypted, KEY)).resolves.toBe(
+      'значение',
+    )
+  })
+
+  it('данные прежней сборки при этом не теряются', async () => {
+    /* Пересоздать базу целиком было бы проще всего и означало бы
+       потерю зашифрованной фразы: восстановить её без seed-фразы
+       нельзя. */
+    const имя = `старая-база-с-данными-${String(Date.now())}`
+
+    await new Promise<void>((resolve, reject) => {
+      const request = globalThis.indexedDB.open(имя, 1)
+
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore(STORAGE_NAMESPACE.Settings)
+      }
+
+      request.onsuccess = () => {
+        const database = request.result
+        const store = database
+          .transaction(STORAGE_NAMESPACE.Settings, 'readwrite')
+          .objectStore(STORAGE_NAMESPACE.Settings)
+
+        store.put('старое значение', KEY)
+
+        store.transaction.oncomplete = () => {
+          database.close()
+          resolve()
+        }
+      }
+
+      request.onerror = () => {
+        reject(request.error ?? new Error('база не открылась'))
+      }
+    })
+
+    const обновлённое = new IndexedDbStorageService({ databaseName: имя })
+
+    await expect(обновлённое.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('старое значение')
   })
 })
