@@ -1008,7 +1008,11 @@ export class WalletSession implements IWalletSession {
     })
 
     this.#networks = new NetworkService({
-      repository: new NetworkRepository(this.#storage),
+      /* Сети хранятся зашифрованными: у пользовательской сети
+         в `rpcUrls` лежит адрес её узла, обычно с ключом учётной записи
+         в строке. Открытое хранилище передаётся вторым: из него
+         переносятся записи, сделанные прежними версиями. */
+      repository: new NetworkRepository(this.#secureStorage, this.#storage),
       providerFactory: this.#providerFactory,
       logger: this.#logger,
       builtInNetworks: BUILT_IN_NETWORKS,

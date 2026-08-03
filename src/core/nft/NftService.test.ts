@@ -22,10 +22,9 @@ import type {
   IProvider,
   ProviderEventMap,
 } from '@/core/provider'
-import { MemoryStorageService } from '@/core/storage'
 import { NAME_SELECTOR, SYMBOL_SELECTOR } from '@/core/token'
 import { toWei, type Address, type ChainId, type HexString, type TxHash } from '@/core/types'
-import { FakeProviderFactory, NullLogger } from '@/test/doubles'
+import { FakeProviderFactory, NullLogger, createSecureMemoryStorage } from '@/test/doubles'
 
 import { ERC1155_BALANCE_OF_SELECTOR, OWNER_OF_SELECTOR } from './abi'
 import { NftService } from './NftService'
@@ -245,7 +244,7 @@ beforeEach(async () => {
   node = new CollectionNode()
 
   const networks = new NetworkService({
-    repository: new NetworkRepository(new MemoryStorageService()),
+    repository: new NetworkRepository(await createSecureMemoryStorage()),
     providerFactory: new FakeProviderFactory(),
     logger: new NullLogger(),
     builtInNetworks: BUILT_IN_NETWORKS,

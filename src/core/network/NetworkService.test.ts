@@ -10,7 +10,12 @@ import {
   NotInitializedError,
 } from '@/core/errors'
 import { toChainId, type ChainId } from '@/core/types'
-import { FakeProviderFactory, InMemoryStorageService, NullLogger } from '@/test/doubles'
+import {
+  FakeProviderFactory,
+  InMemoryStorageService,
+  NullLogger,
+  createSecureMemoryStorage,
+} from '@/test/doubles'
 
 import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, DEFAULT_CHAIN_ID } from './built-in'
 import { NetworkRepository } from './NetworkRepository'
@@ -38,8 +43,10 @@ interface ITestContext {
   readonly service: NetworkService
 }
 
-function createContext(storage = new InMemoryStorageService()): ITestContext {
-  const repository = new NetworkRepository(storage)
+async function createContext(storage = new InMemoryStorageService()): Promise<ITestContext> {
+  /* Сети хранятся зашифрованными: репозиторий получает защищённое
+     хранилище поверх той же памяти, что видит проверка. */
+  const repository = new NetworkRepository(await createSecureMemoryStorage(storage))
   const providerFactory = new FakeProviderFactory()
   const logger = new NullLogger()
 
@@ -61,8 +68,8 @@ function createContext(storage = new InMemoryStorageService()): ITestContext {
 describe('NetworkService: инициализация', () => {
   let context: ITestContext
 
-  beforeEach(() => {
-    context = createContext()
+  beforeEach(async () => {
+    context = await createContext()
   })
 
   it('до init() отказывает в доступе к активной сети', () => {
@@ -92,7 +99,7 @@ describe('NetworkService: инициализация', () => {
     await context.service.init()
     await context.service.switchTo(BUILT_IN_CHAIN_ID.Polygon)
 
-    const restored = createContext(context.storage)
+    const restored = await createContext(context.storage)
     await restored.service.init()
 
     expect(restored.service.getActive().chainId).toBe(BUILT_IN_CHAIN_ID.Polygon)
@@ -109,7 +116,7 @@ describe('NetworkService: инициализация', () => {
 describe('NetworkService: защита встроенных сетей от подмены', () => {
   it('игнорирует сохранённую копию встроенной сети', async () => {
     const storage = new InMemoryStorageService()
-    const repository = new NetworkRepository(storage)
+    const repository = new NetworkRepository(await createSecureMemoryStorage(storage))
 
     /* Имитация подмены: в хранилище лежит Ethereum с чужим RPC. */
     const tampered: INetworkConfig = {
@@ -124,7 +131,7 @@ describe('NetworkService: защита встроенных сетей от по
     }
     await repository.save(tampered)
 
-    const context = createContext(storage)
+    const context = await createContext(storage)
     await context.service.init()
 
     const ethereum = context.service.getByChainId(BUILT_IN_CHAIN_ID.Ethereum)
@@ -134,12 +141,12 @@ describe('NetworkService: защита встроенных сетей от по
 
   it('сообщает в журнал об отброшенной записи', async () => {
     const storage = new InMemoryStorageService()
-    const repository = new NetworkRepository(storage)
+    const repository = new NetworkRepository(await createSecureMemoryStorage(storage))
     const [ethereum] = BUILT_IN_NETWORKS
 
     await repository.save(ethereum as INetworkConfig)
 
-    const context = createContext(storage)
+    const context = await createContext(storage)
     await context.service.init()
 
     const warnings = context.logger.records.filter((record) => record.level === 'warn')
@@ -152,7 +159,7 @@ describe('NetworkService: переключение сетей', () => {
   let context: ITestContext
 
   beforeEach(async () => {
-    context = createContext()
+    context = await createContext()
     await context.service.init()
   })
 
@@ -201,7 +208,7 @@ describe('NetworkService: добавление сети', () => {
   let context: ITestContext
 
   beforeEach(async () => {
-    context = createContext()
+    context = await createContext()
     await context.service.init()
   })
 
@@ -216,7 +223,7 @@ describe('NetworkService: добавление сети', () => {
   it('сохраняет сеть в хранилище', async () => {
     await context.service.add(customNetworkParams())
 
-    const restored = createContext(context.storage)
+    const restored = await createContext(context.storage)
     await restored.service.init()
 
     expect(restored.service.getByChainId(CUSTOM_CHAIN_ID)?.name).toBe('Local Node')
@@ -342,7 +349,7 @@ describe('NetworkService: удаление сети', () => {
   let context: ITestContext
 
   beforeEach(async () => {
-    context = createContext()
+    context = await createContext()
     await context.service.init()
     await context.service.add(customNetworkParams())
   })
@@ -381,7 +388,7 @@ describe('NetworkService: изменение сети', () => {
   let context: ITestContext
 
   beforeEach(async () => {
-    context = createContext()
+    context = await createContext()
     await context.service.init()
     await context.service.add(customNetworkParams())
   })

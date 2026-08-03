@@ -20,7 +20,13 @@ import {
 import type { ICallRequest, ILogEntry, IProvider, ProviderEventMap } from '@/core/provider'
 import { MemoryStorageService } from '@/core/storage'
 import type { ChainId, HexString, Wei } from '@/core/types'
-import { FakeClock, FakeProviderFactory, FastEncryptionService, NullLogger } from '@/test/doubles'
+import {
+  FakeClock,
+  FakeProviderFactory,
+  FastEncryptionService,
+  NullLogger,
+  createSecureMemoryStorage,
+} from '@/test/doubles'
 
 import { BALANCE_OF_SELECTOR, DECIMALS_SELECTOR, NAME_SELECTOR, SYMBOL_SELECTOR } from './erc20'
 import { TokenRepository } from './TokenRepository'
@@ -171,7 +177,7 @@ async function createService(): Promise<TokenService> {
 
   const logger = new NullLogger()
   const networks = new NetworkService({
-    repository: new NetworkRepository(storage),
+    repository: new NetworkRepository(secure),
     providerFactory: new FakeProviderFactory(),
     logger,
     builtInNetworks: BUILT_IN_NETWORKS,
@@ -403,10 +409,9 @@ describe('TokenService: баланс', () => {
 
 /** Пересоздаёт сервис поверх того же защищённого хранилища. */
 async function createServiceWith(storage: SecureStorage): Promise<TokenService> {
-  const plain = new MemoryStorageService()
   const logger = new NullLogger()
   const networks = new NetworkService({
-    repository: new NetworkRepository(plain),
+    repository: new NetworkRepository(await createSecureMemoryStorage()),
     providerFactory: new FakeProviderFactory(),
     logger,
     builtInNetworks: BUILT_IN_NETWORKS,

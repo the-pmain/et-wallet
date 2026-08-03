@@ -9,10 +9,14 @@ import {
   NetworkService,
 } from '@/core/network'
 import { ProviderPool } from '@/core/provider'
-import { MemoryStorageService } from '@/core/storage'
 import { toAddress } from '@/core/address'
 import type { Wei } from '@/core/types'
-import { FakeClock, FakeProviderFactory, NullLogger } from '@/test/doubles'
+import {
+  FakeClock,
+  FakeProviderFactory,
+  NullLogger,
+  createSecureMemoryStorage,
+} from '@/test/doubles'
 
 import { BalanceService } from './BalanceService'
 
@@ -33,10 +37,9 @@ beforeEach(async () => {
   clock = new FakeClock(1_700_000_000_000)
 
   const logger = new NullLogger()
-  const storage = new MemoryStorageService()
 
   networks = new NetworkService({
-    repository: new NetworkRepository(storage),
+    repository: new NetworkRepository(await createSecureMemoryStorage()),
     providerFactory: factory,
     logger,
     builtInNetworks: BUILT_IN_NETWORKS,

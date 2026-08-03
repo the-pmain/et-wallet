@@ -166,7 +166,7 @@ beforeEach(async () => {
 
   const logger = new NullLogger()
   const networks = new NetworkService({
-    repository: new NetworkRepository(storage),
+    repository: new NetworkRepository(secure),
     providerFactory: new FakeProviderFactory(),
     logger,
     builtInNetworks: BUILT_IN_NETWORKS,

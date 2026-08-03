@@ -17,10 +17,9 @@ import type {
   IProvider,
   ProviderEventMap,
 } from '@/core/provider'
-import { MemoryStorageService } from '@/core/storage'
 import { DECIMALS_SELECTOR, SYMBOL_SELECTOR, TOKEN_STANDARD } from '@/core/token'
 import { toWei, type Address, type ChainId, type HexString, type TxHash } from '@/core/types'
-import { FakeProviderFactory, NullLogger } from '@/test/doubles'
+import { FakeProviderFactory, NullLogger, createSecureMemoryStorage } from '@/test/doubles'
 
 import {
   ALLOWANCE_SELECTOR,
@@ -230,7 +229,7 @@ beforeEach(async () => {
   node = new ApprovalNode()
 
   const networks = new NetworkService({
-    repository: new NetworkRepository(new MemoryStorageService()),
+    repository: new NetworkRepository(await createSecureMemoryStorage()),
     providerFactory: new FakeProviderFactory(),
     logger: new NullLogger(),
     builtInNetworks: BUILT_IN_NETWORKS,
