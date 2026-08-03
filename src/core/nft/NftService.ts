@@ -1,3 +1,4 @@
+import { decodeAddress, encodeCallWithAddressAndUint, encodeCallWithUint } from '@/core/abi'
 import { areAddressesEqual } from '@/core/address'
 import {
   TRANSFER_BATCH_TOPIC,
@@ -20,13 +21,7 @@ import {
 } from '@/core/token'
 import type { Address, ChainId, HexString } from '@/core/types'
 
-import {
-  ERC1155_BALANCE_OF_SELECTOR,
-  OWNER_OF_SELECTOR,
-  decodeAddress,
-  encodeCallWithAddressAndUint,
-  encodeCallWithUint,
-} from './abi'
+import { ERC1155_BALANCE_OF_SELECTOR, OWNER_OF_SELECTOR } from './abi'
 import type { INftPage } from './types'
 
 const SERVICE_NAME = 'NftService'

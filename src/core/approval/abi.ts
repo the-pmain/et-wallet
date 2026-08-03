@@ -1,8 +1,10 @@
-import { keccak_256 } from '@noble/hashes/sha3.js'
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
-
-import { encodeAddressWord, encodeUintWord } from '@/core/nft'
-import { functionSelector } from '@/core/token'
+import {
+  encodeAddressWord,
+  encodeCallWithTwoAddresses,
+  encodeUintWord,
+  eventTopic,
+  functionSelector,
+} from '@/core/abi'
 import type { Address, HexString } from '@/core/types'
 
 /**
@@ -14,11 +16,6 @@ import type { Address, HexString } from '@/core/types'
  * сообщения об ошибке — то есть кошелёк молча сообщит владельцу,
  * что он никому ничего не разрешал.
  */
-
-/** Идентификатор события в журнале — keccak256 от его подписи. */
-function eventTopic(signature: string): HexString {
-  return `0x${bytesToHex(keccak_256(utf8ToBytes(signature)))}` as HexString
-}
 
 /**
  * `Approval(address,address,uint256)` — выдача разрешения ERC-20.
@@ -61,7 +58,7 @@ export const ERC20_APPROVAL_TOPIC_COUNT = 3
  * и показать владельцу, что он ничего не выдавал.
  */
 export function encodeAllowance(selector: string, owner: Address, spender: Address): HexString {
-  return `0x${selector}${encodeAddressWord(owner)}${encodeAddressWord(spender)}` as HexString
+  return encodeCallWithTwoAddresses(selector, owner, spender)
 }
 
 /**

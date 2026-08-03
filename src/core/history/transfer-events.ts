@@ -1,22 +1,6 @@
-import { keccak_256 } from '@noble/hashes/sha3.js'
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
-
+import { eventTopic } from '@/core/abi'
 import { toAddress } from '@/core/address'
 import type { Address, HexString } from '@/core/types'
-
-/**
- * Идентификатор события в журнале — keccak256 от его подписи.
- *
- * ЗНАЧЕНИЯ ВЫЧИСЛЯЮТСЯ, А НЕ ВПИСЫВАЮТСЯ КОНСТАНТАМИ. Шестнадцатеричный
- * хэш, скопированный из памяти или со стороннего сайта, непроверяем
- * при чтении кода: ошибка в одном символе даёт пустую историю без
- * единого сообщения об ошибке. Подпись события читается и сверяется
- * со стандартом глазами, а вычисление воспроизводит определение
- * из спецификации.
- */
-function eventTopic(signature: string): HexString {
-  return `0x${bytesToHex(keccak_256(utf8ToBytes(signature)))}` as HexString
-}
 
 /**
  * `Transfer(address,address,uint256)`.

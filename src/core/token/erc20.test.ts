@@ -1,3 +1,4 @@
+import { decodeUint, encodeCall, encodeCallWithAddress } from '@/core/abi'
 import { describe, expect, it } from 'vitest'
 
 import { toAddress } from '@/core/address'
@@ -11,10 +12,7 @@ import {
   TRANSFER_SELECTOR,
   decodeString,
   decodeTransfer,
-  decodeUint,
   encodeTransfer,
-  encodeCall,
-  encodeCallWithAddress,
 } from './erc20'
 
 const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')

@@ -1,5 +1,12 @@
-import { toAddress } from '@/core/address'
-import { functionSelector } from '@/core/token'
+import {
+  SELECTOR_LENGTH,
+  WORD_LENGTH,
+  encodeAddressWord,
+  encodeUintWord,
+  functionSelector,
+  readAddressWord,
+  strip,
+} from '@/core/abi'
 import type { Address, HexString } from '@/core/types'
 
 /**
@@ -15,15 +22,6 @@ import type { Address, HexString } from '@/core/types'
  * и вызовы с несколькими аргументами. У ERC-20 таких вызовов
  * не встречается.
  */
-
-/** Длина одного слова ABI в шестнадцатеричных символах. */
-const WORD_LENGTH = 64
-
-/** Длина адреса в шестнадцатеричных символах: двадцать байт. */
-const ADDRESS_LENGTH = 40
-
-/** Наибольшее значение `uint256`. */
-const MAX_UINT256 = (1n << 256n) - 1n
 
 /** `ownerOf(uint256)` — владелец предмета ERC-721. */
 export const OWNER_OF_SELECTOR = functionSelector('ownerOf(uint256)')
@@ -46,49 +44,6 @@ export const SAFE_TRANSFER_721_SELECTOR = functionSelector(
 export const SAFE_TRANSFER_1155_SELECTOR = functionSelector(
   'safeTransferFrom(address,address,uint256,uint256,bytes)',
 )
-
-/**
- * Кодирует одно беззнаковое число как слово ABI.
- *
- * @throws RangeError если значение отрицательно либо не помещается
- *         в `uint256`. Обрезать номер предмета молча нельзя: получился бы
- *         вызов про другой предмет.
- */
-export function encodeUintWord(value: bigint): string {
-  if (value < 0n) {
-    throw new RangeError('The value cannot be negative.')
-  }
-
-  if (value > MAX_UINT256) {
-    throw new RangeError('The value does not fit into uint256.')
-  }
-
-  return value.toString(16).padStart(WORD_LENGTH, '0')
-}
-
-/**
- * Кодирует адрес как слово ABI.
- *
- * Регистр приводится к нижнему: контракт сравнивает байты, и запись
- * в контрольной сумме EIP-55 читалась бы как другое значение.
- */
-export function encodeAddressWord(address: Address): string {
-  return address.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')
-}
-
-/** Вызов с одним числовым аргументом. */
-export function encodeCallWithUint(selector: string, value: bigint): HexString {
-  return `0x${selector}${encodeUintWord(value)}` as HexString
-}
-
-/** Вызов с адресом и числом — `balanceOf(address,uint256)` у ERC-1155. */
-export function encodeCallWithAddressAndUint(
-  selector: string,
-  address: Address,
-  value: bigint,
-): HexString {
-  return `0x${selector}${encodeAddressWord(address)}${encodeUintWord(value)}` as HexString
-}
 
 /**
  * Кодирует вызов `supportsInterface(bytes4)`.
@@ -154,63 +109,16 @@ export function encodeSafeTransfer1155(
  * @returns `null`, если данные не являются безопасной передачей.
  */
 export function decodeSafeTransferRecipient(data: HexString): Address | null {
-  const body = data.startsWith('0x') ? data.slice(2) : data
-  const selector = body.slice(0, 8)
+  const body = strip(data)
+  const selector = body.slice(0, SELECTOR_LENGTH)
 
   if (selector !== SAFE_TRANSFER_721_SELECTOR && selector !== SAFE_TRANSFER_1155_SELECTOR) {
     return null
   }
 
-  const word = body.slice(8 + WORD_LENGTH, 8 + WORD_LENGTH * 2)
-
-  if (word.length !== WORD_LENGTH) {
-    return null
-  }
-
-  if (word.slice(0, WORD_LENGTH - ADDRESS_LENGTH) !== '0'.repeat(WORD_LENGTH - ADDRESS_LENGTH)) {
-    return null
-  }
-
-  return toAddress(`0x${word.slice(WORD_LENGTH - ADDRESS_LENGTH)}`)
-}
-
-/**
- * Читает адрес из ответа контракта.
- *
- * @throws Error если ответ пуст либо старшие байты слова ненулевые:
- *         слово, заполненное целиком, адресом не является, и выдавать
- *         его за адрес нельзя.
- */
-export function decodeAddress(data: HexString): Address {
-  const body = data.startsWith('0x') ? data.slice(2) : data
-
-  if (body.length < WORD_LENGTH) {
-    throw new Error('the contract returned a response shorter than one word')
-  }
-
-  const word = body.slice(0, WORD_LENGTH)
-  const padding = word.slice(0, WORD_LENGTH - ADDRESS_LENGTH)
-
-  if (padding !== '0'.repeat(WORD_LENGTH - ADDRESS_LENGTH)) {
-    throw new Error('the response is not an address')
-  }
-
-  return toAddress(`0x${word.slice(WORD_LENGTH - ADDRESS_LENGTH)}`)
-}
-
-/**
- * Читает логическое значение из ответа контракта.
- *
- * Ненулевое слово означает `true`. Пустой ответ означает, что функции
- * нет: у ERC-165 это законный случай — старые контракты интерфейс
- * не объявляют.
- */
-export function decodeBool(data: HexString): boolean {
-  const body = data.startsWith('0x') ? data.slice(2) : data
-
-  if (body === '') {
-    return false
-  }
-
-  return BigInt(`0x${body.slice(0, WORD_LENGTH)}`) !== 0n
+  /* Второе слово после селектора: у обоих стандартов получатель стоит
+     именно там. Различаются они дальше — номером и количеством. */
+  return readAddressWord(
+    body.slice(SELECTOR_LENGTH + WORD_LENGTH, SELECTOR_LENGTH + WORD_LENGTH * 2),
+  )
 }

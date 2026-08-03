@@ -1,3 +1,14 @@
+/* Примитивы кодировки живут в `core/abi`: они одинаковы для любого
+   контракта. Здесь они реэкспортируются, чтобы потребители модуля
+   предметов не знали о двух источниках. */
+export {
+  decodeAddress,
+  decodeBool,
+  encodeAddressWord,
+  encodeCallWithAddressAndUint,
+  encodeCallWithUint,
+  encodeUintWord,
+} from '@/core/abi'
 export {
   ERC1155_BALANCE_OF_SELECTOR,
   OWNER_OF_SELECTOR,
@@ -5,16 +16,10 @@ export {
   SAFE_TRANSFER_721_SELECTOR,
   SUPPORTS_INTERFACE_SELECTOR,
   TOKEN_URI_SELECTOR,
-  decodeAddress,
-  decodeBool,
   decodeSafeTransferRecipient,
-  encodeAddressWord,
-  encodeCallWithAddressAndUint,
-  encodeCallWithUint,
   encodeSafeTransfer1155,
   encodeSafeTransfer721,
   encodeSupportsInterface,
-  encodeUintWord,
 } from './abi'
 export { NftService, type INftServiceDependencies } from './NftService'
 export type { INftItem, INftLimits, INftPage } from './types'

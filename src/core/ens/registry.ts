@@ -1,3 +1,4 @@
+import { WORD_LENGTH, readAddressWord, strip } from '@/core/abi'
 import { toAddress } from '@/core/address'
 import { functionSelector } from '@/core/token'
 import { toChainId, type Address, type ChainId, type HexString } from '@/core/types'
@@ -37,9 +38,6 @@ export const ENS_ADDR_SELECTOR = functionSelector('addr(bytes32)')
 /** `name(bytes32)` — имя, объявленное для адреса. Метод резолвера, EIP-181. */
 export const ENS_NAME_SELECTOR = functionSelector('name(bytes32)')
 
-/** Длина слова ABI в шестнадцатеричных символах. */
-const WORD_LENGTH = 64
-
 /** Вызов с одним аргументом-узлом. */
 export function encodeNodeCall(selector: string, node: HexString): HexString {
   return `0x${selector}${node.slice(2)}` as HexString
@@ -57,22 +55,22 @@ export function encodeNodeCall(selector: string, node: HexString): HexString {
  * @returns Адрес либо `null`, если ответ пуст, нулевой или короче слова.
  */
 export function decodeAddressWord(data: HexString): Address | null {
-  const body = data.startsWith('0x') ? data.slice(2) : data
+  const body = strip(data)
 
   if (body.length < WORD_LENGTH) {
     return null
   }
 
-  const word = body.slice(0, WORD_LENGTH)
+  /* Выравнивание проверяет общий разбор: слово с ненулевыми старшими
+     байтами адресом не является. Прежде эта проверка стояла здесь
+     собственным выражением — третьей копией одного правила. */
+  const address = readAddressWord(body.slice(0, WORD_LENGTH))
 
-  /* Первые двенадцать байт слова обязаны быть нулевыми: адрес занимает
-     двадцать байт из тридцати двух. Мусор в старших байтах означает,
-     что ответ не является адресом, и принимать его нельзя. */
-  if (!/^0{24}[0-9a-f]{40}$/i.test(word)) {
+  if (address === null) {
     return null
   }
 
-  const hex = `0x${word.slice(24)}`
+  const hex = address.toLowerCase()
 
   if (/^0x0{40}$/.test(hex)) {
     return null

@@ -1,21 +1,22 @@
-import { keccak_256 } from '@noble/hashes/sha3.js'
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
-
-import { toAddress } from '@/core/address'
+import {
+  SELECTOR_LENGTH,
+  WORD_LENGTH,
+  encodeAddressWord,
+  encodeUintWord,
+  functionSelector,
+  readAddressWord,
+  strip,
+} from '@/core/abi'
 import type { Address, HexString } from '@/core/types'
 
 /**
- * Селектор функции — первые четыре байта keccak256 от её подписи.
+ * Кодирование вызовов ERC-20.
  *
- * ЗНАЧЕНИЯ ВЫЧИСЛЯЮТСЯ, А НЕ ВПИСЫВАЮТСЯ КОНСТАНТАМИ. Восемь
- * шестнадцатеричных символов, скопированных из памяти, непроверяемы
- * при чтении кода: ошибка в одном из них даёт вызов несуществующей
- * функции и отказ контракта без внятной причины. Подпись читается
- * и сверяется со стандартом глазами.
+ * ЗДЕСЬ ТОЛЬКО ЗНАНИЕ СТАНДАРТА: селекторы функций и разбор их
+ * аргументов. Правила кодирования — длина слова, выравнивание адреса,
+ * чтение чисел и строк — живут в `core/abi` и общие для всех
+ * контрактов.
  */
-export function functionSelector(signature: string): string {
-  return bytesToHex(keccak_256(utf8ToBytes(signature))).slice(0, 8)
-}
 
 /** Краткое имя для объявлений внутри этого модуля. */
 const selector = functionSelector
@@ -35,34 +36,6 @@ export const BALANCE_OF_SELECTOR = selector('balanceOf(address)')
 /** `transfer(address,uint256)` — перевод токена. */
 export const TRANSFER_SELECTOR = selector('transfer(address,uint256)')
 
-/** Длина одного слова ABI в шестнадцатеричных символах. */
-const WORD_LENGTH = 64
-
-/** Длина селектора функции в шестнадцатеричных символах: четыре байта. */
-const SELECTOR_LENGTH = 8
-
-/** Длина адреса в шестнадцатеричных символах: двадцать байт. */
-const ADDRESS_LENGTH = 40
-
-/** Наибольшее значение `uint256`. */
-const MAX_UINT256 = (1n << 256n) - 1n
-
-/** Вызов без аргументов. */
-export function encodeCall(functionSelector: string): HexString {
-  return `0x${functionSelector}` as HexString
-}
-
-/**
- * Вызов с одним адресом.
- *
- * Адрес занимает 20 байт, слово ABI — 32, поэтому значение дополняется
- * нулями слева. Регистр приводится к нижнему: контракт сравнивает байты,
- * и запись в контрольной сумме EIP-55 читалась бы как другое значение.
- */
-export function encodeCallWithAddress(functionSelector: string, address: Address): HexString {
-  return `0x${functionSelector}${address.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')}` as HexString
-}
-
 /**
  * Кодирует вызов `transfer(address,uint256)`.
  *
@@ -80,18 +53,7 @@ export function encodeCallWithAddress(functionSelector: string, address: Address
  *         не ту сумму, которую подтвердил пользователь.
  */
 export function encodeTransfer(to: Address, amount: bigint): HexString {
-  if (amount < 0n) {
-    throw new RangeError('The transfer amount cannot be negative.')
-  }
-
-  if (amount > MAX_UINT256) {
-    throw new RangeError('The transfer amount does not fit into uint256.')
-  }
-
-  const recipient = to.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')
-  const value = amount.toString(16).padStart(WORD_LENGTH, '0')
-
-  return `0x${TRANSFER_SELECTOR}${recipient}${value}` as HexString
+  return `0x${TRANSFER_SELECTOR}${encodeAddressWord(to)}${encodeUintWord(amount)}` as HexString
 }
 
 /**
@@ -122,38 +84,16 @@ export function decodeTransfer(
     return null
   }
 
-  const recipient = body.slice(SELECTOR_LENGTH, SELECTOR_LENGTH + WORD_LENGTH)
+  /* Слово с ненулевыми старшими байтами адресом не является: выдать
+     его за получателя значило бы показать на экране подтверждения
+     того, кого в вызове нет. */
+  const to = readAddressWord(body.slice(SELECTOR_LENGTH, SELECTOR_LENGTH + WORD_LENGTH))
 
-  /* Адрес занимает младшие двадцать байт слова. Ненулевые старшие байты
-     означают, что это не адрес, и выдавать их за адрес нельзя. */
-  if (
-    recipient.slice(0, WORD_LENGTH - ADDRESS_LENGTH) !== '0'.repeat(WORD_LENGTH - ADDRESS_LENGTH)
-  ) {
+  if (to === null) {
     return null
   }
 
-  return {
-    /* Адрес приводится к записи с контрольной суммой EIP-55: показанный
-       в нижнем регистре, он лишает пользователя единственной защиты
-       от опечатки при сверке. */
-    to: toAddress(`0x${recipient.slice(WORD_LENGTH - ADDRESS_LENGTH)}`),
-    amount: BigInt(`0x${body.slice(SELECTOR_LENGTH + WORD_LENGTH)}`),
-  }
-}
-
-/**
- * Читает беззнаковое целое из ответа контракта.
- *
- * @throws Error если ответ пуст: это означает, что функции нет.
- */
-export function decodeUint(data: HexString): bigint {
-  const body = strip(data)
-
-  if (body === '') {
-    throw new Error('the contract returned an empty response')
-  }
-
-  return BigInt(`0x${body.slice(0, WORD_LENGTH)}`)
+  return { to, amount: BigInt(`0x${body.slice(SELECTOR_LENGTH + WORD_LENGTH)}`) }
 }
 
 /**
@@ -214,39 +154,29 @@ function decodeDynamicString(body: string): string {
 /** Разбирает `bytes32`: содержимое до первого нулевого байта. */
 function decodeBytes32(body: string): string {
   const padded = body.padEnd(WORD_LENGTH, '0')
-  const nullIndex = padded.indexOf('00')
 
   /* Нулевой байт может оказаться на нечётной позиции внутри символа —
      тогда это часть значащего байта, а не признак конца. Поиск идёт
      по парам символов. */
   let end = padded.length
 
-  for (let index = 0; index + 1 < padded.length; index += 2) {
+  for (let index = 0; index < padded.length; index += 2) {
     if (padded.slice(index, index + 2) === '00') {
       end = index
       break
     }
   }
 
-  return hexToUtf8(padded.slice(0, nullIndex === -1 ? padded.length : end))
+  return hexToUtf8(padded.slice(0, end))
 }
 
-/**
- * Переводит шестнадцатеричные байты в текст.
- *
- * Кодировка UTF-8: символы вне латиницы в именах токенов встречаются,
- * а побайтовое преобразование исказило бы их.
- */
+/** Переводит шестнадцатеричную строку в текст. */
 function hexToUtf8(hex: string): string {
-  const bytes = new Uint8Array(Math.floor(hex.length / 2))
+  const bytes = new Uint8Array(hex.length / 2)
 
   for (let index = 0; index < bytes.length; index += 1) {
     bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16)
   }
 
-  return new TextDecoder().decode(bytes).replace(/\0+$/u, '')
-}
-
-function strip(data: HexString): string {
-  return data.startsWith('0x') ? data.slice(2) : data
+  return new TextDecoder().decode(bytes)
 }

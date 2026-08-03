@@ -1,3 +1,4 @@
+import { decodeUint, encodeCall, encodeCallWithAddress } from '@/core/abi'
 import { areAddressesEqual, isValidAddress } from '@/core/address'
 import {
   InvalidTokenContractError,
@@ -22,9 +23,6 @@ import {
   NAME_SELECTOR,
   SYMBOL_SELECTOR,
   decodeString,
-  decodeUint,
-  encodeCall,
-  encodeCallWithAddress,
 } from './erc20'
 import {
   TOKEN_STANDARD,
