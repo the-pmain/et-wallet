@@ -551,3 +551,49 @@ describe('Развёртывание контракта', () => {
     expect((await service.prepare(deployment)).data).toBe(BYTECODE)
   })
 })
+
+describe('Отзыв разрешения', () => {
+  const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+  const SPENDER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
+
+  const revokeRequest = {
+    chainId: CHAIN_ID,
+    from: SENDER,
+    contract: TOKEN,
+    spender: SPENDER,
+    standard: TOKEN_STANDARD.Erc20,
+  }
+
+  it('транзакция адресована контракту, хранящему разрешение', async () => {
+    expect((await service.prepareRevokeApproval(revokeRequest)).to).toBe(TOKEN)
+  })
+
+  it('у токена отзыв выдаёт ноль', async () => {
+    /* Отдельной функции «отозвать» в стандарте нет: разрешение
+       перезаписывается значением. */
+    const transaction = await service.prepareRevokeApproval(revokeRequest)
+
+    expect(transaction.data.startsWith('0x095ea7b3')).toBe(true)
+    expect(BigInt(`0x${transaction.data.slice(74)}`)).toBe(0n)
+  })
+
+  it('у коллекции отзыв снимает признак', async () => {
+    const transaction = await service.prepareRevokeApproval({
+      ...revokeRequest,
+      standard: TOKEN_STANDARD.Erc721,
+    })
+
+    expect(transaction.data.startsWith('0xa22cb465')).toBe(true)
+    expect(BigInt(`0x${transaction.data.slice(74)}`)).toBe(0n)
+  })
+
+  it('нативная валюта не переводится', async () => {
+    expect((await service.prepareRevokeApproval(revokeRequest)).value).toBe(0n)
+  })
+
+  it('получатель разрешения входит в данные вызова', async () => {
+    const transaction = await service.prepareRevokeApproval(revokeRequest)
+
+    expect(transaction.data.slice(10, 74)).toContain(SPENDER.slice(2).toLowerCase())
+  })
+})

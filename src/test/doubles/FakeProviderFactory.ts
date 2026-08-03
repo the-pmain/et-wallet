@@ -1,4 +1,5 @@
 import {
+  ALLOWANCE_SELECTOR,
   BALANCE_OF_SELECTOR,
   ChainIdMismatchError,
   ERC1155_BALANCE_OF_SELECTOR,
@@ -8,6 +9,7 @@ import {
   ENS_REGISTRY_ADDRESS,
   ENS_RESOLVER_SELECTOR,
   EventBus,
+  IS_APPROVED_FOR_ALL_SELECTOR,
   NAME_SELECTOR,
   OWNER_OF_SELECTOR,
   SYMBOL_SELECTOR,
@@ -58,6 +60,7 @@ class FakeProvider implements IProvider {
   readonly #readEnsRecords: () => readonly IFakeEnsRecord[]
   readonly #readTokens: () => readonly IFakeToken[]
   readonly #readCollections: () => IFakeCollections
+  readonly #readApprovals: () => IFakeApprovals
   readonly #readLogsError: () => string | null
   readonly #events = new EventBus<ProviderEventMap>()
 
@@ -73,6 +76,7 @@ class FakeProvider implements IProvider {
     readEnsRecords: () => readonly IFakeEnsRecord[],
     readTokens: () => readonly IFakeToken[],
     readCollections: () => IFakeCollections,
+    readApprovals: () => IFakeApprovals,
     readLogsError: () => string | null,
   ) {
     this.chainId = chainId
@@ -86,6 +90,7 @@ class FakeProvider implements IProvider {
     this.#readEnsRecords = readEnsRecords
     this.#readTokens = readTokens
     this.#readCollections = readCollections
+    this.#readApprovals = readApprovals
     this.#readLogsError = readLogsError
   }
 
@@ -131,6 +136,12 @@ class FakeProvider implements IProvider {
    * не знает, обязан упасть, а не получить пустую строку.
    */
   call(request: ICallRequest): Promise<HexString> {
+    const approval = answerApprovalCall(request, this.#readApprovals())
+
+    if (approval !== null) {
+      return Promise.resolve(approval)
+    }
+
     const collection = answerCollectionCall(request, this.#readCollections())
 
     if (collection !== null) {
@@ -229,6 +240,19 @@ class FakeProvider implements IProvider {
   off = this.#events.off.bind(this.#events)
 }
 
+/** Действующее разрешение ERC-20 у дублёра. */
+export interface IFakeAllowance {
+  readonly contract: string
+  readonly spender: string
+  readonly amount: bigint
+}
+
+/** Действующее разрешение на коллекцию. */
+export interface IFakeOperatorApproval {
+  readonly contract: string
+  readonly operator: string
+}
+
 /** Владелец предмета ERC-721 у дублёра. */
 export interface IFakeNftOwner {
   readonly contract: string
@@ -323,6 +347,12 @@ export interface IFakeProviderOptions {
 
   /** Названия коллекций. Без записи контракт отвечает отказом. */
   readonly collections?: readonly IFakeCollection[]
+
+  /** Действующие разрешения ERC-20. Без записи разрешение нулевое. */
+  readonly allowances?: readonly IFakeAllowance[]
+
+  /** Действующие разрешения на коллекции. */
+  readonly operatorApprovals?: readonly IFakeOperatorApproval[]
 
   /** Причина отказа выборки журналов. Без неё выборка удаётся. */
   readonly logsError?: string
@@ -518,6 +548,10 @@ export class FakeProviderFactory implements IProviderFactory {
         balances: this.#options.nftBalances ?? [],
         names: this.#options.collections ?? [],
       }),
+      () => ({
+        allowances: this.#options.allowances ?? [],
+        operators: this.#options.operatorApprovals ?? [],
+      }),
       () => this.#options.logsError ?? null,
     )
 
@@ -625,6 +659,45 @@ function answerCollectionCall(
     const record = state.names.find((entry) => areAddressesEqual(entry.address, request.to))
 
     return record === undefined ? null : text(record.name)
+  }
+
+  return null
+}
+
+/** Состояние разрешений у дублёра. */
+export interface IFakeApprovals {
+  readonly allowances: readonly IFakeAllowance[]
+  readonly operators: readonly IFakeOperatorApproval[]
+}
+
+/**
+ * Ответ контракта на чтение разрешения.
+ *
+ * Отсутствие записи означает ноль и `false` — то есть «разрешения нет»,
+ * а не отказ: настоящий контракт отвечает так же.
+ */
+function answerApprovalCall(request: ICallRequest, state: IFakeApprovals): HexString | null {
+  const data = request.data ?? '0x'
+
+  if (data.startsWith(`0x${ALLOWANCE_SELECTOR}`)) {
+    const spender = `0x${data.slice(-40)}`
+    const record = state.allowances.find(
+      (entry) =>
+        areAddressesEqual(entry.contract, request.to) && areAddressesEqual(entry.spender, spender),
+    )
+
+    return `0x${(record?.amount ?? 0n).toString(16).padStart(64, '0')}` as HexString
+  }
+
+  if (data.startsWith(`0x${IS_APPROVED_FOR_ALL_SELECTOR}`)) {
+    const operator = `0x${data.slice(-40)}`
+    const isApproved = state.operators.some(
+      (entry) =>
+        areAddressesEqual(entry.contract, request.to) &&
+        areAddressesEqual(entry.operator, operator),
+    )
+
+    return `0x${(isApproved ? 1n : 0n).toString(16).padStart(64, '0')}` as HexString
   }
 
   return null

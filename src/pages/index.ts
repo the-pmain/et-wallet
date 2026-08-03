@@ -1,4 +1,5 @@
 export { ActivityPage } from './ActivityPage'
+export { ApprovalsPage } from './ApprovalsPage'
 export { AssetsPage } from './AssetsPage'
 export { BackupPage } from './BackupPage'
 export { ConnectionsPage } from './ConnectionsPage'

@@ -1,4 +1,5 @@
 import {
+  ApprovalService,
   BackupManager,
   BalanceService,
   BUILT_IN_NETWORKS,
@@ -59,6 +60,7 @@ import {
   type IStorageService,
   type ISignableTransaction,
   type INftTransferRequest,
+  type IRevokeApprovalRequest,
   type ITokenMetadata,
   type ITokenTransferRequest,
   type ITransferRecord,
@@ -107,6 +109,9 @@ const CLOSED_SNAPSHOT: IWalletSnapshot = {
   nfts: null,
   nftLimits: null,
   isNftLoading: false,
+  approvals: null,
+  approvalLimits: null,
+  isApprovalsLoading: false,
   portfolio: null,
   arePricesEnabled: false,
   isPortfolioLoading: false,
@@ -217,6 +222,7 @@ export class WalletSession implements IWalletSession {
   #history: HistoryService | null = null
   #tokens: TokenService | null = null
   #nfts: NftService | null = null
+  #approvals: ApprovalService | null = null
   #transactionService: TransactionService | null = null
   #prices: PriceService | null = null
   #backup: BackupManager | null = null
@@ -308,6 +314,13 @@ export class WalletSession implements IWalletSession {
     this.#balances?.stop()
     await this.#providers?.destroy()
 
+    /* Кэши очищаются ДО обнуления ссылок: после него звать их не у кого.
+       Названия коллекций и метаданные токенов не секрет, но связь
+       «этот кошелёк интересовался этими контрактами» переживать
+       блокировку не должна — по тем же причинам, что и кэш имён. */
+    this.#nfts?.clear()
+    this.#approvals?.clear()
+
     /* Затирание корневого ключа — последнее действие и единственное,
        ради которого существует весь этот порядок. */
     this.#hdWallet?.wipe()
@@ -321,6 +334,7 @@ export class WalletSession implements IWalletSession {
     this.#history = null
     this.#tokens = null
     this.#nfts = null
+    this.#approvals = null
     this.#transactionService = null
     this.#prices = null
     this.#backup = null
@@ -687,6 +701,50 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
+   * Ищет разрешения, выданные активным аккаунтом.
+   *
+   * ЗАПРОС ИДЁТ ТОЛЬКО ПО ТРЕБОВАНИЮ — как и поиск предметов: это
+   * выборка журналов и обращение к каждому найденному контракту.
+   */
+  async loadApprovals(): Promise<void> {
+    const account = this.#snapshot.activeAccount
+    const network = this.#snapshot.activeNetwork
+
+    if (account === null || network === null || this.#approvals === null) {
+      return
+    }
+
+    this.#publish({ ...this.#snapshot, isApprovalsLoading: true })
+
+    const page = await this.#approvals.list(account.address, network.chainId)
+
+    /* Ответ применяется, только если аккаунт и сеть не сменились:
+       чужой список разрешений под новым адресом успокоил бы владельца
+       без оснований. */
+    if (
+      this.#snapshot.activeAccount?.id !== account.id ||
+      this.#snapshot.activeNetwork?.chainId !== network.chainId
+    ) {
+      return
+    }
+
+    this.#publish({
+      ...this.#snapshot,
+      approvals: page.items,
+      approvalLimits: page.limits,
+      isApprovalsLoading: false,
+    })
+  }
+
+  /** Готовит отзыв выданного разрешения. */
+  async prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<IPreparedTransfer> {
+    const transactions = this.#requireTransactions()
+    const transaction = await transactions.prepareRevokeApproval(request)
+
+    return { transaction, fees: await transactions.estimateFees(transaction) }
+  }
+
+  /**
    * Ищет коллекционные предметы активного аккаунта.
    *
    * ЗАПРОС ИДЁТ ТОЛЬКО ПО ТРЕБОВАНИЮ. Поиск — это выборка журналов
@@ -1023,6 +1081,12 @@ export class WalletSession implements IWalletSession {
       logger: this.#logger,
     })
 
+    this.#approvals = new ApprovalService({
+      resolver: this.#providers,
+      networks: this.#networks,
+      logger: this.#logger,
+    })
+
     this.#balances = new BalanceService({
       providers: this.#providers,
       networks: this.#networks,
@@ -1185,6 +1249,12 @@ export class WalletSession implements IWalletSession {
       nfts: null,
       nftLimits: null,
       isNftLoading: false,
+      /* Разрешения выдаются от имени адреса и живут в контрактах
+         конкретной сети: показать список одного адреса под другим
+         значило бы успокоить владельца чужими данными. */
+      approvals: null,
+      approvalLimits: null,
+      isApprovalsLoading: false,
       /* Имена сбрасываются вместе с сетью: имя, действительное
          в Ethereum, показанное рядом с балансом Polygon, утверждало бы
          больше, чем известно. */

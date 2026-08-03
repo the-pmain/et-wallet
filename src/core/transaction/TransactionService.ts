@@ -8,6 +8,7 @@ import {
   TransactionNotReplaceableError,
 } from '@/core/errors'
 import { EventBus, type EventListener } from '@/core/events'
+import { encodeRevokeAllowance, encodeRevokeApprovalForAll } from '@/core/approval'
 import type { INetworkConfig, INetworkService } from '@/core/network'
 import {
   ERC1155_BALANCE_OF_SELECTOR,
@@ -47,6 +48,7 @@ import {
   type ISignableTransaction,
   type ISignedTransaction,
   type INftTransferRequest,
+  type IRevokeApprovalRequest,
   type ITokenTransferRequest,
   type ITransactionRecord,
   type ITransactionRequest,
@@ -305,6 +307,36 @@ export class TransactionService implements ITransactionService {
       from: request.from,
       /* Транзакция адресована контракту коллекции: именно он передаёт
          предмет. */
+      to: request.contract,
+      value: toWei(0n),
+      data,
+    })
+  }
+
+  /**
+   * Готовит отзыв выданного разрешения.
+   *
+   * ЧТО ПРОИСХОДИТ. У токенов ERC-20 отдельной функции «отозвать»
+   * не существует: разрешение перезаписывается значением, и ноль
+   * означает «распоряжаться нечем». У коллекций снимается признак
+   * `setApprovalForAll`.
+   *
+   * ПРОВЕРКИ ДЕЙСТВУЮЩЕГО ЗНАЧЕНИЯ ЗДЕСЬ НЕТ СОЗНАТЕЛЬНО. Отзыв
+   * уже отозванного разрешения безвреден — он лишь стоит газа, —
+   * а лишний запрос к узлу между показом списка и подписью создал бы
+   * окно, в котором ответ устарел бы точно так же.
+   */
+  async prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<ISignableTransaction> {
+    const data =
+      request.standard === TOKEN_STANDARD.Erc20
+        ? encodeRevokeAllowance(request.spender)
+        : encodeRevokeApprovalForAll(request.spender)
+
+    return await this.prepare({
+      ...(request.chainId === undefined ? {} : { chainId: request.chainId }),
+      ...(request.feePriority === undefined ? {} : { feePriority: request.feePriority }),
+      from: request.from,
+      /* Транзакция адресована контракту: разрешение хранится в нём. */
       to: request.contract,
       value: toWei(0n),
       data,

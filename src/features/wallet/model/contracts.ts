@@ -10,9 +10,12 @@ import type {
   IHistoryLimits,
   INetworkConfig,
   IFeeEstimate,
+  IApprovalLimits,
+  IApprovalRecord,
   INftItem,
   INftLimits,
   INftTransferRequest,
+  IRevokeApprovalRequest,
   IPortfolioSummary,
   IRpcEndpoint,
   IRpcEndpointHealth,
@@ -196,6 +199,24 @@ export interface IWalletSnapshot {
 
   /** Идёт поиск предметов. */
   readonly isNftLoading: boolean
+
+  /**
+   * Разрешения, выданные активным аккаунтом в активной сети.
+   *
+   * `null` означает «не запрашивали», пустой массив — «действующих
+   * разрешений не найдено». Разница существенна: первое не утверждает
+   * ничего, второе утверждает, что искали.
+   *
+   * СПИСОК НЕ ЗАГРУЖАЕТСЯ САМ — как и предметы: это выборка журналов
+   * и обращение к каждому найденному контракту.
+   */
+  readonly approvals: readonly IApprovalRecord[] | null
+
+  /** Чем ограничен показанный список разрешений. `null` до запроса. */
+  readonly approvalLimits: IApprovalLimits | null
+
+  /** Идёт поиск разрешений. */
+  readonly isApprovalsLoading: boolean
 
   /**
    * Оценка портфеля активного аккаунта в активной сети.
@@ -404,6 +425,22 @@ export interface IWalletSession {
    * @returns Хэш опубликованной транзакции.
    */
   sendTransfer(transaction: ISignableTransaction): Promise<TxHash>
+
+  /**
+   * Ищет разрешения, выданные активным аккаунтом.
+   *
+   * Вызывается разделом разрешений при открытии. Повторный вызов
+   * перезапрашивает список.
+   */
+  loadApprovals(): Promise<void>
+
+  /**
+   * Готовит отзыв выданного разрешения.
+   *
+   * Отзыв — обычная транзакция: она стоит газа и требует подписи.
+   * Отправляется тем же `sendTransfer`, что и перевод.
+   */
+  prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<IPreparedTransfer>
 
   /**
    * Ищет коллекционные предметы активного аккаунта.

@@ -1,4 +1,4 @@
-import { Info, Lock, Monitor, Moon, Plug, ShieldCheck, Sun } from 'lucide-react'
+import { Info, Lock, Monitor, Moon, Plug, ShieldAlert, ShieldCheck, Sun } from 'lucide-react'
 import { useId } from 'react'
 import { Link } from 'react-router'
 
@@ -102,6 +102,25 @@ export function SettingsPage() {
           <p className="text-xs text-muted-foreground">
             Подключённое приложение может присылать запросы на подпись. Каждый спрашивается
             отдельно, но само подключение стоит закрывать, когда оно больше не нужно.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium text-muted-foreground">Разрешения</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Button asChild variant="outline" className="w-full">
+            <Link to="/wallet/approvals">
+              <ShieldAlert className="size-4" aria-hidden />
+              Выданные разрешения
+            </Link>
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            Разрешение позволяет контракту забирать ваши токены без новой подписи и не истекает
+            само. Забытое разрешение — самый частый способ потерять средства при целом ключе.
           </p>
         </CardContent>
       </Card>

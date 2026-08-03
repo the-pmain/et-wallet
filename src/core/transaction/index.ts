@@ -12,6 +12,7 @@ export {
   type ISignedTransaction,
   type ITransactionRecord,
   type INftTransferRequest,
+  type IRevokeApprovalRequest,
   type ITokenTransferRequest,
   type ITransactionRequest,
   type ITypedData,

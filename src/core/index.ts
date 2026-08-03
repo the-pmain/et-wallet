@@ -485,6 +485,24 @@ export {
   type ITokenAmount,
 } from './portfolio'
 
+/* --- Разрешения --- */
+export {
+  ALLOWANCE_SELECTOR,
+  APPROVAL_FOR_ALL_TOPIC,
+  APPROVAL_TOPIC,
+  APPROVE_SELECTOR,
+  ApprovalService,
+  IS_APPROVED_FOR_ALL_SELECTOR,
+  SET_APPROVAL_FOR_ALL_SELECTOR,
+  encodeAllowance,
+  encodeRevokeAllowance,
+  encodeRevokeApprovalForAll,
+  type IApprovalLimits,
+  type IApprovalPage,
+  type IApprovalRecord,
+  type IApprovalServiceDependencies,
+} from './approval'
+
 /* --- Коллекционные токены --- */
 export {
   ERC1155_BALANCE_OF_SELECTOR,
@@ -593,6 +611,7 @@ export {
   type ITransactionRecord,
   type ITransactionRepository,
   type INftTransferRequest,
+  type IRevokeApprovalRequest,
   type ITokenTransferRequest,
   type ITransactionRequest,
   type ITransactionService,

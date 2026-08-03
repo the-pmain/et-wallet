@@ -5,6 +5,7 @@ import type {
   IFeeEstimate,
   ISignableTransaction,
   ISignedTransaction,
+  IRevokeApprovalRequest,
   ITokenTransferRequest,
   ITransactionRecord,
   ITransactionRequest,
@@ -49,6 +50,14 @@ export interface ITransactionService extends IEventSource<TransactionEventMap> {
    *         InsufficientFundsError
    */
   prepareTokenTransfer(request: ITokenTransferRequest): Promise<ISignableTransaction>
+
+  /**
+   * Готовит отзыв выданного разрешения.
+   *
+   * Отзыв — транзакция: разрешение живёт в контракте, и убрать его
+   * можно только вызовом, который стоит газа и требует подписи.
+   */
+  prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<ISignableTransaction>
 
   /**
    * Варианты комиссии для показа пользователю.

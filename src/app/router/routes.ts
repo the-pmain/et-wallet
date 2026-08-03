@@ -21,6 +21,7 @@ export const ROUTE = {
   Nft: '/wallet/nft',
   Activity: '/wallet/activity',
   Settings: '/wallet/settings',
+  Approvals: '/wallet/approvals',
   Backup: '/wallet/backup',
 } as const
 

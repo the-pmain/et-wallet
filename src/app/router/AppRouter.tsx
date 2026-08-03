@@ -15,6 +15,7 @@ import { TEST_MODE } from '@/shared/config'
 import { AppShell, AuthLayout } from '../layouts'
 import {
   ActivityPage,
+  ApprovalsPage,
   AssetsPage,
   BackupPage,
   ConnectionsPage,
@@ -172,6 +173,7 @@ export function AppRouter() {
             <Route path="activity" element={<ActivityPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="backup" element={<BackupPage />} />
+            <Route path="approvals" element={<ApprovalsPage />} />
           </Route>
         </Route>
 
