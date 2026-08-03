@@ -1,6 +1,12 @@
 import { useId, useState } from 'react'
 
-import { TOKEN_STANDARD, decodeSafeTransferRecipient, type INftItem, type TxHash } from '@/core'
+import {
+  TOKEN_STANDARD,
+  areAddressesEqual,
+  decodeSafeTransferRecipient,
+  type INftItem,
+  type TxHash,
+} from '@/core'
 import { ConfirmPassword, useSecurity } from '@/features/security'
 import {
   Alert,
@@ -72,6 +78,21 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
 
       if (resolution.address === null) {
         setError('The recipient was not resolved: enter an address or an ENS name that exists.')
+
+        return
+      }
+
+      /* ПЕРЕДАЧА ПРЕДМЕТА В ЕГО СОБСТВЕННУЮ КОЛЛЕКЦИЮ — ЗАВЕДОМАЯ
+         ПОТЕРЯ, и предмет существует в одном экземпляре. Адрес контракта
+         легко попадает в поле получателя: он стоит рядом в обозревателе
+         и в самой карточке предмета. В отличие от прочих замечаний это
+         не повод задуматься, а отказ: законного применения у такой
+         операции нет. */
+      if (areAddressesEqual(resolution.address, item.contract)) {
+        setError(
+          'The recipient is the collection contract itself. An item sent there is lost for good: ' +
+            'only the code of that contract could return it, and such code almost never exists.',
+        )
 
         return
       }

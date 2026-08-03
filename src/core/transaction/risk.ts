@@ -18,9 +18,36 @@ export const RECIPIENT_RISK = {
    * перевод монет на адрес токен-контракта.
    */
   ContractRecipient: 'contract-recipient',
+
+  /**
+   * Получатель — контракт самого отправляемого актива.
+   *
+   * САМАЯ ЧАСТАЯ БЕЗВОЗВРАТНАЯ ОШИБКА С ТОКЕНАМИ. Человек копирует
+   * адрес контракта — из обозревателя, из списка активов, из чужого
+   * сообщения — и вставляет его в поле получателя. Перевод проходит:
+   * контракт записывает токены на собственный адрес. Забрать их оттуда
+   * может только код контракта, а такого кода почти никогда нет.
+   *
+   * ОТ `ContractRecipient` ОТЛИЧАЕТСЯ ОПРЕДЕЛЁННОСТЬЮ. «Получатель —
+   * контракт» иногда законно: биржи, мультиподписи и хранилища
+   * принимают переводы. Отправка актива в его собственный контракт
+   * законного применения не имеет.
+   */
+  AssetContractRecipient: 'asset-contract-recipient',
 } as const
 
 export type RecipientRisk = (typeof RECIPIENT_RISK)[keyof typeof RECIPIENT_RISK]
+
+/** Что известно об отправляемом активе. */
+export interface IRecipientRiskOptions {
+  /**
+   * Адрес контракта отправляемого токена либо коллекции.
+   *
+   * `null` либо отсутствие означает перевод нативной валюты: у неё
+   * контракта нет, и проверять нечего.
+   */
+  readonly assetContract?: Address | null
+}
 
 /**
  * Проверяет получателя перед отправкой.
@@ -42,8 +69,22 @@ export type RecipientRisk = (typeof RECIPIENT_RISK)[keyof typeof RECIPIENT_RISK]
  *        контрольной суммы» теряется до проверки — предупреждение
  *        не появится никогда.
  */
-export function findRecipientRisks(recipient: string, sender: Address): readonly RecipientRisk[] {
+export function findRecipientRisks(
+  recipient: string,
+  sender: Address,
+  options: IRecipientRiskOptions = {},
+): readonly RecipientRisk[] {
   const risks: RecipientRisk[] = []
+
+  /* Проверка стоит первой: она означает заведомую потерю, а не повод
+     задуматься, и должна быть замечена раньше остальных. */
+  if (
+    options.assetContract !== undefined &&
+    options.assetContract !== null &&
+    areAddressesEqual(recipient, options.assetContract)
+  ) {
+    risks.push(RECIPIENT_RISK.AssetContractRecipient)
+  }
 
   /* Сравнение адресов нечувствительно к регистру, поэтому необработанная
      строка годится и для этих двух проверок. */

@@ -481,3 +481,76 @@ describe('Отправка: токен ERC-20', () => {
     expect(list.getByText(/USDC/u)).toBeInTheDocument()
   })
 })
+
+describe('Отправка: получатель — контракт самого токена', () => {
+  const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+
+  const USDC: IFakeToken = {
+    address: TOKEN,
+    symbol: 'USDC',
+    name: 'USD Coin',
+    decimals: 6,
+    balance: 250_000_000n,
+  }
+
+  beforeEach(async () => {
+    services.providerFactory.configure({ balance: BALANCE, tokens: [USDC] })
+
+    await services.session.open()
+    await services.session.addToken(TOKEN)
+  })
+
+  it('предупреждает о заведомой потере', async () => {
+    /* Самая частая безвозвратная ошибка с токенами: адрес контракта
+       копируют из обозревателя или из списка активов и вставляют
+       в поле получателя. Забрать оттуда токены может только код самого
+       контракта, а его почти никогда нет. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await fillAndContinue(TOKEN, '1')
+
+    expect(await screen.findByText(/recipient is the token contract itself/i)).toBeInTheDocument()
+  })
+
+  it('объясняет, откуда берётся такая ошибка', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await fillAndContinue(TOKEN, '1')
+
+    expect(await screen.findByText(/copied instead of the recipient address/i)).toBeInTheDocument()
+  })
+
+  it('обычный получатель этого предупреждения не вызывает', async () => {
+    /* Ложная тревога приучает не читать предупреждения, и настоящее
+       останется незамеченным. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await fillAndContinue(RECIPIENT, '1')
+
+    await screen.findByRole('heading', { name: 'Confirmation' })
+
+    expect(screen.queryByText(/recipient is the token contract itself/i)).not.toBeInTheDocument()
+  })
+
+  it('при переводе валюты на тот же адрес предупреждение другое', async () => {
+    /* Нативная валюта, отправленная контракту, теряется по другой
+       причине и требует другого объяснения: у неё контракта нет,
+       и «его собственный контракт» — бессмыслица. */
+    renderApp()
+    await openSend()
+    await fillAndContinue(TOKEN, '0.1')
+
+    await screen.findByRole('heading', { name: 'Confirmation' })
+
+    expect(screen.queryByText(/recipient is the token contract itself/i)).not.toBeInTheDocument()
+  })
+})

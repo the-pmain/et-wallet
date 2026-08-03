@@ -249,6 +249,10 @@ export function SendPage() {
         ...findRecipientRisks(
           resolved.result.status === RECIPIENT_STATUS.Address ? trimmedRecipient : recipientAddress,
           account.address,
+          /* Адрес контракта отправляемого токена: перевод токена в его
+             собственный контракт — заведомая потеря. У нативной валюты
+             контракта нет, и сравнивать не с чем. */
+          { assetContract: token?.address ?? null },
         ),
       ]
 
@@ -854,6 +858,20 @@ function Row({ label, children }: { readonly label: string; readonly children: R
 }
 
 function RiskAlert({ risk }: { readonly risk: string }) {
+  if (risk === RECIPIENT_RISK.AssetContractRecipient) {
+    return (
+      <Alert variant="danger">
+        <Flame />
+        <AlertTitle>The recipient is the token contract itself</AlertTitle>
+        <AlertDescription>
+          Tokens sent to their own contract are lost for good: only the code of that contract could
+          return them, and such code almost never exists. This usually happens when the contract
+          address is copied instead of the recipient address — check where you took it from.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   if (risk === RECIPIENT_RISK.BurnAddress) {
     return (
       <Alert variant="danger">

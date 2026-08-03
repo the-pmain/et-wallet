@@ -308,3 +308,50 @@ describe('NFT: передача предмета', () => {
     expect(await screen.findByText(/belongs to a different address/i)).toBeInTheDocument()
   })
 })
+
+describe('NFT: передача в собственную коллекцию', () => {
+  beforeEach(() => {
+    services.providerFactory.configure({
+      balance: BALANCE,
+      latestBlock: LATEST_BLOCK,
+      logs: [incoming721(PUNKS, 777n)],
+      nftOwners: [{ contract: PUNKS, tokenId: 777n, owner: OWNER }],
+      collections: [{ address: PUNKS, name: 'CryptoPunks' }],
+    })
+  })
+
+  it('отвергается до подтверждения', async () => {
+    /* Предмет существует в одном экземпляре, а адрес контракта стоит
+       рядом — и в обозревателе, и в самой карточке. В отличие
+       от прочих замечаний это не повод задуматься, а отказ: законного
+       применения у такой операции нет. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openNft()
+    await user.click(await screen.findByRole('button', { name: 'Transfer' }))
+    await screen.findByRole('heading', { level: 1, name: 'Transfer an item' })
+
+    await user.type(screen.getByLabelText(/Recipient address/), PUNKS)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(
+      await screen.findByText(/recipient is the collection contract itself/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Confirm the transfer' })).not.toBeInTheDocument()
+  })
+
+  it('обычный получатель проходит дальше', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openNft()
+    await user.click(await screen.findByRole('button', { name: 'Transfer' }))
+    await screen.findByRole('heading', { level: 1, name: 'Transfer an item' })
+
+    await user.type(screen.getByLabelText(/Recipient address/), PEER)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByText('Confirm the transfer')).toBeInTheDocument()
+  })
+})

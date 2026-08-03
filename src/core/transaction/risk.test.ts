@@ -60,3 +60,48 @@ describe('findRecipientRisks', () => {
     expect(risks).toContain(RECIPIENT_RISK.NoChecksum)
   })
 })
+
+describe('Перевод актива в его собственный контракт', () => {
+  const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+
+  it('получатель, совпавший с контрактом токена, помечается', () => {
+    /* Самая частая безвозвратная ошибка с токенами: адрес контракта
+       копируют из обозревателя или из списка активов и вставляют
+       в поле получателя. */
+    const risks = findRecipientRisks(TOKEN, SENDER, { assetContract: TOKEN })
+
+    expect(risks).toContain(RECIPIENT_RISK.AssetContractRecipient)
+  })
+
+  it('регистр адреса значения не имеет', () => {
+    const risks = findRecipientRisks(TOKEN.toLowerCase(), SENDER, { assetContract: TOKEN })
+
+    expect(risks).toContain(RECIPIENT_RISK.AssetContractRecipient)
+  })
+
+  it('другой контракт этого замечания не вызывает', () => {
+    /* Перевод токена на адрес другого контракта бывает законным:
+       биржи и хранилища принимают такие переводы. */
+    const risks = findRecipientRisks(PEER, SENDER, { assetContract: TOKEN })
+
+    expect(risks).not.toContain(RECIPIENT_RISK.AssetContractRecipient)
+  })
+
+  it('без сведений об активе замечание не появляется', () => {
+    /* Перевод нативной валюты: контракта у неё нет, и сравнивать
+       не с чем. */
+    const risks = findRecipientRisks(TOKEN, SENDER)
+
+    expect(risks).not.toContain(RECIPIENT_RISK.AssetContractRecipient)
+  })
+
+  it('замечание идёт первым', () => {
+    /* Оно означает заведомую потерю, а не повод задуматься, и должно
+       быть замечено раньше остальных: адрес контракта записан
+       с контрольной суммой не всегда, и «нет контрольной суммы»
+       не должно оказаться выше. */
+    const risks = findRecipientRisks(TOKEN.toLowerCase(), SENDER, { assetContract: TOKEN })
+
+    expect(risks[0]).toBe(RECIPIENT_RISK.AssetContractRecipient)
+  })
+})
