@@ -17,6 +17,7 @@ import {
 } from '@/core'
 
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
+import { WALLET_BROADCAST, type WalletBroadcast } from './WalletBroadcast'
 
 /**
  * Зависимости сервиса.
@@ -41,6 +42,14 @@ export interface IOnboardingServiceDependencies {
    * боевой сборки.
    */
   readonly unlockThrottle?: UnlockThrottle
+
+  /**
+   * Оповещение соседних вкладок.
+   *
+   * Необязательно: без него кошелёк работает как прежде, а вкладки
+   * узнают о стирании только при перезагрузке.
+   */
+  readonly broadcast?: WalletBroadcast
 }
 
 /**
@@ -75,6 +84,7 @@ function assertAcceptableUsername(username: string | undefined): void {
 export class OnboardingService implements IOnboardingService {
   readonly #secureStorage: ISecureStorage
   readonly #unlockThrottle: UnlockThrottle | null
+  readonly #broadcast: WalletBroadcast | null
   readonly #mnemonicService = new MnemonicService()
   readonly #listeners = new Set<() => void>()
 
@@ -83,6 +93,7 @@ export class OnboardingService implements IOnboardingService {
   constructor(dependencies: IOnboardingServiceDependencies) {
     this.#secureStorage = dependencies.secureStorage
     this.#unlockThrottle = dependencies.unlockThrottle ?? null
+    this.#broadcast = dependencies.broadcast ?? null
   }
 
   getState(): OnboardingState {
@@ -243,6 +254,26 @@ export class OnboardingService implements IOnboardingService {
 
   async reset(): Promise<void> {
     await this.#secureStorage.destroy()
+
+    this.#setState(ONBOARDING_STATE.Uninitialized)
+
+    /* ОСТАЛЬНЫЕ ВКЛАДКИ ОБЯЗАНЫ УЗНАТЬ. Хранилище общее, а память — нет:
+       вкладка, пережившая стирание, продолжала бы показывать балансы
+       и предлагать отправку, потому что ключи у неё в памяти. Владелец
+       видел бы работающий кошелёк, которого на диске уже нет. */
+    this.#broadcast?.post(WALLET_BROADCAST.Erased)
+  }
+
+  /**
+   * Принимает стирание, выполненное в другой вкладке.
+   *
+   * ХРАНИЛИЩЕ НЕ ТРОГАЕТСЯ: его уже уничтожила та вкладка, а повторное
+   * удаление ничего не изменит. Здесь снимается доступ в этой вкладке —
+   * ключ шифрования забывается, состояние возвращается к «кошелька
+   * нет».
+   */
+  handleExternalReset(): void {
+    this.#secureStorage.lock()
 
     this.#setState(ONBOARDING_STATE.Uninitialized)
   }

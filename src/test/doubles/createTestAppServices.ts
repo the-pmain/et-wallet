@@ -1,6 +1,9 @@
 import { MemoryStorageService, SecureStorage, UnlockThrottle, type IProviderFactory } from '@/core'
 import { DappSessionService } from '@/features/dapp'
-import { OnboardingService } from '@/features/onboarding'
+import { bytesToHex } from '@noble/hashes/utils.js'
+
+import { getRandomBytes } from '@/core'
+import { OnboardingService, WalletBroadcast } from '@/features/onboarding'
 import { SecuritySettingsRepository } from '@/features/security'
 import { WalletSession } from '@/features/wallet'
 
@@ -14,6 +17,26 @@ import { NullLogger } from './NullLogger'
 /** Сервисы приложения, собранные для теста. */
 export interface ITestAppServices {
   readonly onboarding: OnboardingService
+
+  /**
+   * Канал оповещения между вкладками.
+   *
+   * В проверках он настоящий: `BroadcastChannel` есть и в jsdom,
+   * и в Node. Подменять его дублёром значило бы проверять дублёр.
+   */
+  readonly broadcast: WalletBroadcast
+
+  /**
+   * Имя канала, своё у каждого набора сервисов.
+   *
+   * ИЗОЛЯЦИЯ ОБЯЗАТЕЛЬНА. `BroadcastChannel` в Node доставляет
+   * сообщения между рабочими потоками одного процесса, а проверки идут
+   * параллельно. С общим именем сообщение о стирании из одной проверки
+   * закрывало бы кошелёк во всех остальных — что и произошло при первом
+   * прогоне: упала проверка ограничителя попыток, к вкладкам отношения
+   * не имеющая.
+   */
+  readonly broadcastName: string
   readonly session: WalletSession
   readonly providerFactory: FakeProviderFactory
   readonly priceProvider: FakePriceProvider
@@ -74,12 +97,19 @@ export function createTestAppServices(): ITestAppServices {
      кошелька, а не чужой сервер. */
   const dappTransport = new FakeSessionTransport()
 
+  /* Имя уникально: см. пояснение к `broadcastName`. */
+  const broadcastName = `etwallet-test-${bytesToHex(getRandomBytes(8))}`
+  const broadcast = new WalletBroadcast(broadcastName)
+
   return {
     onboarding: new OnboardingService({
+      broadcast,
       secureStorage,
       unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
     }),
     session,
+    broadcast,
+    broadcastName,
     providerFactory,
     priceProvider,
     clock,

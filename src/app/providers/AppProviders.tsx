@@ -53,7 +53,7 @@ export function AppProviders({ children, services }: AppProvidersProps) {
           оформления: язык нужен уже экрану загрузки, а от того, открыт
           ли кошелёк, он не зависит. */}
         <I18nProvider>
-          <OnboardingProvider service={value.onboarding}>
+          <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
             {/* Модуль безопасности вложен в онбординг и охватывает сессию
               кошелька: автоблокировка следит за состоянием блокировки,
               а её срабатывание обязано закрыть сессию. */}

@@ -12,3 +12,8 @@ export { PasswordFields } from './ui/PasswordFields'
 export { SeedPhraseConfirmation } from './ui/SeedPhraseConfirmation'
 export { SeedPhraseDisplay } from './ui/SeedPhraseDisplay'
 export { SeedPhraseInput } from './ui/SeedPhraseInput'
+export {
+  WALLET_BROADCAST,
+  WalletBroadcast,
+  type WalletBroadcastEvent,
+} from './model/WalletBroadcast'

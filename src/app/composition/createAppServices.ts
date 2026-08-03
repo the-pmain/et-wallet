@@ -15,7 +15,7 @@ import {
   type IStorageService,
 } from '@/core'
 import { DappSessionService, WalletConnectTransport } from '@/features/dapp'
-import { OnboardingService, type IOnboardingService } from '@/features/onboarding'
+import { OnboardingService, WalletBroadcast, type IOnboardingService } from '@/features/onboarding'
 import { SecuritySettingsRepository } from '@/features/security'
 import { WalletSession, type IWalletSession } from '@/features/wallet'
 import { APP_CONFIG } from '@/shared/config'
@@ -24,6 +24,14 @@ import { APP_CONFIG } from '@/shared/config'
 export interface IAppServices {
   readonly onboarding: IOnboardingService
   readonly session: IWalletSession
+
+  /**
+   * Канал оповещения между вкладками.
+   *
+   * Собирается здесь, а не внутри провайдера: сервис отправляет
+   * сообщения, провайдер их принимает, и канал у них обязан быть один.
+   */
+  readonly broadcast: WalletBroadcast
 
   /**
    * Источник времени.
@@ -90,15 +98,19 @@ export function createAppServices(): IAppServices {
     priceProvider: createPriceProvider(),
   })
 
+  const broadcast = new WalletBroadcast()
+
   return {
     onboarding: new OnboardingService({
       secureStorage,
+      broadcast,
       /* Счётчик попыток лежит в незашифрованных настройках: он обязан
          работать до разблокировки, когда ключ дешифрования ещё
          не выведен. */
       unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
     }),
     session,
+    broadcast,
     clock,
     securitySettings: new SecuritySettingsRepository(storage),
     dappSessions: createDappSessions(session, logger),
