@@ -159,6 +159,25 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base font-medium text-muted-foreground">Trust</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Button asChild variant="outline" className="w-full">
+            <Link to="/trust">
+              <ShieldAlert className="size-4" aria-hidden />
+              What you are trusting
+            </Link>
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            The wallet runs as a web page: its code is downloaded from a server every time you open
+            it. What that means, and what it does not protect against, is spelled out there.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base font-medium text-muted-foreground">Approvals</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">

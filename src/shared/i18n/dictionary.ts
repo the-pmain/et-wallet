@@ -36,6 +36,7 @@ const ENGLISH = {
   'welcome.subtitle': '{app} keeps private keys encrypted on your device.',
   'welcome.create': 'Create a new wallet',
   'welcome.import': 'Import with a seed phrase',
+  'welcome.trust': 'What you are trusting when you use a wallet in a browser',
   'welcome.notice':
     'Your seed phrase is the only way to restore access: we do not store keys and cannot help if it is lost. No support team will ever ask for it — such a request is an attempt to steal your funds.',
   'welcome.noticeTestMode':

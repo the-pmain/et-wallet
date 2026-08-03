@@ -25,6 +25,7 @@ import {
   PortfolioPage,
   SendPage,
   SettingsPage,
+  TrustPage,
 } from './lazy-pages'
 import { ROUTE } from './routes'
 
@@ -150,6 +151,7 @@ export function AppRouter() {
             />
           )}
           <Route path={ROUTE.Unlock} element={<UnlockWalletPage />} />
+          <Route path={ROUTE.Trust} element={<TrustPage />} />
           <Route path={ROUTE.ForgotPassword} element={<ForgotPasswordPage />} />
         </Route>
 

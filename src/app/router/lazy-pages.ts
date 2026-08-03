@@ -63,3 +63,7 @@ export const ImportWalletPage = lazy(async () => ({
 export const ApprovalsPage = lazy(async () => ({
   default: (await import('@/pages/ApprovalsPage')).ApprovalsPage,
 }))
+
+export const TrustPage = lazy(async () => ({
+  default: (await import('@/pages/TrustPage')).TrustPage,
+}))

@@ -116,6 +116,17 @@ export function WelcomePage() {
           {TEST_MODE.hideSeedImport ? t('welcome.noticeTestMode') : t('welcome.notice')}
         </AlertDescription>
       </Alert>
+
+      {/* ССЫЛКА, А НЕ ВТОРОЙ БЛОК ПРЕДУПРЕЖДЕНИЯ — см. пояснение выше:
+          два равновесных блока рядом соперничают за внимание. Риск,
+          о котором она говорит, реален, но в момент создания кошелька
+          seed-фраза важнее, и вытеснять её нельзя. */}
+      <Link
+        to="/trust"
+        className="animate-in text-xs text-muted-foreground underline-offset-4 delay-500 duration-700 fill-mode-both fade-in hover:text-foreground hover:underline"
+      >
+        {t('welcome.trust')}
+      </Link>
     </div>
   )
 }
