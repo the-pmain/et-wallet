@@ -13,36 +13,52 @@ import type { Plugin } from 'vite'
  * выставляют inline-стили через атрибут `style`. Это не даёт исполнения кода,
  * но при появлении CSS-инъекций стоит пересмотреть.
  *
- * `connect-src` РАЗРЕШАЕТ ЛЮБОЙ HTTPS, И СУЗИТЬ ЕГО НЕЛЬЗЯ. Пользователь
- * вправе указать собственный RPC-узел — адрес, который на этапе сборки
- * неизвестен. Перечень, составленный из встроенных сетей, отменил бы
- * эту возможность, а она и есть главная защита приватности запросов.
- * Ограничение снимаемо только заголовком от хостинга, формируемым
- * с учётом пользовательских адресов; для meta-тега оно недостижимо.
+ * `connect-src` ПО УМОЛЧАНИЮ РАЗРЕШАЕТ ЛЮБОЙ HTTPS, И ЭТО ОСОЗНАННЫЙ
+ * ОБМЕН. Пользователь вправе указать собственный RPC-узел — адрес,
+ * который на этапе сборки неизвестен. Перечень, составленный
+ * из встроенных сетей, отменил бы эту возможность, а она и есть главная
+ * защита приватности запросов: без своего узла оператор чужого видит
+ * IP и все адреса владельца.
+ *
+ * РАЗМЕЩАЮЩИЙ ВПРАВЕ РЕШИТЬ ИНАЧЕ. Переменная сборки
+ * `VITE_CSP_CONNECT_SRC` задаёт перечень источников явно — например
+ * для размещения, где своим узлом пользоваться не предполагают, и
+ * запрет обращений к произвольным адресам ценнее. Выбор делает тот, кто
+ * раздаёт сборку, потому что последствия несёт он.
+ *
+ * `https:` покрывает и `wss:`: по спецификации CSP схема `https`
+ * соответствует защищённым веб-сокетам. Отдельная запись не нужна,
+ * и её отсутствие не означает, что WalletConnect запрещён.
  */
-const PRODUCTION_CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self' https:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'none'",
-  "frame-src 'none'",
-  /*
+
+/** Источники соединений по умолчанию. */
+const DEFAULT_CONNECT_SRC = "'self' https:"
+
+/** Собирает политику с заданными источниками соединений. */
+export function buildContentSecurityPolicy(connectSrc: string = DEFAULT_CONNECT_SRC): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src ${connectSrc}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+    "frame-src 'none'",
+    /*
     Воркеров у приложения нет. Разрешение `blob:` позволяло бы запустить
     в воркере код, собранный из строки, — обход `script-src 'self'`,
     ради которого политика и существует.
   */
-  "worker-src 'none'",
-  /* Приложение не встраивает ничего и ничего не проигрывает. Директивы
+    "worker-src 'none'",
+    /* Приложение не встраивает ничего и ничего не проигрывает. Директивы
      закрыты явно: `default-src` покрывает не все типы ресурсов. */
-  "child-src 'none'",
-  "media-src 'none'",
-  "manifest-src 'self'",
-  /*
+    "child-src 'none'",
+    "media-src 'none'",
+    "manifest-src 'self'",
+    /*
     Trusted Types запрещают присваивание строк в места, ведущие
     к исполнению кода: `innerHTML`, `src` скрипта, `eval`. Правило ESLint
     против `innerHTML` работает на нашем коде; эта директива действует
@@ -52,9 +68,10 @@ const PRODUCTION_CSP = [
     в приложении нет, и разрешать его заранее значило бы открывать путь,
     которым никто не пользуется.
   */
-  "require-trusted-types-for 'script'",
-  'upgrade-insecure-requests',
-].join('; ')
+    "require-trusted-types-for 'script'",
+    'upgrade-insecure-requests',
+  ].join('; ')
+}
 
 /**
  * Внедряет meta-тег CSP в index.html только при production-сборке.
@@ -74,12 +91,18 @@ export function cspPlugin(): Plugin {
     transformIndexHtml: {
       order: 'pre',
       handler() {
+        /* Пустое значение переменной означает «не задано», а не «запретить
+           всё»: пустой `connect-src` отрезал бы кошелёк от любых узлов,
+           и заметить это можно было бы только после размещения. */
+        const configured = process.env['VITE_CSP_CONNECT_SRC']?.trim()
         return [
           {
             tag: 'meta',
             attrs: {
               'http-equiv': 'Content-Security-Policy',
-              content: PRODUCTION_CSP,
+              content: buildContentSecurityPolicy(
+                configured === undefined || configured === '' ? undefined : configured,
+              ),
             },
             injectTo: 'head-prepend' as const,
           },
