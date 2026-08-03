@@ -10,6 +10,9 @@ import type {
   IHistoryLimits,
   INetworkConfig,
   IFeeEstimate,
+  INftItem,
+  INftLimits,
+  INftTransferRequest,
   IPortfolioSummary,
   IRpcEndpoint,
   IRpcEndpointHealth,
@@ -173,6 +176,26 @@ export interface IWalletSnapshot {
 
   /** Идёт загрузка балансов токенов. */
   readonly isTokensLoading: boolean
+
+  /**
+   * Коллекционные предметы активного аккаунта в активной сети.
+   *
+   * `null` означает «не запрашивали», пустой массив — «предметов
+   * не найдено». Разница существенна: первое не утверждает ничего,
+   * второе утверждает, что искали.
+   *
+   * СПИСОК НЕ ЗАГРУЖАЕТСЯ САМ. Поиск требует выборки журналов и запроса
+   * к каждому найденному контракту — это десятки обращений к узлу
+   * и подробный след активности у его оператора. Владелец запрашивает
+   * их, открывая раздел.
+   */
+  readonly nfts: readonly INftItem[] | null
+
+  /** Чем ограничен показанный список предметов. `null` до запроса. */
+  readonly nftLimits: INftLimits | null
+
+  /** Идёт поиск предметов. */
+  readonly isNftLoading: boolean
 
   /**
    * Оценка портфеля активного аккаунта в активной сети.
@@ -383,6 +406,14 @@ export interface IWalletSession {
   sendTransfer(transaction: ISignableTransaction): Promise<TxHash>
 
   /**
+   * Ищет коллекционные предметы активного аккаунта.
+   *
+   * Вызывается разделом NFT при открытии. Повторный вызов перезапрашивает
+   * список: он мог измениться с прошлого раза.
+   */
+  loadNfts(): Promise<void>
+
+  /**
    * Готовит перевод токена ERC-20.
    *
    * Данные вызова собирает ядро: получатель и количество лежат в них,
@@ -391,6 +422,13 @@ export interface IWalletSession {
    * @throws InsufficientTokenBalanceError если токенов меньше суммы.
    */
   prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer>
+
+  /**
+   * Готовит передачу коллекционного предмета.
+   *
+   * @throws NftNotOwnedError если предмет не принадлежит отправителю.
+   */
+  prepareNftTransfer(request: INftTransferRequest): Promise<IPreparedTransfer>
 
   /**
    * Готовит ускорение зависшей транзакции.

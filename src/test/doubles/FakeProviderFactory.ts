@@ -1,6 +1,7 @@
 import {
   BALANCE_OF_SELECTOR,
   ChainIdMismatchError,
+  ERC1155_BALANCE_OF_SELECTOR,
   DECIMALS_SELECTOR,
   ENS_ADDR_SELECTOR,
   ENS_NAME_SELECTOR,
@@ -8,6 +9,7 @@ import {
   ENS_RESOLVER_SELECTOR,
   EventBus,
   NAME_SELECTOR,
+  OWNER_OF_SELECTOR,
   SYMBOL_SELECTOR,
   ProviderUnavailableError,
   areAddressesEqual,
@@ -55,6 +57,8 @@ class FakeProvider implements IProvider {
   readonly #readContracts: () => readonly string[]
   readonly #readEnsRecords: () => readonly IFakeEnsRecord[]
   readonly #readTokens: () => readonly IFakeToken[]
+  readonly #readCollections: () => IFakeCollections
+  readonly #readLogsError: () => string | null
   readonly #events = new EventBus<ProviderEventMap>()
 
   constructor(
@@ -68,6 +72,8 @@ class FakeProvider implements IProvider {
     readContracts: () => readonly string[],
     readEnsRecords: () => readonly IFakeEnsRecord[],
     readTokens: () => readonly IFakeToken[],
+    readCollections: () => IFakeCollections,
+    readLogsError: () => string | null,
   ) {
     this.chainId = chainId
     this.#reportedChainId = reportedChainId
@@ -79,6 +85,8 @@ class FakeProvider implements IProvider {
     this.#readContracts = readContracts
     this.#readEnsRecords = readEnsRecords
     this.#readTokens = readTokens
+    this.#readCollections = readCollections
+    this.#readLogsError = readLogsError
   }
 
   request<TResult>(request: { readonly method: string }): Promise<TResult> {
@@ -123,6 +131,12 @@ class FakeProvider implements IProvider {
    * не знает, обязан упасть, а не получить пустую строку.
    */
   call(request: ICallRequest): Promise<HexString> {
+    const collection = answerCollectionCall(request, this.#readCollections())
+
+    if (collection !== null) {
+      return collection instanceof Error ? Promise.reject(collection) : Promise.resolve(collection)
+    }
+
     const token = answerTokenCall(request, this.#readTokens())
 
     if (token !== null) {
@@ -199,7 +213,11 @@ class FakeProvider implements IProvider {
    * из истории.
    */
   getLogs(filter: ILogFilter): Promise<readonly ILogEntry[]> {
-    return Promise.resolve(this.#readLogs().filter((entry) => matchesFilter(entry, filter)))
+    const failure = this.#readLogsError()
+
+    return failure === null
+      ? Promise.resolve(this.#readLogs().filter((entry) => matchesFilter(entry, filter)))
+      : Promise.reject(new Error(failure))
   }
 
   destroy(): void {
@@ -211,7 +229,26 @@ class FakeProvider implements IProvider {
   off = this.#events.off.bind(this.#events)
 }
 
-/** Настройки поведения фабрики в конкретном тесте. */
+/** Владелец предмета ERC-721 у дублёра. */
+export interface IFakeNftOwner {
+  readonly contract: string
+  readonly tokenId: bigint
+  readonly owner: string
+}
+
+/** Остаток предмета ERC-1155 у владельца. */
+export interface IFakeNftBalance {
+  readonly contract: string
+  readonly tokenId: bigint
+  readonly balance: bigint
+}
+
+/** Название коллекции, которое отдаёт контракт. */
+export interface IFakeCollection {
+  readonly address: string
+  readonly name: string
+}
+
 /** Токен-контракт, отвечающий дублёру узла. */
 export interface IFakeToken {
   readonly address: string
@@ -223,6 +260,7 @@ export interface IFakeToken {
   readonly balance: bigint
 }
 
+/** Настройки поведения фабрики в конкретном тесте. */
 export interface IFakeProviderOptions {
   /**
    * Идентификатор, который узел сообщит в ответ на `eth_chainId`.
@@ -276,6 +314,18 @@ export interface IFakeProviderOptions {
    * непроверенным.
    */
   readonly tokens?: readonly IFakeToken[]
+
+  /** Владельцы предметов ERC-721. Предмет без записи считается сожжённым. */
+  readonly nftOwners?: readonly IFakeNftOwner[]
+
+  /** Остатки предметов ERC-1155. Без записи остаток нулевой. */
+  readonly nftBalances?: readonly IFakeNftBalance[]
+
+  /** Названия коллекций. Без записи контракт отвечает отказом. */
+  readonly collections?: readonly IFakeCollection[]
+
+  /** Причина отказа выборки журналов. Без неё выборка удаётся. */
+  readonly logsError?: string
 
   /** Адреса, по которым `getCode` вернёт байт-код. По умолчанию таких нет. */
   readonly contractAddresses?: readonly string[]
@@ -463,6 +513,12 @@ export class FakeProviderFactory implements IProviderFactory {
       () => this.#options.contractAddresses ?? [],
       () => this.#options.ensRecords ?? [],
       () => this.#options.tokens ?? [],
+      () => ({
+        owners: this.#options.nftOwners ?? [],
+        balances: this.#options.nftBalances ?? [],
+        names: this.#options.collections ?? [],
+      }),
+      () => this.#options.logsError ?? null,
     )
 
     this.createdCount += 1
@@ -521,4 +577,55 @@ function text(value: string): HexString {
   return `0x${32n.toString(16).padStart(64, '0')}${BigInt(value.length)
     .toString(16)
     .padStart(64, '0')}${bytes.padEnd(64, '0')}` as HexString
+}
+
+/** Состояние коллекций у дублёра. */
+export interface IFakeCollections {
+  readonly owners: readonly IFakeNftOwner[]
+  readonly balances: readonly IFakeNftBalance[]
+  readonly names: readonly IFakeCollection[]
+}
+
+/**
+ * Ответ контракта коллекции.
+ *
+ * Возвращает `null`, если вызов к коллекциям не относится, и `Error`,
+ * если контракт обязан ответить отказом: `ownerOf` несуществующего
+ * предмета откатывается, и именно так выглядит сожжённый предмет.
+ */
+function answerCollectionCall(
+  request: ICallRequest,
+  state: IFakeCollections,
+): HexString | Error | null {
+  const data = request.data ?? '0x'
+
+  if (data.startsWith(`0x${OWNER_OF_SELECTOR}`)) {
+    const tokenId = BigInt(`0x${data.slice(10)}`)
+    const record = state.owners.find(
+      (entry) => areAddressesEqual(entry.contract, request.to) && entry.tokenId === tokenId,
+    )
+
+    return record === undefined
+      ? new Error('ERC721: invalid token ID')
+      : (`0x${record.owner.slice(2).toLowerCase().padStart(64, '0')}` as HexString)
+  }
+
+  if (data.startsWith(`0x${ERC1155_BALANCE_OF_SELECTOR}`)) {
+    const tokenId = BigInt(`0x${data.slice(74)}`)
+    const record = state.balances.find(
+      (entry) => areAddressesEqual(entry.contract, request.to) && entry.tokenId === tokenId,
+    )
+
+    return `0x${(record?.balance ?? 0n).toString(16).padStart(64, '0')}` as HexString
+  }
+
+  /* Название спрашивается и у коллекций, и у токенов ERC-20. Здесь
+     отвечают только известные коллекции; остальное уходит дальше. */
+  if (data.startsWith(`0x${NAME_SELECTOR}`)) {
+    const record = state.names.find((entry) => areAddressesEqual(entry.address, request.to))
+
+    return record === undefined ? null : text(record.name)
+  }
+
+  return null
 }

@@ -1,14 +1,26 @@
+import { areAddressesEqual } from '@/core/address'
 import {
   InsufficientFundsError,
   InsufficientTokenBalanceError,
   NetworkNotFoundError,
+  NftNotOwnedError,
   TransactionNotFoundError,
   TransactionNotReplaceableError,
 } from '@/core/errors'
 import { EventBus, type EventListener } from '@/core/events'
 import type { INetworkConfig, INetworkService } from '@/core/network'
 import {
+  ERC1155_BALANCE_OF_SELECTOR,
+  OWNER_OF_SELECTOR,
+  decodeAddress,
+  encodeCallWithAddressAndUint,
+  encodeCallWithUint,
+  encodeSafeTransfer1155,
+  encodeSafeTransfer721,
+} from '@/core/nft'
+import {
   BALANCE_OF_SELECTOR,
+  TOKEN_STANDARD,
   decodeUint,
   encodeCallWithAddress,
   encodeTransfer,
@@ -34,6 +46,7 @@ import {
   type IFeeEstimate,
   type ISignableTransaction,
   type ISignedTransaction,
+  type INftTransferRequest,
   type ITokenTransferRequest,
   type ITransactionRecord,
   type ITransactionRequest,
@@ -252,6 +265,106 @@ export class TransactionService implements ITransactionService {
       value: toWei(0n),
       data: encodeTransfer(request.to, request.amount),
     })
+  }
+
+  /**
+   * Превращает намерение передать предмет в транзакцию к подписи.
+   *
+   * ВЫЗОВ ЗАВИСИТ ОТ СТАНДАРТА. У ERC-721 передаётся один неделимый
+   * предмет, у ERC-1155 — заданное количество экземпляров; функции
+   * называются одинаково, но принимают разные аргументы, и перепутать
+   * их значит вызвать несуществующую.
+   *
+   * ИСПОЛЬЗУЕТСЯ БЕЗОПАСНЫЙ ВАРИАНТ ПЕРЕДАЧИ. Обычный `transferFrom`
+   * отправит предмет и контракту, который не умеет их принимать, —
+   * оттуда он не вернётся никогда.
+   *
+   * ПРИНАДЛЕЖНОСТЬ ПРОВЕРЯЕТСЯ ДО ПОДПИСИ. Контракт отверг бы такой
+   * вызов и сам, но газ при этом списался бы, а причина осталась бы
+   * невнятной.
+   *
+   * @throws NftNotOwnedError если предмет не принадлежит отправителю,
+   *         GasEstimationFailedError если вызов завершится откатом,
+   *         InsufficientFundsError если не хватает на комиссию.
+   */
+  async prepareNftTransfer(request: INftTransferRequest): Promise<ISignableTransaction> {
+    const network = this.#requireNetwork(request)
+    const provider = await this.#resolver.get(network)
+    const amount = request.amount ?? 1n
+
+    await this.#assertOwnsNft(provider, request, amount)
+
+    const data =
+      request.standard === TOKEN_STANDARD.Erc1155
+        ? encodeSafeTransfer1155(request.from, request.to, request.tokenId, amount)
+        : encodeSafeTransfer721(request.from, request.to, request.tokenId)
+
+    return await this.prepare({
+      ...(request.chainId === undefined ? {} : { chainId: request.chainId }),
+      ...(request.feePriority === undefined ? {} : { feePriority: request.feePriority }),
+      from: request.from,
+      /* Транзакция адресована контракту коллекции: именно он передаёт
+         предмет. */
+      to: request.contract,
+      value: toWei(0n),
+      data,
+    })
+  }
+
+  /**
+   * Проверяет, что предмет принадлежит отправителю.
+   *
+   * Недоступность контракта означает «проверить не удалось» и проходит
+   * дальше: отказать по неполученному значению значило бы не дать
+   * распорядиться своим имуществом из-за молчания узла. Такой случай
+   * поймает оценка газа.
+   */
+  async #assertOwnsNft(
+    provider: IProvider,
+    request: INftTransferRequest,
+    amount: bigint,
+  ): Promise<void> {
+    try {
+      if (request.standard === TOKEN_STANDARD.Erc1155) {
+        const balance = decodeUint(
+          await provider.call({
+            to: request.contract,
+            data: encodeCallWithAddressAndUint(
+              ERC1155_BALANCE_OF_SELECTOR,
+              request.from,
+              request.tokenId,
+            ),
+          }),
+        )
+
+        if (balance < amount) {
+          throw new NftNotOwnedError(
+            `у вас ${balance.toString()} экз., а отправляется ${amount.toString()}`,
+          )
+        }
+
+        return
+      }
+
+      const holder = decodeAddress(
+        await provider.call({
+          to: request.contract,
+          data: encodeCallWithUint(OWNER_OF_SELECTOR, request.tokenId),
+        }),
+      )
+
+      if (!areAddressesEqual(holder, request.from)) {
+        throw new NftNotOwnedError('он принадлежит другому адресу')
+      }
+    } catch (error) {
+      if (error instanceof NftNotOwnedError) {
+        throw error
+      }
+
+      this.#logger.warn('Принадлежность предмета проверить не удалось', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   /**

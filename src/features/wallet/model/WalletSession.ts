@@ -13,6 +13,7 @@ import {
   MnemonicService,
   NetworkRepository,
   NetworkService,
+  NftService,
   NullPriceProvider,
   PriceService,
   PublicRpcProvider,
@@ -57,6 +58,7 @@ import {
   type ISecureStorage,
   type IStorageService,
   type ISignableTransaction,
+  type INftTransferRequest,
   type ITokenMetadata,
   type ITokenTransferRequest,
   type ITransferRecord,
@@ -102,6 +104,9 @@ const CLOSED_SNAPSHOT: IWalletSnapshot = {
   isHistoryLoading: false,
   tokenBalances: [],
   isTokensLoading: false,
+  nfts: null,
+  nftLimits: null,
+  isNftLoading: false,
   portfolio: null,
   arePricesEnabled: false,
   isPortfolioLoading: false,
@@ -211,6 +216,7 @@ export class WalletSession implements IWalletSession {
   #transactions: TransactionRepository | null = null
   #history: HistoryService | null = null
   #tokens: TokenService | null = null
+  #nfts: NftService | null = null
   #transactionService: TransactionService | null = null
   #prices: PriceService | null = null
   #backup: BackupManager | null = null
@@ -314,6 +320,7 @@ export class WalletSession implements IWalletSession {
     this.#transactions = null
     this.#history = null
     this.#tokens = null
+    this.#nfts = null
     this.#transactionService = null
     this.#prices = null
     this.#backup = null
@@ -680,6 +687,44 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
+   * Ищет коллекционные предметы активного аккаунта.
+   *
+   * ЗАПРОС ИДЁТ ТОЛЬКО ПО ТРЕБОВАНИЮ. Поиск — это выборка журналов
+   * и обращение к каждому найденному контракту: десятки запросов
+   * и подробный след у оператора узла. Делать это при каждом входе
+   * в кошелёк значило бы платить за то, чего владелец не просил.
+   */
+  async loadNfts(): Promise<void> {
+    const account = this.#snapshot.activeAccount
+    const network = this.#snapshot.activeNetwork
+
+    if (account === null || network === null || this.#nfts === null) {
+      return
+    }
+
+    this.#publish({ ...this.#snapshot, isNftLoading: true })
+
+    const page = await this.#nfts.list(account.address, network.chainId)
+
+    /* Ответ применяется, только если аккаунт и сеть не сменились, пока
+       шёл поиск: чужой список под новым адресом читается как чужое
+       имущество. */
+    if (
+      this.#snapshot.activeAccount?.id !== account.id ||
+      this.#snapshot.activeNetwork?.chainId !== network.chainId
+    ) {
+      return
+    }
+
+    this.#publish({
+      ...this.#snapshot,
+      nfts: page.items,
+      nftLimits: page.limits,
+      isNftLoading: false,
+    })
+  }
+
+  /**
    * Готовит перевод токена ERC-20 к подписи.
    *
    * ОТДЕЛЬНЫЙ МЕТОД, А НЕ ПРИЗНАК В `prepareTransfer`. У перевода токена
@@ -691,6 +736,19 @@ export class WalletSession implements IWalletSession {
   async prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer> {
     const transactions = this.#requireTransactions()
     const transaction = await transactions.prepareTokenTransfer(request)
+
+    return { transaction, fees: await transactions.estimateFees(transaction) }
+  }
+
+  /**
+   * Готовит передачу коллекционного предмета к подписи.
+   *
+   * Как и у токена, транзакция адресована контракту, а получатель
+   * лежит в данных вызова. Экран подтверждения показывает оба адреса.
+   */
+  async prepareNftTransfer(request: INftTransferRequest): Promise<IPreparedTransfer> {
+    const transactions = this.#requireTransactions()
+    const transaction = await transactions.prepareNftTransfer(request)
 
     return { transaction, fees: await transactions.estimateFees(transaction) }
   }
@@ -953,6 +1011,12 @@ export class WalletSession implements IWalletSession {
        по chainId, и перечень сетей нужен, чтобы знать, что читать. */
     await this.#tokens.init()
 
+    this.#nfts = new NftService({
+      resolver: this.#providers,
+      networks: this.#networks,
+      logger: this.#logger,
+    })
+
     this.#balances = new BalanceService({
       providers: this.#providers,
       networks: this.#networks,
@@ -1108,6 +1172,13 @@ export class WalletSession implements IWalletSession {
       isHistoryLoading: activeAccount !== null,
       tokenBalances: [],
       isTokensLoading: activeAccount !== null,
+      /* Предметы сбрасываются вместе с сетью и аккаунтом: показать
+         коллекцию одного адреса под другим — то же, что показать чужое
+         имущество как своё. Новый поиск начнётся, когда владелец
+         откроет раздел. */
+      nfts: null,
+      nftLimits: null,
+      isNftLoading: false,
       /* Имена сбрасываются вместе с сетью: имя, действительное
          в Ethereum, показанное рядом с балансом Polygon, утверждало бы
          больше, чем известно. */

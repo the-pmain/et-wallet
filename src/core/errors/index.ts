@@ -38,6 +38,7 @@ export {
   GasEstimationFailedError,
   InsufficientFundsError,
   InsufficientTokenBalanceError,
+  NftNotOwnedError,
   InvalidTokenContractError,
   NonceTooLowError,
   TokenNotFoundError,

@@ -6,6 +6,7 @@ import {
   GasEstimationFailedError,
   InsufficientFundsError,
   InsufficientTokenBalanceError,
+  NftNotOwnedError,
 } from '@/core/errors'
 import { EventBus } from '@/core/events'
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/core/network'
 import type { IFeeData, ILogEntry, IProvider, ProviderEventMap } from '@/core/provider'
 import { MemoryStorageService } from '@/core/storage'
+import { TOKEN_STANDARD } from '@/core/token'
 import { toWei, type ChainId, type HexString, type TxHash, type Wei } from '@/core/types'
 import { FakeClock, FakeProviderFactory, FastEncryptionService, NullLogger } from '@/test/doubles'
 
@@ -108,12 +110,23 @@ class StubProvider implements IProvider {
   /** Ответ контракта на `call`. По умолчанию — баланс токена. */
   tokenBalance = 1_000_000n
 
+  /** Владелец предмета, которого назовёт `ownerOf`. */
+  nftOwner: string | null = null
+
   /** Отказ узла при чтении баланса токена. */
   callError: Error | null = null
 
-  call(): Promise<HexString> {
+  call(request: { readonly data?: HexString }): Promise<HexString> {
     if (this.callError !== null) {
       return Promise.reject(this.callError)
+    }
+
+    /* `ownerOf` отвечает адресом; отсутствие владельца — откат,
+       как у сожжённого предмета. */
+    if (this.nftOwner !== null && (request.data ?? '').startsWith('0x6352211e')) {
+      return Promise.resolve(
+        `0x${this.nftOwner.slice(2).toLowerCase().padStart(64, '0')}` as HexString,
+      )
     }
 
     return Promise.resolve(`0x${this.tokenBalance.toString(16).padStart(64, '0')}` as HexString)
@@ -411,5 +424,91 @@ describe('Перевод токена', () => {
     node.balance = 1n
 
     await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toThrow(InsufficientFundsError)
+  })
+})
+
+describe('Передача коллекционного предмета', () => {
+  const COLLECTION = toAddress('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D')
+
+  const nftRequest = {
+    chainId: CHAIN_ID,
+    from: SENDER,
+    contract: COLLECTION,
+    to: RECIPIENT,
+    tokenId: 777n,
+    standard: TOKEN_STANDARD.Erc721,
+  }
+
+  it('транзакция адресована контракту коллекции', async () => {
+    node.nftOwner = SENDER
+
+    expect((await service.prepareNftTransfer(nftRequest)).to).toBe(COLLECTION)
+  })
+
+  it('нативная валюта не переводится', async () => {
+    node.nftOwner = SENDER
+
+    expect((await service.prepareNftTransfer(nftRequest)).value).toBe(0n)
+  })
+
+  it('вызывается безопасная передача', async () => {
+    /* Обычный `transferFrom` отправит предмет и контракту, который
+       не умеет их принимать: оттуда он не вернётся никогда. */
+    node.nftOwner = SENDER
+
+    expect((await service.prepareNftTransfer(nftRequest)).data.startsWith('0x42842e0e')).toBe(true)
+  })
+
+  it('отправитель входит в данные вызова', async () => {
+    /* `safeTransferFrom` принимает его явным аргументом: контракт
+       разрешает передачу и доверенному лицу. */
+    node.nftOwner = SENDER
+
+    const data = (await service.prepareNftTransfer(nftRequest)).data
+
+    expect(data.slice(10, 74)).toContain(SENDER.slice(2).toLowerCase())
+  })
+
+  it('отказывает, если предмет принадлежит другому адресу', async () => {
+    /* Контракт отверг бы вызов и сам, но газ при этом списался бы,
+       а причина осталась бы невнятной. */
+    node.nftOwner = RECIPIENT
+
+    await expect(service.prepareNftTransfer(nftRequest)).rejects.toThrow(NftNotOwnedError)
+  })
+
+  it('ERC-1155 передаётся с количеством', async () => {
+    node.tokenBalance = 5n
+
+    const transaction = await service.prepareNftTransfer({
+      ...nftRequest,
+      standard: TOKEN_STANDARD.Erc1155,
+      amount: 3n,
+    })
+
+    expect(transaction.data.startsWith('0xf242432a')).toBe(true)
+    expect(BigInt(`0x${transaction.data.slice(202, 266)}`)).toBe(3n)
+  })
+
+  it('ERC-1155 отказывает, когда экземпляров меньше', async () => {
+    node.tokenBalance = 1n
+
+    await expect(
+      service.prepareNftTransfer({
+        ...nftRequest,
+        standard: TOKEN_STANDARD.Erc1155,
+        amount: 3n,
+      }),
+    ).rejects.toThrow(NftNotOwnedError)
+  })
+
+  it('недоступность контракта не запрещает передачу', async () => {
+    /* «Проверить не удалось» и «предмет не ваш» — разные утверждения.
+       Отказ по молчанию узла не дал бы распорядиться своим имуществом. */
+    node.callError = new Error('узел не ответил')
+
+    await expect(service.prepareNftTransfer(nftRequest)).resolves.toMatchObject({
+      to: COLLECTION,
+    })
   })
 })

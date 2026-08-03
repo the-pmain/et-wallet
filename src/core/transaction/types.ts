@@ -1,3 +1,4 @@
+import type { TokenStandard } from '@/core/token'
 import type { Address, ChainId, HexString, Timestamp, TxHash, Wei } from '@/core/types'
 
 /**
@@ -108,6 +109,46 @@ export interface ITokenTransferRequest {
 
   /** Количество в минимальных единицах токена. */
   readonly amount: bigint
+
+  readonly feePriority?: FeePriority
+}
+
+/**
+ * Намерение передать коллекционный предмет.
+ *
+ * ОТПРАВИТЕЛЬ ВХОДИТ В ДАННЫЕ ВЫЗОВА. У `safeTransferFrom` он задан
+ * явным аргументом, а не выводится из подписи: контракт разрешает
+ * передачу и доверенному лицу. Кошелёк передаёт свой адрес — иное
+ * означало бы распоряжение чужим имуществом.
+ */
+export interface INftTransferRequest {
+  readonly chainId?: ChainId
+
+  readonly from: Address
+
+  /** Адрес контракта коллекции. */
+  readonly contract: Address
+
+  /** Настоящий получатель предмета. */
+  readonly to: Address
+
+  readonly tokenId: bigint
+
+  /**
+   * Стандарт коллекции.
+   *
+   * Определяет вызов: у ERC-721 и ERC-1155 разные `safeTransferFrom`.
+   * Догадаться по контракту нельзя — ошибка означала бы вызов
+   * несуществующей функции.
+   */
+  readonly standard: TokenStandard
+
+  /**
+   * Сколько экземпляров передаётся. Только для ERC-1155.
+   *
+   * У ERC-721 предмет неделим, и количество не участвует в вызове.
+   */
+  readonly amount?: bigint
 
   readonly feePriority?: FeePriority
 }

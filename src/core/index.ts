@@ -66,6 +66,7 @@ export {
   InsecureRpcUrlError,
   InsufficientFundsError,
   InsufficientTokenBalanceError,
+  NftNotOwnedError,
   InvalidAddressError,
   InvalidArgumentError,
   InvalidDerivationPathError,
@@ -484,6 +485,30 @@ export {
   type ITokenAmount,
 } from './portfolio'
 
+/* --- Коллекционные токены --- */
+export {
+  ERC1155_BALANCE_OF_SELECTOR,
+  NftService,
+  OWNER_OF_SELECTOR,
+  SAFE_TRANSFER_1155_SELECTOR,
+  SAFE_TRANSFER_721_SELECTOR,
+  SUPPORTS_INTERFACE_SELECTOR,
+  TOKEN_URI_SELECTOR,
+  decodeAddress,
+  decodeBool,
+  decodeSafeTransferRecipient,
+  encodeCallWithAddressAndUint,
+  encodeCallWithUint,
+  encodeSafeTransfer1155,
+  encodeSafeTransfer721,
+  encodeSupportsInterface,
+  encodeUintWord,
+  type INftItem,
+  type INftLimits,
+  type INftPage,
+  type INftServiceDependencies,
+} from './nft'
+
 /* --- Токены --- */
 export {
   BALANCE_OF_SELECTOR,
@@ -567,6 +592,7 @@ export {
   type ISignedTransaction,
   type ITransactionRecord,
   type ITransactionRepository,
+  type INftTransferRequest,
   type ITokenTransferRequest,
   type ITransactionRequest,
   type ITransactionService,

@@ -26,6 +26,7 @@ export const ERROR_CODE = {
   TooManyAttempts: 'TOO_MANY_ATTEMPTS',
   TransactionNotReplaceable: 'TRANSACTION_NOT_REPLACEABLE',
   InsufficientTokenBalance: 'INSUFFICIENT_TOKEN_BALANCE',
+  NftNotOwned: 'NFT_NOT_OWNED',
   WeakPassword: 'WEAK_PASSWORD',
   InvalidMnemonic: 'INVALID_MNEMONIC',
   InvalidPrivateKey: 'INVALID_PRIVATE_KEY',

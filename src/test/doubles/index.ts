@@ -7,6 +7,9 @@ export {
   FakeProviderFactory,
   type IFakeEnsRecord,
   type IFakeProviderOptions,
+  type IFakeCollection,
+  type IFakeNftBalance,
+  type IFakeNftOwner,
   type IFakeToken,
 } from './FakeProviderFactory'
 export { FakeSessionTransport, type ISentResponse } from './FakeSessionTransport'

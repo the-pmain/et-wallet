@@ -146,7 +146,9 @@ describe('Раздел активов', () => {
 })
 
 describe('Раздел NFT', () => {
-  it('объясняет отсутствие поддержки вместо пустой галереи', async () => {
+  it('объясняет границы поиска вместо пустой галереи', async () => {
+    /* Пустой список без объяснения читается владельцем как пропажа
+       имущества: поиск охватывает окно блоков, а не всю цепь. */
     const user = userEvent.setup()
 
     renderApp()
@@ -154,8 +156,8 @@ describe('Раздел NFT', () => {
 
     await user.click(screen.getByRole('link', { name: 'NFT' }))
 
-    expect(await screen.findByText('Коллекционные токены пока не поддержаны')).toBeInTheDocument()
-    expect(screen.getByText(/а не что коллекции нет/i)).toBeInTheDocument()
+    expect(await screen.findByText('Предметов не найдено')).toBeInTheDocument()
+    expect(screen.getByText(/просматривает последние/i)).toBeInTheDocument()
   })
 
   it('предупреждает о раскрытии IP при загрузке изображений', async () => {
@@ -166,7 +168,7 @@ describe('Раздел NFT', () => {
 
     await user.click(screen.getByRole('link', { name: 'NFT' }))
 
-    expect(await screen.findByText(/видит IP-адрес и связывает его/i)).toBeInTheDocument()
+    expect(await screen.findByText(/увидел бы ваш IP-адрес/i)).toBeInTheDocument()
   })
 })
 
