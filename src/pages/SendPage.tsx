@@ -23,7 +23,7 @@ import {
   type RecipientRisk,
   type TxHash,
 } from '@/core'
-import { ConfirmPassword, useSecurity } from '@/features/security'
+import { ConfirmPassword, UntrustedText, useSecurity } from '@/features/security'
 import {
   RECIPIENT_STATUS,
   AccountAvatar,
@@ -349,7 +349,9 @@ export function SendPage() {
               </div>
 
               {network === null ? null : (
-                <Badge variant={network.isTestnet ? 'warning' : 'default'}>{network.name}</Badge>
+                <Badge variant={network.isTestnet ? 'warning' : 'default'}>
+                  <UntrustedText value={network.name} />
+                </Badge>
               )}
             </div>
           )}
@@ -427,7 +429,7 @@ export function SendPage() {
                     key={item.token.address ?? NATIVE_ASSET_VALUE}
                     value={item.token.address ?? NATIVE_ASSET_VALUE}
                   >
-                    {item.token.symbol}
+                    <UntrustedText value={item.token.symbol} />
                     {item.token.isVerified
                       ? ' — verified'
                       : item.token.isCustom
@@ -722,7 +724,7 @@ function ConfirmTransfer({
             <span className="text-xs text-muted-foreground">{networkName}</span>
             {token === null ? null : (
               <span className="text-xs text-muted-foreground">
-                Token {token.name}
+                Token <UntrustedText value={token.name} />
                 {token.isVerified ? ', verified contract' : token.isCustom ? ', added by hand' : ''}
               </span>
             )}

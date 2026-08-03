@@ -8,6 +8,7 @@ import {
   type Address,
   type ITokenMetadata,
 } from '@/core'
+import { UntrustedText } from '@/features/security'
 import { Alert, AlertDescription, AlertTitle, Button, Input, Label } from '@/shared/ui'
 
 import { TokenAvatar } from './TokenAvatar'
@@ -133,9 +134,11 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
             <TokenAvatar address={trimmed} symbol={preview.symbol} />
 
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium">{preview.name}</span>
+              <span className="truncate text-sm font-medium">
+                <UntrustedText value={preview.name} />
+              </span>
               <span className="text-xs text-muted-foreground">
-                {preview.symbol} · {String(preview.decimals)} decimals
+                <UntrustedText value={preview.symbol} /> · {String(preview.decimals)} decimals
               </span>
             </div>
           </div>

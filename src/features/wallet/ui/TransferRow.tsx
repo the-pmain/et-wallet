@@ -9,6 +9,7 @@ import {
   type ITransferRecord,
   type TxHash,
 } from '@/core'
+import { UntrustedText } from '@/features/security'
 import { cn } from '@/shared/lib/utils'
 import { Badge } from '@/shared/ui'
 
@@ -100,7 +101,7 @@ export const TransferRow = memo(function TransferRow({
       <span className="flex shrink-0 flex-col items-end gap-0.5">
         <span className="text-sm font-medium tabular-nums">
           {isOutgoing ? '−' : '+'}
-          {amount.text} {amount.unit}
+          {amount.text} <UntrustedText value={amount.unit} />
         </span>
 
         {/* У зависшей отправки действия важнее ссылки: обозреватель

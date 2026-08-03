@@ -187,8 +187,11 @@ describe('История: содержимое', () => {
 
     const list = within(transferList())
 
-    expect(list.getAllByText('Token')).toHaveLength(2)
-    expect(list.getByText('NFT')).toBeInTheDocument()
+    /* Отбор по классу подписи: то же слово встречается и в сумме
+       строки — единицей измерения, — и проверять надо именно
+       категорию. */
+    expect(list.getAllByText('Token', { selector: '.font-medium' })).toHaveLength(2)
+    expect(list.getByText('NFT', { selector: '.font-medium' })).toBeInTheDocument()
     expect(list.getByText('NFT (ERC-1155)')).toBeInTheDocument()
   })
 
@@ -239,7 +242,7 @@ describe('История: фильтрация', () => {
 
     const list = within(transferList())
 
-    expect(list.getByText('NFT')).toBeInTheDocument()
+    expect(list.getByText('NFT', { selector: '.font-medium' })).toBeInTheDocument()
     expect(list.getByText('NFT (ERC-1155)')).toBeInTheDocument()
     expect(visibleCount()).toBe(2)
   })

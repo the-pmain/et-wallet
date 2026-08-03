@@ -1,3 +1,4 @@
+import { safeText } from '@/core'
 import { RefreshCw, Trash2 } from 'lucide-react'
 
 import type { Address } from '@/core'
@@ -68,7 +69,7 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Remove token ${entry.token.symbol}`}
+                aria-label={`Remove token ${safeText(entry.token.symbol)}`}
                 onClick={() => {
                   onRemove(entry.token.address as Address)
                 }}

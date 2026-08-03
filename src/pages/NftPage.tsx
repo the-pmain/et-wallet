@@ -1,3 +1,4 @@
+import { UntrustedText } from '@/features/security'
 import { ExternalLink, Images, RefreshCw, ShieldAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -221,7 +222,11 @@ function NftRow({
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium">
-            {item.collectionName ?? 'Collection without a name'}
+            {item.collectionName === null ? (
+              'Collection without a name'
+            ) : (
+              <UntrustedText value={item.collectionName} />
+            )}
           </span>
           <Badge variant="outline">{item.standard}</Badge>
         </span>

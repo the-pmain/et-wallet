@@ -134,3 +134,80 @@ describe('Пометка проверенного контракта', () => {
     expect(list.queryByText('unverified')).not.toBeInTheDocument()
   })
 })
+
+describe('Показ чужих строк в списке активов', () => {
+  it('смешение письменностей в символе помечается значком', async () => {
+    /*
+      ЭТО ГЛАВНОЕ ЗДЕСЬ. `USDС` с кириллической `С` выглядит безупречно:
+      скрытых символов нет, буквы обычные и видимые, просто из разных
+      алфавитов. Без пометки владелец видит в списке привычный символ
+      и выбирает его при отправке.
+    */
+    services.providerFactory.configure({
+      balance: BALANCE,
+      tokens: [
+        { address: UNKNOWN, symbol: 'USD\u0421', name: 'USD Coin', decimals: 6, balance: 0n },
+      ],
+    })
+
+    await services.session.open()
+    await services.session.addToken(UNKNOWN, undefined, true)
+
+    renderApp()
+    await openAssets()
+
+    expect(
+      await within(screen.getByRole('list')).findByLabelText(/mixes alphabets/i),
+    ).toBeInTheDocument()
+  })
+
+  it('скрытые символы в символе помечаются отдельно', async () => {
+    /* Разные признаки требуют разных объяснений: в одном случае
+       в строке есть невидимое, в другом — всё видимо, но не из того
+       алфавита. */
+    services.providerFactory.configure({
+      balance: BALANCE,
+      tokens: [
+        /* Символ намеренно не похож на проверенный: проверяется пометка
+           скрытого символа, а не отказ в добавлении подделки. */
+        {
+          address: UNKNOWN,
+          symbol: `MY${String.fromCharCode(0x200b)}TKN`,
+          name: 'My Token',
+          decimals: 6,
+          balance: 0n,
+        },
+      ],
+    })
+
+    await services.session.open()
+    await services.session.addToken(UNKNOWN)
+
+    renderApp()
+    await openAssets()
+
+    expect(
+      await within(screen.getByRole('list')).findByLabelText(/hidden characters/i),
+    ).toBeInTheDocument()
+  })
+
+  it('обычный символ значка не получает', async () => {
+    /* Значок на каждой строке перестаёт читаться. */
+    services.providerFactory.configure({
+      balance: BALANCE,
+      tokens: [{ address: UNKNOWN, symbol: 'MYTKN', name: 'My Token', decimals: 6, balance: 0n }],
+    })
+
+    await services.session.open()
+    await services.session.addToken(UNKNOWN)
+
+    renderApp()
+    await openAssets()
+
+    const list = within(screen.getByRole('list'))
+
+    await list.findByText('MYTKN')
+
+    expect(list.queryByLabelText(/mixes alphabets|hidden characters/i)).not.toBeInTheDocument()
+  })
+})

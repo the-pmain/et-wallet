@@ -1,3 +1,5 @@
+import { safeText } from '@/core'
+import { UntrustedText } from '@/features/security'
 import { Check, FlaskConical, Plus, Trash2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
@@ -96,7 +98,7 @@ export function NetworkList({
 
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="flex items-center gap-1.5 truncate text-sm font-medium">
-                      {network.name}
+                      <UntrustedText value={network.name} />
                       {network.isTestnet ? (
                         <FlaskConical
                           className="size-3 text-muted-foreground"
@@ -106,7 +108,8 @@ export function NetworkList({
                       {network.isBuiltIn ? null : <Badge variant="outline">custom</Badge>}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      chainId {network.chainId.toString()} · {network.nativeCurrency.symbol}
+                      chainId {network.chainId.toString()} ·{' '}
+                      {safeText(network.nativeCurrency.symbol)}
                     </span>
                   </span>
                 </button>
@@ -116,7 +119,7 @@ export function NetworkList({
                     variant="ghost"
                     size="sm"
                     disabled={isBusy}
-                    aria-label={`Remove network ${network.name}`}
+                    aria-label={`Remove network ${safeText(network.name)}`}
                     onClick={() => {
                       onRemove(network.chainId)
                     }}

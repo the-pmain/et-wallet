@@ -1,3 +1,4 @@
+import { safeText } from '@/core'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -52,7 +53,7 @@ export function BalanceCard({
       <CardHeader className="flex-row items-center justify-between gap-2">
         <CardTitle className="text-base font-medium text-muted-foreground">
           {t('dashboard.balance')}
-          {network === null ? '' : ` · ${network.name}`}
+          {network === null ? '' : ` · ${safeText(network.name)}`}
         </CardTitle>
         <Button
           variant="ghost"

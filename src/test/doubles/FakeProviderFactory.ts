@@ -694,13 +694,19 @@ function word(value: bigint): HexString {
 
 /** Строка переменной длины в кодировке ABI: смещение, длина, содержимое. */
 function text(value: string): HexString {
-  const bytes = [...new TextEncoder().encode(value)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+  const encoded = new TextEncoder().encode(value)
+  const bytes = [...encoded].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 
-  return `0x${32n.toString(16).padStart(64, '0')}${BigInt(value.length)
-    .toString(16)
-    .padStart(64, '0')}${bytes.padEnd(64, '0')}` as HexString
+  /* ДЛИНА В БАЙТАХ, А НЕ В СИМВОЛАХ. Кодировка ABI объявляет длину
+     строки числом байтов; `value.length` считает единицы UTF-16.
+     Для ASCII эти числа совпадают, и расхождение было незаметно —
+     а любая не-ASCII строка контракта обрезалась на середине символа
+     и доходила до кошелька испорченной. Проверка подделки символа
+     кириллицей на таком дублёре не работала бы, причём молча. */
+  const length = BigInt(encoded.length).toString(16).padStart(64, '0')
+  const padded = bytes.padEnd(Math.max(64, Math.ceil(bytes.length / 64) * 64), '0')
+
+  return `0x${32n.toString(16).padStart(64, '0')}${length}${padded}` as HexString
 }
 
 /** Состояние коллекций у дублёра. */

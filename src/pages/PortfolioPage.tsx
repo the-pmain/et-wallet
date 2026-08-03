@@ -1,3 +1,5 @@
+import { safeText } from '@/core'
+import { UntrustedText } from '@/features/security'
 import {
   ArrowLeft,
   ChartPie,
@@ -311,7 +313,9 @@ function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }
                 style={{ backgroundColor: sliceColor(index) }}
                 aria-hidden
               />
-              <span className="flex-1 truncate font-medium">{position.token.symbol}</span>
+              <span className="flex-1 truncate font-medium">
+                <UntrustedText value={position.token.symbol} />
+              </span>
               <span className="text-muted-foreground tabular-nums">
                 {formatShare(position.share)}
               </span>
@@ -353,14 +357,16 @@ function PositionRow({ position }: { readonly position: IPortfolioPosition }) {
 
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-medium">{token.symbol}</span>
+          <span className="truncate text-sm font-medium">
+            <UntrustedText value={token.symbol} />
+          </span>
           <TokenTrustBadge token={token} />
         </span>
 
         <span className="truncate text-xs text-muted-foreground tabular-nums">
           {balance === null
             ? 'balance not received'
-            : `${formatTokenAmount(balance, token.decimals)} ${token.symbol}`}
+            : `${formatTokenAmount(balance, token.decimals)} ${safeText(token.symbol)}`}
         </span>
       </span>
 
@@ -400,7 +406,7 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
         {largest === null || largest.share === null ? null : (
           <StatRow
             label="Largest share"
-            value={`${largest.token.symbol} · ${formatShare(largest.share)}`}
+            value={`${safeText(largest.token.symbol)} · ${formatShare(largest.share)}`}
           />
         )}
 
