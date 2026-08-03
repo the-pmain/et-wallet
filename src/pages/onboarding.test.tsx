@@ -413,7 +413,7 @@ describe('Разблокировка', () => {
 
     await user.click(await screen.findByRole('link', { name: /забыли пароль/i }))
 
-    expect(await screen.findByText('Пароль восстановить нельзя')).toBeInTheDocument()
+    expect(await screen.findByText('Стереть кошелёк с этого устройства')).toBeInTheDocument()
   })
 })
 
@@ -427,7 +427,9 @@ describe('Забыли пароль', () => {
   it('сразу сообщает, что восстановление невозможно', async () => {
     renderApp()
 
-    expect(await screen.findByText('Пароль восстановить нельзя')).toBeInTheDocument()
+    expect(await screen.findByText(/Восстановить его\s+нельзя/i)).toBeInTheDocument()
+
+    expect(await screen.findByText('Стереть кошелёк с этого устройства')).toBeInTheDocument()
   })
 
   it('предупреждает о безвозвратной потере средств', async () => {
@@ -500,5 +502,47 @@ describe('Боевые параметры шифрования', () => {
        фиксирует, что понижение стойкости не просочилось в значения
        по умолчанию, которыми пользуется composition root. */
     expect(new EncryptionService().createKdfParams().iterations).toBe(600_000)
+  })
+})
+
+describe('Путь к другому кошельку', () => {
+  beforeEach(async () => {
+    await service.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
+    service.lock()
+  })
+
+  it('экран входа предлагает завести другой кошелёк', async () => {
+    /* Человек, который пароль помнит, но хочет другой кошелёк, за ссылку
+       «забыли пароль» не нажмёт — и решит, что кошелёк его никуда
+       не пускает. */
+    renderApp()
+
+    expect(
+      await screen.findByRole('link', { name: /создать другой кошелёк|восстановить по seed/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('ведёт на экран стирания, который объясняет оба случая', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await user.click(
+      await screen.findByRole('link', { name: /создать другой кошелёк|восстановить по seed/i }),
+    )
+
+    expect(await screen.findByText(/Забыт пароль/i)).toBeInTheDocument()
+    expect(screen.getByText(/Нужен другой кошелёк/i)).toBeInTheDocument()
+  })
+
+  it('называет главное ограничение: кошелёк на устройстве один', async () => {
+    /* Иначе непонятно, почему нельзя просто создать второй. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await user.click(
+      await screen.findByRole('link', { name: /создать другой кошелёк|восстановить по seed/i }),
+    )
+
+    expect(await screen.findByText(/На одном устройстве кошелёк один/i)).toBeInTheDocument()
   })
 })

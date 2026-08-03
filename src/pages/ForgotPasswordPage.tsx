@@ -79,9 +79,9 @@ export function ForgotPasswordPage() {
             </Link>
           </Button>
 
-          <CardTitle>Пароль восстановить нельзя</CardTitle>
+          <CardTitle>Стереть кошелёк с этого устройства</CardTitle>
           <CardDescription>
-            Это некастодиальный кошелёк: пароль никуда не отправляется и нигде не хранится
+            Единственный путь и к забытому паролю, и к другому кошельку на этом устройстве
           </CardDescription>
         </CardHeader>
 
@@ -96,11 +96,33 @@ export function ForgotPasswordPage() {
             </AlertDescription>
           </Alert>
 
+          {/* ЭКРАН ОТВЕЧАЕТ НА ДВА РАЗНЫХ ВОПРОСА, и оба надо назвать.
+              Прежде он говорил только о забытом пароле, и человек,
+              который пароль помнит, но хочет другой кошелёк, не понимал,
+              туда ли попал. */}
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium">Зачем сюда приходят</p>
+            <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Забыт пароль.</span> Восстановить его
+                нельзя: он никуда не отправляется и нигде не хранится, а из него выводится ключ
+                шифрования. Без пароля хранилище не открыть никому, включая разработчиков.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Нужен другой кошелёк.</span> На одном
+                устройстве кошелёк один. Создать новый либо восстановить другую seed-фразу можно
+                только вместо нынешнего — поэтому путь тот же.
+              </li>
+            </ul>
+          </div>
+
           <div className="flex flex-col gap-3">
             <p className="text-sm font-medium">Как это работает</p>
             <ol className="flex flex-col gap-2 text-sm text-muted-foreground">
               <li>1. Кошелёк стирается с этого устройства вместе с зашифрованными ключами.</li>
-              <li>2. Вы вводите seed-фразу заново на экране импорта.</li>
+              <li>
+                2. Вы создаёте новый кошелёк либо вводите seed-фразу — свою прежнюю или другую.
+              </li>
               <li>3. Придумываете новый пароль. Все аккаунты восстанавливаются из фразы.</li>
             </ol>
           </div>

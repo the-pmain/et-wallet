@@ -222,6 +222,17 @@ export function UnlockWalletPage() {
             <Button asChild variant="ghost" size="sm">
               <Link to="/forgot-password">{t('unlock.forgot')}</Link>
             </Button>
+
+            {/* ВТОРОЙ ПУТЬ НАЗЫВАЕТСЯ СВОИМ ИМЕНЕМ. Человек, который
+                пароль помнит, но хочет завести другой кошелёк либо
+                восстановить чужую seed-фразу, за ссылку «забыли пароль»
+                не нажмёт — и решит, что кошелёк его никуда не пускает.
+                Ведёт туда же: другой кошелёк на устройстве возможен
+                только вместо нынешнего, и предупредить об этом обязан
+                тот же экран. */}
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/forgot-password">{t('unlock.otherWallet')}</Link>
+            </Button>
           </form>
         </CardContent>
       </Card>

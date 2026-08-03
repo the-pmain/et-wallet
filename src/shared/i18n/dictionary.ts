@@ -80,6 +80,7 @@ const RUSSIAN = {
     'Задержка растёт с каждой неудачей и переживает перезагрузку страницы. Она защищает от подбора пароля тем, кто получил доступ к устройству.',
   'unlock.attemptsLeft': 'Осталось попыток до задержки:',
   'unlock.forgot': 'Забыли пароль?',
+  'unlock.otherWallet': 'Создать другой кошелёк или восстановить по seed-фразе',
   'unlock.failed': 'Не удалось разблокировать кошелёк',
 
   /* Навигация */
@@ -158,6 +159,7 @@ const ENGLISH: Readonly<Record<TranslationKey, string>> = {
     'The delay grows with each failure and survives a page reload. It protects against password guessing by whoever got hold of the device.',
   'unlock.attemptsLeft': 'Attempts left before a delay:',
   'unlock.forgot': 'Forgot your password?',
+  'unlock.otherWallet': 'Create another wallet or restore from a seed phrase',
   'unlock.failed': 'Could not unlock the wallet',
 
   'nav.wallet': 'Wallet',
