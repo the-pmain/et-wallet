@@ -37,6 +37,7 @@ export {
 export {
   GasEstimationFailedError,
   InsufficientFundsError,
+  InsufficientTokenBalanceError,
   InvalidTokenContractError,
   NonceTooLowError,
   TokenNotFoundError,

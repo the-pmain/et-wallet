@@ -11,6 +11,7 @@ export {
   type ISignableTransaction,
   type ISignedTransaction,
   type ITransactionRecord,
+  type ITokenTransferRequest,
   type ITransactionRequest,
   type ITypedData,
   type ITypedDataDomain,

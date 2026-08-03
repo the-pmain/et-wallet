@@ -1,11 +1,18 @@
 import {
   InsufficientFundsError,
+  InsufficientTokenBalanceError,
   NetworkNotFoundError,
   TransactionNotFoundError,
   TransactionNotReplaceableError,
 } from '@/core/errors'
 import { EventBus, type EventListener } from '@/core/events'
 import type { INetworkConfig, INetworkService } from '@/core/network'
+import {
+  BALANCE_OF_SELECTOR,
+  decodeUint,
+  encodeCallWithAddress,
+  encodeTransfer,
+} from '@/core/token'
 import type { IClock, ILogger } from '@/core/platform'
 import type { IProvider, IProviderResolver } from '@/core/provider'
 import {
@@ -27,6 +34,7 @@ import {
   type IFeeEstimate,
   type ISignableTransaction,
   type ISignedTransaction,
+  type ITokenTransferRequest,
   type ITransactionRecord,
   type ITransactionRequest,
   type TransactionEventMap,
@@ -207,6 +215,77 @@ export class TransactionService implements ITransactionService {
     await this.#assertSufficientFunds(provider, transaction)
 
     return transaction
+  }
+
+  /**
+   * Превращает намерение отправить токен в транзакцию к подписи.
+   *
+   * ЧТО ПРОИСХОДИТ НА САМОМ ДЕЛЕ. Перевод токена — это вызов функции
+   * контракта. Поле `to` транзакции указывает на контракт токена,
+   * сумма перевода нативной валюты равна нулю, а настоящий получатель
+   * и количество лежат в данных вызова. Интерфейс обязан показать это
+   * так же прямо, иначе пользователь сверит адрес контракта с адресом
+   * получателя и не найдёт совпадения.
+   *
+   * БАЛАНС ТОКЕНА ПРОВЕРЯЕТСЯ ЗДЕСЬ. Нативных средств может хватать
+   * на комиссию, а токенов — нет; тогда контракт откатит вызов, газ
+   * спишется, а перевода не будет. Отказ узла в оценке газа сообщил бы
+   * лишь «вызов завершится откатом», не называя причину.
+   *
+   * @throws InsufficientTokenBalanceError если токенов меньше суммы,
+   *         GasEstimationFailedError если вызов завершится откатом,
+   *         InsufficientFundsError если не хватает на комиссию.
+   */
+  async prepareTokenTransfer(request: ITokenTransferRequest): Promise<ISignableTransaction> {
+    const network = this.#requireNetwork(request)
+    const provider = await this.#resolver.get(network)
+
+    await this.#assertSufficientTokens(provider, request)
+
+    return await this.prepare({
+      ...(request.chainId === undefined ? {} : { chainId: request.chainId }),
+      ...(request.feePriority === undefined ? {} : { feePriority: request.feePriority }),
+      from: request.from,
+      /* Транзакция адресована контракту: именно он переводит токен. */
+      to: request.token,
+      /* Нативная валюта не переводится вовсе. */
+      value: toWei(0n),
+      data: encodeTransfer(request.to, request.amount),
+    })
+  }
+
+  /**
+   * Проверяет, что токенов хватает на перевод.
+   *
+   * Отсутствие ответа контракта — это «проверить не удалось», а не
+   * «баланс нулевой»: отказать по неполученному значению значило бы
+   * не дать отправить перевод из-за недоступности узла. Такой случай
+   * проходит дальше, где его поймает оценка газа.
+   */
+  async #assertSufficientTokens(
+    provider: IProvider,
+    request: ITokenTransferRequest,
+  ): Promise<void> {
+    let balance: bigint
+
+    try {
+      balance = decodeUint(
+        await provider.call({
+          to: request.token,
+          data: encodeCallWithAddress(BALANCE_OF_SELECTOR, request.from),
+        }),
+      )
+    } catch (error) {
+      this.#logger.warn('Баланс токена прочитать не удалось', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+
+      return
+    }
+
+    if (balance < request.amount) {
+      throw new InsufficientTokenBalanceError(request.amount, balance)
+    }
   }
 
   /**

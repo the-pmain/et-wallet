@@ -4,10 +4,13 @@ export {
   DECIMALS_SELECTOR,
   NAME_SELECTOR,
   SYMBOL_SELECTOR,
+  TRANSFER_SELECTOR,
   decodeString,
+  decodeTransfer,
   decodeUint,
   encodeCall,
   encodeCallWithAddress,
+  encodeTransfer,
   functionSelector,
 } from './erc20'
 export { TokenRepository } from './TokenRepository'

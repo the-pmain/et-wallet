@@ -3,8 +3,9 @@ import type { INetworkService } from '@/core/network'
 import { NetworkNotFoundError } from '@/core/errors'
 import type { ILogger } from '@/core/platform'
 import type { IProviderResolver } from '@/core/provider'
-import type { ITransactionRepository } from '@/core/transaction'
-import type { Address, ChainId, TxHash } from '@/core/types'
+import { decodeTransfer } from '@/core/token'
+import type { ITransactionRecord, ITransactionRepository } from '@/core/transaction'
+import { toWei, type Address, type ChainId, type TxHash, type Wei } from '@/core/types'
 
 import type { IHistoryProvider, IHistoryQuery } from './contracts'
 import {
@@ -13,6 +14,7 @@ import {
   TRANSFER_SOURCE,
   type IHistoryPage,
   type ITransferRecord,
+  type TransferKind,
 } from './types'
 
 const SERVICE_NAME = 'HistoryService'
@@ -107,27 +109,31 @@ export class HistoryService {
   async #loadLocal(owner: Address, chainId: ChainId): Promise<readonly ITransferRecord[]> {
     const records = await this.#local.findByAddress(owner, chainId)
 
-    return records.map((record) => ({
-      /* Ключ строится так же, как у внешних источников: хэш плюс
-         порядковый номер. Локальная запись описывает транзакцию целиком,
-         поэтому номер нулевой. */
-      id: `${record.hash}:local`,
-      hash: record.hash,
-      chainId: record.chainId,
-      kind: TRANSFER_KIND.Native,
-      direction: TRANSFER_DIRECTION.Outgoing,
-      from: record.from,
-      to: record.to,
-      value: record.value,
-      tokenId: null,
-      asset: { contract: null, symbol: null, decimals: null },
-      blockNumber: record.blockNumber ?? 0n,
-      timestamp: record.confirmedAt ?? record.submittedAt,
-      source: TRANSFER_SOURCE.Local,
-      /* Состояние берётся из записи транзакции: именно оно
-         отличает ожидание от выполнения, отката и замещения. */
-      status: record.status,
-    }))
+    return records.map((record) => {
+      const transfer = describeLocal(record)
+
+      return {
+        /* Ключ строится так же, как у внешних источников: хэш плюс
+           порядковый номер. Локальная запись описывает транзакцию целиком,
+           поэтому номер нулевой. */
+        id: `${record.hash}:local`,
+        hash: record.hash,
+        chainId: record.chainId,
+        kind: transfer.kind,
+        direction: TRANSFER_DIRECTION.Outgoing,
+        from: record.from,
+        to: transfer.to,
+        value: transfer.value,
+        tokenId: null,
+        asset: { contract: transfer.contract, symbol: null, decimals: null },
+        blockNumber: record.blockNumber ?? 0n,
+        timestamp: record.confirmedAt ?? record.submittedAt,
+        source: TRANSFER_SOURCE.Local,
+        /* Состояние берётся из записи транзакции: именно оно
+           отличает ожидание от выполнения, отката и замещения. */
+        status: record.status,
+      }
+    })
   }
 
   /**
@@ -220,4 +226,38 @@ function compareByRecency(left: ITransferRecord, right: ITransferRecord): number
 /** Совпадает ли адрес с владельцем истории. Вынесено для читаемости условий. */
 export function isOwner(candidate: Address | null, owner: Address): boolean {
   return candidate !== null && areAddressesEqual(candidate, owner)
+}
+
+/**
+ * Что именно перевела собственная транзакция.
+ *
+ * ЧИТАЕТСЯ ИЗ ПОДПИСАННЫХ ДАННЫХ, А НЕ ИЗ НАМЕРЕНИЯ. У перевода токена
+ * поле `to` указывает на контракт, сумма нативной валюты нулевая,
+ * а настоящий получатель и количество лежат в данных вызова. Показать
+ * такую запись по полям транзакции значило бы сообщить пользователю
+ * о переводе нуля неизвестно кому.
+ *
+ * Разбор данных, а не отдельное поле в записи, выбран сознательно:
+ * так в историю попадает ровно то, что ушло в сеть. Разойдись форма
+ * с подписью — запись покажет действительное содержимое.
+ */
+function describeLocal(record: ITransactionRecord): {
+  readonly kind: TransferKind
+  readonly to: Address | null
+  readonly value: Wei
+  readonly contract: Address | null
+} {
+  const call = record.data === null ? null : decodeTransfer(record.data)
+
+  if (call === null || record.to === null) {
+    return { kind: TRANSFER_KIND.Native, to: record.to, value: record.value, contract: null }
+  }
+
+  return {
+    kind: TRANSFER_KIND.Erc20,
+    to: call.to,
+    value: toWei(call.amount),
+    /* Адресат транзакции и есть контракт токена. */
+    contract: record.to,
+  }
 }

@@ -16,6 +16,7 @@ import type {
   ISignableTransaction,
   IToken,
   ITokenMetadata,
+  ITokenTransferRequest,
   ITransactionRequest,
   ITransferRecord,
   TxHash,
@@ -380,6 +381,16 @@ export interface IWalletSession {
    * @returns Хэш опубликованной транзакции.
    */
   sendTransfer(transaction: ISignableTransaction): Promise<TxHash>
+
+  /**
+   * Готовит перевод токена ERC-20.
+   *
+   * Данные вызова собирает ядро: получатель и количество лежат в них,
+   * а не в полях транзакции.
+   *
+   * @throws InsufficientTokenBalanceError если токенов меньше суммы.
+   */
+  prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer>
 
   /**
    * Готовит ускорение зависшей транзакции.

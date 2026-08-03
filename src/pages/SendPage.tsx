@@ -14,9 +14,12 @@ import {
   FEE_PRIORITY,
   RECIPIENT_RISK,
   TRANSACTION_TYPE,
+  decodeTransfer,
   findRecipientRisks,
   toWei,
+  type Address,
   type FeePriority,
+  type IToken,
   type RecipientRisk,
   type TxHash,
 } from '@/core'
@@ -64,6 +67,24 @@ type Step = (typeof STEP)[keyof typeof STEP]
  */
 const RESOLVE_DEBOUNCE_MS = 350
 
+/**
+ * Значение пункта «нативная валюта» в списке активов.
+ *
+ * У нативной валюты нет адреса контракта, а `<option>` обязан иметь
+ * значение-строку. Пустая строка не годится: браузер считает её
+ * отсутствием выбора.
+ */
+const NATIVE_ASSET_VALUE = 'native'
+
+/** Совпадают ли активы. `null` с обеих сторон — нативная валюта. */
+function sameAsset(left: Address | null, right: Address | null): boolean {
+  if (left === null || right === null) {
+    return left === right
+  }
+
+  return left.toLowerCase() === right.toLowerCase()
+}
+
 /** Разбор получателя вместе с вводом, которому он соответствует. */
 interface IResolvedRecipient {
   /** Строка, для которой получен разбор. */
@@ -90,11 +111,16 @@ const EMPTY_RECIPIENT: IResolvedRecipient = {
  * и адрес отправителя, и после смены перестала бы соответствовать тому,
  * что видит пользователь.
  *
- * ТОКЕНЫ ЗДЕСЬ НЕ ОТПРАВЛЯЮТСЯ. При переводе ERC-20 поле `to` — адрес
- * контракта, а настоящий получатель лежит в данных вызова. Показать это
- * честно требует отдельного экрана; сведение двух разных операций
- * к одной форме породило бы ровно то расхождение, против которого
- * выстроен весь этот путь.
+ * ТОКЕН ОТПРАВЛЯЕТСЯ ИНАЧЕ, И ЭКРАН ЭТОГО НЕ СКРЫВАЕТ. При переводе
+ * ERC-20 поле `to` подписываемой транзакции указывает на контракт,
+ * сумма нативной валюты равна нулю, а настоящий получатель и количество
+ * лежат в данных вызова. Экран подтверждения показывает и то, и другое:
+ * человек, сверяющий адрес получателя с полем `to`, обязан понимать,
+ * почему они не совпадают, — иначе он решит, что кошелёк подменил адрес.
+ *
+ * РАСШИФРОВКА ДАННЫХ ВЫЗОВА ЧИТАЕТСЯ ИЗ САМОЙ ТРАНЗАКЦИИ, а не берётся
+ * из полей формы. Совпадение показанного с подписываемым тогда следует
+ * из устройства экрана, а не из аккуратности того, кто его писал.
  */
 export function SendPage() {
   const session = useWallet()
@@ -105,6 +131,12 @@ export function SendPage() {
   const [recipient, setRecipient] = useState('')
   const [resolved, setResolved] = useState<IResolvedRecipient>(EMPTY_RECIPIENT)
   const [amount, setAmount] = useState('')
+
+  /* Что отправляется. `null` — нативная валюта сети; иначе адрес
+     контракта токена. Хранится адрес, а не сам токен: список приходит
+     из снимка и пересоздаётся при каждом обновлении баланса, и ссылка
+     на прежний объект перестала бы совпадать. */
+  const [assetAddress, setAssetAddress] = useState<Address | null>(null)
   const [priority, setPriority] = useState<FeePriority>(FEE_PRIORITY.Medium)
   const [prepared, setPrepared] = useState<IPreparedTransfer | null>(null)
   const [risks, setRisks] = useState<readonly RecipientRisk[]>([])
@@ -114,8 +146,21 @@ export function SendPage() {
 
   const network = snapshot.activeNetwork
   const account = snapshot.activeAccount
-  const decimals = network?.nativeCurrency.decimals ?? 18
-  const symbol = network?.nativeCurrency.symbol ?? ''
+
+  /* Отслеживаемые активы: первой идёт нативная валюта, дальше токены.
+     Список тот же, что на главном экране, — второй источник правды
+     о составе кошелька разошёлся бы с первым. */
+  const assets = snapshot.tokenBalances
+  const selected = assets.find((item) => sameAsset(item.token.address, assetAddress)) ?? null
+  const token = selected === null || selected.token.address === null ? null : selected.token
+
+  const decimals = selected?.token.decimals ?? network?.nativeCurrency.decimals ?? 18
+  const symbol = selected?.token.symbol ?? network?.nativeCurrency.symbol ?? ''
+
+  /* Доступное количество берётся у выбранного актива. `null` означает
+     «прочитать не удалось» и показывается прочерком: ноль на этом месте
+     сказал бы, что средств нет. */
+  const available = selected === null ? (snapshot.balance?.raw ?? null) : selected.balance
 
   const trimmedRecipient = recipient.trim()
 
@@ -169,14 +214,30 @@ export function SendPage() {
     setError(null)
 
     try {
-      /* `toWei` — единственный допустимый способ получить брендированное
-         значение: приведение типом обошло бы проверку диапазона. */
-      const result = await session.prepareTransfer({
-        chainId: network.chainId,
-        from: account.address,
-        to: recipientAddress,
-        value: toWei(parseAmount(amount, decimals)),
-      })
+      const value = parseAmount(amount, decimals)
+
+      /* Два разных намерения — два разных вызова. У перевода токена
+         получатель и сумма уходят в данные вызова, и собирать их
+         в интерфейсе нельзя: ошибка кодирования отправит средства
+         не туда без возможности возврата. */
+      const result =
+        token === null
+          ? await session.prepareTransfer({
+              chainId: network.chainId,
+              from: account.address,
+              to: recipientAddress,
+              /* `toWei` — единственный допустимый способ получить
+                 брендированное значение: приведение типом обошло бы
+                 проверку диапазона. */
+              value: toWei(value),
+            })
+          : await session.prepareTokenTransfer({
+              chainId: network.chainId,
+              from: account.address,
+              token: token.address as Address,
+              to: recipientAddress,
+              amount: value,
+            })
 
       /* Замечания считаются по ВВЕДЁННОЙ строке, а не по полю готовой
          транзакции: `toAddress` приводит адрес к записи с контрольной
@@ -198,6 +259,9 @@ export function SendPage() {
       const isContract = await session.isContractRecipient(recipientAddress)
 
       if (isContract === true) {
+        /* Для токена «получатель — контракт» звучит иначе: перевод
+           токена контракту, который его не ждёт, теряется так же
+           безвозвратно, но нативная валюта здесь ни при чём. */
         found.push(RECIPIENT_RISK.ContractRecipient)
       }
 
@@ -237,6 +301,7 @@ export function SendPage() {
     return (
       <ConfirmTransfer
         prepared={prepared}
+        token={token}
         risks={risks}
         recipientName={recipientName}
         symbol={symbol}
@@ -295,9 +360,7 @@ export function SendPage() {
           <div className="flex items-baseline justify-between text-xs">
             <span className="text-muted-foreground">Доступно</span>
             <span className="tabular-nums">
-              {snapshot.balance === null
-                ? '—'
-                : `${formatTokenAmount(snapshot.balance.raw, snapshot.balance.decimals)} ${symbol}`}
+              {available === null ? '—' : `${formatTokenAmount(available, decimals)} ${symbol}`}
             </span>
           </div>
         </CardContent>
@@ -332,6 +395,47 @@ export function SendPage() {
                 resolution={resolved.result}
                 isEnsSupported={snapshot.isEnsSupported}
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`${fieldId}-asset`}>Что отправить</Label>
+              <select
+                id={`${fieldId}-asset`}
+                value={assetAddress ?? NATIVE_ASSET_VALUE}
+                className="h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                onChange={(event) => {
+                  /* Сумма сбрасывается вместе с активом: число знаков
+                     у токенов разное, и «10», набранное для актива
+                     с восемнадцатью знаками, при шести означало бы
+                     совсем другую величину. */
+                  setAssetAddress(
+                    event.target.value === NATIVE_ASSET_VALUE
+                      ? null
+                      : (event.target.value as Address),
+                  )
+                  setAmount('')
+                  setError(null)
+                }}
+              >
+                {assets.map((item) => (
+                  <option
+                    key={item.token.address ?? NATIVE_ASSET_VALUE}
+                    value={item.token.address ?? NATIVE_ASSET_VALUE}
+                  >
+                    {item.token.symbol}
+                    {item.token.isCustom ? ' — добавлен вручную' : ''}
+                  </option>
+                ))}
+              </select>
+
+              {token === null ? null : (
+                /* Символ токена задаёт автор контракта, и выпустить токен
+                   с чужим символом может кто угодно. Адрес контракта —
+                   единственное, что отличает настоящий USDC от поддельного. */
+                <p className="text-xs break-all text-muted-foreground">
+                  Контракт: <span className="font-mono">{token.address}</span>
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -523,6 +627,15 @@ function applyPriority(prepared: IPreparedTransfer, priority: FeePriority): IPre
 
 interface ConfirmTransferProps {
   readonly prepared: IPreparedTransfer
+
+  /**
+   * Отправляемый токен. `null` — нативная валюта сети.
+   *
+   * Нужен для подписей и числа знаков; получатель и сумма берутся
+   * не отсюда, а из данных подписываемой транзакции.
+   */
+  readonly token: IToken | null
+
   readonly risks: readonly RecipientRisk[]
 
   /**
@@ -551,6 +664,7 @@ interface ConfirmTransferProps {
  */
 function ConfirmTransfer({
   prepared,
+  token,
   risks,
   recipientName,
   symbol,
@@ -568,6 +682,17 @@ function ConfirmTransfer({
   const feePerGas = transaction.maxFeePerGas ?? transaction.gasPrice ?? 0n
   const maxFee = transaction.gasLimit * feePerGas
 
+  /* РАСШИФРОВКА ЧИТАЕТСЯ ИЗ ПОДПИСЫВАЕМОГО ОБЪЕКТА, а не из полей формы.
+     Показать получателя, взятого из состояния экрана, значило бы
+     утверждать, что в данных вызова записан именно он, — а проверено
+     это не было бы ничем. */
+  const call = token === null ? null : decodeTransfer(transaction.data)
+
+  /* Настоящий получатель: у токена он в данных вызова, у нативной
+     валюты — в поле `to`. */
+  const recipient = call?.to ?? transaction.to
+  const amount = call === null ? transaction.value : call.amount
+
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-2">
@@ -581,9 +706,15 @@ function ConfirmTransfer({
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col items-center gap-1 py-2 text-center">
             <span className="text-3xl font-semibold tabular-nums">
-              {formatTokenAmount(transaction.value, decimals)} {symbol}
+              {formatTokenAmount(amount, decimals)} {symbol}
             </span>
             <span className="text-xs text-muted-foreground">{networkName}</span>
+            {token === null ? null : (
+              <span className="text-xs text-muted-foreground">
+                Токен {token.name}
+                {token.isCustom ? ', добавлен вручную' : ''}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -597,7 +728,7 @@ function ConfirmTransfer({
               <span className="text-sm font-medium">{recipientName}</span>
             )}
 
-            <span className="font-mono text-sm break-all">{transaction.to ?? '—'}</span>
+            <span className="font-mono text-sm break-all">{recipient ?? '—'}</span>
 
             {recipientName === null ? null : (
               <span className="text-xs text-muted-foreground">
@@ -606,6 +737,24 @@ function ConfirmTransfer({
               </span>
             )}
           </div>
+
+          {token === null ? null : (
+            /* ЧЕЛОВЕК, СВЕРЯЮЩИЙ АДРЕСА, ОБЯЗАН ПОНИМАТЬ, ПОЧЕМУ ИХ ДВА.
+               В сети транзакция уйдёт контракту токена, а не получателю;
+               умолчать об этом значит показать одно, а подписать другое. */
+            <div className="flex flex-col gap-1.5 rounded-xl border p-3">
+              <span className="text-xs text-muted-foreground">
+                Транзакция будет отправлена контракту токена
+              </span>
+              <span className="font-mono text-sm break-all">{transaction.to ?? '—'}</span>
+              <span className="text-xs text-muted-foreground">
+                Так работает перевод токена: контракт переписывает {symbol} на адрес получателя.
+                Самой валюты {'«'}
+                {networkName}
+                {'»'} при этом переводится ноль — списывается только комиссия.
+              </span>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">Отправитель</span>

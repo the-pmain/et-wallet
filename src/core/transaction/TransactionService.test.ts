@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { toAddress } from '@/core/address'
 import { SecureStorage } from '@/core/encryption'
-import { GasEstimationFailedError, InsufficientFundsError } from '@/core/errors'
+import {
+  GasEstimationFailedError,
+  InsufficientFundsError,
+  InsufficientTokenBalanceError,
+} from '@/core/errors'
 import { EventBus } from '@/core/events'
 import {
   BUILT_IN_CHAIN_ID,
@@ -101,8 +105,18 @@ class StubProvider implements IProvider {
     return Promise.resolve(this.nonce)
   }
 
+  /** Ответ контракта на `call`. По умолчанию — баланс токена. */
+  tokenBalance = 1_000_000n
+
+  /** Отказ узла при чтении баланса токена. */
+  callError: Error | null = null
+
   call(): Promise<HexString> {
-    return Promise.resolve('0x' as HexString)
+    if (this.callError !== null) {
+      return Promise.reject(this.callError)
+    }
+
+    return Promise.resolve(`0x${this.tokenBalance.toString(16).padStart(64, '0')}` as HexString)
   }
 
   getLogs(): Promise<readonly ILogEntry[]> {
@@ -317,5 +331,85 @@ describe('TransactionService.send', () => {
     await service.send(signed('0xsigned'))
 
     expect(submitted).toBe(1)
+  })
+})
+
+describe('Перевод токена', () => {
+  const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+
+  const tokenRequest = {
+    chainId: CHAIN_ID,
+    from: SENDER,
+    token: TOKEN,
+    to: RECIPIENT,
+    amount: 250_000n,
+  }
+
+  it('транзакция адресована контракту, а не получателю', async () => {
+    /* Перевод токена — вызов функции контракта. Поставить в `to` адрес
+       человека значило бы отправить ему нативную валюту вместо токена. */
+    const transaction = await service.prepareTokenTransfer(tokenRequest)
+
+    expect(transaction.to).toBe(TOKEN)
+  })
+
+  it('нативная валюта не переводится', async () => {
+    expect((await service.prepareTokenTransfer(tokenRequest)).value).toBe(0n)
+  })
+
+  it('получатель и сумма лежат в данных вызова', async () => {
+    const transaction = await service.prepareTokenTransfer(tokenRequest)
+
+    expect(transaction.data).toBe(
+      '0xa9059cbb' +
+        '000000000000000000000000fb6916095ca1df60bb79ce92ce3ea74c37c5d359' +
+        '000000000000000000000000000000000000000000000000000000000003d090',
+    )
+  })
+
+  it('лимит газа оценивается узлом, а не назначается', async () => {
+    /* Вызов контракта стоит дороже простого перевода, и насколько —
+       зависит от контракта: у токена с начислениями или чёрным списком
+       расход выше. Назначенный наугад лимит приводит к откату
+       со списанием газа. */
+    node.gasEstimate = 65_000n
+
+    expect((await service.prepareTokenTransfer(tokenRequest)).gasLimit).toBeGreaterThan(65_000n)
+  })
+
+  it('отказывает, если токенов на балансе меньше суммы', async () => {
+    /* Иначе контракт откатил бы вызов, газ списался, а перевода
+       не случилось бы. Отказ узла в оценке газа причину не называет. */
+    node.tokenBalance = 100n
+
+    await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toThrow(
+      InsufficientTokenBalanceError,
+    )
+  })
+
+  it('называет требуемое и доступное количество', async () => {
+    node.tokenBalance = 100n
+
+    await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toMatchObject({
+      required: 250_000n,
+      available: 100n,
+    })
+  })
+
+  it('недоступность контракта не выдаётся за нулевой баланс', async () => {
+    /* «Проверить не удалось» и «токенов нет» — разные утверждения.
+       Отказ по неполученному значению не давал бы отправить перевод
+       из-за недоступности узла. */
+    node.tokenBalance = 0n
+    node.callError = new Error('узел не ответил')
+
+    await expect(service.prepareTokenTransfer(tokenRequest)).resolves.toMatchObject({ to: TOKEN })
+  })
+
+  it('нехватка нативной валюты на комиссию по-прежнему ловится', async () => {
+    /* Токенов достаточно, а газ платить нечем. */
+    node.balance = 1n
+
+    await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toThrow(InsufficientFundsError)
   })
 })

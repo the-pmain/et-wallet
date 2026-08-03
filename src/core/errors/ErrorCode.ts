@@ -25,6 +25,7 @@ export const ERROR_CODE = {
   InvalidPassword: 'INVALID_PASSWORD',
   TooManyAttempts: 'TOO_MANY_ATTEMPTS',
   TransactionNotReplaceable: 'TRANSACTION_NOT_REPLACEABLE',
+  InsufficientTokenBalance: 'INSUFFICIENT_TOKEN_BALANCE',
   WeakPassword: 'WEAK_PASSWORD',
   InvalidMnemonic: 'INVALID_MNEMONIC',
   InvalidPrivateKey: 'INVALID_PRIVATE_KEY',

@@ -58,6 +58,8 @@ import {
   type IStorageService,
   type ISignableTransaction,
   type ITokenMetadata,
+  type ITokenTransferRequest,
+  type ITransferRecord,
   type ITransactionRequest,
   type TxHash,
   type Unsubscribe,
@@ -675,6 +677,22 @@ export class WalletSession implements IWalletSession {
     await this.#reloadAccountScopedData()
 
     return hash
+  }
+
+  /**
+   * Готовит перевод токена ERC-20 к подписи.
+   *
+   * ОТДЕЛЬНЫЙ МЕТОД, А НЕ ПРИЗНАК В `prepareTransfer`. У перевода токена
+   * поле `to` подписываемой транзакции указывает на контракт, а получатель
+   * и сумма лежат в данных вызова. Общая форма для двух разных операций
+   * рано или поздно приводит к тому, что адрес контракта принимают
+   * за адрес человека.
+   */
+  async prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer> {
+    const transactions = this.#requireTransactions()
+    const transaction = await transactions.prepareTokenTransfer(request)
+
+    return { transaction, fees: await transactions.estimateFees(transaction) }
   }
 
   /**
@@ -1304,7 +1322,7 @@ export class WalletSession implements IWalletSession {
 
       this.#publish({
         ...this.#snapshot,
-        transfers: page.transfers,
+        transfers: this.#withKnownAssets(page.transfers, network.chainId),
         historyLimits: page.limits,
         isHistoryLoading: false,
       })
@@ -1315,6 +1333,56 @@ export class WalletSession implements IWalletSession {
 
       this.#publish({ ...this.#snapshot, isHistoryLoading: false })
     }
+  }
+
+  /**
+   * Подставляет символ и число знаков известных токенов.
+   *
+   * ЗАЧЕМ. Источники истории возвращают адрес контракта, но не его
+   * метаданные: разбор журналов их не читает, а собственные отправки
+   * ядро истории описывает по подписанным данным, где их тоже нет.
+   * Без подстановки только что отправленные десять USDC выглядят
+   * в списке как «10000000 единиц контракта».
+   *
+   * ПОДСТАВЛЯЮТСЯ ТОЛЬКО ОТСЛЕЖИВАЕМЫЕ ТОКЕНЫ. Их пользователь добавил
+   * сам либо они пришли из встроенного списка; число знаков для них
+   * прочитано из контракта. Для незнакомого адреса значения остаются
+   * пустыми, и запись честно помечается как показанная в необработанных
+   * единицах — выдумывать привычные восемнадцать знаков нельзя,
+   * это исказило бы сумму на порядки.
+   *
+   * СИМВОЛ ОСТАЁТСЯ НЕДОВЕРЕННЫМ: его задаёт автор контракта. Здесь он
+   * лишь переносится из списка токенов, где отличие добавленного вручную
+   * от встроенного уже отмечено.
+   */
+  #withKnownAssets(
+    transfers: readonly ITransferRecord[],
+    chainId: ChainId,
+  ): readonly ITransferRecord[] {
+    const tokens = this.#tokens
+
+    if (tokens === null) {
+      return transfers
+    }
+
+    return transfers.map((record) => {
+      const contract = record.asset.contract
+
+      if (contract === null || record.asset.decimals !== null) {
+        return record
+      }
+
+      const token = tokens.get({ chainId, address: contract })
+
+      if (token === null) {
+        return record
+      }
+
+      return {
+        ...record,
+        asset: { contract, symbol: token.symbol, decimals: token.decimals },
+      }
+    })
   }
 
   async #loadBalance(account: IAccount | null, network: INetworkConfig | null): Promise<void> {

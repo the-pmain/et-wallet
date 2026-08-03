@@ -5,6 +5,7 @@ import type {
   IFeeEstimate,
   ISignableTransaction,
   ISignedTransaction,
+  ITokenTransferRequest,
   ITransactionRecord,
   ITransactionRequest,
   TransactionEventMap,
@@ -36,6 +37,18 @@ export interface ITransactionService extends IEventSource<TransactionEventMap> {
    * @throws GasEstimationFailedError, InsufficientFundsError
    */
   prepare(request: ITransactionRequest): Promise<ISignableTransaction>
+
+  /**
+   * Готовит перевод токена ERC-20.
+   *
+   * Данные вызова собирает сервис: получатель и количество лежат в них,
+   * а не в полях транзакции, и кодировать их в интерфейсе значило бы
+   * держать место с ценой ошибки в потерянные средства вне ядра.
+   *
+   * @throws InsufficientTokenBalanceError, GasEstimationFailedError,
+   *         InsufficientFundsError
+   */
+  prepareTokenTransfer(request: ITokenTransferRequest): Promise<ISignableTransaction>
 
   /**
    * Варианты комиссии для показа пользователю.

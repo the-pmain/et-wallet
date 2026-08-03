@@ -1,6 +1,7 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 
+import { toAddress } from '@/core/address'
 import type { Address, HexString } from '@/core/types'
 
 /**
@@ -31,8 +32,20 @@ export const NAME_SELECTOR = selector('name()')
 /** `balanceOf(address)` — баланс владельца. */
 export const BALANCE_OF_SELECTOR = selector('balanceOf(address)')
 
+/** `transfer(address,uint256)` — перевод токена. */
+export const TRANSFER_SELECTOR = selector('transfer(address,uint256)')
+
 /** Длина одного слова ABI в шестнадцатеричных символах. */
 const WORD_LENGTH = 64
+
+/** Длина селектора функции в шестнадцатеричных символах: четыре байта. */
+const SELECTOR_LENGTH = 8
+
+/** Длина адреса в шестнадцатеричных символах: двадцать байт. */
+const ADDRESS_LENGTH = 40
+
+/** Наибольшее значение `uint256`. */
+const MAX_UINT256 = (1n << 256n) - 1n
 
 /** Вызов без аргументов. */
 export function encodeCall(functionSelector: string): HexString {
@@ -48,6 +61,84 @@ export function encodeCall(functionSelector: string): HexString {
  */
 export function encodeCallWithAddress(functionSelector: string, address: Address): HexString {
   return `0x${functionSelector}${address.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')}` as HexString
+}
+
+/**
+ * Кодирует вызов `transfer(address,uint256)`.
+ *
+ * ЭТО МЕСТО, ГДЕ ОШИБКА СТОИТ СРЕДСТВ. Данные вызова — единственное,
+ * что определяет получателя и сумму перевода токена: поле `to` самой
+ * транзакции указывает на контракт, а не на человека. Ошибка
+ * в кодировании отправит токены не туда, и вернуть их будет нельзя.
+ *
+ * КОДИРОВАНИЕ ВЫПОЛНЯЕТСЯ В ЯДРЕ, А НЕ В ИНТЕРФЕЙСЕ. Экран отправки
+ * оперирует получателем и суммой; собирать из них байты вызова —
+ * работа слоя, который знает стандарт.
+ *
+ * @throws RangeError если сумма отрицательна либо не помещается
+ *         в `uint256`: молча обрезанное значение отправило бы совсем
+ *         не ту сумму, которую подтвердил пользователь.
+ */
+export function encodeTransfer(to: Address, amount: bigint): HexString {
+  if (amount < 0n) {
+    throw new RangeError('Сумма перевода не может быть отрицательной.')
+  }
+
+  if (amount > MAX_UINT256) {
+    throw new RangeError('Сумма перевода не помещается в uint256.')
+  }
+
+  const recipient = to.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')
+  const value = amount.toString(16).padStart(WORD_LENGTH, '0')
+
+  return `0x${TRANSFER_SELECTOR}${recipient}${value}` as HexString
+}
+
+/**
+ * Разбирает вызов `transfer(address,uint256)`.
+ *
+ * ЗАЧЕМ ЧИТАТЬ ТО, ЧТО САМИ СОБРАЛИ. Запись истории строится из данных
+ * подписанной транзакции, а не из намерения, которое было до подписи.
+ * Так в историю попадает ровно то, что ушло в сеть: если между формой
+ * и подписью что-то разошлось, запись покажет действительное содержимое,
+ * а не желаемое.
+ *
+ * @returns `null`, если данные не являются вызовом `transfer` нужной
+ *          длины. Ошибка здесь неуместна: перевод токена — лишь один
+ *          из возможных вызовов.
+ */
+export function decodeTransfer(
+  data: HexString,
+): { readonly to: Address; readonly amount: bigint } | null {
+  const body = strip(data)
+
+  /* Селектор занимает четыре байта, аргументы — два слова. Более
+     длинные данные означают другой вызов с тем же началом. */
+  if (body.length !== SELECTOR_LENGTH + WORD_LENGTH * 2) {
+    return null
+  }
+
+  if (body.slice(0, SELECTOR_LENGTH) !== TRANSFER_SELECTOR) {
+    return null
+  }
+
+  const recipient = body.slice(SELECTOR_LENGTH, SELECTOR_LENGTH + WORD_LENGTH)
+
+  /* Адрес занимает младшие двадцать байт слова. Ненулевые старшие байты
+     означают, что это не адрес, и выдавать их за адрес нельзя. */
+  if (
+    recipient.slice(0, WORD_LENGTH - ADDRESS_LENGTH) !== '0'.repeat(WORD_LENGTH - ADDRESS_LENGTH)
+  ) {
+    return null
+  }
+
+  return {
+    /* Адрес приводится к записи с контрольной суммой EIP-55: показанный
+       в нижнем регистре, он лишает пользователя единственной защиты
+       от опечатки при сверке. */
+    to: toAddress(`0x${recipient.slice(WORD_LENGTH - ADDRESS_LENGTH)}`),
+    amount: BigInt(`0x${body.slice(SELECTOR_LENGTH + WORD_LENGTH)}`),
+  }
 }
 
 /**

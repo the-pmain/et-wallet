@@ -8,8 +8,11 @@ import {
   DECIMALS_SELECTOR,
   NAME_SELECTOR,
   SYMBOL_SELECTOR,
+  TRANSFER_SELECTOR,
   decodeString,
+  decodeTransfer,
   decodeUint,
+  encodeTransfer,
   encodeCall,
   encodeCallWithAddress,
 } from './erc20'
@@ -141,5 +144,82 @@ describe('decodeString: bytes32', () => {
 
   it('отвергает пустой ответ', () => {
     expect(() => decodeString('0x' as HexString)).toThrow()
+  })
+})
+
+describe('Кодирование перевода', () => {
+  /* Эталон: вызов transfer к 0xfB69…d359 на 1 000 000 единиц.
+     Селектор 0xa9059cbb — общеизвестное значение, и оно же выходит
+     из keccak256('transfer(address,uint256)'). */
+  const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
+
+  it('селектор совпадает со стандартным', () => {
+    expect(TRANSFER_SELECTOR).toBe('a9059cbb')
+  })
+
+  it('собирает вызов из селектора и двух слов', () => {
+    expect(encodeTransfer(RECIPIENT, 1_000_000n)).toBe(
+      '0xa9059cbb' +
+        '000000000000000000000000fb6916095ca1df60bb79ce92ce3ea74c37c5d359' +
+        '00000000000000000000000000000000000000000000000000000000000f4240',
+    )
+  })
+
+  it('приводит адрес к нижнему регистру', () => {
+    /* Контракт сравнивает байты. Запись с контрольной суммой EIP-55
+       дала бы другое значение слова. */
+    expect(encodeTransfer(RECIPIENT, 1n)).toContain('fb6916095ca1df60bb79ce92ce3ea74c37c5d359')
+  })
+
+  it('данные вызова занимают ровно 68 байт', () => {
+    /* Четыре байта селектора и два слова по 32. Лишние байты означали бы
+       другой вызов. */
+    expect(encodeTransfer(RECIPIENT, 1n)).toHaveLength(2 + 8 + 64 * 2)
+  })
+
+  it('отвергает сумму, не помещающуюся в uint256', () => {
+    /* Молча обрезанное значение отправило бы не ту сумму, которую
+       подтвердил пользователь. */
+    expect(() => encodeTransfer(RECIPIENT, 1n << 256n)).toThrow(RangeError)
+  })
+
+  it('отвергает отрицательную сумму', () => {
+    expect(() => encodeTransfer(RECIPIENT, -1n)).toThrow(RangeError)
+  })
+})
+
+describe('Разбор перевода', () => {
+  const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
+
+  it('читает получателя и сумму обратно', () => {
+    const decoded = decodeTransfer(encodeTransfer(RECIPIENT, 123_456n))
+
+    expect(decoded?.to.toLowerCase()).toBe(RECIPIENT.toLowerCase())
+    expect(decoded?.amount).toBe(123_456n)
+  })
+
+  it('не признаёт переводом пустые данные', () => {
+    expect(decodeTransfer('0x' as HexString)).toBeNull()
+  })
+
+  it('не признаёт переводом чужой вызов', () => {
+    expect(decodeTransfer(encodeCallWithAddress(BALANCE_OF_SELECTOR, RECIPIENT))).toBeNull()
+  })
+
+  it('не признаёт переводом вызов с лишними данными', () => {
+    /* Тот же селектор с третьим словом — другая функция. Прочитать
+       из неё получателя значило бы показать в истории перевод,
+       которого не было. */
+    expect(
+      decodeTransfer(`${encodeTransfer(RECIPIENT, 1n)}${'0'.repeat(64)}` as HexString),
+    ).toBeNull()
+  })
+
+  it('не признаёт адресом слово с ненулевыми старшими байтами', () => {
+    /* Адрес занимает младшие двадцать байт. Слово, заполненное целиком,
+       адресом не является, и выдавать его за адрес нельзя. */
+    const forged = `0xa9059cbb${'f'.repeat(64)}${'0'.repeat(64)}` as HexString
+
+    expect(decodeTransfer(forged)).toBeNull()
   })
 })

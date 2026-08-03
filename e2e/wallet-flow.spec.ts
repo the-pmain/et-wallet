@@ -174,6 +174,16 @@ test.describe('Сквозной путь: отправка', () => {
 
     await expect(page.getByRole('button', { name: 'Далее' })).toBeEnabled()
   })
+
+  test('выбор актива предлагает нативную валюту', async ({ page }) => {
+    await importWallet(page)
+    await page.goto('/#/wallet/send')
+
+    /* Список активов собирается из отслеживаемых токенов, и нативная
+       валюта в нём есть всегда: её нельзя убрать. Пустой список означал
+       бы, что отправить нечего вовсе. */
+    await expect(page.getByLabel('Что отправить')).toHaveValue('native')
+  })
 })
 
 test.describe('Сквозной путь: резервная копия', () => {

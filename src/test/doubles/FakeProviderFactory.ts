@@ -1,10 +1,14 @@
 import {
+  BALANCE_OF_SELECTOR,
   ChainIdMismatchError,
+  DECIMALS_SELECTOR,
   ENS_ADDR_SELECTOR,
   ENS_NAME_SELECTOR,
   ENS_REGISTRY_ADDRESS,
   ENS_RESOLVER_SELECTOR,
   EventBus,
+  NAME_SELECTOR,
+  SYMBOL_SELECTOR,
   ProviderUnavailableError,
   areAddressesEqual,
   chainIdToHex,
@@ -50,6 +54,7 @@ class FakeProvider implements IProvider {
   readonly #readLatestBlock: () => bigint
   readonly #readContracts: () => readonly string[]
   readonly #readEnsRecords: () => readonly IFakeEnsRecord[]
+  readonly #readTokens: () => readonly IFakeToken[]
   readonly #events = new EventBus<ProviderEventMap>()
 
   constructor(
@@ -62,6 +67,7 @@ class FakeProvider implements IProvider {
     readLatestBlock: () => bigint,
     readContracts: () => readonly string[],
     readEnsRecords: () => readonly IFakeEnsRecord[],
+    readTokens: () => readonly IFakeToken[],
   ) {
     this.chainId = chainId
     this.#reportedChainId = reportedChainId
@@ -72,6 +78,7 @@ class FakeProvider implements IProvider {
     this.#readLatestBlock = readLatestBlock
     this.#readContracts = readContracts
     this.#readEnsRecords = readEnsRecords
+    this.#readTokens = readTokens
   }
 
   request<TResult>(request: { readonly method: string }): Promise<TResult> {
@@ -116,6 +123,12 @@ class FakeProvider implements IProvider {
    * не знает, обязан упасть, а не получить пустую строку.
    */
   call(request: ICallRequest): Promise<HexString> {
+    const token = answerTokenCall(request, this.#readTokens())
+
+    if (token !== null) {
+      return Promise.resolve(token)
+    }
+
     const answer = answerEnsCall(request, this.#readEnsRecords())
 
     return answer === null
@@ -199,6 +212,17 @@ class FakeProvider implements IProvider {
 }
 
 /** Настройки поведения фабрики в конкретном тесте. */
+/** Токен-контракт, отвечающий дублёру узла. */
+export interface IFakeToken {
+  readonly address: string
+  readonly symbol: string
+  readonly name: string
+  readonly decimals: number
+
+  /** Баланс владельца. Один на всех: адресность здесь ничего не проверяет. */
+  readonly balance: bigint
+}
+
 export interface IFakeProviderOptions {
   /**
    * Идентификатор, который узел сообщит в ответ на `eth_chainId`.
@@ -242,6 +266,16 @@ export interface IFakeProviderOptions {
    * окно, отсчитанное от последнего блока назад.
    */
   readonly latestBlock?: bigint
+
+  /**
+   * Токен-контракты, отвечающие на `decimals`, `symbol`, `name`
+   * и `balanceOf`.
+   *
+   * Нужны проверкам отправки токена: без ответа контракта токен нельзя
+   * ни добавить, ни оценить его баланс, и весь путь остался бы
+   * непроверенным.
+   */
+  readonly tokens?: readonly IFakeToken[]
 
   /** Адреса, по которым `getCode` вернёт байт-код. По умолчанию таких нет. */
   readonly contractAddresses?: readonly string[]
@@ -428,6 +462,7 @@ export class FakeProviderFactory implements IProviderFactory {
       () => this.#options.latestBlock ?? 0n,
       () => this.#options.contractAddresses ?? [],
       () => this.#options.ensRecords ?? [],
+      () => this.#options.tokens ?? [],
     )
 
     this.createdCount += 1
@@ -435,4 +470,55 @@ export class FakeProviderFactory implements IProviderFactory {
 
     return Promise.resolve(provider)
   }
+}
+
+/**
+ * Ответ токен-контракта.
+ *
+ * Различаются вызовы по селектору — так же, как это делает настоящий
+ * контракт. Дублёр, отвечающий одинаково на любой вызов, скрыл бы
+ * ошибку в составлении данных.
+ */
+function answerTokenCall(request: ICallRequest, tokens: readonly IFakeToken[]): HexString | null {
+  const token = tokens.find((entry) => areAddressesEqual(entry.address, request.to))
+
+  if (token === undefined) {
+    return null
+  }
+
+  const data = request.data ?? '0x'
+
+  if (data.startsWith(`0x${DECIMALS_SELECTOR}`)) {
+    return word(BigInt(token.decimals))
+  }
+
+  if (data.startsWith(`0x${BALANCE_OF_SELECTOR}`)) {
+    return word(token.balance)
+  }
+
+  if (data.startsWith(`0x${SYMBOL_SELECTOR}`)) {
+    return text(token.symbol)
+  }
+
+  if (data.startsWith(`0x${NAME_SELECTOR}`)) {
+    return text(token.name)
+  }
+
+  return null
+}
+
+/** Одно слово ABI с числом. */
+function word(value: bigint): HexString {
+  return `0x${value.toString(16).padStart(64, '0')}` as HexString
+}
+
+/** Строка переменной длины в кодировке ABI: смещение, длина, содержимое. */
+function text(value: string): HexString {
+  const bytes = [...new TextEncoder().encode(value)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+
+  return `0x${32n.toString(16).padStart(64, '0')}${BigInt(value.length)
+    .toString(16)
+    .padStart(64, '0')}${bytes.padEnd(64, '0')}` as HexString
 }

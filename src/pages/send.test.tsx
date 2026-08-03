@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { toAddress, type Wei } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
-import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { createTestAppServices, type IFakeToken, type ITestAppServices } from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -339,5 +339,147 @@ describe('Отправка: недостаток средств', () => {
       expect(screen.getByRole('heading', { name: 'Отправка' })).toBeInTheDocument()
     })
     expect(screen.getByText(/средств/i)).toBeInTheDocument()
+  })
+})
+
+describe('Отправка: токен ERC-20', () => {
+  const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+
+  /** Токен с шестью знаками: подстановка привычных восемнадцати заметна. */
+  const USDC: IFakeToken = {
+    address: TOKEN,
+    symbol: 'USDC',
+    name: 'USD Coin',
+    decimals: 6,
+    balance: 250_000_000n,
+  }
+
+  /** Выбирает токен в списке активов и заполняет форму. */
+  async function fillTokenForm(amount: string): Promise<void> {
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Что отправить'), TOKEN)
+    await fillAndContinue(RECIPIENT, amount)
+  }
+
+  beforeEach(async () => {
+    services.providerFactory.configure({ balance: BALANCE, tokens: [USDC] })
+
+    /* Токен добавляется до рендера: экран отправки берёт список активов
+       из снимка, а наполняет его сессия. */
+    await services.session.open()
+    await services.session.addToken(TOKEN)
+  })
+
+  it('токен доступен для отправки в списке активов', async () => {
+    renderApp()
+    await openSend()
+
+    expect(
+      within(screen.getByLabelText('Что отправить')).getByRole('option', { name: /USDC/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('показывает адрес контракта выбранного токена', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await user.selectOptions(screen.getByLabelText('Что отправить'), TOKEN)
+
+    /* Символ задаёт автор контракта, и выпустить токен с символом USDC
+       может кто угодно. Адрес — единственное, что отличает настоящий
+       от поддельного. */
+    expect(screen.getByText(TOKEN)).toBeInTheDocument()
+  })
+
+  it('сумма считается по числу знаков токена, а не по восемнадцати', async () => {
+    renderApp()
+    await openSend()
+    await fillTokenForm('10')
+
+    await screen.findByRole('heading', { name: 'Подтверждение' })
+
+    /* Десять USDC — это 10 000 000 единиц, а не 10^19. Подстановка
+       привычных восемнадцати знаков занизила бы перевод в триллион раз. */
+    expect(screen.getByText('10 USDC')).toBeInTheDocument()
+  })
+
+  it('транзакция адресована контракту, и это сказано прямо', async () => {
+    renderApp()
+    await openSend()
+    await fillTokenForm('1')
+
+    await screen.findByRole('heading', { name: 'Подтверждение' })
+
+    /* Человек, сверяющий адреса, обязан понимать, почему их два: иначе
+       он решит, что кошелёк подменил получателя. */
+    expect(screen.getByText(/будет отправлена контракту токена/i)).toBeInTheDocument()
+    expect(screen.getByText(TOKEN)).toBeInTheDocument()
+  })
+
+  it('получатель показан настоящий, а не адрес контракта', async () => {
+    renderApp()
+    await openSend()
+    await fillTokenForm('1')
+
+    await screen.findByRole('heading', { name: 'Подтверждение' })
+
+    expect(screen.getByText(RECIPIENT)).toBeInTheDocument()
+  })
+
+  it('не даёт отправить больше, чем есть токенов', async () => {
+    renderApp()
+    await openSend()
+    await fillTokenForm('1000')
+
+    /* Иначе контракт откатил бы вызов, газ списался, а перевода
+       не случилось бы. */
+    expect(await screen.findByText(/Токенов на балансе меньше/i)).toBeInTheDocument()
+  })
+
+  it('смена актива очищает сумму', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await user.type(screen.getByLabelText(/Сумма/), '10')
+    await user.selectOptions(screen.getByLabelText('Что отправить'), TOKEN)
+
+    /* Число знаков у активов разное: «10», набранное для эфира,
+       при шести знаках означало бы совсем другую величину. */
+    expect(screen.getByLabelText(/Сумма/)).toHaveValue('')
+  })
+
+  it('доступное количество показано в единицах токена', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await user.selectOptions(screen.getByLabelText('Что отправить'), TOKEN)
+
+    expect(await screen.findByText('250 USDC')).toBeInTheDocument()
+  })
+
+  it('отправленный токен попадает в историю как перевод токена', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+    await fillTokenForm('10')
+
+    await screen.findByRole('heading', { name: 'Подтверждение' })
+    await confirmAndSend()
+    await screen.findByRole('heading', { name: 'Транзакция отправлена' })
+
+    await user.click(screen.getByRole('link', { name: /вернуться в кошелёк/i }))
+    await user.click(await screen.findByRole('link', { name: /вся история/i }))
+
+    /* Запись строится из подписанных данных: не разбери кошелёк вызов,
+       в истории оказался бы перевод нуля неизвестно кому. */
+    const list = within(await screen.findByRole('list'))
+
+    expect(list.getByText('Токен')).toBeInTheDocument()
+    expect(list.getByText(/USDC/u)).toBeInTheDocument()
   })
 })

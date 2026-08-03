@@ -7,6 +7,7 @@ export {
   FakeProviderFactory,
   type IFakeEnsRecord,
   type IFakeProviderOptions,
+  type IFakeToken,
 } from './FakeProviderFactory'
 export { FakeSessionTransport, type ISentResponse } from './FakeSessionTransport'
 export { InMemoryStorageService } from './InMemoryStorageService'
