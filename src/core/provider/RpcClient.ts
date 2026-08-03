@@ -21,6 +21,7 @@ import type { IProvider } from './contracts'
 import { mapProviderError } from './error-mapping'
 import type {
   ICallRequest,
+  IGasEstimateRequest,
   IFeeData,
   ILogEntry,
   ILogFilter,
@@ -206,9 +207,9 @@ export class RpcClient implements IProvider {
     })
   }
 
-  async estimateGas(request: ICallRequest): Promise<bigint> {
+  async estimateGas(request: IGasEstimateRequest): Promise<bigint> {
     return await this.#call(
-      async () => await this.#provider.estimateGas(RpcClient.#toEthersTransaction(request)),
+      async () => await this.#provider.estimateGas(RpcClient.#toEstimateRequest(request)),
     )
   }
 
@@ -423,6 +424,29 @@ export class RpcClient implements IProvider {
     }
 
     return typeof blockTag === 'bigint' ? Number(blockTag) : blockTag
+  }
+
+  /**
+   * Готовит запрос оценки газа.
+   *
+   * ПОЛЕ `to` ОПУСКАЕТСЯ ЦЕЛИКОМ, а не заполняется чем-нибудь. Именно
+   * его отсутствие означает для узла развёртывание контракта; подстановка
+   * адреса отправителя дала бы оценку простого перевода самому себе —
+   * величину, которой не хватит на развёртывание, и транзакция
+   * завершилась бы откатом со списанием газа.
+   */
+  static #toEstimateRequest(request: IGasEstimateRequest): {
+    to?: string
+    from?: string
+    data?: string
+    value?: bigint
+  } {
+    return {
+      ...(request.to === null ? {} : { to: request.to }),
+      ...(request.from === undefined ? {} : { from: request.from }),
+      ...(request.data === undefined ? {} : { data: request.data }),
+      ...(request.value === undefined ? {} : { value: request.value }),
+    }
   }
 
   static #toEthersTransaction(request: ICallRequest): {

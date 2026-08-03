@@ -892,19 +892,11 @@ export class TransactionService implements ITransactionService {
    * лимит значило бы гарантированно сжечь газ впустую.
    */
   async #estimateGasLimit(provider: IProvider, request: ITransactionRequest): Promise<bigint> {
-    if (request.to === null) {
-      /* Развёртывание контракта: получателя нет, оценка выполняется
-         по данным вызова. */
-      const estimate = await provider.estimateGas({
-        to: request.from,
-        from: request.from,
-        data: request.data ?? ('0x' as HexString),
-        value: request.value,
-      })
-
-      return (estimate * GAS_LIMIT_HEADROOM) / MULTIPLIER_BASE
-    }
-
+    /* ОТСУТСТВИЕ ПОЛУЧАТЕЛЯ ПЕРЕДАЁТСЯ УЗЛУ КАК ЕСТЬ. Именно так узел
+       узнаёт, что оценивается развёртывание контракта. Прежде сюда
+       подставлялся адрес отправителя, и узел оценивал стоимость
+       перевода самому себе — величину, которой на развёртывание
+       не хватает: транзакция завершилась бы откатом со списанием газа. */
     const estimate = await provider.estimateGas({
       to: request.to,
       from: request.from,

@@ -4,6 +4,7 @@ import { OnboardingProvider } from '@/features/onboarding'
 import { WalletProvider } from '@/features/wallet'
 
 import { createAppServices, type IAppServices } from '../composition/createAppServices'
+import { AppErrorBoundary } from './AppErrorBoundary'
 import { DappProvider } from './DappProvider'
 import { I18nProvider } from './I18nProvider'
 import { SecurityProvider } from './SecurityProvider'
@@ -41,28 +42,35 @@ export function AppProviders({ children, services }: AppProvidersProps) {
   const value = services ?? created
 
   return (
-    <ThemeProvider>
-      {/* Локализация обёрнута снаружи состояния кошелька и внутри
+    /* ПЕРЕХВАТ СБОЕВ — САМЫЙ ВНЕШНИЙ СЛОЙ. Ошибка в любом провайдере
+       или экране размонтировала бы всё дерево, и владелец средств увидел
+       бы белый экран — для него неотличимый от пропажи денег. Оформление
+       и локализация при этом остаются внутри: экран отказа обязан
+       отрисоваться, даже если сломались они. */
+    <AppErrorBoundary>
+      <ThemeProvider>
+        {/* Локализация обёрнута снаружи состояния кошелька и внутри
           оформления: язык нужен уже экрану загрузки, а от того, открыт
           ли кошелёк, он не зависит. */}
-      <I18nProvider>
-        <OnboardingProvider service={value.onboarding}>
-          {/* Модуль безопасности вложен в онбординг и охватывает сессию
+        <I18nProvider>
+          <OnboardingProvider service={value.onboarding}>
+            {/* Модуль безопасности вложен в онбординг и охватывает сессию
               кошелька: автоблокировка следит за состоянием блокировки,
               а её срабатывание обязано закрыть сессию. */}
-          <SecurityProvider
-            clock={value.clock}
-            settingsRepository={value.securitySettings}
-            storage={value.storage}
-          >
-            <WalletProvider session={value.session}>
-              {/* Подключения вложены в сессию кошелька: запрос
+            <SecurityProvider
+              clock={value.clock}
+              settingsRepository={value.securitySettings}
+              storage={value.storage}
+            >
+              <WalletProvider session={value.session}>
+                {/* Подключения вложены в сессию кошелька: запрос
                   от приложения выполняется её ключами и в её сети. */}
-              <DappProvider service={value.dappSessions}>{children}</DappProvider>
-            </WalletProvider>
-          </SecurityProvider>
-        </OnboardingProvider>
-      </I18nProvider>
-    </ThemeProvider>
+                <DappProvider service={value.dappSessions}>{children}</DappProvider>
+              </WalletProvider>
+            </SecurityProvider>
+          </OnboardingProvider>
+        </I18nProvider>
+      </ThemeProvider>
+    </AppErrorBoundary>
   )
 }

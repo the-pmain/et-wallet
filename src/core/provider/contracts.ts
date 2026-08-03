@@ -4,6 +4,7 @@ import type { Address, BlockTag, ChainId, HexString, TxHash, Wei } from '@/core/
 
 import type {
   ICallRequest,
+  IGasEstimateRequest,
   IFeeData,
   ILogEntry,
   ILogFilter,
@@ -106,7 +107,7 @@ export interface IProvider extends IEventSource<ProviderEventMap> {
    *         Назначать лимит произвольно в этой ситуации нельзя: газ будет
    *         списан, а операция не выполнится.
    */
-  estimateGas(request: ICallRequest): Promise<bigint>
+  estimateGas(request: IGasEstimateRequest): Promise<bigint>
 
   /** Текущие параметры стоимости газа. */
   getFeeData(): Promise<IFeeData>

@@ -7,10 +7,12 @@ import {
   toAddress,
   toChainId,
   type Address,
+  type HexString,
   type IDappRequest,
   type Wei,
 } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
+import { TransactionRepository } from '@/core/transaction/TransactionRepository'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
@@ -318,5 +320,67 @@ describe('Подключения: отключение сессий', () => {
     await waitFor(() => {
       expect(services.dappTransport.disconnected).toEqual(['session-1'])
     })
+  })
+})
+
+describe('Подключения: развёртывание контракта', () => {
+  /** Запрос без получателя: так приложение просит развернуть контракт. */
+  function deploymentRequest(): IDappRequest {
+    return {
+      id: 'req-3',
+      sessionId: 'session-1',
+      dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
+      chainId: ETHEREUM,
+      payload: {
+        kind: DAPP_REQUEST_KIND.SendTransaction,
+        transaction: {
+          from: OWNER,
+          to: null,
+          value: 0n,
+          data: '0x60806040' as HexString,
+          gasLimit: null,
+        },
+      },
+    }
+  }
+
+  it('предупреждает, что запрос создаёт контракт', async () => {
+    renderApp()
+    await openConnections()
+
+    services.dappTransport.emitRequest(deploymentRequest())
+
+    expect(await screen.findByText('Разворачивается контракт')).toBeInTheDocument()
+  })
+
+  it('подписывается развёртывание, а не перевод самому себе', async () => {
+    /* Прежде получатель подменялся адресом отправителя: пользователь
+       одобрял создание контракта, а подписывал перевод себе с байт-кодом
+       в данных вызова — газ списывался, одобренная операция
+       не выполнялась. */
+    const user = userEvent.setup()
+
+    renderApp()
+    await openConnections()
+
+    services.dappTransport.emitRequest(deploymentRequest())
+    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }))
+    await user.type(await screen.findByLabelText('Пароль'), PASSWORD)
+    await user.click(screen.getByRole('button', { name: 'Подтвердить' }))
+
+    await waitFor(() => {
+      expect(services.dappTransport.responses).toHaveLength(1)
+    })
+
+    /* Транзакция без получателя сериализуется с пустым полем `to`.
+       Разобрать её обратно можно из хранилища: запись отправки
+       сохраняет то, что ушло в сеть. */
+    const saved = await new TransactionRepository(services.secureStorage).findByAddress(
+      OWNER,
+      ETHEREUM,
+    )
+
+    expect(saved).toHaveLength(1)
+    expect(saved[0]?.to).toBeNull()
   })
 })

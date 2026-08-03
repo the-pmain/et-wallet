@@ -844,7 +844,13 @@ export class WalletSession implements IWalletSession {
     const prepared = await this.#requireTransactions().prepare({
       chainId: request.chainId,
       from: payload.transaction.from,
-      to: payload.transaction.to ?? payload.transaction.from,
+      /* ПОЛУЧАТЕЛЬ ПЕРЕДАЁТСЯ КАК ПРИСЛАН, ВКЛЮЧАЯ ЕГО ОТСУТСТВИЕ.
+         Пустое поле означает развёртывание контракта, и экран
+         подтверждения говорит об этом прямо. Прежде сюда подставлялся
+         адрес отправителя: пользователь одобрял создание контракта,
+         а подписывал перевод самому себе с байт-кодом в данных вызова —
+         газ списывался, одобренная операция не выполнялась. */
+      to: payload.transaction.to,
       value: toWei(payload.transaction.value),
       ...(payload.transaction.data === null ? {} : { data: payload.transaction.data }),
     })

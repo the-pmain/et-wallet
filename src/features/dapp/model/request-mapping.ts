@@ -29,9 +29,9 @@ export interface IRawRequest {
  * на такой запрос будет отказ.
  *
  * ПОРЯДОК АРГУМЕНТОВ У МЕТОДОВ ПОДПИСИ РАЗНЫЙ, И ЭТО НЕ ОПЕЧАТКА.
- * `personal_sign` присылает сначала сообщение, затем адрес; `eth_sign`
- * и `eth_signTypedData_v4` — наоборот. Перепутать их значит принять
- * адрес за сообщение и показать пользователю бессмыслицу.
+ * `personal_sign` присылает сначала сообщение, затем адрес;
+ * `eth_signTypedData_v4` — наоборот. Перепутать их значит принять адрес
+ * за сообщение и показать пользователю бессмыслицу.
  */
 export function toDappRequest(raw: IRawRequest): IDappRequest | null {
   if (raw.chainId === null) {
@@ -67,15 +67,12 @@ function toPayload(method: string, params: readonly unknown[]): IDappRequest['pa
         : { kind: DAPP_REQUEST_KIND.SignMessage, address, message }
     }
 
-    case 'eth_sign': {
-      /* Сначала адрес, затем сообщение — порядок обратный. */
-      const address = readAddress(params[0])
-      const message = readMessage(params[1])
-
-      return message === null || address === null
-        ? null
-        : { kind: DAPP_REQUEST_KIND.SignMessage, address, message }
-    }
+    /* `eth_sign` НЕ ПОДДЕРЖИВАЕТСЯ СОЗНАТЕЛЬНО, а не забыт.
+       Метод задуман как подпись произвольного 32-байтового значения
+       без префикса — то есть приложение может прислать хэш транзакции
+       и получить подпись под ней, ничего не показав пользователю.
+       MetaMask отключил метод по умолчанию, а затем удалил; остальные
+       кошельки последовали за ним. Приложению уходит отказ. */
 
     case 'eth_signTypedData':
     case 'eth_signTypedData_v4': {

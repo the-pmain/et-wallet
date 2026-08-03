@@ -63,7 +63,12 @@ class StubProvider implements IProvider {
   getCode(): Promise<HexString> {
     return Promise.resolve('0x' as HexString)
   }
-  estimateGas(): Promise<bigint> {
+  /** Последний запрос оценки газа. Позволяет проверить, что ушло узлу. */
+  lastEstimateRequest: { readonly to: unknown } | null = null
+
+  estimateGas(request: { readonly to: unknown }): Promise<bigint> {
+    this.lastEstimateRequest = request
+
     return this.gasEstimate instanceof Error
       ? Promise.reject(this.gasEstimate)
       : Promise.resolve(this.gasEstimate)
@@ -510,5 +515,39 @@ describe('Передача коллекционного предмета', () =>
     await expect(service.prepareNftTransfer(nftRequest)).resolves.toMatchObject({
       to: COLLECTION,
     })
+  })
+})
+
+describe('Развёртывание контракта', () => {
+  /* Данные вызова без получателя: так выглядит развёртывание. */
+  const BYTECODE = '0x60806040' as HexString
+
+  const deployment = {
+    chainId: CHAIN_ID,
+    from: SENDER,
+    to: null,
+    value: toWei(0n),
+    data: BYTECODE,
+  }
+
+  it('получатель остаётся пустым', async () => {
+    /* Подстановка адреса отправителя превратила бы развёртывание
+       в перевод самому себе: пользователь одобрял бы одно,
+       а подписывал другое. */
+    expect((await service.prepare(deployment)).to).toBeNull()
+  })
+
+  it('узлу уходит запрос без получателя', async () => {
+    /* Именно отсутствие поля `to` сообщает узлу, что оценивается
+       развёртывание. С подставленным адресом он оценил бы простой
+       перевод, и назначенного лимита не хватило бы: откат
+       со списанием газа. */
+    await service.prepare(deployment)
+
+    expect(node.lastEstimateRequest?.to).toBeNull()
+  })
+
+  it('данные вызова сохраняются целиком', async () => {
+    expect((await service.prepare(deployment)).data).toBe(BYTECODE)
   })
 })

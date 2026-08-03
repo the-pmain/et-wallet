@@ -7,6 +7,7 @@ import type { IProvider } from './contracts'
 import type { IRpcEndpoint } from './rpc-endpoint'
 import type {
   ICallRequest,
+  IGasEstimateRequest,
   IFeeData,
   ILogEntry,
   ILogFilter,
@@ -133,7 +134,7 @@ export class FailoverProvider implements IProvider {
     return await this.#withFailover((provider) => provider.getCode(address, blockTag))
   }
 
-  async estimateGas(request: ICallRequest): Promise<bigint> {
+  async estimateGas(request: IGasEstimateRequest): Promise<bigint> {
     return await this.#withFailover((provider) => provider.estimateGas(request))
   }
 

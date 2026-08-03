@@ -42,6 +42,24 @@ export interface ICallRequest {
   readonly value?: Wei
 }
 
+/**
+ * Запрос оценки газа.
+ *
+ * ОТЛИЧАЕТСЯ ОТ `ICallRequest` ОДНИМ ПОЛЕМ, И ОТЛИЧИЕ СУЩЕСТВЕННОЕ.
+ * Чтение контракта без адреса бессмысленно, а оценка газа без него —
+ * законный случай: отсутствие получателя означает развёртывание
+ * контракта. Узел различает эти запросы именно по наличию поля `to`,
+ * и подставить туда что-нибудь «для совместимости» значит оценить
+ * не ту операцию.
+ */
+export interface IGasEstimateRequest {
+  /** Получатель. `null` — развёртывание контракта. */
+  readonly to: Address | null
+  readonly from?: Address
+  readonly data?: HexString
+  readonly value?: Wei
+}
+
 /** Запись журнала событий контракта. */
 export interface ILogEntry {
   readonly address: Address
