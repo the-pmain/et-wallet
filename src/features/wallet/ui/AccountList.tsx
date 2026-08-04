@@ -89,9 +89,21 @@ export function AccountList({
             </Button>
           )}
 
-          <Button variant="ghost" size="sm" onClick={onCreate} disabled={isBusy}>
+          {/* НАДПИСЬ КОРОТКАЯ, ДОСТУПНОЕ ИМЯ ПОЛНОЕ. Рядом стоит вторая
+              кнопка, и вдвоём с полными надписями они не помещаются
+              в ширину телефона — не хватает восемнадцати точек, и строка
+              рвётся надвое. Значок с «Add» читается однозначно, а
+              экранный диктор получает полное имя: у кошелька есть второе
+              добавление, для RPC-узла, и на слух их надо различать. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCreate}
+            disabled={isBusy}
+            aria-label="Add an account"
+          >
             <Plus className="size-4" aria-hidden />
-            Add an account
+            Add
           </Button>
         </div>
       </CardHeader>
