@@ -83,8 +83,14 @@ const ENGLISH = {
   'nav.settings': 'Settings',
 
   'dashboard.balance': 'Balance',
+  /* Свод двух прежних оговорок в одну. Раньше на главном экране стояли
+     подряд «Showing the native currency balance…» и «The native currency
+     of the network is sent here…» — два абзаца об одном и том же в самом
+     центре экрана. Утрачено при сведении ничего: и то, что показанная
+     сумма не покрывает токены, и то, что отправка отсюда касается только
+     нативной валюты, и предупреждение про поле получателя — на месте. */
   'dashboard.nativeOnly':
-    'Showing the native currency balance. Tokens and value estimates live in the portfolio.',
+    'The native currency of the network is sent here, and the balance above shows only it. Token balances live in the portfolio; token transfers have their own screen, where the recipient is written into the call data, not into the recipient field.',
   'dashboard.portfolio': 'Portfolio',
   'dashboard.send': 'Send',
   'dashboard.receive': 'Receive',

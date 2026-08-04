@@ -14,7 +14,14 @@ import { cva } from 'class-variance-authority'
  * с клавиатуры.
  */
 export const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  /* `cursor-pointer` задан явно: Tailwind сбрасывает курсор кнопки
+     к стрелке, и элемент перестаёт выглядеть нажимаемым.
+
+     `active:scale` — отклик на нажатие. Мгновенная смена состояния без
+     отклика читается как «не нажалось», и пользователь жмёт второй раз;
+     в кошельке второе нажатие по «Отправить» стоит дорого. Движение
+     снимается при `prefers-reduced-motion`. */
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all duration-150 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

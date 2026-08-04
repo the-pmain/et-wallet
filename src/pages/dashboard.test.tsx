@@ -95,11 +95,16 @@ describe('Панель: шапка', () => {
     expect(screen.getByRole('img', { name: 'Address fingerprint' })).toBeInTheDocument()
   })
 
-  it('называет активную сеть', async () => {
+  it('называет активную сеть и у суммы, и в шапке', async () => {
     renderApp()
     await findDashboard()
 
-    expect(screen.getByText('Ethereum')).toBeInTheDocument()
+    /* Дважды — намеренно, и это не тот дубль, что убирают. В шапке
+       сеть названа как общий признак положения, действующий на всех
+       экранах; у суммы — как ответ на вопрос, чьи это деньги. Один
+       адрес в разных сетях держит разные средства, и цифра без
+       указания сети неполна. */
+    expect(screen.getAllByText('Ethereum')).toHaveLength(2)
   })
 })
 

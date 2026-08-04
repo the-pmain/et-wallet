@@ -18,7 +18,11 @@ export interface EmptyStateProps {
   readonly description: ReactNode
 
   readonly action?: ReactNode
-  readonly className?: string
+
+  /* `| undefined` явно: при `exactOptionalPropertyTypes` необязательное
+     свойство и свойство со значением `undefined` — разные типы, а сюда
+     значение приходит прокинутым из другого необязательного поля. */
+  readonly className?: string | undefined
 }
 
 /**

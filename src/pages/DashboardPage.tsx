@@ -1,4 +1,4 @@
-import { ArrowRight, ChartPie } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 
 import {
@@ -72,26 +72,12 @@ export function DashboardPage() {
         isLoading={snapshot.isBalanceLoading}
         error={snapshot.balanceError}
         onRefresh={() => void session.refreshBalance()}
-        action={
-          /* Портфель не попал в нижнюю панель сознательно: пять пунктов —
-             предел для окна шириной 360 пикселей, и шестой сделал бы
-             подписи нечитаемыми. Вход отсюда и из раздела активов. */
-          <Button asChild variant="outline" size="sm" className="self-start">
-            <Link to="/wallet/portfolio">
-              <ChartPie className="size-4" aria-hidden />
-              {t('dashboard.portfolio')}
-            </Link>
-          </Button>
-        }
-      />
-
-      <QuickActions
-        account={snapshot.activeAccount}
-        isBusy={snapshot.isBalanceLoading}
-        onRefresh={() => void session.refreshBalance()}
-        onLock={() => {
-          onboarding.lock()
-        }}
+        /* Действия встроены в карточку баланса, а не стоят отдельной
+           плитой под ней: сумма и обращение с ней — один объект.
+           Портфель входит в тот же ряд — он такое же обращение к
+           деньгам, а в нижнюю панель не попал сознательно: пять
+           пунктов предел для окна шириной 360 пикселей. */
+        action={<QuickActions account={snapshot.activeAccount} />}
       />
 
       <Card>
@@ -112,6 +98,9 @@ export function DashboardPage() {
                 the source are in the History section.
               </>
             }
+            /* Компактнее, чем на экране истории: там пустота — это
+               ответ экрана, а здесь она не должна вытеснять баланс. */
+            emptyClassName="gap-2 py-6"
           />
 
           <div className="px-4 pb-4 sm:px-6">

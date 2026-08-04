@@ -1,5 +1,5 @@
 import { ChevronDown, Lock } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
 import { useOnboarding } from '@/features/onboarding'
 import { AutoLockWarning, useSecurity } from '@/features/security'
@@ -44,13 +44,20 @@ export function AppShell() {
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3 lg:ml-60">
           {snapshot.activeAccount === null ? null : (
-            <>
+            /* ПЕРЕКЛЮЧАТЕЛЬ ВЫГЛЯДИТ НАЖИМАЕМЫМ. Прежде здесь стояли
+               значок со стрелкой и текст без фона и без отклика на
+               наведение: стрелка обещала выбор, вид его не подтверждал.
+               Ссылка ведёт в настройки, где аккаунты и переключаются. */
+            <Link
+              to="/wallet/settings"
+              className="-ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
               <AccountAvatar address={snapshot.activeAccount.address} />
 
               <div className="flex min-w-0 flex-col">
                 <span className="flex items-center gap-1 truncate text-sm font-semibold">
                   {snapshot.activeAccount.name}
-                  <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+                  <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 </span>
                 {/* Имя ENS вместо адреса, когда оно подтверждено сверкой.
                     Моноширинный шрифт снимается: он существует ради
@@ -65,12 +72,25 @@ export function AppShell() {
                   {addressLabel(snapshot.activeAccount.address, snapshot.ensNames)}
                 </span>
               </div>
-            </>
+            </Link>
           )}
 
           <div className="ml-auto flex items-center gap-2">
             {snapshot.activeNetwork === null ? null : (
-              <Badge variant={snapshot.activeNetwork.isTestnet ? 'warning' : 'default'}>
+              /* Точка перед именем сети. Цвет несёт то же, что и вариант
+                 значка, но виден раньше текста: боевая сеть или испытательная
+                 — первое, что нужно знать, глядя на сумму. */
+              <Badge
+                variant={snapshot.activeNetwork.isTestnet ? 'warning' : 'default'}
+                className="gap-1.5"
+              >
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full',
+                    snapshot.activeNetwork.isTestnet ? 'bg-risk-medium' : 'bg-risk-low',
+                  )}
+                  aria-hidden
+                />
                 {snapshot.activeNetwork.name}
               </Badge>
             )}

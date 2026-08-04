@@ -35,6 +35,16 @@ interface TransferListProps {
   readonly emptyDescription: ReactNode
 
   /**
+   * Оформление пустого состояния.
+   *
+   * Нужно потому, что один и тот же список стоит на двух экранах с
+   * разной ценой пустоты. На экране истории пустота — весь смысл
+   * экрана, и ей отведено место. На главном экране тот же блок
+   * вытеснял бы за нижний край баланс, ради которого экран и открыт.
+   */
+  readonly emptyClassName?: string | undefined
+
+  /**
    * Начинает замену зависшей отправки.
    *
    * Ссылка обязана быть устойчивой: её смена перерисовывает всё окно
@@ -65,6 +75,7 @@ export function TransferList({
   isLoading,
   emptyTitle = 'No operations yet',
   emptyDescription,
+  emptyClassName,
   onReplace,
 }: TransferListProps) {
   /* Обработчики создаются заново при смене сети, а не на каждый рендер:
@@ -89,7 +100,14 @@ export function TransferList({
   }
 
   if (transfers.length === 0) {
-    return <EmptyState icon={Inbox} title={emptyTitle} description={emptyDescription} />
+    return (
+      <EmptyState
+        icon={Inbox}
+        title={emptyTitle}
+        description={emptyDescription}
+        className={emptyClassName}
+      />
+    )
   }
 
   return (
