@@ -176,6 +176,40 @@ export class DappSessionService {
     await this.#transport.pair(uri.trim())
   }
 
+  /**
+   * Сообщает подключённым приложениям текущие сеть и аккаунт кошелька.
+   *
+   * ВЫЗЫВАЕТСЯ ПРИ СМЕНЕ СОСТОЯНИЯ КОШЕЛЬКА, а не по расписанию: событие
+   * должно совпасть с действием владельца, иначе приложение узнаёт
+   * о переключении с запозданием и успевает подготовить операцию
+   * для прежней сети.
+   *
+   * НИЧЕГО НЕ ДЕЛАЕТ ДО ГОТОВНОСТИ ТРАНСПОРТА И БЕЗ АКТИВНОЙ СЕТИ:
+   * уведомлять некому и нечем.
+   */
+  async notifyWalletState(): Promise<void> {
+    if (!this.#snapshot.isReady) {
+      return
+    }
+
+    const chainId = this.#dependencies.getActiveChainId()
+
+    if (chainId === null) {
+      return
+    }
+
+    try {
+      await this.#transport.notifyStateChange(chainId, this.#dependencies.getAddresses())
+    } catch (error) {
+      /* Уведомление — удобство, а не операция со средствами: его отказ
+         не должен всплывать ошибкой в кошельке. Причина уходит
+         в журнал. */
+      this.#logger.warn('Connected applications could not be notified of the state change', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   /** Отвечает на предложение подключения. */
   async respondToProposal(isApproved: boolean): Promise<void> {
     const proposal = this.#snapshot.proposal

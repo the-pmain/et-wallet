@@ -1,4 +1,5 @@
 import {
+  chainIdToHex,
   toAddress,
   toChainId,
   type Address,
@@ -200,6 +201,27 @@ export class WalletConnectTransport implements ISessionTransport {
     })
   }
 
+  async notifyStateChange(chainId: ChainId, addresses: readonly Address[]): Promise<void> {
+    const client = this.#client
+
+    if (client === null) {
+      return
+    }
+
+    for (const emission of buildStateChangeEmissions(client.session.getAll(), chainId, addresses)) {
+      try {
+        await client.emit(emission)
+      } catch (error) {
+        /* Отказ одного подключения не должен лишать уведомления
+           остальные: причина уходит в журнал, обход продолжается. */
+        this.#logger.warn('An application could not be notified of the state change', {
+          topic: emission.topic,
+          reason: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+  }
+
   listSessions(): readonly IDappSession[] {
     if (this.#client === null) {
       return []
@@ -299,6 +321,11 @@ interface WalletConnectClient {
   approve(params: unknown): Promise<unknown>
   reject(params: unknown): Promise<void>
   respond(params: unknown): Promise<void>
+  emit(params: {
+    topic: string
+    chainId: string
+    event: { name: string; data: unknown }
+  }): Promise<void>
   disconnect(params: unknown): Promise<void>
   on(event: 'session_proposal', listener: (event: RawProposal) => void): void
   on(event: 'session_request', listener: (event: RawRequest) => void): void
@@ -316,7 +343,66 @@ interface RawSession {
   readonly topic: string
   readonly expiry: number
   readonly peer: { readonly metadata: RawMetadata }
-  readonly namespaces: Readonly<Record<string, { readonly accounts?: readonly string[] }>>
+  readonly namespaces: Readonly<
+    Record<string, { readonly accounts?: readonly string[]; readonly chains?: readonly string[] }>
+  >
+}
+
+/** Одно событие, готовое к отправке приложению. */
+export interface IStateChangeEmission {
+  readonly topic: string
+  readonly chainId: string
+  readonly event: { readonly name: string; readonly data: unknown }
+}
+
+/**
+ * Собирает события смены состояния для всех подходящих подключений.
+ *
+ * ВЫНЕСЕНО ИЗ ТРАНСПОРТА РАДИ ПРОВЕРЯЕМОСТИ. Само соединение с relay
+ * подставить нечем, а именно здесь легко ошибиться: формат CAIP,
+ * шестнадцатеричный идентификатор сети, отбор по одобренным сетям.
+ * Чистая функция проверяется без библиотеки.
+ *
+ * СОБЫТИЕ УХОДИТ ТОЛЬКО ОДОБРИВШИМ ЭТУ СЕТЬ. Приложению, не запрашивавшему
+ * её, relay всё равно откажет, а перебор несогласованных сетей засоряет
+ * журнал ложными отказами.
+ *
+ * НА КАЖДОЕ ПОДКЛЮЧЕНИЕ — ДВА СОБЫТИЯ. `chainChanged` несёт сеть
+ * шестнадцатеричной строкой (формат EIP-1193), `accountsChanged` —
+ * адреса в CAIP-10, том же, в каком они выданы при подключении. Голый
+ * адрес часть приложений не принимает.
+ */
+export function buildStateChangeEmissions(
+  sessions: readonly RawSession[],
+  chainId: ChainId,
+  addresses: readonly Address[],
+): readonly IStateChangeEmission[] {
+  const caip2 = toCaip2(chainId)
+  const accounts = addresses.map((address) => toCaip10(chainId, address))
+  const emissions: IStateChangeEmission[] = []
+
+  for (const session of sessions) {
+    const approved = session.namespaces[EVM_NAMESPACE]?.chains ?? []
+
+    if (!approved.includes(caip2)) {
+      continue
+    }
+
+    emissions.push(
+      {
+        topic: session.topic,
+        chainId: caip2,
+        event: { name: 'chainChanged', data: chainIdToHex(chainId) },
+      },
+      {
+        topic: session.topic,
+        chainId: caip2,
+        event: { name: 'accountsChanged', data: accounts },
+      },
+    )
+  }
+
+  return emissions
 }
 
 interface RawProposal {

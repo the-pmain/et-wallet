@@ -41,6 +41,9 @@ export class FakeSessionTransport implements ISessionTransport {
   /** Строки приглашений, по которым выполнялось подключение. */
   readonly pairings: string[] = []
 
+  /** Уведомления о смене состояния: сеть и выданные адреса. */
+  readonly stateChanges: { chainId: ChainId; addresses: readonly Address[] }[] = []
+
   #sessions: IDappSession[] = []
 
   /** Причина отказа при инициализации. Без неё транспорт поднимается. */
@@ -64,6 +67,12 @@ export class FakeSessionTransport implements ISessionTransport {
 
   respondToRequest(requestId: string, response: DappResponse): Promise<void> {
     this.responses.push({ requestId, response })
+
+    return Promise.resolve()
+  }
+
+  notifyStateChange(chainId: ChainId, addresses: readonly Address[]): Promise<void> {
+    this.stateChanges.push({ chainId, addresses })
 
     return Promise.resolve()
   }

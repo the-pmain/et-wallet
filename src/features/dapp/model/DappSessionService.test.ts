@@ -274,3 +274,49 @@ describe('Отключение сессий', () => {
     expect(service.getSnapshot().isReady).toBe(false)
   })
 })
+
+describe('Уведомление приложений о смене состояния', () => {
+  it('передаёт транспорту текущие сеть и адреса', async () => {
+    /* Приложение помнит сеть с момента подключения; без уведомления
+       оно готовит операцию для прежней. */
+    await service.notifyWalletState()
+
+    expect(transport.stateChanges).toEqual([{ chainId: ETHEREUM, addresses: [OWNER] }])
+  })
+
+  it('до готовности транспорта молчит', async () => {
+    /* Уведомлять некому и нечем: сервис не прошёл init(). */
+    const idleTransport = new FakeSessionTransport()
+    const notReady = new DappSessionService({
+      transport: idleTransport,
+      logger: new NullLogger(),
+      getAddresses: () => [OWNER],
+      getActiveChainId: () => ETHEREUM,
+      getAvailableChainIds: () => [ETHEREUM],
+      execute,
+    })
+
+    await notReady.notifyWalletState()
+
+    expect(idleTransport.stateChanges).toEqual([])
+  })
+
+  it('без активной сети не уведомляет', async () => {
+    /* Между блокировкой и открытием сети нет; событие бессмысленно. */
+    const noChain = new DappSessionService({
+      transport,
+      logger: new NullLogger(),
+      getAddresses: () => [OWNER],
+      getActiveChainId: () => null,
+      getAvailableChainIds: () => [ETHEREUM],
+      execute,
+    })
+
+    await noChain.init()
+    transport.stateChanges.length = 0
+
+    await noChain.notifyWalletState()
+
+    expect(transport.stateChanges).toEqual([])
+  })
+})

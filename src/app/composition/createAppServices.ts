@@ -102,6 +102,9 @@ export function createAppServices(): IAppServices {
   })
 
   const broadcast = new WalletBroadcast()
+  const dappSessions = createDappSessions(session, secureStorage, logger)
+
+  notifyDappsOnWalletChange(session, dappSessions)
 
   return {
     onboarding: new OnboardingService({
@@ -116,9 +119,40 @@ export function createAppServices(): IAppServices {
     broadcast,
     clock,
     securitySettings: new SecuritySettingsRepository(storage),
-    dappSessions: createDappSessions(session, secureStorage, logger),
+    dappSessions,
     storage,
   }
+}
+
+/**
+ * Уведомляет подключённые приложения при смене сети либо аккаунта.
+ *
+ * ПОДПИСКА НА СНИМОК, А НЕ ОТДЕЛЬНОЕ СОБЫТИЕ. Сессия кошелька публикует
+ * снимок целиком; здесь запоминается прежняя пара «сеть — адрес»
+ * и уведомление шлётся, лишь когда она изменилась. Без сравнения
+ * приложения получали бы событие на каждое обновление баланса.
+ *
+ * СВЯЗЬ ЖИВЁТ, ПОКА ЖИВУТ СЕРВИСЫ. Оба создаются на весь срок работы
+ * приложения и вместе с ним исчезают, поэтому отписка не нужна:
+ * отписываться было бы не в какой момент.
+ */
+export function notifyDappsOnWalletChange(
+  session: Pick<IWalletSession, 'subscribe' | 'getSnapshot'>,
+  dappSessions: Pick<DappSessionService, 'notifyWalletState'>,
+): void {
+  let previous = ''
+
+  session.subscribe(() => {
+    const snapshot = session.getSnapshot()
+    const current = `${snapshot.activeNetwork?.chainId ?? ''}:${snapshot.activeAccount?.address ?? ''}`
+
+    if (current === previous) {
+      return
+    }
+
+    previous = current
+    void dappSessions.notifyWalletState()
+  })
 }
 
 /**
