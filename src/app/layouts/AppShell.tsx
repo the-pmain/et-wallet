@@ -42,7 +42,7 @@ export function AppShell() {
       <Toaster />
 
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3 lg:ml-60">
           {snapshot.activeAccount === null ? null : (
             <>
               <AccountAvatar address={snapshot.activeAccount.address} />
@@ -96,7 +96,7 @@ export function AppShell() {
       {/* Предупреждение стоит над содержимым и вне ключа маршрута:
           переход между экранами не должен его сбрасывать — до блокировки
           осталось столько же, сколько было. */}
-      <div className="relative z-10 mx-auto w-full max-w-3xl px-4 pt-2">
+      <div className="relative z-10 mx-auto w-full max-w-3xl px-4 pt-2 lg:ml-60">
         <AutoLockWarning
           isVisible={autoLock.isWarning}
           remainingMs={autoLock.remainingMs}
@@ -108,16 +108,31 @@ export function AppShell() {
           слоя непозиционированное содержимое ушло бы под него. */}
       <main
         key={location.pathname}
-        className="relative z-10 mx-auto w-full max-w-3xl flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2"
+        className="relative z-10 mx-auto w-full max-w-3xl flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 lg:ml-60 lg:pb-8"
       >
         {snapshot.state === SESSION_STATE.Open ? <Outlet /> : <ShellPlaceholder />}
       </main>
 
+      {/*
+        ОДНА ПАНЕЛЬ РАЗДЕЛОВ НА ОБЕ ШИРИНЫ, раскладка меняется классами.
+
+        Две панели — по одной на ширину — означали бы два одноимённых
+        ориентира в разметке: программа чтения с экрана объявила бы
+        «навигация» дважды. Отрисовывать нужную по замеру ширины из кода
+        тоже неверно: значение приходится держать в состоянии, и панель
+        зависит от события, которое может не прийти. Классы ширины
+        пересчитываются браузером всегда.
+
+        Снизу на телефоне: там до панели дотягивается большой палец.
+        Слева на широком экране: низ окна с мышью — самое далёкое от
+        взгляда место, и приложение с нижней панелью читается как
+        растянутое мобильное.
+      */}
       <nav
         aria-label="Wallet sections"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 backdrop-blur-md"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 backdrop-blur-md lg:inset-y-0 lg:right-auto lg:left-0 lg:w-60 lg:border-t-0 lg:border-r lg:bg-background/80"
       >
-        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:mx-0 lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:p-3 lg:pt-20">
           {NAVIGATION.map((item) => (
             <NavLink
               key={item.to}
@@ -126,9 +141,13 @@ export function AppShell() {
               className={({ isActive }) =>
                 cn(
                   'flex flex-1 flex-col items-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium transition-colors',
+                  /* На широком экране подпись встаёт рядом со значком:
+                     в колонке есть ширина, и читать её проще, чем
+                     разбирать значок. */
+                  'lg:flex-none lg:flex-row lg:items-center lg:gap-3 lg:px-3 lg:text-sm',
                   isActive
-                    ? 'text-primary-emphasis'
-                    : 'text-muted-foreground hover:text-foreground focus-visible:text-foreground',
+                    ? 'text-primary-emphasis lg:bg-primary/12'
+                    : 'text-muted-foreground hover:text-foreground focus-visible:text-foreground lg:hover:bg-accent',
                 )
               }
             >
@@ -136,7 +155,7 @@ export function AppShell() {
                 <>
                   <span
                     className={cn(
-                      'flex size-8 items-center justify-center rounded-lg transition-colors',
+                      'flex size-8 items-center justify-center rounded-lg transition-colors lg:size-auto lg:bg-transparent',
                       isActive ? 'bg-primary/12' : 'bg-transparent',
                     )}
                   >
