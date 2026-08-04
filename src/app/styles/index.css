@@ -151,7 +151,29 @@
     и адреса, и цвет уместен ровно до тех пор, пока не начинает
     соперничать с ними за внимание.
   */
-  --aurora-ambient-opacity: 0.2;
+  --aurora-ambient-opacity: 0.5;
+
+  /*
+    Цвета градиентных пятен, свои для каждой темы.
+
+    ПОЧЕМУ НЕ ОДИН НАБОР НА ОБЕ. Пятно светлее фона читается свечением,
+    темнее — грязным разводом. Средний по светлоте фиолетовый на тёмном
+    фоне светлее его и выглядит подсветкой, а на белом оказывается
+    темнее и превращается в серое пятно. Прежде это лечили понижением
+    непрозрачности втрое, отчего светлая тема выглядела пустой рядом
+    с тёмной.
+
+    Здесь для светлой темы взяты те же оттенки, но заметно светлее
+    и чуть насыщеннее: они остаются светлее белого фона по восприятию
+    и дают цвет, не давая тяжести. Карточки непрозрачны, поэтому
+    на читаемость текста это не влияет — цвет виден только на полях.
+  */
+  --aurora-blob-1-from: oklch(0.82 0.14 296 / 60%);
+  --aurora-blob-1-to: oklch(0.82 0.14 296 / 0%);
+  --aurora-blob-2-from: oklch(0.84 0.12 268 / 55%);
+  --aurora-blob-2-to: oklch(0.84 0.12 268 / 0%);
+  --aurora-blob-3-from: oklch(0.86 0.11 320 / 45%);
+  --aurora-blob-3-to: oklch(0.86 0.11 320 / 0%);
 }
 
 .dark {
@@ -210,6 +232,15 @@
      значение выше: иначе панель осталась бы тем же чёрным полотном,
      ради ухода от которого фон и появился. */
   --aurora-ambient-opacity: 0.42;
+
+  /* Средние по светлоте оттенки: на тёмном фоне они светлее его
+     и читаются подсветкой. См. пояснение в светлой теме. */
+  --aurora-blob-1-from: oklch(0.55 0.22 296 / 45%);
+  --aurora-blob-1-to: oklch(0.55 0.22 296 / 0%);
+  --aurora-blob-2-from: oklch(0.5 0.2 268 / 40%);
+  --aurora-blob-2-to: oklch(0.5 0.2 268 / 0%);
+  --aurora-blob-3-from: oklch(0.6 0.19 320 / 28%);
+  --aurora-blob-3-to: oklch(0.6 0.19 320 / 0%);
 }
 
 /*
@@ -403,8 +434,8 @@
     height: 70vmax;
     background: radial-gradient(
       circle at center,
-      oklch(0.55 0.22 296 / 45%) 0%,
-      oklch(0.55 0.22 296 / 0%) 65%
+      var(--aurora-blob-1-from) 0%,
+      var(--aurora-blob-1-to) 65%
     );
     animation: aurora-drift-a 26s ease-in-out infinite;
   }
@@ -416,8 +447,8 @@
     height: 65vmax;
     background: radial-gradient(
       circle at center,
-      oklch(0.5 0.2 268 / 40%) 0%,
-      oklch(0.5 0.2 268 / 0%) 65%
+      var(--aurora-blob-2-from) 0%,
+      var(--aurora-blob-2-to) 65%
     );
     animation: aurora-drift-b 32s ease-in-out infinite;
   }
@@ -429,8 +460,8 @@
     height: 45vmax;
     background: radial-gradient(
       circle at center,
-      oklch(0.6 0.19 320 / 28%) 0%,
-      oklch(0.6 0.19 320 / 0%) 70%
+      var(--aurora-blob-3-from) 0%,
+      var(--aurora-blob-3-to) 70%
     );
     animation: aurora-drift-c 38s ease-in-out infinite;
   }
