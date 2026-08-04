@@ -6,7 +6,7 @@ import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Badge, Button } from '@/shared/ui'
+import { Badge, Button, Toaster } from '@/shared/ui'
 
 import { AmbientBackground } from './AmbientBackground'
 import { NAVIGATION } from './navigation'
@@ -37,6 +37,9 @@ export function AppShell() {
           шапка и панель навигации размывают его собственным фильтром,
           а карточки непрозрачны — текст читается на них, а не на нём. */}
       <AmbientBackground />
+
+      {/* Область уведомлений: смонтирована один раз на всю оболочку. */}
+      <Toaster />
 
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3">

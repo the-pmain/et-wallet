@@ -91,6 +91,7 @@ const ENGLISH = {
   'dashboard.refresh': 'Refresh',
   'dashboard.lock': 'Lock',
   'dashboard.smartContract': 'Smart contract',
+  'dashboard.smartContractSoon': 'Working with smart contracts is not available yet',
   'dashboard.recent': 'Recent activity',
   'dashboard.allHistory': 'Full history',
 } as const

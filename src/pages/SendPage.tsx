@@ -16,6 +16,7 @@ import {
   TRANSACTION_TYPE,
   decodeTransfer,
   findRecipientRisks,
+  safeText,
   toWei,
   type Address,
   type FeePriority,
@@ -429,7 +430,9 @@ export function SendPage() {
                     key={item.token.address ?? NATIVE_ASSET_VALUE}
                     value={item.token.address ?? NATIVE_ASSET_VALUE}
                   >
-                    <UntrustedText value={item.token.symbol} />
+                    {/* `<option>` вмещает только текст, не элементы:
+                        обезвреживание строкой, а не компонентом со span. */}
+                    {safeText(item.token.symbol)}
                     {item.token.isVerified
                       ? ' — verified'
                       : item.token.isCustom

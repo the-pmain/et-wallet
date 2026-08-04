@@ -5,7 +5,7 @@ import { Link } from 'react-router'
 import type { IAccount } from '@/core'
 import { copyWithAutoClear } from '@/features/security'
 import { useTranslation } from '@/shared/i18n'
-import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
+import { Alert, AlertDescription, Button, Card, CardContent, toast } from '@/shared/ui'
 
 interface QuickActionsProps {
   readonly account: IAccount | null
@@ -75,10 +75,17 @@ export function QuickActions({ account, onRefresh, onLock, isBusy }: QuickAction
             {t('dashboard.lock')}
           </Button>
 
-          {/* Кнопка без действия — сознательное решение заказчика,
-              а не упущение. Функциональности за ней пока нет; занесено
-              в TECH_DEBT, чтобы состояние было видно, а не забыто. */}
-          <Button variant="outline">
+          {/* Функциональности за кнопкой пока нет. Нажатие показывает
+              честное уведомление, а не сообщение об отправке того, чего
+              не отправляли: тост «отправлено на подпись» при пустом
+              действии — та самая ложь интерфейса, против которой
+              выстроен кошелёк. Занесено в TECH_DEBT. */}
+          <Button
+            variant="outline"
+            onClick={() => {
+              toast(t('dashboard.smartContractSoon'))
+            }}
+          >
             <FileCode className="size-4" aria-hidden />
             {t('dashboard.smartContract')}
           </Button>
