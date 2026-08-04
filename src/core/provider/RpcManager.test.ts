@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { toAddress } from '@/core/address'
 import { SecureStorage } from '@/core/encryption'
 import { ChainIdMismatchError, InsecureRpcUrlError, ProviderUnavailableError } from '@/core/errors'
 import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, type INetworkConfig } from '@/core/network'
@@ -20,6 +21,9 @@ const ETHEREUM = BUILT_IN_NETWORKS.find(
 ) as INetworkConfig
 
 const COOLDOWN_MS = 60_000
+
+/** Произвольный адрес: важен сам факт вызова, а не чей баланс. */
+const ETHEREUM_OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 
 let factory: FakeProviderFactory
 let clock: FakeClock
@@ -117,6 +121,30 @@ describe('RpcManager: кэш соединений', () => {
 
     /* Следующий вызов обязан попробовать снова: узел мог восстановиться. */
     await expect(manager.get(ETHEREUM)).resolves.toBeDefined()
+  })
+
+  it('пересобирает соединение, исчерпавшее список адресов', async () => {
+    const provider = await manager.get(ETHEREUM)
+
+    /* Узел отвалился посреди сеанса и больше не поднимается: перебор
+       обходит все адреса и доходит до конца списка. */
+    factory.lastProvider?.destroy()
+    factory.configure({ unavailable: true })
+
+    await expect(provider.getBalance(ETHEREUM_OWNER)).rejects.toBeInstanceOf(
+      ProviderUnavailableError,
+    )
+    expect(provider.isActive).toBe(false)
+
+    factory.configure({ balance: 5n as Wei })
+
+    /* Узлы восстановились. Исчерпанный провайдер обязан уйти из кэша,
+       иначе кошелёк сообщал бы о недоступной сети до перезагрузки,
+       не обращаясь к сети вовсе. */
+    const rebuilt = await manager.get(ETHEREUM)
+
+    expect(rebuilt).not.toBe(provider)
+    expect(await rebuilt.getBalance(ETHEREUM_OWNER)).toBe(5n)
   })
 
   it('закрывает соединение по release', async () => {

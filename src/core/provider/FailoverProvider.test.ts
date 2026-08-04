@@ -32,7 +32,18 @@ interface INodeBehaviour {
   readonly failTransport?: boolean
   /** Ответ узла с ошибкой JSON-RPC. */
   readonly rpcError?: boolean
+
+  /**
+   * Отказ ТОЛЬКО на выборке журналов при исправном узле в остальном.
+   *
+   * Именно так ведут себя публичные узлы: измерено живьём — «408» и
+   * «403» на `eth_getLogs` у двух узлов, отдававших баланс в ту же
+   * секунду.
+   */
+  readonly failLogs?: boolean
+
   readonly balance?: bigint
+  readonly logs?: readonly never[]
 }
 
 class StubProvider implements IProvider {
@@ -42,6 +53,7 @@ class StubProvider implements IProvider {
 
   balanceCalls = 0
   sendCalls = 0
+  logCalls = 0
 
   readonly #behaviour: INodeBehaviour
   readonly #events = new EventBus<ProviderEventMap>()
@@ -124,7 +136,17 @@ class StubProvider implements IProvider {
   }
 
   getLogs(): Promise<readonly never[]> {
-    return Promise.resolve([])
+    this.logCalls += 1
+
+    if (this.#behaviour.failLogs === true) {
+      return Promise.reject(new RpcError(-32602, 'archive requests require a token'))
+    }
+
+    if (this.#behaviour.failTransport === true || this.#behaviour.rpcError === true) {
+      return Promise.reject(this.#error())
+    }
+
+    return Promise.resolve(this.#behaviour.logs ?? [])
   }
 
   destroy(): void {
@@ -278,6 +300,78 @@ describe('FailoverProvider: отказ узла посреди работы', ()
     await expect(createProvider().getBalance(OWNER)).rejects.toBeInstanceOf(
       ProviderUnavailableError,
     )
+  })
+
+  it('признаёт себя непригодным, исчерпав список', async () => {
+    for (const item of ENDPOINTS) {
+      behaviours.set(item.url, { failTransport: true })
+    }
+
+    const provider = createProvider()
+
+    await expect(provider.getBalance(OWNER)).rejects.toBeInstanceOf(ProviderUnavailableError)
+
+    /* Иначе `RpcManager` оставил бы пустышку в кэше, и кошелёк сообщал
+       бы о недоступной сети при исправных узлах до перезагрузки. */
+    expect(provider.isActive).toBe(false)
+  })
+})
+
+/**
+ * Отказ на журналах — приговор запросу, а не узлу.
+ *
+ * Поведение проверено на живых узлах: `eth.drpc.org` отвечал «408», а
+ * `ethereum-rpc.publicnode.com` — «403: нужен архивный токен», причём
+ * оба в ту же секунду отдавали баланс. Обычный перебор вычёркивал бы
+ * по узлу за каждый заход в историю и оставил бы кошелёк без соединения.
+ */
+describe('FailoverProvider: выборка журналов', () => {
+  const ANY_FILTER = { fromBlock: 0n, toBlock: 1n }
+
+  it('оставляет узел в работе, когда тот отказал только на журналах', async () => {
+    for (const item of ENDPOINTS) {
+      behaviours.set(item.url, { failLogs: true })
+    }
+    behaviours.set('https://a.example', { failLogs: true, balance: 3n })
+
+    const provider = createProvider()
+
+    await expect(provider.getLogs(ANY_FILTER)).rejects.toBeInstanceOf(RpcError)
+
+    /* Главное в этой проверке: узел остался рабочим. Ради истории
+       нельзя лишать кошелёк баланса и отправки. */
+    expect(await provider.getBalance(OWNER)).toBe(3n)
+    expect(provider.rpcUrl).toBe('https://a.example')
+  })
+
+  it('берёт журналы у соседа, когда действующий узел в них отказал', async () => {
+    behaviours.set('https://a.example', { failLogs: true, balance: 3n })
+
+    const provider = createProvider()
+
+    expect(await provider.getLogs(ANY_FILTER)).toStrictEqual([])
+
+    /* Сосед ответил, но действующим не стал: его спросили и отпустили. */
+    expect(provider.rpcUrl).toBe('https://a.example')
+    expect(created.find((stub) => stub.rpcUrl === 'https://b.example')?.logCalls).toBe(1)
+  })
+
+  it('закрывает временное соединение с соседом', async () => {
+    behaviours.set('https://a.example', { failLogs: true })
+
+    await createProvider().getLogs(ANY_FILTER)
+
+    expect(created.find((stub) => stub.rpcUrl === 'https://b.example')?.isActive).toBe(false)
+  })
+
+  it('доводит ошибку действующего узла, когда отказали все', async () => {
+    for (const item of ENDPOINTS) {
+      behaviours.set(item.url, { failLogs: true })
+    }
+
+    /* Наружу уходит ответ того узла, с которым кошелёк работает,
+       а не случайного соседа, опрошенного последним. */
+    await expect(createProvider().getLogs(ANY_FILTER)).rejects.toMatchObject({ rpcCode: -32602 })
   })
 })
 

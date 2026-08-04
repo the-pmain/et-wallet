@@ -153,12 +153,26 @@ export class NetworkImpersonationError extends AppError {
   }
 }
 
-/** Ни один RPC-узел сети не отвечает. */
+/**
+ * Узел не ответил.
+ *
+ * ПОЧЕМУ ТЕКСТ ЗАМЕНЯЕМ. Ошибка возникает в двух разных положениях:
+ * когда перебор дошёл до конца списка — и тогда адресов действительно
+ * не осталось, — и когда конкретный узел не дал ответа на конкретный
+ * запрос, а остальные адреса целы. Один текст на оба случая
+ * оказывается неправдой в одном из них: сообщение об исчерпанном
+ * списке доходило до экрана истории при двух исправных узлах.
+ *
+ * Поэтому вызывающий код, знающий подробность, передаёт `reason`.
+ * Без неё остаётся прежний текст — он верен для исчерпанного списка.
+ */
 export class ProviderUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.ProviderUnavailable
 
-  constructor(chainId: bigint, options?: ErrorOptions) {
-    super(`No RPC endpoints are available for network ${chainId.toString()}.`, options)
+  constructor(chainId: bigint, options?: ErrorOptions & { readonly reason?: string }) {
+    super(options?.reason ?? `No RPC endpoints are available for network ${chainId.toString()}.`, {
+      ...(options?.cause === undefined ? {} : { cause: options.cause }),
+    })
   }
 }
 
