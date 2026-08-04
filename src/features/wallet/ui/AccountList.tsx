@@ -63,12 +63,16 @@ export function AccountList({
 }: AccountListProps) {
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between gap-2">
+      {/* НА УЗКОМ ЭКРАНЕ ЗАГОЛОВОК СКЛАДЫВАЕТСЯ. Две кнопки с полными
+          именами не помещаются в строку рядом с названием при ширине
+          телефона и выталкивали строку за край. На широком экране всё
+          возвращается в одну строку. */}
+      <CardHeader className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base font-medium text-muted-foreground">Accounts</CardTitle>
         {/* Имя действия полное, а не «Добавить»: на экране есть вторая
             кнопка добавления — для RPC-узла. Одинаковые имена неразличимы
             в экранном дикторе и в списке элементов управления. */}
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-end gap-1">
           {/* ПОИСК ОТДЕЛЬНОЙ КНОПКОЙ, А НЕ САМ ПО СЕБЕ. Он сообщает
               оператору узла два десятка адресов разом и связывает их
               между собой; делать это без спроса при каждом открытии
