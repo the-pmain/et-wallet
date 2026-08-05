@@ -29,8 +29,11 @@ interface TokenListProps {
  * с нативной валютой сети, чья конфигурация проверена.
  */
 export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
+  /* `aria-busy` по той же причине, что и на карточке баланса: пока
+     количество читается, на его месте вращается значок и больше
+     ничего — зрячий это видит, слушающий страницу нет. */
   return (
-    <ul className="divide-y divide-border">
+    <ul className="divide-y divide-border" aria-busy={isLoading}>
       {tokens.map((entry) => (
         <li
           key={entry.token.address ?? 'native'}
