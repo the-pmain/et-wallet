@@ -3,7 +3,7 @@ import type { ComponentType } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 /** Один вариант выбора. */
-export interface ISegmentedOption<TValue extends string> {
+export interface ISegmentedOption<TValue extends string | number> {
   readonly value: TValue
   readonly label: string
 
@@ -26,7 +26,7 @@ export interface ISegmentedOption<TValue extends string> {
   readonly name?: string | undefined
 }
 
-export interface SegmentedControlProps<TValue extends string> {
+export interface SegmentedControlProps<TValue extends string | number> {
   readonly options: readonly ISegmentedOption<TValue>[]
   readonly value: TValue
   readonly onChange: (value: TValue) => void
@@ -60,7 +60,7 @@ export interface SegmentedControlProps<TValue extends string> {
  * ВЫСОТА 44 ПИКСЕЛЯ — нижний предел прицеливания пальцем. И отбор,
  * и скорость отправки нажимают на телефоне не реже, чем мышью.
  */
-export function SegmentedControl<TValue extends string>({
+export function SegmentedControl<TValue extends string | number>({
   options,
   value,
   onChange,
@@ -85,7 +85,7 @@ export function SegmentedControl<TValue extends string>({
 
           return (
             <button
-              key={option.value}
+              key={String(option.value)}
               type="button"
               aria-pressed={isSelected}
               aria-label={option.name}

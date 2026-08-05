@@ -79,12 +79,12 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  /* `tap-target`: удаление отслеживания — необратимое
-                     действие, и промахиваться по нему пальцем нельзя
-                     ни в ту, ни в другую сторону. Видимый размер
-                     оставлен малым намеренно: разрушающее действие
-                     не должно спорить за внимание с количеством. */
-                  className="tap-target size-8 text-muted-foreground hover:text-destructive"
+                  /* Видимый размер меньше обычного намеренно:
+                     разрушающее действие не должно спорить за внимание
+                     с количеством. Область нажатия при этом остаётся
+                     полной — её задаёт `tap-target` в базовом наборе
+                     классов кнопки. */
+                  className="size-8 text-muted-foreground hover:text-destructive"
                   aria-label={`Remove token ${safeText(entry.token.symbol)}`}
                   onClick={() => {
                     onRemove(entry.token.address as Address)

@@ -25,7 +25,6 @@ import {
   useWalletSnapshot,
   type IAccountDiscoverySummary,
 } from '@/features/wallet'
-import { cn } from '@/shared/lib/utils'
 import { useTheme, type Theme } from '@/shared/theme'
 import {
   Alert,
@@ -328,35 +327,27 @@ function SecuritySection() {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium">Lock after inactivity</legend>
-
-          <div className="grid grid-cols-5 gap-2">
-            {AUTO_LOCK_OPTIONS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={settings.autoLockTimeoutMs === value}
-                onClick={() => {
-                  void setAutoLockTimeout(value)
-                }}
-                className={cn(
-                  'rounded-xl border px-1 py-2 text-xs font-medium transition-colors',
-                  settings.autoLockTimeoutMs === value
-                    ? 'border-primary bg-primary/10 text-primary-emphasis'
-                    : 'border-border text-muted-foreground hover:bg-accent',
-                )}
-              >
-                {AUTO_LOCK_LABEL[value] ?? `${String(Math.round(value / 60_000))} min`}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-col gap-2">
+          {/* Четвёртое место, где стоял свой набор кнопок. Здесь он был
+              ещё и ниже прочих — 34 пикселя при пределе прицеливания
+              пальцем в 44. */}
+          <SegmentedControl
+            legend="Lock after inactivity"
+            options={AUTO_LOCK_OPTIONS.map((value) => ({
+              value,
+              label: AUTO_LOCK_LABEL[value] ?? `${String(Math.round(value / 60_000))} min`,
+            }))}
+            value={settings.autoLockTimeoutMs}
+            onChange={(value) => {
+              void setAutoLockTimeout(value)
+            }}
+          />
 
           <p className="text-xs text-muted-foreground">
             An unlocked wallet keeps the keys in memory: until it locks, anyone with access to the
             device can dispose of the funds.
           </p>
-        </fieldset>
+        </div>
 
         <div className="flex flex-col gap-2 border-t pt-4">
           <Label htmlFor={confirmId} className="items-start gap-3">
