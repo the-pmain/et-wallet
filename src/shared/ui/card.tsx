@@ -28,9 +28,25 @@ export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
   )
 }
 
-export function CardTitle({ className, ...props }: ComponentProps<'h2'>) {
+/** Допустимые уровни заголовка карточки. */
+type CardTitleLevel = 'h1' | 'h2' | 'h3'
+
+/**
+ * Заголовок карточки.
+ *
+ * УРОВЕНЬ ЗАДАЁТСЯ МЕСТОМ, А НЕ КОМПОНЕНТОМ. Жёсткий `h2` внутри общей
+ * карточки означает, что порядок заголовков страницы определяет не автор
+ * страницы, а библиотека: экран, где карточка несёт главный смысл,
+ * оставался без заголовка первого уровня, и обход по заголовкам
+ * начинался с середины иерархии.
+ */
+export function CardTitle({
+  className,
+  as: Component = 'h2',
+  ...props
+}: ComponentProps<'h2'> & { readonly as?: CardTitleLevel }) {
   return (
-    <h2
+    <Component
       data-slot="card-title"
       className={cn('text-xl leading-none font-semibold tracking-tight', className)}
       {...props}

@@ -99,7 +99,15 @@ const ENGLISH = {
   'dashboard.smartContract': 'Smart contract',
   'dashboard.smartContractSoon': 'Working with smart contracts is not available yet',
   'dashboard.recent': 'Recent activity',
-  'dashboard.allHistory': 'Full history',
+  /* ОДНО ИМЯ У ЭКРАНА. Панель звала его «Activity», заголовок —
+     «History», ссылка с главного — «Full history», текст рядом —
+     «History section»: одно место под двумя именами, и связать их
+     приходилось пользователю.
+
+     Выбрано «Activity», потому что экран показывает не только
+     состоявшееся: незавершённые отправки с кнопками «ускорить»
+     и «отменить» — это не история. Имя выбрано по содержанию. */
+  'dashboard.allActivity': 'All activity',
 } as const
 
 /** Ключ перевода. */

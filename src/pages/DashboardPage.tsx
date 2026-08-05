@@ -95,7 +95,7 @@ export function DashboardPage() {
             emptyDescription={
               <>
                 No operations were found for the available period. The full list and the limits of
-                the source are in the History section.
+                the source are in the Activity section.
               </>
             }
             /* Компактнее, чем на экране истории: там пустота — это
@@ -106,7 +106,7 @@ export function DashboardPage() {
           <div className="px-4 pb-4 sm:px-6">
             <Button asChild variant="ghost" size="sm" className="w-full">
               <Link to="/wallet/activity">
-                {t('dashboard.allHistory')}
+                {t('dashboard.allActivity')}
                 <ArrowRight className="size-4" aria-hidden />
               </Link>
             </Button>

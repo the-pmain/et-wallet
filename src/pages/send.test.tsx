@@ -479,7 +479,7 @@ describe('Отправка: токен ERC-20', () => {
     await screen.findByRole('heading', { name: 'Transaction sent' })
 
     await user.click(screen.getByRole('link', { name: /back to the wallet/i }))
-    await user.click(await screen.findByRole('link', { name: /full history/i }))
+    await user.click(await screen.findByRole('link', { name: /all activity/i }))
 
     /* Запись строится из подписанных данных: не разбери кошелёк вызов,
        в истории оказался бы перевод нуля неизвестно кому. */

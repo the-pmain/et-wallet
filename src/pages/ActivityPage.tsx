@@ -175,7 +175,7 @@ export function ActivityPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">History</h1>
+        <h1 className="text-lg font-semibold">Activity</h1>
 
         <Button
           variant="ghost"

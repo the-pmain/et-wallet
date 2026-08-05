@@ -117,11 +117,11 @@ describe('Панель: операции', () => {
     expect(screen.getByText(/the limits of the\s+source/i)).toBeInTheDocument()
   })
 
-  it('ведёт на полную историю', async () => {
+  it('ведёт на весь список операций', async () => {
     renderApp()
     await findDashboard()
 
-    expect(screen.getByRole('link', { name: /full history/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /all activity/i })).toBeInTheDocument()
   })
 })
 

@@ -59,7 +59,21 @@ export function BalanceCard({
         {/* Метка и сеть в одну строку: сложенные в столбец, они занимали
             две строки перед суммой и отодвигали её от верха карточки. */}
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <CardTitle className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          {/* ЗАГОЛОВОК ПЕРВОГО УРОВНЯ ГЛАВНОГО ЭКРАНА.
+
+              Прежде экран не имел его вовсе: обход по заголовкам
+              начинался сразу со второго уровня, и слушающий страницу
+              не получал её названия. Заводить ради этого отдельную
+              строку «Кошелёк» незачем — она повторяла бы подсвеченный
+              пункт панели и не сообщала ничего.
+
+              Роль отдана существующей подписи: главное на экране —
+              сумма, и обход по заголовкам приводит именно к ней.
+              Вид не меняется, меняется разметка. */}
+          <CardTitle
+            as="h1"
+            className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+          >
             {t('dashboard.balance')}
           </CardTitle>
 
@@ -116,7 +130,12 @@ export function BalanceCard({
             постоянно, так что случай не выдуманный. */}
         {balance === null ? (
           <p className="text-4xl leading-none font-semibold tracking-tight text-muted-foreground tabular-nums sm:text-5xl">
-            {isLoading ? 'Loading…' : '—'}
+            {/* «Reading…», а не «Loading…»: во всём остальном
+                приложении надпись называет само действие — «Loading
+                the history…», «Searching for items…», «Checking the
+                approvals…». Здесь стояло единственное безымянное
+                «Loading…», да ещё и самым крупным кеглем экрана. */}
+            {isLoading ? 'Reading…' : '—'}
           </p>
         ) : (
           /*

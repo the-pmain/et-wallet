@@ -53,7 +53,7 @@ test.describe('Сквозной путь: создание и работа ко�
     await importWallet(page)
 
     for (const [hash, heading] of [
-      ['#/wallet/activity', 'History'],
+      ['#/wallet/activity', 'Activity'],
       ['#/wallet/assets', 'Assets'],
       ['#/wallet/portfolio', 'Portfolio'],
       ['#/wallet/settings', 'Settings'],

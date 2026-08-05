@@ -140,8 +140,8 @@ async function openActivity(): Promise<void> {
   const user = userEvent.setup()
 
   await screen.findByText('Account 1')
-  await user.click(screen.getByRole('link', { name: /full history/i }))
-  await screen.findByRole('heading', { name: 'History' })
+  await user.click(screen.getByRole('link', { name: /all activity/i }))
+  await screen.findByRole('heading', { name: 'Activity' })
 }
 
 /** Список записей истории. Заголовки и предупреждения в него не входят. */
@@ -512,7 +512,7 @@ describe('История: замена зависшей отправки', () =>
     await user.click(await screen.findByRole('button', { name: 'Speed up' }))
     await user.click(await screen.findByRole('button', { name: 'Back to the history' }))
 
-    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
   })
 })
 
@@ -571,7 +571,7 @@ describe('История: отправка замены', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     /* После отправки экран возвращается к истории. */
-    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
 
     /* Замена сохранена с номером исходной транзакции. Возьми она
        следующий свободный номер — в сети оказались бы две транзакции

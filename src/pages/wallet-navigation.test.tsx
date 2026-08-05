@@ -75,7 +75,7 @@ describe('Навигация кошелька', () => {
 
     await user.click(screen.getByRole('link', { name: 'Activity' }))
 
-    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
   })
 
   it('открывает раздел настроек', async () => {
