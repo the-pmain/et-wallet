@@ -55,11 +55,19 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
             </span>
           </span>
 
-          <span className="flex shrink-0 items-center gap-1">
+          {/* Группа сжимается, а кнопка внутри — нет. `shrink-0` здесь
+                не давал сжаться всей колонке, и ограничитель на самом
+                числе не действовал: ширину диктовало содержимое. */}
+          <span className="flex min-w-0 items-center gap-1">
             {/* Количество — то, ради чего список открывают, и потому
                 весит больше имени. Табличные цифры плюс выравнивание
-                по правому краю: разряды обязаны встать друг под друга. */}
-            <span className="text-right text-base font-semibold tabular-nums">
+                по правому краю: разряды обязаны встать друг под друга.
+
+                `min-w-0` и перенос по символам — защита от предельного
+                числа: измерено, что баланс спам-токена растягивал
+                строку до 1738 пикселей при доступных 734. Обрезать
+                сумму нельзя, поэтому она переносится. */}
+            <span className="min-w-0 text-right text-base font-semibold break-all tabular-nums">
               {entry.balance === null ? (
                 isLoading ? (
                   <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-hidden />

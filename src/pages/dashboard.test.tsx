@@ -171,3 +171,36 @@ describe('Панель: быстрые действия', () => {
     expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 })
+
+/**
+ * Переход между экранами должен быть заметен не только глазами.
+ *
+ * Без перевода фокуса нажатие пункта панели подменяло содержимое,
+ * фокус оставался на ссылке, и тому, кто страницу слушает, ничего
+ * не объявлялось: переход существовал только для зрячих.
+ */
+describe('Панель: переход между экранами', () => {
+  it('не отнимает фокус при открытии приложения', async () => {
+    renderApp()
+    await findDashboard()
+
+    /* Человек ещё никуда не переходил. Перехваченный фокус сбил бы
+       того, кто уже начал обход клавишей. */
+    expect(document.activeElement).not.toBe(document.querySelector('main'))
+  })
+
+  it('переводит фокус в содержимое после перехода', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await findDashboard()
+
+    await user.click(screen.getByRole('link', { name: 'Assets' }))
+    await screen.findByRole('heading', { level: 1, name: 'Assets' })
+
+    /* Фокус на области содержимого, а не на заголовке: заголовок есть
+       не у всех экранов, а область есть всегда, и программа чтения
+       начинает читать её сверху. */
+    expect(document.activeElement).toBe(document.querySelector('main'))
+  })
+})

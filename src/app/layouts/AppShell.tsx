@@ -1,4 +1,5 @@
 import { ChevronDown, Lock } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
 import { useOnboarding } from '@/features/onboarding'
@@ -30,6 +31,47 @@ export function AppShell() {
   const location = useLocation()
   const { t } = useTranslation()
   const { autoLock } = useSecurity()
+
+  /*
+    ПЕРЕХОД МЕЖДУ ЭКРАНАМИ ПЕРЕВОДИТ ФОКУС В СОДЕРЖИМОЕ.
+
+    Без этого переход был не виден тому, кто страницу слушает: нажатие
+    пункта панели подменяло содержимое, фокус оставался на ссылке, и
+    ничего не объявлялось. Человек не узнавал, что попал на другой
+    экран, — переход существовал только для зрячих.
+
+    Фокус на область содержимого, а не на заголовок: заголовок есть
+    не у всех экранов, а область есть всегда, и программа чтения
+    начинает читать её сверху — то есть с названия экрана, если оно
+    там есть.
+
+    ПЕРВЫЙ ПОКАЗ ПРОПУСКАЕТСЯ. Отнимать фокус при открытии приложения
+    незачем: человек ещё никуда не переходил, а перехваченный фокус
+    сбил бы того, кто уже начал обход клавишей.
+
+    СРАВНИВАЕТСЯ ПРЕЖНИЙ АДРЕС, А НЕ СЧИТАЮТСЯ ПОКАЗЫ. Первая редакция
+    держала признак «это первый показ» и снимала его в эффекте. В режиме
+    `StrictMode` React вызывает эффект дважды: первый вызов снимал
+    признак, второй забирал фокус — и приложение отнимало его ровно там,
+    где не должно. Измерено живьём. Сравнение адресов от числа вызовов
+    не зависит: пока адрес прежний, фокус не трогается, сколько бы раз
+    эффект ни выполнился.
+  */
+  const contentRef = useRef<HTMLElement>(null)
+  const previousPath = useRef<string | null>(null)
+
+  useEffect(() => {
+    const previous = previousPath.current
+    previousPath.current = location.pathname
+
+    if (previous === null || previous === location.pathname) {
+      return
+    }
+
+    /* Без прокрутки: экран и так показан сверху, а браузер иначе
+       дёрнул бы его к области, которую только что отрисовали. */
+    contentRef.current?.focus({ preventScroll: true })
+  }, [location.pathname])
 
   return (
     <div className="relative flex min-h-svh flex-col bg-background">
@@ -128,7 +170,12 @@ export function AppShell() {
           слоя непозиционированное содержимое ушло бы под него. */}
       <main
         key={location.pathname}
-        className="relative z-10 mx-auto w-full max-w-3xl flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 lg:ml-60 lg:pb-8"
+        ref={contentRef}
+        /* Область получает фокус только программно, при переходе:
+           клавишей в неё не попадают, и кольцо здесь было бы шумом
+           на весь экран. */
+        tabIndex={-1}
+        className="relative z-10 mx-auto w-full max-w-3xl flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 focus:outline-none lg:ml-60 lg:pb-8"
       >
         {snapshot.state === SESSION_STATE.Open ? <Outlet /> : <ShellPlaceholder />}
       </main>

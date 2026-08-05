@@ -99,7 +99,21 @@ export function BalanceCard({
       <CardContent className="flex flex-col gap-2" aria-busy={isLoading}>
         {/* Сумма — самый крупный объект приложения. Табличные цифры
             обязательны: без них разряды в соседних строках не
-            выстраиваются в столбец, и суммы сравнивают на глаз. */}
+            выстраиваются в столбец, и суммы сравнивают на глаз.
+
+            ПЕРЕНОС ПО СИМВОЛАМ — ЗАЩИТА ОТ ПРЕДЕЛЬНОГО ЧИСЛА. Целая
+            часть суммы ничем не ограничена: у токена с шестью знаками
+            и балансом близким к пределу uint256 это семьдесят с лишним
+            цифр. Измерено — такое число растягивало документ до 2112
+            пикселей в окне шириной 961, то есть ломало весь экран
+            горизонтальной прокруткой.
+
+            Обрезать число нельзя: показанная сумма обязана быть суммой,
+            а не её началом. Поэтому оно переносится — в обычной жизни
+            перенос не наступает никогда, а в предельном случае экран
+            остаётся целым и значение полным. Спам-токены с
+            астрономическими количествами шлют на чужие адреса
+            постоянно, так что случай не выдуманный. */}
         {balance === null ? (
           <p className="text-4xl leading-none font-semibold tracking-tight text-muted-foreground tabular-nums sm:text-5xl">
             {isLoading ? 'Loading…' : '—'}
@@ -131,7 +145,7 @@ export function BalanceCard({
           <p
             key={arrivals}
             className={cn(
-              'flex flex-wrap items-baseline gap-x-2 text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl',
+              'flex max-w-full flex-wrap items-baseline gap-x-2 text-4xl leading-none font-semibold tracking-tight break-all tabular-nums sm:text-5xl',
               arrivals > 0 &&
                 'animate-in duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] fade-in slide-in-from-bottom-1',
             )}
