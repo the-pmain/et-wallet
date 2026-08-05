@@ -49,28 +49,56 @@ export const BUILT_IN_CHAIN_ID = {
  * работает история переводов. Публичные узлы почти всегда умеют первое
  * и почти никогда второе, поэтому список отсортирован по журналам.
  *
- * Проверено обращением к живым узлам 3 августа 2026, окно 10 000 блоков
- * с фильтром по адресу — ровно так, как запрашивает кошелёк:
+ * ПРЕЖНЯЯ ТАБЛИЦА ПРОТУХЛА ЗА ДВОЕ СУТОК. Замер 3 августа 2026 говорил,
+ * что первый узел Ethereum журналы отдаёт; 5 августа он отвечал «500»,
+ * а затем «не могу направить запрос подходящему провайдеру». Пределы
+ * бесплатного доступа меняются без предупреждения, и это свойство
+ * такого списка, а не случайность: его придётся перемерять.
  *
- * | Сеть      | `eth_getLogs` у первого узла         |
- * | --------- | ------------------------------------ |
- * | Ethereum  | работает                             |
- * | Optimism  | работает                             |
- * | Base      | работает                             |
- * | Avalanche | работает                             |
- * | Polygon   | отказ: бесплатный доступ не отдаёт   |
- * | Arbitrum  | временный отказ узла                 |
- * | BNB Chain | не ответил: предел частоты запросов  |
+ * Замер 5 августа 2026, окно 10 000 блоков с фильтром по адресу
+ * владельца и без фильтра по контракту — ровно так, как запрашивает
+ * история:
  *
- * ЧТО УБРАНО. `eth.llamarpc.com` и `cloudflare-eth.com` не отвечают
- * из браузера вовсе — первый обрывает соединение, второй отказывает
- * даже в номере блока. Держать в списке мёртвые адреса значит тратить
- * время пользователя на перебор, который заведомо не даст результата.
+ * | Узел                             | `eth_getLogs`                    |
+ * | -------------------------------- | -------------------------------- |
+ * | gateway.tenderly.co (6 сетей)    | работает, 50 000 блоков за 0,2 с |
+ * | eth.drpc.org                     | «500», затем отказ маршрутизации |
+ * | *-rpc.publicnode.com             | «403: нужен архивный токен»      |
+ * | polygon.drpc.org                 | «диапазоны свыше 10 000 блоков»  |
+ * | bsc-dataseed.bnbchain.org        | «limit exceeded»                 |
+ * | 1rpc.io                          | предел 50 блоков                 |
+ * | rpc.ankr.com                     | требует учётной записи           |
+ * | bsc.rpc.blxrbdn.com              | работает                         |
+ *
+ * ПОЧЕМУ ШЛЮЗЫ TENDERLY СТОЯТ ПЕРВЫМИ. Они единственные из проверенных
+ * отдают журналы бесплатно и при этом отвечают на весь набор методов,
+ * нужный кошельку: баланс, nonce, вызов, оценка газа, приоритетная
+ * надбавка. Проверено по каждой из шести сетей отдельно, а не по одной
+ * с распространением вывода на остальные.
+ *
+ * ПОЧЕМУ У BNB ЖУРНАЛЬНЫЙ УЗЕЛ СТОИТ ПОСЛЕДНИМ, А НЕ ПЕРВЫМ.
+ * `bsc.rpc.blxrbdn.com` — шлюз компании, работающей с приватным потоком
+ * сделок. Журналы он отдаёт, но как именно он публикует транзакции,
+ * не проверено, а первый узел списка обслуживает и отправку. Менять
+ * способ публикации транзакции ради истории недопустимо: это разные
+ * по цене вещи. Стоя последним, он достаётся только выборке журналов —
+ * `FailoverProvider.getLogs` опрашивает остальные адреса, не меняя
+ * действующий узел.
+ *
+ * По той же причине НЕ добавлен `rpc.mevblocker.io`: журналы отдаёт,
+ * но это релей приватного потока сделок, и в списке Ethereum он мог бы
+ * стать действующим узлом.
+ *
+ * ЧТО УБРАНО. `eth.llamarpc.com`, `cloudflare-eth.com` и `eth.merkle.io`
+ * не отвечают из браузера вовсе, а `polygon-rpc.com` отказывает даже
+ * в номере блока: «API key disabled, tenant disabled». Держать в списке
+ * мёртвые адреса значит тратить время пользователя на перебор, который
+ * заведомо не даст результата.
  *
  * ЭТО НЕ ЗАМЕНА СВОЕМУ УЗЛУ. Публичный узел видит IP и все адреса,
- * чьи балансы запрашиваются, а его пределы меняются без предупреждения.
- * Владелец, которому история нужна во всех сетях, указывает собственный
- * адрес в настройках.
+ * чьи балансы запрашиваются, а его пределы меняются без предупреждения —
+ * см. выше. Владелец, которому история нужна надёжно, указывает
+ * собственный адрес в настройках.
  */
 const ETHEREUM: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Ethereum,
@@ -79,7 +107,8 @@ const ETHEREUM: INetworkConfig = {
   rpcUrls: [
     /* Первым идёт узел, у которого работает выборка журналов: без неё
        кошелёк не показывает историю переводов. Проверено обращением
-       к живым узлам — см. пояснение к списку ниже. */
+       к живым узлам — см. пояснение к списку выше. */
+    'https://gateway.tenderly.co/public/mainnet',
     'https://eth.drpc.org',
     'https://ethereum-rpc.publicnode.com',
   ],
@@ -106,6 +135,8 @@ const BNB_CHAIN: INetworkConfig = {
     'https://bsc.drpc.org',
     'https://bsc-rpc.publicnode.com',
     'https://bsc-dataseed.bnbchain.org',
+    /* Последним намеренно — см. пояснение к списку выше. */
+    'https://bsc.rpc.blxrbdn.com',
   ],
   blockExplorerUrls: ['https://bscscan.com'],
   isTestnet: false,
@@ -124,9 +155,9 @@ const POLYGON: INetworkConfig = {
   name: 'Polygon',
   nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
   rpcUrls: [
+    'https://gateway.tenderly.co/public/polygon',
     'https://polygon.drpc.org',
     'https://polygon-bor-rpc.publicnode.com',
-    'https://polygon-rpc.com',
   ],
   blockExplorerUrls: ['https://polygonscan.com'],
   isTestnet: false,
@@ -139,6 +170,7 @@ const ARBITRUM: INetworkConfig = {
   name: 'Arbitrum One',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: [
+    'https://gateway.tenderly.co/public/arbitrum',
     'https://arbitrum.drpc.org',
     'https://arbitrum-one-rpc.publicnode.com',
     'https://arb1.arbitrum.io/rpc',
@@ -154,6 +186,7 @@ const OPTIMISM: INetworkConfig = {
   name: 'OP Mainnet',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: [
+    'https://gateway.tenderly.co/public/optimism',
     'https://optimism.drpc.org',
     'https://optimism-rpc.publicnode.com',
     'https://mainnet.optimism.io',
@@ -168,7 +201,12 @@ const BASE: INetworkConfig = {
   chainId: BUILT_IN_CHAIN_ID.Base,
   name: 'Base',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://base.drpc.org', 'https://base-rpc.publicnode.com', 'https://mainnet.base.org'],
+  rpcUrls: [
+    'https://gateway.tenderly.co/public/base',
+    'https://base.drpc.org',
+    'https://base-rpc.publicnode.com',
+    'https://mainnet.base.org',
+  ],
   blockExplorerUrls: ['https://basescan.org'],
   isTestnet: false,
   isBuiltIn: true,
@@ -180,6 +218,7 @@ const AVALANCHE: INetworkConfig = {
   name: 'Avalanche C-Chain',
   nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
   rpcUrls: [
+    'https://gateway.tenderly.co/public/avalanche',
     'https://avalanche.drpc.org',
     'https://avalanche-c-chain-rpc.publicnode.com',
     'https://api.avax.network/ext/bc/C/rpc',

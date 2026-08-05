@@ -191,14 +191,23 @@ export function ActivityPage() {
         </Button>
       </header>
 
+      {/* СООБЩЕНИЕ НЕ ОБЕЩАЕТ, ЧТО «СКОРО ПРОЙДЁТ».
+          Прежний текст звучал как рассказ о сбое, после которого стоит
+          повторить попытку. Измерение живых узлов показало другое:
+          бесплатные публичные узлы отказывают в выборке журналов
+          постоянно — кто требует платного архивного доступа, кто режет
+          диапазон до пятидесяти блоков, кто просит учётную запись.
+          Владелец, ждущий, что «само наладится», прождёт вечно, поэтому
+          названы обе настоящие развязки и сказано, что дело не в сбое. */}
       {limits?.sourceUnavailable === true ? (
         <Alert variant="danger">
           <AlertDescription>
             The history could not be fetched, so only the sends made from this wallet are shown.
             That does not mean there were no other operations.
-            {limits.reason === null ? null : <> The node replied: "{limits.reason}".</>} Many public
-            nodes refuse to search across every contract at once. Connect your own node in the
-            settings or provide an indexer key.
+            {limits.reason === null ? null : <> The node replied: "{limits.reason}".</>} This is
+            usually not a temporary failure: free public nodes refuse log searches as a rule — some
+            require a paid archive plan, others cap the range at a few dozen blocks. Retrying will
+            not help. Connect your own node in the settings, or provide an indexer key.
           </AlertDescription>
         </Alert>
       ) : null}

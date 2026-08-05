@@ -38,6 +38,12 @@ const PROVIDER_NAME = 'Node logs'
  */
 const DEFAULT_SCAN_BLOCKS = 10_000
 
+/** Итог одной выборки журналов: либо записи, либо причина отказа. */
+interface IScanBatch {
+  readonly logs: readonly ILogEntry[]
+  readonly error: string | null
+}
+
 /** Число тем у события ERC-721: идентификатор события плюс три параметра. */
 const ERC721_TOPIC_COUNT = 4
 
@@ -112,14 +118,38 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     /* Шесть выборок: отправленное и полученное, отдельно для трёх
        семейств событий. Объединить их в одну нельзя — позиция адреса
        в темах у ERC-20 и ERC-1155 разная. */
-    const batches = await Promise.all([
-      this.#getLogs(provider, fromBlock, latest, [TRANSFER_TOPIC, ownerTopic]),
-      this.#getLogs(provider, fromBlock, latest, [TRANSFER_TOPIC, null, ownerTopic]),
-      this.#getLogs(provider, fromBlock, latest, [TRANSFER_SINGLE_TOPIC, null, ownerTopic]),
-      this.#getLogs(provider, fromBlock, latest, [TRANSFER_SINGLE_TOPIC, null, null, ownerTopic]),
-      this.#getLogs(provider, fromBlock, latest, [TRANSFER_BATCH_TOPIC, null, ownerTopic]),
-      this.#getLogs(provider, fromBlock, latest, [TRANSFER_BATCH_TOPIC, null, null, ownerTopic]),
-    ])
+    const requests: readonly (readonly (HexString | null)[])[] = [
+      [TRANSFER_TOPIC, ownerTopic],
+      [TRANSFER_TOPIC, null, ownerTopic],
+      [TRANSFER_SINGLE_TOPIC, null, ownerTopic],
+      [TRANSFER_SINGLE_TOPIC, null, null, ownerTopic],
+      [TRANSFER_BATCH_TOPIC, null, ownerTopic],
+      [TRANSFER_BATCH_TOPIC, null, null, ownerTopic],
+    ]
+
+    /*
+      ВЫБОРКИ ИДУТ ПО ОЧЕРЕДИ, А НЕ ОДНОВРЕМЕННО.
+
+      Прежде здесь стоял `Promise.all`, и это выглядело безобидной
+      оптимизацией: шесть запросов вместо шести ожиданий. Но библиотека
+      склеивает одновременные вызовы в одну пачку JSON-RPC, и снаружи
+      получался запрос с шестью тяжёлыми выборками журналов разом.
+
+      Измерено живьём на шлюзе, который эти выборки обслуживает: пачка
+      из шести — «429, rate limit exceeded»; те же шесть запросов
+      по очереди — все шесть по 180 миллисекунд. То есть узел не
+      отказывал в самой выборке, он отказывал в шести сразу, а история
+      выглядела недоступной.
+
+      Цена очереди — около секунды вместо трети. Для экрана, который
+      открывают, чтобы посмотреть переводы, это несопоставимо с тем,
+      что история не показывалась вовсе.
+    */
+    const batches: IScanBatch[] = []
+
+    for (const topics of requests) {
+      batches.push(await this.#getLogs(provider, fromBlock, latest, topics))
+    }
 
     /*
       ОТКАЗ ВСЕХ ВЫБОРОК — ЭТО ОТКАЗ ИСТОЧНИКА, А НЕ ПУСТАЯ ИСТОРИЯ.
@@ -204,7 +234,7 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     fromBlock: bigint,
     toBlock: bigint,
     topics: readonly (HexString | null)[],
-  ): Promise<{ logs: readonly ILogEntry[]; error: string | null }> {
+  ): Promise<IScanBatch> {
     try {
       return { logs: await provider.getLogs({ fromBlock, toBlock, topics }), error: null }
     } catch (error) {
