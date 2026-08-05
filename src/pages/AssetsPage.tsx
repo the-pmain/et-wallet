@@ -82,6 +82,7 @@ export function AssetsPage() {
           <TokenList
             tokens={snapshot.tokenBalances}
             isLoading={snapshot.isTokensLoading}
+            chainId={snapshot.activeNetwork?.chainId ?? null}
             onRemove={(address: Address) => {
               void session.removeToken(address)
             }}

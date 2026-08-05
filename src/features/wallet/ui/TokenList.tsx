@@ -1,7 +1,7 @@
 import { safeText } from '@/core'
 import { RefreshCw, Trash2 } from 'lucide-react'
 
-import type { Address } from '@/core'
+import type { Address, ChainId } from '@/core'
 import { UntrustedText } from '@/features/security'
 import { Button } from '@/shared/ui'
 
@@ -14,6 +14,15 @@ interface TokenListProps {
   readonly tokens: readonly ITokenBalance[]
   readonly isLoading: boolean
   readonly onRemove: (address: Address) => void
+
+  /**
+   * Сеть, в которой действуют контракты списка.
+   *
+   * Нужна знаку монеты: он выдаётся по паре «сеть и адрес», сверенной
+   * со встроенным реестром, а один и тот же адрес в разных сетях —
+   * разные контракты.
+   */
+  readonly chainId: ChainId | null
 }
 
 /**
@@ -28,7 +37,7 @@ interface TokenListProps {
  * Пометка не мешает пользоваться, но не даёт спутать подделку
  * с нативной валютой сети, чья конфигурация проверена.
  */
-export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
+export function TokenList({ tokens, isLoading, onRemove, chainId }: TokenListProps) {
   /* `aria-busy` по той же причине, что и на карточке баланса: пока
      количество читается, на его месте вращается значок и больше
      ничего — зрячий это видит, слушающий страницу нет. */
@@ -39,7 +48,11 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
           key={entry.token.address ?? 'native'}
           className="flex items-center gap-3 px-4 py-3.5 sm:px-6"
         >
-          <TokenAvatar address={entry.token.address} symbol={entry.token.symbol} />
+          <TokenAvatar
+            address={entry.token.address}
+            symbol={entry.token.symbol}
+            chainId={chainId}
+          />
 
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             {/* Символ и имя задаёт автор контракта: они могут содержать

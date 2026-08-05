@@ -14,7 +14,7 @@ import {
 import { useState } from 'react'
 import { Link } from 'react-router'
 
-import type { IPortfolioPosition, IPortfolioSummary } from '@/core'
+import type { ChainId, IPortfolioPosition, IPortfolioSummary } from '@/core'
 import {
   TokenAvatar,
   TokenTrustBadge,
@@ -123,7 +123,7 @@ export function PortfolioPage() {
         <>
           <PortfolioValue portfolio={portfolio} networkName={network?.name ?? ''} />
           <AllocationCard portfolio={portfolio} />
-          <PositionsCard portfolio={portfolio} />
+          <PositionsCard portfolio={portfolio} chainId={network?.chainId ?? null} />
           <StatisticsCard portfolio={portfolio} sourceName={snapshot.priceSourceName} />
         </>
       ) : null}
@@ -355,7 +355,15 @@ function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }
 }
 
 /** Полный список позиций, включая те, для которых оценки нет. */
-function PositionsCard({ portfolio }: { readonly portfolio: IPortfolioSummary }) {
+function PositionsCard({
+  portfolio,
+  chainId,
+}: {
+  readonly portfolio: IPortfolioSummary
+  /* Знак монеты выдаётся по паре «сеть и адрес»: один адрес в разных
+     сетях — разные контракты. */
+  readonly chainId: ChainId | null
+}) {
   return (
     <Card>
       <CardHeader>
@@ -365,7 +373,7 @@ function PositionsCard({ portfolio }: { readonly portfolio: IPortfolioSummary })
       <CardContent className="p-0 sm:p-0">
         <ul className="divide-y divide-border">
           {portfolio.positions.map((position) => (
-            <PositionRow key={positionKey(position)} position={position} />
+            <PositionRow key={positionKey(position)} position={position} chainId={chainId} />
           ))}
         </ul>
       </CardContent>
@@ -374,12 +382,18 @@ function PositionsCard({ portfolio }: { readonly portfolio: IPortfolioSummary })
 }
 
 /** Одна строка списка активов. */
-function PositionRow({ position }: { readonly position: IPortfolioPosition }) {
+function PositionRow({
+  position,
+  chainId,
+}: {
+  readonly position: IPortfolioPosition
+  readonly chainId: ChainId | null
+}) {
   const { token, balance, quote, value } = position
 
   return (
     <li className="flex items-center gap-3 px-4 py-3 sm:px-6">
-      <TokenAvatar address={token.address} symbol={token.symbol} />
+      <TokenAvatar address={token.address} symbol={token.symbol} chainId={chainId} />
 
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5">
