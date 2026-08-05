@@ -11,9 +11,6 @@
  * которой был написан соответствующий экран. Ни одно из них не должно
  * попасть в сборку, которой пользуются с настоящими средствами:
  *
- * - без подтверждения записи seed-фразы кошелёк создаётся у человека,
- *   который фразу нигде не записал. Потеря устройства означает потерю
- *   средств безвозвратно;
  * - без импорта по seed-фразе исчезает единственный способ
  *   восстановления. Забытый пароль после этого означает, что
  *   расшифровать хранилище нечем, и кошелёк потерян вместе с ним.
@@ -25,21 +22,16 @@
 /**
  * Включены ли временные послабления.
  *
- * ВЕРНУЛОСЬ В `false` ПО УКАЗАНИЮ ВЛАДЕЛЬЦА. Вход по seed-фразе
- * и проверка её записи снова работают.
+ * ВЕРНУЛОСЬ В `false` ПО УКАЗАНИЮ ВЛАДЕЛЬЦА: вход по seed-фразе
+ * работает.
+ *
+ * Проверка записи фразы сюда больше не относится — она выключена
+ * постоянным решением, см. `APP_CONFIG.requiresSeedConfirmation`.
  */
 export const IS_TEST_MODE = false
 
 /** Какие именно защиты сняты. Перечислены явно, а не подразумеваются. */
 export const TEST_MODE = {
-  /**
-   * Пропуск шага проверки записанной seed-фразы при создании кошелька.
-   *
-   * Фраза всё равно показывается: пользователь обязан иметь возможность
-   * её записать, даже когда проверка отключена.
-   */
-  skipSeedConfirmation: IS_TEST_MODE,
-
   /**
    * Скрытие входа по seed-фразе.
    *
@@ -60,7 +52,7 @@ export function assertTestModeIsDisabledInProduction(): void {
   if (IS_TEST_MODE && import.meta.env.PROD) {
     throw new Error(
       'This build was made with temporary security relaxations (IS_TEST_MODE). ' +
-        'Seed phrase confirmation and restoring from it are disabled. ' +
+        'Restoring a wallet from a seed phrase is disabled. ' +
         'Set IS_TEST_MODE back to false in src/shared/config/test-mode.ts.',
     )
   }

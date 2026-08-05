@@ -56,8 +56,6 @@ const ENGLISH = {
     'The password protects the wallet on this device only. It does not restore access and does not replace the seed phrase.',
   'create.acknowledge':
     'I have written down the phrase and understand that without it access to funds cannot be restored',
-  'create.skipConfirmationNotice':
-    'Seed phrase verification is temporarily disabled for faster testing. The wallet will be created immediately. If the phrase is not written down anywhere, losing this device means losing the funds for good.',
   'create.showPhrase': 'Show the phrase',
   'create.submit': 'Create wallet',
   'create.encrypting': 'Encrypting…',

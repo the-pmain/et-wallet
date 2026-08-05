@@ -13,7 +13,7 @@ import {
   useOnboarding,
   type IConfirmationChallenge,
 } from '@/features/onboarding'
-import { TEST_MODE } from '@/shared/config'
+import { APP_CONFIG } from '@/shared/config'
 import { useTranslation, type TranslationKey } from '@/shared/i18n'
 import {
   Alert,
@@ -217,15 +217,10 @@ export function CreateWalletPage() {
                 <span className="text-sm leading-snug font-normal">{t('create.acknowledge')}</span>
               </Label>
 
-              {/* ВРЕМЕННОЕ ПОСЛАБЛЕНИЕ. Проверка записанной фразы снята
-                  флагом в `shared/config/test-mode.ts`. Фраза при этом
-                  по-прежнему показывается: возможность её записать
-                  обязана оставаться, даже когда проверка отключена. */}
-              {TEST_MODE.skipSeedConfirmation ? (
-                <Alert variant="warning">
-                  <AlertDescription>{t('create.skipConfirmationNotice')}</AlertDescription>
-                </Alert>
-              ) : null}
+              {/* Отдельного предупреждения о выключенной проверке нет:
+                  она выключена постоянно, а не временно, и сообщать
+                  об этом при каждом создании кошелька — шум. Цену
+                  решения несёт отметка выше: без неё кнопка недоступна. */}
 
               {error !== null && (
                 <Alert variant="danger">
@@ -237,7 +232,7 @@ export function CreateWalletPage() {
                 size="lg"
                 disabled={!isAcknowledged || isBusy}
                 onClick={() => {
-                  if (TEST_MODE.skipSeedConfirmation) {
+                  if (!APP_CONFIG.requiresSeedConfirmation) {
                     void finish()
 
                     return
@@ -246,11 +241,11 @@ export function CreateWalletPage() {
                   goToConfirm()
                 }}
               >
-                {TEST_MODE.skipSeedConfirmation
-                  ? isBusy
+                {APP_CONFIG.requiresSeedConfirmation
+                  ? t('common.next')
+                  : isBusy
                     ? t('create.encrypting')
-                    : t('create.submit')
-                  : t('common.next')}
+                    : t('create.submit')}
               </Button>
             </>
           )}

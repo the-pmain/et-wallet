@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { EncryptionService, type Wei } from '@/core'
-import { TEST_MODE } from '@/shared/config'
+import { APP_CONFIG, TEST_MODE } from '@/shared/config'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
@@ -177,7 +177,9 @@ describe('Создание кошелька', () => {
     /* Подпись кнопки зависит от режима: при снятой проверке она сразу
        создаёт кошелёк, при включённой ведёт к вопросам о словах.
        Отметка о записи фразы обязательна в обоих случаях. */
-    const submitName = TEST_MODE.skipSeedConfirmation ? 'Создать кошелёк' : 'Next'
+    /* Обе метки взяты из словаря: прежде эта ветка не выполнялась
+       ни разу и хранила устаревшее русское название кнопки. */
+    const submitName = APP_CONFIG.requiresSeedConfirmation ? 'Next' : 'Create wallet'
 
     expect(screen.getByRole('button', { name: submitName })).toBeDisabled()
 
@@ -215,11 +217,12 @@ describe('Создание кошелька', () => {
     await fillCreationForm(user)
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    const notice = screen.queryByText(
-      /Seed phrase confirmation and restoring from it are disabled/i,
-    )
+    /* Отдельного предупреждения о выключенной проверке нет: она
+       выключена постоянно, и сообщать об этом при каждом создании
+       кошелька — шум. */
+    const notice = screen.queryByText(/confirmation .* disabled/i)
 
-    expect(notice !== null).toBe(TEST_MODE.skipSeedConfirmation)
+    expect(notice).toBeNull()
   })
 
   it('создаёт кошелёк и подписывает его именем пользователя', async () => {
@@ -230,13 +233,13 @@ describe('Создание кошелька', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('checkbox'))
 
-    if (!TEST_MODE.skipSeedConfirmation) {
+    if (APP_CONFIG.requiresSeedConfirmation) {
       /* Полный путь с вопросами о словах проверяется отдельным набором:
          здесь важно только имя аккаунта после создания. */
       return
     }
 
-    await user.click(screen.getByRole('button', { name: 'Create the wallet' }))
+    await user.click(screen.getByRole('button', { name: 'Create wallet' }))
 
     /* Вместо безликого «Аккаунт 1» в шапке стоит имя владельца. */
     expect(await screen.findByText(USERNAME)).toBeInTheDocument()
