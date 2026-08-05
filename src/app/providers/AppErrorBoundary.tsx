@@ -73,7 +73,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
         <button
           type="button"
-          className="h-10 rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground"
+          className="focus-ring h-10 rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground"
           onClick={() => {
             globalThis.location.reload()
           }}

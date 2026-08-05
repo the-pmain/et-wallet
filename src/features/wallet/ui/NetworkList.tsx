@@ -90,7 +90,7 @@ export function NetworkList({
                   }}
                   disabled={isBusy || isActive}
                   aria-current={isActive}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent disabled:cursor-default aria-[current=true]:bg-accent"
+                  className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent disabled:cursor-default aria-[current=true]:bg-accent"
                 >
                   <span className="flex size-4 shrink-0 items-center justify-center">
                     {isActive ? <Check className="size-4" aria-hidden /> : null}

@@ -170,7 +170,7 @@ function ActionTile({ icon: Icon, label, to, onClick, isPrimary, isDisabled }: A
   )
 
   const shared = cn(
-    'action-tile outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+    'action-tile focus-ring',
     isDisabled === true ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-accent',
   )
 

@@ -168,7 +168,7 @@ function RowAction({
       type="button"
       title={hint}
       onClick={onClick}
-      className="rounded text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="focus-ring rounded text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline"
     >
       {label}
     </button>

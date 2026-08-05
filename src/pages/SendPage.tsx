@@ -442,7 +442,7 @@ export function SendPage() {
                    элемент, а не кнопка, и общий `tap-target` его не
                    касается. Прежние 36 пикселей были ниже предела
                    прицеливания пальцем. */
-                className="h-11 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="focus-ring h-11 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs"
                 onChange={(event) => {
                   /* Сумма сбрасывается вместе с активом: число знаков
                      у токенов разное, и «10», набранное для актива

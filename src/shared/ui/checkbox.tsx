@@ -23,7 +23,7 @@ export function Checkbox({ className, ...props }: CheckboxProps) {
         className={cn(
           'peer size-4 shrink-0 appearance-none rounded-[4px] border shadow-xs transition-shadow outline-none',
           'checked:border-primary checked:bg-primary',
-          'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          'focus-ring',
           'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}

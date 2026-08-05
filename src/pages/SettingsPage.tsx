@@ -408,7 +408,7 @@ function SettingsNavRow({ to, icon: Icon, title, description }: SettingsNavRowPr
   return (
     <Link
       to={to}
-      className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:px-6"
+      className="focus-ring flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-accent sm:px-6"
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary-emphasis">
         <Icon className="size-4.5" />

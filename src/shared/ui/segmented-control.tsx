@@ -95,7 +95,7 @@ export function SegmentedControl<TValue extends string | number>({
               className={cn(
                 /* Рамок нет: внутри дорожки они рисовали бы вторую
                    сетку поверх первой. */
-                'flex min-h-11 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg px-2 text-xs font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                'focus-ring flex min-h-11 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg px-2 text-xs font-medium transition-all',
                 isSelected
                   ? 'bg-primary/15 text-primary-emphasis shadow-surface'
                   : 'text-muted-foreground hover:text-foreground',

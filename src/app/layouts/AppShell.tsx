@@ -92,7 +92,7 @@ export function AppShell() {
                Ссылка ведёт в настройки, где аккаунты и переключаются. */
             <Link
               to="/wallet/settings"
-              className="-ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+              className="focus-ring -ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent"
             >
               <AccountAvatar address={snapshot.activeAccount.address} />
 
@@ -207,7 +207,7 @@ export function AppShell() {
               end={item.to === NAVIGATION[0]?.to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-1 flex-col items-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium transition-colors',
+                  'focus-ring flex flex-1 flex-col items-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium transition-colors',
                   /* На широком экране подпись встаёт рядом со значком:
                      в колонке есть ширина, и читать её проще, чем
                      разбирать значок. */

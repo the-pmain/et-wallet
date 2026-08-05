@@ -122,7 +122,7 @@ export function AccountList({
                   }}
                   disabled={isBusy || isActive}
                   aria-current={isActive}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent disabled:cursor-default aria-[current=true]:bg-accent"
+                  className="focus-ring flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent disabled:cursor-default aria-[current=true]:bg-accent"
                 >
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                     {isActive ? <Check className="size-4" aria-hidden /> : account.order + 1}
