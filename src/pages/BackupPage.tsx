@@ -179,16 +179,18 @@ export function BackupPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Возврат и заголовок в одной строке — как на остальных
+          вложенных экранах. Прежде здесь кнопка стояла отдельной
+          строкой над заголовком: два ряда вместо одного и разный
+          вид одного и того же места на соседних экранах. */}
       <header className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="sm" className="-ml-2">
+        <Button asChild variant="ghost" size="icon" className="-ml-1" aria-label="Back to settings">
           <Link to="/wallet/settings">
-            <ArrowLeft />
-            Settings
+            <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
+        <h1 className="text-lg font-semibold">Backup</h1>
       </header>
-
-      <h1 className="text-lg font-semibold">Backup</h1>
 
       <Alert>
         <ShieldAlert />

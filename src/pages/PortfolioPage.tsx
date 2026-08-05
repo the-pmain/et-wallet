@@ -2,10 +2,12 @@ import { safeText } from '@/core'
 import { UntrustedText } from '@/features/security'
 import {
   ArrowLeft,
+  ArrowUpRight,
   ChartPie,
   EyeOff,
   Info,
   RefreshCw,
+  ShieldCheck,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
@@ -173,22 +175,46 @@ function PriceConsent({ sourceName, isBusy, onEnable }: PriceConsentProps) {
           {sourceName === '' ? '' : ` «${sourceName}»`}.
         </p>
 
-        <div className="flex flex-col gap-2 rounded-xl border p-3 text-xs">
-          <p className="font-medium">What the service learns</p>
-          <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-            <li>
-              the contract addresses of your tokens — that is, the composition of the portfolio;
-            </li>
-            <li>the network you work in;</li>
-            <li>your IP address.</li>
-          </ul>
+        {/*
+          ДВЕ СТОРОНЫ СДЕЛКИ — ДВА РАЗНЫХ БЛОКА, А НЕ ОДИН СПИСОК.
 
-          <p className="mt-1 font-medium">What the service does not learn</p>
-          <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-            <li>your wallet address — it is never sent;</li>
-            <li>your balances — they never leave the device;</li>
-            <li>the seed phrase and the keys — they never leave the device at all.</li>
-          </ul>
+          Прежде «что узнает» и «чего не узнает» шли одной стопкой
+          в общей рамке: чтобы взвесить, приходилось читать всё подряд
+          и держать обе половины в голове. Согласие даётся именно
+          о соотношении цены и защищённого, и увидеть это соотношение
+          нужно целиком, а не собирать по строкам.
+
+          Цвета взяты из смысловой шкалы риска: жёлтая сторона — цена,
+          зелёная — то, что не уходит. Цвет при этом не единственный
+          признак: у каждой стороны свой значок и свой заголовок, и
+          смысл читается без различения цветов.
+        */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex flex-col gap-2 rounded-xl border border-risk-medium/40 bg-risk-medium/5 p-3 text-xs">
+            <p className="flex items-center gap-1.5 font-medium">
+              <ArrowUpRight className="size-3.5 shrink-0 text-risk-medium" aria-hidden />
+              What the service learns
+            </p>
+            <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
+              <li>
+                the contract addresses of your tokens — that is, the composition of the portfolio;
+              </li>
+              <li>the network you work in;</li>
+              <li>your IP address.</li>
+            </ul>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-xl border border-risk-low/40 bg-risk-low/5 p-3 text-xs">
+            <p className="flex items-center gap-1.5 font-medium">
+              <ShieldCheck className="size-3.5 shrink-0 text-risk-low" aria-hidden />
+              What the service does not learn
+            </p>
+            <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
+              <li>your wallet address — it is never sent;</li>
+              <li>your balances — they never leave the device;</li>
+              <li>the seed phrase and the keys — they never leave the device at all.</li>
+            </ul>
+          </div>
         </div>
 
         <Button size="lg" disabled={isBusy} onClick={onEnable}>

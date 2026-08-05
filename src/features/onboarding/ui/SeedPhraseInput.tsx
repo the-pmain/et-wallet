@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useId } from 'react'
 
 import {
@@ -51,7 +52,25 @@ export function SeedPhraseInput({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>Seed phrase</Label>
+      {/* СЧЁТЧИК СЛОВ — У ПОДПИСИ, А НЕ ПОД ПОЛЕМ. Он отвечает на
+          единственный вопрос, который человек задаёт себе, набирая
+          фразу: «сколько уже». Стоя под полем, он оказывался ниже
+          взгляда, занятого набором, и его находили не сразу.
+
+          Двенадцать и двадцать четыре — единственные допустимые
+          значения, поэтому счётчик показывает не «сколько введено»,
+          а «сколько из скольких»: цель названа вместе с достигнутым. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <Label htmlFor={inputId}>Seed phrase</Label>
+
+        <span className="text-xs text-muted-foreground">
+          Words{' '}
+          <span className="font-medium text-foreground tabular-nums">
+            {validation.wordCount}
+            <span className="text-muted-foreground"> / 12 or 24</span>
+          </span>
+        </span>
+      </div>
 
       <Textarea
         id={inputId}
@@ -68,11 +87,12 @@ export function SeedPhraseInput({
         }}
       />
 
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Words: {validation.wordCount}</p>
-
-        {validation.isValid && <p className="text-xs text-risk-low">The phrase is valid</p>}
-      </div>
+      {validation.isValid && (
+        <p className="flex items-center gap-1.5 text-xs text-risk-low">
+          <Check className="size-3.5 shrink-0" aria-hidden />
+          The phrase is valid
+        </p>
+      )}
 
       {shouldShowError && validation.reason !== null && (
         <p className="text-xs text-risk-high">{REASON_TEXT[validation.reason]}</p>

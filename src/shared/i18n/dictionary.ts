@@ -49,7 +49,7 @@ const ENGLISH = {
   'create.confirmTitle': 'Let us check what you wrote down',
   'create.confirmDescription': 'Pick the words that belong in the listed positions',
   'create.username': 'Your name',
-  'create.usernamePlaceholder': 'For example, Alex',
+  'create.usernamePlaceholder': 'For example, John',
   'create.usernameNotice':
     'The name is stored on this device only and labels the wallet in the interface. This is not an account: access cannot be restored by name, and there is nobody to ask.',
   'create.passwordNotice':

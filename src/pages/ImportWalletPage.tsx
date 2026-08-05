@@ -128,7 +128,7 @@ export function ImportWalletPage() {
             <Input
               id={usernameId}
               value={username}
-              placeholder="For example, Alex"
+              placeholder="For example, John"
               disabled={isBusy}
               autoComplete="off"
               autoCapitalize="words"

@@ -256,17 +256,44 @@ export function ApprovalsPage() {
         </CardContent>
       </Card>
 
-      <Alert variant="warning">
-        <ShieldAlert />
-        <AlertDescription>
-          An approval lets a contract take your tokens without a new signature. It does not expire
-          on its own: until you revoke it, it keeps working long after the application is no longer
-          needed. Revoking is an ordinary transaction and costs a fee.
-        </AlertDescription>
-      </Alert>
+      {/*
+        ВЕС ПРЕДУПРЕЖДЕНИЯ ЗАВИСИТ ОТ ТОГО, ЕСТЬ ЛИ О ЧЁМ ПРЕДУПРЕЖДАТЬ.
+
+        Текст один и тот же, но положение разное. Когда одобрения есть,
+        опасность существует прямо сейчас, и предупреждение обязано
+        выглядеть предупреждением. Когда список пуст, взять нечего —
+        и тот же оранжевый блок сообщал бы о риске там, где риска нет.
+        Ложные тревоги приучают не читать настоящие, а одобрения —
+        самый частый способ потерять средства при целом ключе, и здесь
+        такая привычка обходится дороже всего.
+
+        Именно поэтому текст НЕ убран из пустого состояния: узнать, чем
+        грозит одобрение, полезнее до того, как оно выдано.
+      */}
+      {items !== null && items.length > 0 ? (
+        <Alert variant="warning">
+          <ShieldAlert />
+          <AlertDescription>{APPROVAL_RISK_TEXT}</AlertDescription>
+        </Alert>
+      ) : (
+        <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
+          <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>{APPROVAL_RISK_TEXT}</span>
+        </p>
+      )}
     </div>
   )
 }
+
+/**
+ * Чем грозит одобрение.
+ *
+ * Вынесен в постоянную, потому что показывается в двух видах —
+ * предупреждением и пояснением, — а расхождение двух копий одного
+ * текста заметили бы не раньше, чем кто-нибудь прочёл бы обе.
+ */
+const APPROVAL_RISK_TEXT =
+  'An approval lets a contract take your tokens without a new signature. It does not expire on its own: until you revoke it, it keeps working long after the application is no longer needed. Revoking is an ordinary transaction and costs a fee.'
 
 /**
  * Строка списка разрешений.

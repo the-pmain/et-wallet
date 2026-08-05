@@ -1,4 +1,4 @@
-import { ArrowLeft, Globe, KeyRound, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Globe, KeyRound, ListChecks, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { APP_CONFIG } from '@/shared/config'
@@ -55,9 +55,26 @@ export function TrustPage() {
         </AlertDescription>
       </Alert>
 
-      <Card>
+      {/*
+        ТРИ РАЗДЕЛА СТРАНИЦЫ ОЗНАЧАЮТ ПРОТИВОПОЛОЖНОЕ И ОБЯЗАНЫ
+        РАЗЛИЧАТЬСЯ НА ВИД.
+
+        Прежде «что защищено», «чего защитить нельзя» и «как снизить
+        риск» шли тремя одинаковыми карточками подряд. Страница
+        существует ради того, чтобы владелец удержал в голове модель
+        угрозы, а одинаковые блоки эту модель сглаживают: читается
+        сплошной текст, из которого не видно, где граница защищённого.
+
+        Цвета взяты из смысловой шкалы риска и продублированы значком
+        в заголовке: цвет как единственный признак недоступен людям
+        с нарушением цветовосприятия.
+      */}
+      <Card className="border-risk-low/40">
         <CardHeader>
-          <CardTitle className="text-base">What the wallet does protect</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="size-4 shrink-0 text-risk-low" aria-hidden />
+            What the wallet does protect
+          </CardTitle>
           <CardDescription>These hold as long as the code you run is genuine</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
@@ -80,9 +97,12 @@ export function TrustPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-risk-high/40">
         <CardHeader>
-          <CardTitle className="text-base">What it cannot protect</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldAlert className="size-4 shrink-0 text-risk-high" aria-hidden />
+            What it cannot protect
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
           <p>
@@ -103,9 +123,12 @@ export function TrustPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-primary/40">
         <CardHeader>
-          <CardTitle className="text-base">How to reduce the risk</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ListChecks className="size-4 shrink-0 text-primary-emphasis" aria-hidden />
+            How to reduce the risk
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
           <p>

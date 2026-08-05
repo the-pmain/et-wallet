@@ -185,14 +185,25 @@ export function NftPage() {
         </CardContent>
       </Card>
 
-      <Alert variant="warning">
-        <ShieldAlert />
-        <AlertDescription>
+      {/* ПОСТОЯННОЕ СВОЙСТВО — СНОСКОЙ, А НЕ ПРЕДУПРЕЖДЕНИЕМ.
+          Прежде здесь стоял `Alert variant="warning"` — тот же вид, что
+          у сообщения о подозрительной операции. Но предупреждать не
+          о чем: изображения не загружаются всегда, это решение кошелька,
+          а не событие. Оранжевый цвет в этой палитре означает риск, и
+          трата его на неизменное свойство приучает не отличать
+          настоящий риск от пояснения.
+
+          Текст сохранён дословно, включая указание сверять адрес
+          контракта, а не имя: имя задаёт автор контракта, и подделать
+          его ничего не стоит. */}
+      <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
+        <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span>
           Images are deliberately not loaded. Their links are set by the contract author, and their
           server would see your IP address next to your wallet address. The collection name is set
           by the contract author too — check the contract address, not the name.
-        </AlertDescription>
-      </Alert>
+        </span>
+      </p>
     </div>
   )
 }
@@ -236,9 +247,14 @@ function NftRow({
         </span>
       </span>
 
-      <span className="flex shrink-0 flex-col items-end gap-1">
+      {/* ДЕЙСТВИЯ В СТРОКУ, А НЕ СТОЛБИКОМ. Прежде количество, кнопка
+          и ссылка на обозреватель стояли друг под другом, и строка
+          вырастала втрое против содержания. Количество к тому же
+          относится к предмету, а не к действиям, и стояло не в том
+          столбце. */}
+      <span className="flex shrink-0 items-center gap-2">
         {item.standard === TOKEN_STANDARD.Erc1155 ? (
-          <span className="text-sm font-medium tabular-nums">×{item.balance.toString()}</span>
+          <span className="text-base font-semibold tabular-nums">×{item.balance.toString()}</span>
         ) : null}
 
         <Button variant="outline" size="sm" onClick={onSend}>
@@ -246,15 +262,19 @@ function NftRow({
         </Button>
 
         {explorer === null ? null : (
-          <a
-            href={`${explorer}/token/${item.contract}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Explorer
-            <ExternalLink className="size-3" aria-hidden />
-          </a>
+          /* Ссылка стала значком: слово «Explorer» рядом с «Transfer»
+             читалось как второе равнозначное действие, хотя это уход
+             из кошелька. Доступное имя при этом полное. */
+          <Button asChild variant="ghost" size="icon" className="size-8 text-muted-foreground">
+            <a
+              href={`${explorer}/token/${item.contract}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="Open the collection in the explorer"
+            >
+              <ExternalLink className="size-4" aria-hidden />
+            </a>
+          </Button>
         )}
       </span>
     </div>
