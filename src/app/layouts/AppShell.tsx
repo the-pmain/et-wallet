@@ -98,6 +98,7 @@ export function AppShell() {
             <Button
               variant="ghost"
               size="icon"
+              className="tap-target"
               aria-label="Lock the wallet"
               onClick={() => {
                 onboarding.lock()

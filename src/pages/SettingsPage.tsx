@@ -1,5 +1,15 @@
-import { Info, Lock, Monitor, Moon, Plug, ShieldAlert, ShieldCheck, Sun } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import {
+  ChevronRight,
+  Info,
+  Lock,
+  Monitor,
+  Moon,
+  Plug,
+  ShieldAlert,
+  ShieldCheck,
+  Sun,
+} from 'lucide-react'
+import { useEffect, useId, useState, type ComponentType } from 'react'
 import { Link } from 'react-router'
 
 import { APP_CONFIG } from '@/shared/config'
@@ -27,6 +37,7 @@ import {
   CardTitle,
   Checkbox,
   Label,
+  SegmentedControl,
 } from '@/shared/ui'
 
 import type { AccountId, ChainId } from '@/core'
@@ -110,112 +121,79 @@ export function SettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Appearance</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-2">
-          {THEME_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={theme === option.value}
-              onClick={() => {
-                setTheme(option.value)
-              }}
-              className={cn(
-                'flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-medium transition-colors',
-                theme === option.value
-                  ? 'border-primary bg-primary/10 text-primary-emphasis'
-                  : 'border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-              )}
-            >
-              <option.icon className="size-4" aria-hidden />
-              {option.label}
-            </button>
-          ))}
+        {/* Заголовка карточки нет намеренно: подпись переключателя уже
+            называет раздел, а два заголовка подряд — «Appearance» над
+            «Appearance» — читаются как сбой вёрстки. */}
+        <CardContent>
+          {/* Тот же переключатель, что у отбора истории и скорости
+              отправки. Свой набор кнопок здесь отличался высотой и
+              видом выбранного — три места, расходившиеся в мелочах. */}
+          <SegmentedControl
+            legend="Appearance"
+            options={THEME_OPTIONS}
+            value={theme}
+            onChange={setTheme}
+          />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Connections</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
+      {/*
+        ЧЕТЫРЕ ПЕРЕХОДА ОДНИМ СПИСКОМ, А НЕ ЧЕТЫРЬМЯ КАРТОЧКАМИ.
+
+        Прежде каждый занимал отдельную карточку из заголовка, кнопки
+        во всю ширину и абзаца — четыре одинаковых блока подряд, ради
+        четырёх ссылок. Экран настроек из-за этого прокручивался вчетверо
+        дольше нужного, а одинаковость блоков мешала различать разделы:
+        глаз читал ритм, а не содержание.
+
+        Строка вместо кнопки — потому что это переход, а не действие.
+        Шеврон справа обещает именно переход, и вся строка целиком
+        служит целью нажатия: попасть в неё проще, чем в кнопку.
+
+        Пояснения сохранены дословно. Они не украшение: одобрение,
+        не имеющее срока, и фраза на бумаге как единственный способ
+        восстановления — то, чего пользователь может не знать, а узнать
+        обязан до, а не после.
+      */}
+      <Card className="py-2">
+        <CardContent className="flex flex-col divide-y divide-border/70 px-0 sm:px-0">
           {/* Раздел не попал в нижнюю панель: пять пунктов — предел
               для окна шириной 360 пикселей, и шестой сделал бы подписи
               нечитаемыми. */}
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/wallet/connections">
-              <Plug className="size-4" aria-hidden />
-              Applications and sessions
-            </Link>
-          </Button>
+          <SettingsNavRow
+            to="/wallet/connections"
+            icon={Plug}
+            title="Applications and sessions"
+            description="A connected application may send signing requests. Each one is asked separately, but the connection itself is worth closing when it is no longer needed."
+          />
 
-          <p className="text-xs text-muted-foreground">
-            A connected application may send signing requests. Each one is asked separately, but the
-            connection itself is worth closing when it is no longer needed.
-          </p>
+          <SettingsNavRow
+            to="/trust"
+            icon={ShieldAlert}
+            title="What you are trusting"
+            description="The wallet runs as a web page: its code is downloaded from a server every time you open it. What that means, and what it does not protect against, is spelled out there."
+          />
+
+          <SettingsNavRow
+            to="/wallet/approvals"
+            icon={ShieldAlert}
+            title="Granted approvals"
+            description="An approval lets a contract take your tokens without a new signature, and it does not expire. A forgotten approval is the most common way to lose funds with an intact key."
+          />
+
+          <SettingsNavRow
+            to="/wallet/backup"
+            icon={ShieldCheck}
+            title="Seed phrase and private keys"
+            description="A seed phrase written on paper is the only way to restore the wallet after losing the device or clearing the browser data."
+          />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Trust</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/trust">
-              <ShieldAlert className="size-4" aria-hidden />
-              What you are trusting
-            </Link>
-          </Button>
-
-          <p className="text-xs text-muted-foreground">
-            The wallet runs as a web page: its code is downloaded from a server every time you open
-            it. What that means, and what it does not protect against, is spelled out there.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Approvals</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/wallet/approvals">
-              <ShieldAlert className="size-4" aria-hidden />
-              Granted approvals
-            </Link>
-          </Button>
-
-          <p className="text-xs text-muted-foreground">
-            An approval lets a contract take your tokens without a new signature, and it does not
-            expire. A forgotten approval is the most common way to lose funds with an intact key.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">Backup</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/wallet/backup">
-              <ShieldCheck className="size-4" aria-hidden />
-              Seed phrase and private keys
-            </Link>
-          </Button>
-
-          <p className="text-xs text-muted-foreground">
-            A seed phrase written on paper is the only way to restore the wallet after losing the
-            device or clearing the browser data.
-          </p>
-
-          <StorageDurabilityAlert durability={storageDurability} />
-        </CardContent>
-      </Card>
+      {/* Предупреждение о ненадёжном хранилище стоит сразу под списком,
+          а не внутри строки: оно о состоянии устройства, а не о разделе,
+          и внутри строки-перехода читалось бы как её описание. */}
+      <StorageDurabilityAlert durability={storageDurability} />
 
       <SecuritySection />
 
@@ -401,5 +379,56 @@ function SecuritySection() {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+interface SettingsNavRowProps {
+  readonly to: string
+  readonly icon: ComponentType<{ className?: string }>
+  readonly title: string
+
+  /**
+   * Зачем этот раздел нужен.
+   *
+   * Обязательное поле. Название раздела отвечает на вопрос «куда я
+   * попаду», но не на вопрос «зачем мне туда». В настройках кошелька
+   * второй вопрос важнее: разделы вроде одобрений открывают редко
+   * и ровно потому, что не знают, чем они грозят.
+   */
+  readonly description: string
+}
+
+/**
+ * Строка-переход в списке настроек.
+ *
+ * ССЫЛКА, А НЕ КНОПКА. Переход, оформленный кнопкой, теряет средний
+ * щелчок, «открыть в новой вкладке» и объявление «ссылка» в программе
+ * чтения с экрана.
+ *
+ * ЦЕЛЬ НАЖАТИЯ — ВСЯ СТРОКА. Попасть в неё проще, чем в кнопку внутри
+ * блока, и это единственная цель: вложенных органов управления здесь
+ * нет, поэтому неоднозначности «куда я нажал» не возникает.
+ *
+ * ОПИСАНИЕ ВХОДИТ В ДОСТУПНОЕ ИМЯ ССЫЛКИ. Это намеренно: тот, кто
+ * слушает страницу, получает ровно то же, что видит зрячий, — название
+ * и причину, по которой сюда стоит зайти.
+ */
+function SettingsNavRow({ to, icon: Icon, title, description }: SettingsNavRowProps) {
+  return (
+    <Link
+      to={to}
+      className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:px-6"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary-emphasis">
+        <Icon className="size-4.5" />
+      </span>
+
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs leading-relaxed text-muted-foreground">{description}</span>
+      </span>
+
+      <ChevronRight className="mt-2 size-4 shrink-0 text-muted-foreground" aria-hidden />
+    </Link>
   )
 }

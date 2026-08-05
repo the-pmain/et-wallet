@@ -49,6 +49,7 @@ import {
   CardTitle,
   Input,
   Label,
+  SegmentedControl,
 } from '@/shared/ui'
 
 /** Этапы отправки. */
@@ -365,12 +366,9 @@ export function SendPage() {
             {network?.name ?? '—'} network from the address shown above.
           </p>
 
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Available</span>
-            <span className="tabular-nums">
-              {available === null ? '—' : `${formatTokenAmount(available, decimals)} ${symbol}`}
-            </span>
-          </div>
+          {/* Доступная сумма переехала к полю ввода: это ограничение
+              на вводимое число, а стоя тремя блоками выше, оно
+              прочитывалось до того, как понадобится, и забывалось. */}
         </CardContent>
       </Card>
 
@@ -453,13 +451,29 @@ export function SendPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}-amount`}>Amount, {symbol}</Label>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <Label htmlFor={`${fieldId}-amount`}>Amount, {symbol}</Label>
+
+                <span className="text-xs text-muted-foreground">
+                  Available{' '}
+                  <span className="font-medium text-foreground tabular-nums">
+                    {available === null
+                      ? '—'
+                      : `${formatTokenAmount(available, decimals)} ${symbol}`}
+                  </span>
+                </span>
+              </div>
+
+              {/* Поле крупнее прочих и с табличными цифрами: здесь
+                  вводят деньги, и ошибку в разряде надо увидеть
+                  до отправки, а не в подтверждении. */}
               <Input
                 id={`${fieldId}-amount`}
                 value={amount}
                 placeholder="0.0"
                 inputMode="decimal"
                 autoComplete="off"
+                className="h-12 text-lg tabular-nums md:text-lg"
                 onChange={(event) => {
                   setAmount(event.target.value)
                   setError(null)
@@ -467,28 +481,16 @@ export function SendPage() {
               />
             </div>
 
-            <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm font-medium">Speed</legend>
-              <div className="grid grid-cols-3 gap-2">
-                {FEE_LEVELS.map((level) => (
-                  <button
-                    key={level.value}
-                    type="button"
-                    aria-pressed={priority === level.value}
-                    onClick={() => {
-                      setPriority(level.value)
-                    }}
-                    className={
-                      priority === level.value
-                        ? 'rounded-xl border border-primary bg-primary/10 px-2 py-2 text-xs font-medium text-primary-emphasis'
-                        : 'rounded-xl border px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent'
-                    }
-                  >
-                    {level.label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+            {/* Тот же переключатель, что и на отборе истории. Прежде
+                здесь стоял свой набор кнопок с собственными размерами:
+                одинаковые по смыслу органы управления, выглядящие
+                по-разному, читаются как разные по назначению. */}
+            <SegmentedControl
+              legend="Speed"
+              options={FEE_LEVELS}
+              value={priority}
+              onChange={setPriority}
+            />
 
             {error === null ? null : (
               <Alert variant="danger">

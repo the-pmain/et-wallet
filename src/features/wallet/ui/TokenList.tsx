@@ -34,7 +34,7 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
       {tokens.map((entry) => (
         <li
           key={entry.token.address ?? 'native'}
-          className="flex items-center gap-3 px-4 py-3 sm:px-6"
+          className="flex items-center gap-3 px-4 py-3.5 sm:px-6"
         >
           <TokenAvatar address={entry.token.address} symbol={entry.token.symbol} />
 
@@ -52,8 +52,11 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
             </span>
           </span>
 
-          <span className="flex shrink-0 items-center gap-2">
-            <span className="text-sm font-medium tabular-nums">
+          <span className="flex shrink-0 items-center gap-1">
+            {/* Количество — то, ради чего список открывают, и потому
+                весит больше имени. Табличные цифры плюс выравнивание
+                по правому краю: разряды обязаны встать друг под друга. */}
+            <span className="text-right text-base font-semibold tabular-nums">
               {entry.balance === null ? (
                 isLoading ? (
                   <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-hidden />
@@ -65,18 +68,32 @@ export function TokenList({ tokens, isLoading, onRemove }: TokenListProps) {
               )}
             </span>
 
-            {entry.token.address === null ? null : (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Remove token ${safeText(entry.token.symbol)}`}
-                onClick={() => {
-                  onRemove(entry.token.address as Address)
-                }}
-              >
-                <Trash2 className="size-4" aria-hidden />
-              </Button>
-            )}
+            {/* МЕСТО ПОД КНОПКУ ЗАНЯТО ДАЖЕ ТАМ, ГДЕ КНОПКИ НЕТ.
+                У нативной валюты удаления быть не может, и без распорки
+                её количество съезжало вправо на ширину кнопки — числа
+                соседних строк переставали стоять в столбец. Ради этого
+                столбца и существуют табличные цифры, и распорка
+                шириной в кнопку — самый дешёвый способ его сохранить. */}
+            <span className="flex size-8 shrink-0 items-center justify-center">
+              {entry.token.address === null ? null : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  /* `tap-target`: удаление отслеживания — необратимое
+                     действие, и промахиваться по нему пальцем нельзя
+                     ни в ту, ни в другую сторону. Видимый размер
+                     оставлен малым намеренно: разрушающее действие
+                     не должно спорить за внимание с количеством. */
+                  className="tap-target size-8 text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove token ${safeText(entry.token.symbol)}`}
+                  onClick={() => {
+                    onRemove(entry.token.address as Address)
+                  }}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </Button>
+              )}
+            </span>
           </span>
         </li>
       ))}

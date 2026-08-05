@@ -98,13 +98,22 @@ export function AssetsPage() {
         </Alert>
       )}
 
-      <Alert>
-        <Info />
-        <AlertDescription>
+      {/* ПОСТОЯННАЯ ОГОВОРКА — СНОСКОЙ, А НЕ ПРЕДУПРЕЖДЕНИЕМ.
+          Прежде она стояла блоком `Alert` того же веса, что и сообщение
+          об отказе узла, — и была крупнее самого списка активов. Но это
+          не событие: она верна всегда и не требует действий. Оформление
+          предупреждением там, где предупреждать не о чем, обесценивает
+          настоящие предупреждения — их перестают отличать от фона.
+
+          Текст сохранён дословно: он объясняет отсутствие привычной
+          колонки, и без него список выглядит недоделанным. */}
+      <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
+        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span>
           Asset value in fiat is not shown: that needs an external price source, which would receive
           your addresses. Choosing such a source is the wallet owner’s decision.
-        </AlertDescription>
-      </Alert>
+        </span>
+      </p>
     </div>
   )
 }

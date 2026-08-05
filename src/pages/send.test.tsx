@@ -93,7 +93,15 @@ describe('Отправка: форма', () => {
     const card = screen.getByText('From').closest('[data-slot=card]') as HTMLElement
 
     expect(within(card).getByText(shortened)).toBeInTheDocument()
-    expect(within(card).getByText('10 ETH')).toBeInTheDocument()
+
+    /* Доступная сумма стоит не в карточке отправителя, а у поля ввода:
+       это ограничение на вводимое число, и читать его нужно там, где
+       число вводят. Проверяется именно соседство с полем — иначе
+       правка вернула бы подпись обратно наверх незамеченной. */
+    const amountField = screen.getByLabelText(/^Amount/)
+    const amountBlock = amountField.parentElement as HTMLElement
+
+    expect(within(amountBlock).getByText('10 ETH')).toBeInTheDocument()
   })
 
   it('не пускает дальше без адреса получателя', async () => {

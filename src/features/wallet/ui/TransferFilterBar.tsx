@@ -1,8 +1,7 @@
 import { Search, X } from 'lucide-react'
 import { useId } from 'react'
 
-import { cn } from '@/shared/lib/utils'
-import { Button, Input, Label } from '@/shared/ui'
+import { Button, Input, Label, SegmentedControl } from '@/shared/ui'
 
 import {
   DIRECTION_FILTER,
@@ -91,74 +90,37 @@ export function TransferFilterBar({ filter, onChange, nativeSymbol }: TransferFi
         )}
       </div>
 
-      <fieldset>
-        <legend className="sr-only">Kind of asset</legend>
-        <div className="grid grid-cols-4 gap-2">
-          {categories.map((item) => (
-            <SegmentButton
-              key={item.value}
-              label={item.label}
-              isSelected={filter.category === item.value}
-              onSelect={() => {
-                onChange({ ...filter, category: item.value })
-              }}
-            />
-          ))}
-        </div>
-      </fieldset>
+      {/* ДВА НАБОРА — ДВА ОТДЕЛЬНЫХ ПЕРЕКЛЮЧАТЕЛЯ, А НЕ СЕМЬ КНОПОК.
+          Прежде они шли двумя рядами кнопок в рамках, и связь «эти
+          четыре про одно, эти три про другое» приходилось выводить из
+          расположения. Хуже того, слово «All» встречается в обоих
+          наборах, а подписи наборов были скрыты в `sr-only`: имя набора
+          получал только слушающий страницу, зрячий — семь кнопок без
+          объяснения. Общая дорожка и видимая подпись это чинят.
 
-      <fieldset>
-        <legend className="sr-only">Transfer direction</legend>
-        <div className="grid grid-cols-3 gap-2">
-          {directions.map((item) => (
-            <SegmentButton
-              key={item.value}
-              label={item.label}
-              name={item.name}
-              isSelected={filter.direction === item.value}
-              onSelect={() => {
-                onChange({ ...filter, direction: item.value })
-              }}
-            />
-          ))}
-        </div>
-      </fieldset>
+          На широком экране наборы встают рядом: два ряда во всю ширину
+          отодвигали сам список вниз, а он здесь главный. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+        <SegmentedControl
+          className="sm:flex-1"
+          legend="Kind of asset"
+          options={categories}
+          value={filter.category}
+          onChange={(category) => {
+            onChange({ ...filter, category })
+          }}
+        />
+
+        <SegmentedControl
+          className="sm:flex-1"
+          legend="Transfer direction"
+          options={directions}
+          value={filter.direction}
+          onChange={(direction) => {
+            onChange({ ...filter, direction })
+          }}
+        />
+      </div>
     </div>
-  )
-}
-
-interface SegmentButtonProps {
-  readonly label: string
-
-  /** Доступное имя, если видимой надписи для различения недостаточно. */
-  readonly name?: string | undefined
-
-  readonly isSelected: boolean
-  readonly onSelect: () => void
-}
-
-/**
- * Кнопка выбора одного значения из набора.
- *
- * Выбранное состояние передаётся через `aria-pressed`, а не только
- * цветом: цвет как единственный признак недоступен людям с нарушением
- * цветовосприятия и не читается вспомогательными технологиями.
- */
-function SegmentButton({ label, name, isSelected, onSelect }: SegmentButtonProps) {
-  return (
-    <button
-      type="button"
-      aria-pressed={isSelected}
-      aria-label={name}
-      onClick={onSelect}
-      className={cn(
-        'truncate rounded-xl border px-2 py-2 text-xs font-medium transition-colors',
-        isSelected
-          ? 'border-primary bg-primary/10 text-primary-emphasis'
-          : 'text-muted-foreground hover:bg-accent',
-      )}
-    >
-      {label}
-    </button>
   )
 }

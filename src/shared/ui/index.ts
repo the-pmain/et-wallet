@@ -9,6 +9,11 @@ export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 export { Checkbox, type CheckboxProps } from './checkbox'
 export { DonutChart, type DonutChartProps, type IDonutSlice } from './donut-chart'
 export { EmptyState, type EmptyStateProps } from './empty-state'
+export {
+  SegmentedControl,
+  type ISegmentedOption,
+  type SegmentedControlProps,
+} from './segmented-control'
 export { Input } from './input'
 export { Label } from './label'
 export { Separator, type SeparatorProps } from './separator'
