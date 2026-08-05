@@ -30,6 +30,9 @@ interface INodeBehaviour {
   readonly failOnConnect?: boolean
   /** Отказ транспорта при каждом вызове. */
   readonly failTransport?: boolean
+
+  /** Узел не умеет `eth_simulateV1`, оставаясь исправным в остальном. */
+  readonly failSimulate?: boolean
   /** Ответ узла с ошибкой JSON-RPC. */
   readonly rpcError?: boolean
 
@@ -54,6 +57,7 @@ class StubProvider implements IProvider {
   balanceCalls = 0
   sendCalls = 0
   logCalls = 0
+  simulateCalls = 0
 
   readonly #behaviour: INodeBehaviour
   readonly #events = new EventBus<ProviderEventMap>()
@@ -71,8 +75,16 @@ class StubProvider implements IProvider {
     throw new ProviderUnavailableError(CHAIN_ID)
   }
 
-  request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+  request<TResult>(request: { method: string }): Promise<TResult> {
+    if (request.method !== 'eth_simulateV1') {
+      return Promise.reject(new Error('не поддержано'))
+    }
+
+    this.simulateCalls += 1
+
+    return this.#behaviour.failSimulate === true
+      ? Promise.reject(new RpcError(-32601, 'the method does not exist'))
+      : Promise.resolve('симуляция' as TResult)
   }
 
   getChainId(): Promise<ChainId> {
@@ -342,6 +354,22 @@ describe('FailoverProvider: выборка журналов', () => {
        нельзя лишать кошелёк баланса и отправки. */
     expect(await provider.getBalance(OWNER)).toBe(3n)
     expect(provider.rpcUrl).toBe('https://a.example')
+  })
+
+  it('спрашивает симуляцию у соседа, когда действующий узел её не умеет', async () => {
+    /* Живое измерение: шлюз, отдающий журналы, отказывает в симуляции,
+       а узел, выполняющий симуляцию, не отдаёт журналов. Без опроса
+       соседей одно из двух всегда оставалось бы недоступным. */
+    behaviours.set('https://a.example', { failSimulate: true, balance: 3n })
+
+    const provider = createProvider()
+
+    expect(await provider.request({ method: 'eth_simulateV1', params: [] })).toBe('симуляция')
+
+    /* Действующий узел не сменился: он исправен, просто не умеет
+       именно этого вызова. */
+    expect(provider.rpcUrl).toBe('https://a.example')
+    expect(await provider.getBalance(OWNER)).toBe(3n)
   })
 
   it('берёт журналы у соседа, когда действующий узел в них отказал', async () => {

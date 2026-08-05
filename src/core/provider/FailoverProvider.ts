@@ -18,6 +18,18 @@ import type {
 
 const PROVIDER_NAME = 'FailoverProvider'
 
+/**
+ * Вызовы, отказ по которым говорит об умениях узла, а не о цепи.
+ *
+ * Только чтение: опрос соседей повторяет вызов на нескольких узлах,
+ * и действие с последствиями исполнилось бы несколько раз.
+ *
+ * `eth_simulateV1` — новый метод, и поддержка у публичных узлов
+ * разрозненная: измерено, что первый узел встроенного списка Ethereum
+ * его не выполняет, а второй выполняет.
+ */
+const NODE_CAPABILITY_METHODS: ReadonlySet<string> = new Set(['eth_simulateV1'])
+
 /** Подключение к одному адресу. Внедряется, чтобы не тянуть сюда транспорт. */
 export type EndpointConnector = (endpoint: IRpcEndpoint, chainId: ChainId) => Promise<IProvider>
 
@@ -59,6 +71,11 @@ export interface IFailoverProviderDependencies {
  * баланса и nonce, отказывает в широком поиске по журналам постоянно.
  * Такой отказ опрашивает соседние адреса временными соединениями, но
  * действующий узел не меняет. Подробности — в `getLogs`.
+ *
+ * ТО ЖЕ ДЛЯ ВЫЗОВОВ ИЗ `NODE_CAPABILITY_METHODS`. Они зависят от умений
+ * узла, а не от состояния цепи: измерено, что узел, отдающий журналы,
+ * отказывает в симуляции, и наоборот. Опрос соседей — единственный
+ * способ иметь и то, и другое, не перебирая рабочий узел.
  *
  * ОТПРАВКА ТРАНЗАКЦИИ НЕ ПОВТОРЯЕТСЯ. `sendRawTransaction` при отказе
  * транспорта завершается ошибкой без попытки на другом узле. Причина
@@ -123,8 +140,33 @@ export class FailoverProvider implements IProvider {
     return this.#current === null ? null : (this.#endpoints[this.#index] ?? null)
   }
 
+  /**
+   * Произвольный вызов JSON-RPC.
+   *
+   * МЕТОДЫ ИЗ `NODE_CAPABILITY_METHODS` ПРИ ОТКАЗЕ СПРАШИВАЮТСЯ
+   * У СОСЕДЕЙ. Причина та же, что у журналов: отказ означает не
+   * состояние цепи, а умения узла, и у соседа ответ может быть другим.
+   * Измерено на живых узлах: шлюз, отдающий журналы, отказывает
+   * в симуляции, а узел, выполняющий симуляцию, не отдаёт журналов.
+   * Без опроса соседей одно из двух всегда оставалось бы недоступным.
+   *
+   * Действующий узел при этом не меняется: он исправен, просто
+   * не умеет именно этого.
+   */
   async request<TResult>(request: IRpcRequest): Promise<TResult> {
-    return await this.#withFailover((provider) => provider.request<TResult>(request))
+    if (!NODE_CAPABILITY_METHODS.has(request.method)) {
+      return await this.#withFailover((provider) => provider.request<TResult>(request))
+    }
+
+    let firstError: unknown
+
+    try {
+      return await (await this.#ensureConnected()).request<TResult>(request)
+    } catch (error) {
+      firstError = error
+    }
+
+    return await this.#askElsewhere((provider) => provider.request<TResult>(request), firstError)
   }
 
   async getChainId(): Promise<ChainId> {
@@ -214,7 +256,7 @@ export class FailoverProvider implements IProvider {
       firstError = error
     }
 
-    return await this.#getLogsElsewhere(filter, firstError)
+    return await this.#askElsewhere((provider) => provider.getLogs(filter), firstError)
   }
 
   destroy(): void {
@@ -276,18 +318,25 @@ export class FailoverProvider implements IProvider {
   }
 
   /**
-   * Опрашивает остальные адреса ради журналов, не меняя действующий узел.
+   * Опрашивает остальные адреса, не меняя действующий узел.
    *
    * Соединения здесь временные и закрываются сразу: это разовый вопрос
    * соседу, а не смена рабочего канала. Порядок обхода — порядок списка,
    * действующий адрес пропускается: его уже спросили.
+   *
+   * ГОДИТСЯ ТОЛЬКО ДЛЯ ЧТЕНИЯ. Вызов уходит нескольким узлам, и
+   * действие с последствиями — отправка транзакции — так исполнилось
+   * бы несколько раз.
    *
    * @throws Исходную ошибку, если ни один сосед не ответил. Наружу
    *         обязана уйти именно она: ошибка последнего опрошенного узла
    *         рассказывала бы о случайном соседе вместо того узла, с
    *         которым кошелёк работает.
    */
-  async #getLogsElsewhere(filter: ILogFilter, firstError: unknown): Promise<readonly ILogEntry[]> {
+  async #askElsewhere<TResult>(
+    call: (provider: IProvider) => Promise<TResult>,
+    firstError: unknown,
+  ): Promise<TResult> {
     for (const [index, endpoint] of this.#endpoints.entries()) {
       if (index === this.#index || this.#destroyed) {
         continue
@@ -303,7 +352,7 @@ export class FailoverProvider implements IProvider {
       }
 
       try {
-        return await probe.getLogs(filter)
+        return await call(probe)
       } catch {
         /* Сосед тоже отказал. Это ожидаемый исход, а не происшествие:
            публичные узлы отказывают в широком поиске сплошь и рядом.

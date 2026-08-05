@@ -70,8 +70,11 @@ import {
   type IHardwareDevice,
   type IPreflightRequest,
   type IPreflightResult,
+  type ISimulationResult,
   PREFLIGHT_OUTCOME,
   preflightCall,
+  simulateTransaction,
+  UNCHECKED_SIMULATION,
   type ITransactionRequest,
   type TxHash,
   type Unsubscribe,
@@ -1867,6 +1870,12 @@ export class WalletSession implements IWalletSession {
       transaction,
       fees: await transactions.estimateFees(transaction),
       preflight: await this.#preflight(transaction),
+      /* Ожидание, а не одновременный запуск с прогоном: библиотека
+         склеивает одновременные вызовы в одну пачку JSON-RPC, а на
+         пачку публичные узлы отвечают отказом по частоте обращений.
+         Проверено на журналах истории — там та же ошибка стоила
+         истории целиком. */
+      simulation: await this.#simulate(transaction),
     }
   }
 
@@ -1930,6 +1939,36 @@ export class WalletSession implements IWalletSession {
       data: transaction.data,
       value: transaction.value,
     })
+  }
+
+  /**
+   * Показывает следствия транзакции до подписи.
+   *
+   * ОТКАЗ НЕ ПРЕРЫВАЕТ ПОДГОТОВКУ. Узел, не знающий метода, — обычное
+   * дело; подготовка транзакции не может от этого срываться, и
+   * состояние «не проверено» доходит до экрана отдельным исходом.
+   */
+  async #simulate(transaction: ISignableTransaction): Promise<ISimulationResult> {
+    const network = this.#snapshot.activeNetwork
+
+    if (network === null || this.#providers === null) {
+      return UNCHECKED_SIMULATION
+    }
+
+    try {
+      return await simulateTransaction(await this.#providers.get(network), {
+        from: transaction.from,
+        to: transaction.to,
+        data: transaction.data,
+        value: transaction.value,
+      })
+    } catch (error) {
+      this.#logger.warn('The transaction could not be simulated before signing', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+
+      return UNCHECKED_SIMULATION
+    }
   }
 
   /** Общий прогон: сеть и узел берутся из текущего состояния сессии. */

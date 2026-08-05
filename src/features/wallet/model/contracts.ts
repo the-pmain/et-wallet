@@ -11,6 +11,7 @@ import type {
   IHistoryCursor,
   IHistoryLimits,
   IPreflightResult,
+  ISimulationResult,
   INetworkConfig,
   IFeeEstimate,
   IApprovalLimits,
@@ -61,6 +62,16 @@ export interface IPreparedTransfer {
    * успешное прохождение.
    */
   readonly preflight: IPreflightResult
+
+  /**
+   * Что транзакция сделает по нынешнему состоянию цепи.
+   *
+   * ПОКАЗЫВАЕТСЯ ВСЕГДА, включая случаи «узел не умеет» и «проверить
+   * не удалось». Пустой перечень перемещений значим только тогда,
+   * когда симуляция прошла: иначе он означал бы «ничего не двинется»
+   * там, где кошелёк попросту не смотрел.
+   */
+  readonly simulation: ISimulationResult
 }
 
 /** Итог поиска занятых адресов. */

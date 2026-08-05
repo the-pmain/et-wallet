@@ -7,7 +7,7 @@ import {
   ShieldAlert,
   Send,
 } from 'lucide-react'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 
 import {
@@ -31,11 +31,14 @@ import {
   addressLabel,
   formatTokenAmount,
   parseAmount,
+  NATIVE_ASSET_KEY,
   PreflightNotice,
+  SimulationNotice,
   useWallet,
   useWalletSnapshot,
   type IPreparedTransfer,
   type IRecipientResolution,
+  type ISimulationAsset,
 } from '@/features/wallet'
 import {
   Alert,
@@ -164,6 +167,32 @@ export function SendPage() {
      «прочитать не удалось» и показывается прочерком: ноль на этом месте
      сказал бы, что средств нет. */
   const available = selected === null ? (snapshot.balance?.raw ?? null) : selected.balance
+
+  /* Обозначения и число знаков по адресу контракта — для показа
+     перемещений, найденных симуляцией. Собирается здесь, а не
+     в карточке подтверждения: там нет доступа к снимку кошелька,
+     а подставлять восемнадцать знаков «по умолчанию» нельзя. */
+  const assetInfo = useMemo(() => {
+    const map = new Map<string, ISimulationAsset>()
+
+    if (network !== null) {
+      map.set(NATIVE_ASSET_KEY, {
+        symbol: network.nativeCurrency.symbol,
+        decimals: network.nativeCurrency.decimals,
+      })
+    }
+
+    for (const item of assets) {
+      if (item.token.address !== null) {
+        map.set(item.token.address.toLowerCase(), {
+          symbol: item.token.symbol,
+          decimals: item.token.decimals,
+        })
+      }
+    }
+
+    return map
+  }, [assets, network])
 
   const trimmedRecipient = recipient.trim()
 
@@ -310,6 +339,7 @@ export function SendPage() {
         prepared={prepared}
         token={token}
         risks={risks}
+        assets={assetInfo}
         recipientName={recipientName}
         symbol={symbol}
         decimals={decimals}
@@ -661,6 +691,15 @@ interface ConfirmTransferProps {
   readonly risks: readonly RecipientRisk[]
 
   /**
+   * Известные активы для показа перемещений, найденных симуляцией.
+   *
+   * Собирается экраном, а не карточкой: число знаков токена живёт
+   * в снимке кошелька, и подставлять его «по умолчанию» нельзя —
+   * у одних токенов их восемнадцать, у других шесть.
+   */
+  readonly assets: ReadonlyMap<string, ISimulationAsset>
+
+  /**
    * Имя ENS получателя, если оно известно.
    *
    * Показывается ДОПОЛНИТЕЛЬНО к адресу и никогда вместо него.
@@ -688,6 +727,7 @@ function ConfirmTransfer({
   prepared,
   token,
   risks,
+  assets,
   recipientName,
   symbol,
   decimals,
@@ -809,6 +849,15 @@ function ConfirmTransfer({
           о том, кому уйдут средства, и важнее. Прогон отвечает
           на другой вопрос — состоится ли вызов вообще. */}
       <PreflightNotice preflight={prepared.preflight} />
+
+      {/* Симуляция идёт ПОСЛЕ прогона: тот отвечает «состоится ли»,
+          эта — «что именно произойдёт». Второй вопрос имеет смысл
+          только при утвердительном ответе на первый. */}
+      <SimulationNotice
+        simulation={prepared.simulation}
+        owner={prepared.transaction.from}
+        assets={assets}
+      />
 
       {error === null ? null : (
         <Alert variant="danger">

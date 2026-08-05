@@ -30,3 +30,14 @@ export {
   type IPreflightResult,
   type PreflightOutcome,
 } from './preflight'
+export {
+  MOVEMENT_KIND,
+  SIMULATION_OUTCOME,
+  UNCHECKED_SIMULATION,
+  simulateTransaction,
+  type IAssetMovement,
+  type ISimulationRequest,
+  type ISimulationResult,
+  type MovementKind,
+  type SimulationOutcome,
+} from './simulate'
