@@ -113,7 +113,7 @@ describe('Портфель: согласие на источник курсов'
 
     /* Два эфира по 2000 — четыре тысячи. Величина встречается трижды:
        общая стоимость, доля в распределении и строка актива. */
-    expect(screen.getAllByText(/4\s?000,00/u).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/\$4,000\.00/u).length).toBeGreaterThan(0)
   })
 
   it('согласие переживает перезапуск сессии', async () => {
@@ -150,7 +150,7 @@ describe('Портфель: стоимость и изменение', () => {
 
   it('показывает вчерашнюю оценку', () => {
     /* Четыре тысячи при росте на 10 % означают вчерашние 3636,36. */
-    expect(screen.getByText(/3\s?636,36/u)).toBeInTheDocument()
+    expect(screen.getByText(/\$3,636\.36/u)).toBeInTheDocument()
   })
 })
 
@@ -191,7 +191,7 @@ describe('Портфель: неизвестное не подменяется �
     await enablePrices()
 
     /* Нативная валюта одна, стоимость только по ней. */
-    expect(screen.getAllByText(/4\s?000,00/u).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/\$4,000\.00/u).length).toBeGreaterThan(0)
   })
 
   it('сообщает о позициях, не вошедших в оценку', async () => {
@@ -231,7 +231,7 @@ describe('Портфель: неизвестное не подменяется �
   })
 
   it('без единого курса показывает прочерк, а не нулевую стоимость', async () => {
-    /* «0,00 $» здесь сообщил бы владельцу, что его активы ничего
+    /* «$0.00» здесь сообщил бы владельцу, что его активы ничего
        не стоят, тогда как кошелёк не получил ни одного курса. */
     services.priceProvider.configure({ quotes: new Map() })
 
@@ -245,7 +245,7 @@ describe('Портфель: неизвестное не подменяется �
     await waitFor(() => {
       expect(screen.getByText(/the value was not calculated/i)).toBeInTheDocument()
     })
-    expect(screen.queryByText(/^0,00\s?\$$/u)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^\$0\.00$/u)).not.toBeInTheDocument()
   })
 })
 

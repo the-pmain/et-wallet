@@ -72,6 +72,13 @@ export function DashboardPage() {
         isLoading={snapshot.isBalanceLoading}
         error={snapshot.balanceError}
         onRefresh={() => void session.refreshBalance()}
+        /* Оценка в долларах собирается из уже имеющегося снимка: курсы
+           запрашиваются тем же обходом, что балансы и токены, и только
+           при данном согласии. Ни одного лишнего обращения наружу
+           главный экран не делает. */
+        portfolio={snapshot.portfolio}
+        arePricesEnabled={snapshot.arePricesEnabled}
+        isPortfolioLoading={snapshot.isPortfolioLoading}
         /* Действия встроены в карточку баланса, а не стоят отдельной
            плитой под ней: сумма и обращение с ней — один объект.
            Портфель входит в тот же ряд — он такое же обращение к

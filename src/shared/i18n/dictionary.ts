@@ -89,6 +89,18 @@ const ENGLISH = {
      нативной валюты, и предупреждение про поле получателя — на месте. */
   'dashboard.nativeOnly':
     'The native currency of the network is sent here, and the balance above shows only it. Token balances live in the portfolio; token transfers have their own screen, where the recipient is written into the call data, not into the recipient field.',
+  /* ОЦЕНКА В ДОЛЛАРАХ ПОД САМОЙ СУММОЙ. Число в эфире отвечает
+     на вопрос «сколько у меня монет», а не «сколько у меня денег»,
+     и второй вопрос — тот, ради которого экран открывают.
+
+     Слово «approximately» стоит в каждом из состояний не для мягкости:
+     оценка получена умножением баланса на курс стороннего сервиса,
+     она меняется ежеминутно и не является суммой, которую кто-либо
+     обязался заплатить. */
+  'dashboard.approxValue': 'approximately {value}',
+  'dashboard.valueLoading': 'Estimating the value…',
+  'dashboard.valueUnknown': 'The value could not be estimated',
+  'dashboard.valueOff': 'Show the value in dollars',
   'dashboard.portfolio': 'Portfolio',
   'dashboard.send': 'Send',
   'dashboard.receive': 'Receive',

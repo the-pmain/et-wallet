@@ -1,13 +1,16 @@
 import { safeText } from '@/core'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 
-import type { IBalance, INetworkConfig } from '@/core'
+import type { IBalance, INetworkConfig, IPortfolioSummary } from '@/core'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
 
 import { formatTokenAmount } from '../lib/format'
+import { estimateNativeValue } from '../lib/native-value'
+import { formatFiat } from '../lib/portfolio-display'
 
 interface BalanceCardProps {
   readonly balance: IBalance | null
@@ -15,6 +18,18 @@ interface BalanceCardProps {
   readonly isLoading: boolean
   readonly error: string | null
   readonly onRefresh: () => void
+
+  /**
+   * Сводка портфеля активной сети. Отсюда берётся только курс нативной
+   * валюты: сама оценка считается от показанного баланса.
+   */
+  readonly portfolio?: IPortfolioSummary | null
+
+  /** Согласие на обращение к стороннему источнику курсов дано. */
+  readonly arePricesEnabled?: boolean
+
+  /** Идёт получение курсов. */
+  readonly isPortfolioLoading?: boolean
 
   /**
    * Переход, добавляемый под балансом.
@@ -45,6 +60,9 @@ export function BalanceCard({
   error,
   onRefresh,
   action,
+  portfolio = null,
+  arePricesEnabled = false,
+  isPortfolioLoading = false,
 }: BalanceCardProps) {
   const { t } = useTranslation()
   const symbol = network?.nativeCurrency.symbol ?? ''
@@ -174,6 +192,15 @@ export function BalanceCard({
           </p>
         )}
 
+        {/* Оценка идёт сразу за суммой и до всех оговорок: это то же
+            число другими словами, а не примечание к нему. */}
+        <BalanceValue
+          balance={balance}
+          portfolio={portfolio}
+          arePricesEnabled={arePricesEnabled}
+          isLoading={isPortfolioLoading}
+        />
+
         {balance !== null && balance.isStale && error === null ? (
           <p className="text-xs text-muted-foreground">
             A cached value, refresh in progress. Do not decide to send based on a stale amount.
@@ -205,6 +232,90 @@ export function BalanceCard({
         <p className="text-xs leading-relaxed text-muted-foreground">{t('dashboard.nativeOnly')}</p>
       </CardContent>
     </Card>
+  )
+}
+
+interface BalanceValueProps {
+  readonly balance: IBalance | null
+  readonly portfolio: IPortfolioSummary | null
+  readonly arePricesEnabled: boolean
+  readonly isLoading: boolean
+}
+
+/**
+ * Оценка показанной суммы в долларах.
+ *
+ * ЗАЧЕМ ОНА ЗДЕСЬ. Число в эфире не отвечает на вопрос, ради которого
+ * кошелёк открывают: «1,4382 ETH» ничего не говорит человеку, который
+ * не следит за курсом, а таких большинство. Доллар — единица, в которой
+ * он думает о деньгах, и без неё крупнейшее число экрана остаётся для
+ * него набором цифр.
+ *
+ * ОЦЕНКА НЕ ЗАМЕНЯЕТ СУММУ И НЕ СПОРИТ С НЕЙ ЗА ВНИМАНИЕ. Настоящая
+ * величина — та, что в монетах: она точна, она подписывается, она не
+ * зависит от чужого сервиса. Долларовая — производная и набрана мельче
+ * и приглушённее ровно поэтому. Поменять их местами значило бы объявить
+ * главным то, за что кошелёк не отвечает.
+ *
+ * КУРСЫ НЕ ЗАПРАШИВАЮТСЯ БЕЗ СОГЛАСИЯ, И ЭТОТ ЭКРАН ИХ НЕ ЗАПРАШИВАЕТ.
+ * Обращение к источнику называет ему адреса контрактов, сеть и IP-адрес,
+ * то есть выдаёт состав портфеля. Согласие берётся на экране портфеля,
+ * где перечислено, что именно уйдёт наружу, а что не уйдёт. Пока его
+ * нет, здесь стоит переход туда — предложение, а не тихое включение.
+ *
+ * ЧЕТЫРЕ СОСТОЯНИЯ РАЗЛИЧАЮТСЯ, как и у самой суммы: оценка получена,
+ * оценка считается, оценку получить не удалось, оценка выключена
+ * владельцем. Ноль не подставляется ни в одном из трёх последних.
+ */
+function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: BalanceValueProps) {
+  const { t } = useTranslation()
+
+  /* Без баланса оценивать нечего, и строка не занимает места:
+     под надписью «Reading…» цена неизвестного числа бессмысленна. */
+  if (balance === null) {
+    return null
+  }
+
+  if (!arePricesEnabled) {
+    return (
+      <Link
+        to="/wallet/portfolio"
+        className="focus-ring -mx-1 inline-flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+      >
+        {t('dashboard.valueOff')}
+        <ArrowRight className="size-3.5 shrink-0" aria-hidden />
+      </Link>
+    )
+  }
+
+  const value = estimateNativeValue(balance, portfolio)
+
+  if (value === null) {
+    /* Пока курсы идут, «получить не удалось» было бы преждевременным
+       приговором, а молчание — обещанием, что оценки не будет вовсе. */
+    return (
+      <p className="text-sm text-muted-foreground">
+        {isLoading ? t('dashboard.valueLoading') : t('dashboard.valueUnknown')}
+      </p>
+    )
+  }
+
+  return (
+    /* Табличные цифры и здесь: оценка стоит под суммой, и два числа
+       с разной шириной разрядов выглядят сдвинутыми друг относительно
+       друга.
+
+       ПЕРЕНОС ДЛИННОГО ЧИСЛА — та же защита, что у самой суммы этажом
+       выше. Измерено: строка «approximately $123 456 789 012 345 678
+       901 234 567 890.00» выходит за свой абзац на 433 пикселя при
+       ширине абзаца 238, потому что разделители разрядов местом
+       переноса не считаются. Величина не выдуманная: у сети
+       с многотриллионной эмиссией нативной валюты оценка выходит
+       именно такой длины. `break-words` рвёт только то слово, которое
+       иначе не помещается, и обычную надпись не трогает. */
+    <p className="text-lg font-medium break-words text-muted-foreground tabular-nums">
+      {t('dashboard.approxValue', { value: formatFiat(value) })}
+    </p>
   )
 }
 
