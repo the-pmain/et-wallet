@@ -21,6 +21,15 @@ describe('assessPassword: длина', () => {
     )
   })
 
+  it('минимум — восемь символов', () => {
+    /* Значение закреплено намеренно. Порог снижен с двенадцати, и
+       обратное движение обязано быть осознанным, а не случайным
+       следствием правки соседней строки. */
+    expect(MIN_PASSWORD_LENGTH).toBe(8)
+    expect(assessPassword('Abcdefg1').issues).not.toContain(PASSWORD_ISSUE.TooShort)
+    expect(assessPassword('Abcdef1').issues).toContain(PASSWORD_ISSUE.TooShort)
+  })
+
   it('отвергает чрезмерно длинный пароль', () => {
     /* Ограничение не про стойкость: PBKDF2 хэширует любую длину.
        Оно защищает от вставки мегабайтного текста, вывод ключа
@@ -78,6 +87,20 @@ describe('assessPassword: оценка качества', () => {
 
   it('называет хорошим длинный пароль со всеми разновидностями', () => {
     expect(assessPassword('Korova-7-Luna-Reka!').strength).toBe(PASSWORD_STRENGTH.Strong)
+  })
+
+  it('отсекает расхожие пароли короче прежнего порога', () => {
+    /* Словарь был написан под минимум в двенадцать символов и пароль
+       `Qwerty12` не замечал вовсе. После снижения порога такие
+       варианты стали достижимы. */
+    expect(assessPassword('Qwerty12').issues).toContain(PASSWORD_ISSUE.Common)
+    expect(assessPassword('Abc123!x').issues).toContain(PASSWORD_ISSUE.Common)
+    expect(assessPassword('Dragon1!').issues).toContain(PASSWORD_ISSUE.Common)
+  })
+
+  it('восьмисимвольный пароль без нарушений считается приемлемым', () => {
+    expect(assessPassword('Reka-7Lu').strength).toBe(PASSWORD_STRENGTH.Fair)
+    expect(assessPassword('Reka-7Lu').isAcceptable).toBe(true)
   })
 
   it('признаёт пригодным пароль без нарушений', () => {
