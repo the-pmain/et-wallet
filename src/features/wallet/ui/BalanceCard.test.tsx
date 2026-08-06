@@ -206,6 +206,23 @@ describe('BalanceCard: оценка в долларах', () => {
     expect(screen.queryByText('The value could not be estimated')).not.toBeInTheDocument()
   })
 
+  it('показывает время котировки рядом с оценкой', () => {
+    /* Курс опрашивается раз в минуту, но при отказе источника на экране
+       остаётся прежний. Живое число от замершего отличает только
+       время. */
+    renderCard(balanceOf(2n), { arePricesEnabled: true, portfolio: portfolioAt(3000) })
+
+    expect(screen.getByText(/^Rate as of \d{1,2}:\d{2}/u)).toBeInTheDocument()
+  })
+
+  it('не выдумывает время, когда момент котировки неизвестен', () => {
+    /* Подставить текущее время значило бы объявить свежим то,
+       о чём ничего не известно. */
+    renderCard(balanceOf(2n), { arePricesEnabled: true, portfolio: null })
+
+    expect(screen.queryByText(/Rate as of/u)).not.toBeInTheDocument()
+  })
+
   it('без баланса не занимает места', () => {
     renderCard(null, { arePricesEnabled: true, portfolio: portfolioAt(3000) })
 

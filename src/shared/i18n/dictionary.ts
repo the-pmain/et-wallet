@@ -101,6 +101,11 @@ const ENGLISH = {
   'dashboard.valueLoading': 'Estimating the value…',
   'dashboard.valueUnknown': 'The value could not be estimated',
   'dashboard.valueOff': 'Show the value in dollars',
+  /* Время котировки, а не «обновлено только что». Кошелёк спрашивает
+     курс раз в минуту, пока экран открыт, но при отказе источника
+     на экране остаётся прежний — и отличить одно от другого можно
+     только по времени. */
+  'dashboard.rateAsOf': 'Rate as of {time}',
   'dashboard.portfolio': 'Portfolio',
   'dashboard.send': 'Send',
   'dashboard.receive': 'Receive',

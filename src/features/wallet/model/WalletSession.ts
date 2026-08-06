@@ -80,6 +80,7 @@ import {
   type Unsubscribe,
 } from '@/core'
 
+import { nextPriceRefreshDelay } from '../lib/price-refresh'
 import {
   RECIPIENT_STATUS,
   SESSION_STATE,
@@ -265,6 +266,11 @@ export class WalletSession implements IWalletSession {
   #unsubscribeBalanceEvents: Unsubscribe | null = null
   #unsubscribeTransactionEvents: Unsubscribe | null = null
 
+  /* Опрос курсов: отмена текущего такта и число отказов подряд.
+     Отказы разводят такты — см. `#restartPricePolling`. */
+  #cancelPricePoll: Unsubscribe | null = null
+  #priceFailures = 0
+
   /* Фоновый опрос включён, пока вкладка на виду. Управляет им слой
      интерфейса: `document.visibilityState` — часть DOM, а сессия
      обязана работать и в service worker расширения, где документа нет. */
@@ -333,6 +339,13 @@ export class WalletSession implements IWalletSession {
   async close(): Promise<void> {
     this.#unsubscribeBalance?.()
     this.#unsubscribeBalance = null
+
+    /* Опрос курсов останавливается вместе с сессией по той же причине,
+       что и слежение за транзакциями: таймер, переживший блокировку,
+       продолжал бы обращаться к источнику и выдавать присутствие. */
+    this.#cancelPricePoll?.()
+    this.#cancelPricePoll = null
+    this.#priceFailures = 0
 
     this.#unsubscribeBalanceEvents?.()
     this.#unsubscribeBalanceEvents = null
@@ -426,6 +439,11 @@ export class WalletSession implements IWalletSession {
     }
 
     this.#resubscribeBalance(this.#snapshot.activeAccount, this.#snapshot.activeNetwork)
+
+    /* Курсы гасятся тем же выключателем, что и балансы. Опрос скрытой
+       вкладки сообщал бы источнику курсов время присутствия владельца,
+       не показывая ему при этом ничего. */
+    this.#restartPricePolling()
 
     if (enabled) {
       void this.refreshBalance()
@@ -723,6 +741,8 @@ export class WalletSession implements IWalletSession {
     this.#publish({ ...this.#snapshot, arePricesEnabled: true })
 
     await this.#loadPortfolio()
+
+    this.#restartPricePolling()
   }
 
   async disablePrices(): Promise<void> {
@@ -740,12 +760,23 @@ export class WalletSession implements IWalletSession {
       priceError: null,
       isPortfolioLoading: false,
     })
+
+    /* Опрос прекращается вместе с согласием, а не «засыпает». Таймер,
+       переживший отзыв, продолжал бы обращаться к источнику — то есть
+       делать ровно то, от чего владелец только что отказался. */
+    this.#restartPricePolling()
   }
 
   async refreshPrices(): Promise<void> {
     this.#prices?.invalidate()
 
     await this.#loadPortfolio()
+
+    /* Отсчёт до следующего опроса начинается заново: курс только что
+       получен, и спрашивать его снова через несколько секунд значило
+       бы тратить предел обращений на уже известное. */
+    this.#priceFailures = 0
+    this.#restartPricePolling()
   }
 
   /**
@@ -1498,6 +1529,12 @@ export class WalletSession implements IWalletSession {
     /* Оценка считается после балансов: без них считать нечего. */
     await this.#loadPortfolio()
 
+    /* Отсчёт до первого опроса идёт от этого момента: курсы только что
+       получены, и немедленный такт удвоил бы обращения на каждом входе
+       в кошелёк и на каждой смене сети. */
+    this.#priceFailures = 0
+    this.#restartPricePolling()
+
     /* История загружается последней и без ожидания: она требует обхода
        журналов либо обращения к индексатору и занимает секунды. Держать
        из-за неё пустым весь экран, включая уже полученный баланс,
@@ -1786,6 +1823,74 @@ export class WalletSession implements IWalletSession {
       /* Отказ фонового обновления не должен стирать показанное значение:
          прежний баланс с пометкой устаревания полезнее пустого места. */
     }
+  }
+
+  /**
+   * Заводит либо останавливает опрос курсов.
+   *
+   * ПОЧЕМУ ОПРОС, А НЕ ПОТОК. Источник курсов не отдаёт потока: ни
+   * бесплатный доступ, ни демонстрационный не имеют ни веб-сокета,
+   * ни длинного соединения. Спрашивать заново — единственный
+   * доступный способ, и «реальное время» здесь означает «не старше
+   * минуты». Поэтому рядом с оценкой показано время котировки:
+   * обещать секундную точность, имея минутную, значило бы лгать.
+   *
+   * ПОЧЕМУ В СЕССИИ, А НЕ В ХУКЕ. Первая редакция держала таймер
+   * в React, со своим слежением за видимостью вкладки. Это давало
+   * два независимых выключателя фоновой работы: `setBackgroundRefresh\
+   * Enabled`, которым уже гасятся балансы, и собственный обработчик
+   * опроса курсов. Два выключателя одного и того же расходятся при
+   * первом же изменении — например, когда фон захотят гасить не только
+   * по видимости. Здесь выключатель один.
+   *
+   * ВРЕМЯ БЕРЁТСЯ ИЗ `IClock`, А НЕ ИЗ `setTimeout` НАПРЯМУЮ: иначе
+   * проверить расписание можно было бы только поддельными таймерами,
+   * а такие тесты в этом наборе уже показали себя плавающими.
+   */
+  #restartPricePolling(): void {
+    this.#cancelPricePoll?.()
+    this.#cancelPricePoll = null
+
+    if (
+      !this.#isBackgroundRefreshEnabled ||
+      !this.#snapshot.arePricesEnabled ||
+      this.#snapshot.state !== SESSION_STATE.Open ||
+      this.#prices === null
+    ) {
+      return
+    }
+
+    this.#cancelPricePoll = this.#clock.setTimeout(() => {
+      void this.#pollPrices()
+    }, nextPriceRefreshDelay(this.#priceFailures))
+  }
+
+  /**
+   * Один такт опроса.
+   *
+   * КЭШ НЕ СБРАСЫВАЕТСЯ. Срок годности котировки решает сам, что
+   * устарело, а при отказе источника `PriceService` возвращает прежние
+   * значения. Сбрось опрос кэш — один неудачный запрос стирал бы
+   * верную оценку с экрана без всякого действия владельца.
+   */
+  async #pollPrices(): Promise<void> {
+    this.#cancelPricePoll = null
+
+    try {
+      await this.#loadPortfolio()
+
+      /* Отказ источника исключением не выражается: сервис курсов
+         отдаёт то, что смог получить, а причину кладёт в снимок. */
+      this.#priceFailures = this.#snapshot.priceError === null ? 0 : this.#priceFailures + 1
+    } catch (error) {
+      this.#priceFailures += 1
+
+      this.#logger.warn('The price poll failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+    }
+
+    this.#restartPricePolling()
   }
 
   #resubscribeBalance(account: IAccount | null, network: INetworkConfig | null): void {

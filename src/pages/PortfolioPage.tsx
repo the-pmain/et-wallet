@@ -200,7 +200,22 @@ function PriceConsent({ sourceName, isBusy, onEnable }: PriceConsentProps) {
                 the contract addresses of your tokens — that is, the composition of the portfolio;
               </li>
               <li>the network you work in;</li>
-              <li>your IP address.</li>
+              <li>your IP address;</li>
+              {/* САМАЯ ВАЖНАЯ СТРОКА ЭТОГО СПИСКА, И ДОБАВЛЕНА ОНА
+                  ПОЗЖЕ ОСТАЛЬНЫХ. До появления опроса обращение было
+                  разовым: источник видел всплеск запросов и терял
+                  владельца из виду. Опрос раз в минуту превращает это
+                  в непрерывный след — оператор получает время начала
+                  и конца каждой сессии, её длительность и суточный
+                  ритм владельца, привязанные к IP и к неизменному
+                  набору адресов.
+
+                  Это заметно больше прежнего, и умолчать значило бы
+                  собрать согласие на одно, а делать другое. */}
+              <li>
+                how long you keep the wallet open: while this screen is visible the rate is
+                requested about once a minute.
+              </li>
             </ul>
           </div>
 

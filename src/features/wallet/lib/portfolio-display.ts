@@ -59,6 +59,28 @@ export function formatFiat(value: number | null): string {
   return fiatFormatter.format(value)
 }
 
+/**
+ * Часы и минуты котировки. `null` — момент неизвестен.
+ *
+ * ВОЗРАСТ КОТИРОВКИ ПОКАЗЫВАЕТСЯ, ПОТОМУ ЧТО «РЕАЛЬНОГО ВРЕМЕНИ» НЕТ.
+ * Курс обновляется опросом раз в минуту, пока экран открыт, а при
+ * отказе источника на экране остаётся прежний. Без времени рядом эти
+ * два случая неотличимы: число выглядит одинаково живым и когда ему
+ * двадцать секунд, и когда двадцать минут.
+ *
+ * Секунды не показываются намеренно: точность, которой нет, читалась
+ * бы как обещание. Минуты — ровно тот разряд, в котором курс и
+ * обновляется.
+ */
+export function formatQuoteTime(at: number | null): string | null {
+  return at === null ? null : timeFormatter.format(at)
+}
+
+const timeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
 /** Доля в процентах. `null` — прочерк. */
 export function formatShare(share: number | null): string {
   return share === null ? '—' : `${(share * 100).toFixed(1)} %`

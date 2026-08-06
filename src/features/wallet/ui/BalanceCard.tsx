@@ -10,7 +10,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
 
 import { formatTokenAmount } from '../lib/format'
 import { estimateNativeValue } from '../lib/native-value'
-import { formatFiat } from '../lib/portfolio-display'
+import { formatFiat, formatQuoteTime } from '../lib/portfolio-display'
 
 interface BalanceCardProps {
   readonly balance: IBalance | null
@@ -300,8 +300,11 @@ function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: Balan
     )
   }
 
+  const quotedAt = formatQuoteTime(portfolio?.oldestQuoteAt ?? null)
+
   return (
-    /* Табличные цифры и здесь: оценка стоит под суммой, и два числа
+    <div className="flex flex-col gap-0.5">
+      {/* Табличные цифры и здесь: оценка стоит под суммой, и два числа
        с разной шириной разрядов выглядят сдвинутыми друг относительно
        друга.
 
@@ -312,10 +315,25 @@ function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: Balan
        переноса не считаются. Величина не выдуманная: у сети
        с многотриллионной эмиссией нативной валюты оценка выходит
        именно такой длины. `break-words` рвёт только то слово, которое
-       иначе не помещается, и обычную надпись не трогает. */
-    <p className="text-lg font-medium break-words text-muted-foreground tabular-nums">
-      {t('dashboard.approxValue', { value: formatFiat(value) })}
-    </p>
+       иначе не помещается, и обычную надпись не трогает. */}
+      <p className="text-lg font-medium break-words text-muted-foreground tabular-nums">
+        {t('dashboard.approxValue', { value: formatFiat(value) })}
+      </p>
+
+      {/* Время котировки, а не «обновлено только что». Курс опрашивается
+          раз в минуту, пока экран открыт, но при отказе источника
+          на экране остаётся прежний — и отличить живое число от
+          замершего можно только по времени.
+
+          Строки нет, когда момент котировки неизвестен: выдумать его
+          из текущего времени значило бы объявить свежим то, о чём
+          ничего не известно. */}
+      {quotedAt === null ? null : (
+        <p className="text-xs text-muted-foreground/80 tabular-nums">
+          {t('dashboard.rateAsOf', { time: quotedAt })}
+        </p>
+      )}
+    </div>
   )
 }
 

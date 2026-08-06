@@ -472,6 +472,7 @@ export {
   CoinGeckoPriceProvider,
   FIAT_CURRENCY,
   NullPriceProvider,
+  PRICE_QUOTE_TTL_MS,
   PriceService,
   findCoinGeckoPlatform,
   priceRefKey,
