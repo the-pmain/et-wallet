@@ -71,8 +71,11 @@ import {
   type IPreflightRequest,
   type IPreflightResult,
   type ISimulationResult,
+  type ITenderlyCredentials,
   PREFLIGHT_OUTCOME,
   preflightCall,
+  SimulationService,
+  TenderlySimulationProvider,
   simulateTransaction,
   UNCHECKED_SIMULATION,
   type ITransactionRequest,
@@ -138,6 +141,9 @@ const CLOSED_SNAPSHOT: IWalletSnapshot = {
   isPortfolioLoading: false,
   priceError: null,
   priceSourceName: '',
+  isTenderlyConfigured: false,
+  isSimulationSourceEnabled: false,
+  simulationSourceName: null,
   ensNames: EMPTY_ENS_NAMES,
   isEnsSupported: false,
   rpcEndpoints: [],
@@ -202,6 +208,20 @@ export interface IWalletSessionDependencies {
    * на раскрытие его состава» принимает владелец средств, а не ядро.
    */
   readonly priceProvider?: IPriceProvider
+
+  /**
+   * Учётные данные Tenderly из окружения сборки.
+   *
+   * ЧИТАЮТСЯ СЛОЕМ ПРИЛОЖЕНИЯ, А НЕ ЯДРОМ. `import.meta.env` —
+   * особенность сборщика, и ядро о ней знать не должно: оно обязано
+   * собираться и в расширении, и в тестах, где никакого `import.meta`
+   * нет.
+   *
+   * Это путь для проверки на своей машине. Значение из `.env` попадает
+   * в текст выложенной программы и достаётся каждому, кто её открыл, —
+   * поэтому введённые владельцем данные его перекрывают.
+   */
+  readonly tenderlyCredentials?: ITenderlyCredentials | null
 }
 
 /**
@@ -237,6 +257,13 @@ export class WalletSession implements IWalletSession {
    */
   readonly #connectHardware: (() => Promise<IHardwareDevice>) | null
   readonly #priceProvider: IPriceProvider
+
+  /** Учётные данные Tenderly из окружения сборки. `null` — их нет. */
+  readonly #buildCredentials: ITenderlyCredentials | null
+
+  /* Служба симуляции пересобирается при смене учётных данных либо
+     согласия: набор источников задаётся в конструкторе. */
+  #simulation: SimulationService | null = null
   readonly #listeners = new Set<() => void>()
 
   /* Один экземпляр на сессию: сервис не хранит состояния, а создание
@@ -302,6 +329,7 @@ export class WalletSession implements IWalletSession {
     this.#historyProviders = dependencies.historyProviders ?? [new LogScanHistoryProvider()]
     this.#connectHardware = dependencies.connectHardware ?? null
     this.#priceProvider = dependencies.priceProvider ?? new NullPriceProvider()
+    this.#buildCredentials = dependencies.tenderlyCredentials ?? null
   }
 
   getSnapshot(): IWalletSnapshot {
@@ -742,6 +770,59 @@ export class WalletSession implements IWalletSession {
     })
   }
 
+  /**
+   * Сохраняет учётные данные Tenderly.
+   *
+   * СОГЛАСИЯ НЕ ДАЁТ. Введённый ключ означает «я готов», а не «начинай»:
+   * включение остаётся отдельным действием с перечнем того, что уходит
+   * наружу. Ввод данных и разрешение на их применение — разные решения,
+   * и объединять их значило бы получать второе под видом первого.
+   */
+  async setTenderlyCredentials(credentials: ITenderlyCredentials): Promise<void> {
+    await this.#storage.set(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.TenderlyAccount,
+      credentials.account.trim(),
+    )
+    await this.#storage.set(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.TenderlyProject,
+      credentials.project.trim(),
+    )
+    await this.#storage.set(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.TenderlyAccessKey,
+      credentials.accessKey.trim(),
+    )
+
+    await this.#refreshSimulation()
+  }
+
+  /** Забывает учётные данные и выключает источник вместе с ними. */
+  async clearTenderlyCredentials(): Promise<void> {
+    await this.#storage.remove(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyAccount)
+    await this.#storage.remove(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyProject)
+    await this.#storage.remove(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyAccessKey)
+
+    /* Согласие снимается вместе с данными: оставить его значило бы, что
+       следующий введённый ключ заработает молча, без нового решения. */
+    await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.SimulationSourceEnabled, false)
+
+    await this.#refreshSimulation()
+  }
+
+  async enableSimulationSource(): Promise<void> {
+    await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.SimulationSourceEnabled, true)
+
+    await this.#refreshSimulation()
+  }
+
+  async disableSimulationSource(): Promise<void> {
+    await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.SimulationSourceEnabled, false)
+
+    await this.#refreshSimulation()
+  }
+
   async refreshPrices(): Promise<void> {
     this.#prices?.invalidate()
 
@@ -1152,10 +1233,15 @@ export class WalletSession implements IWalletSession {
 
       /* Согласие читается до загрузки данных: иначе первая загрузка
          прошла бы без курсов, и оценка появилась бы только со второй. */
+      await this.#buildSimulation()
+
       this.#publish({
         ...this.#snapshot,
         arePricesEnabled: await this.#readPricesConsent(),
         priceSourceName: this.#priceProvider.name,
+        isSimulationSourceEnabled: await this.#readSimulationConsent(),
+        isTenderlyConfigured: (await this.#readTenderlyCredentials()) !== null,
+        simulationSourceName: this.#simulation?.activeSourceName() ?? null,
       })
 
       await this.#reloadAccountScopedData()
@@ -1399,6 +1485,81 @@ export class WalletSession implements IWalletSession {
       (await this.#storage.get<boolean>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.PricesEnabled)) ===
       true
     )
+  }
+
+  async #readSimulationConsent(): Promise<boolean> {
+    return (
+      (await this.#storage.get<boolean>(
+        STORAGE_NAMESPACE.Settings,
+        SETTINGS_KEY.SimulationSourceEnabled,
+      )) === true
+    )
+  }
+
+  /**
+   * Читает учётные данные Tenderly.
+   *
+   * ДВА ИСТОЧНИКА, И НАСТРОЙКИ ВАЖНЕЕ ПЕРЕМЕННЫХ СБОРКИ. Значения
+   * из `.env` попадают в текст программы и достаются каждому, кто открыл
+   * кошелёк, — они годятся для проверки на своей машине, но не для
+   * выложенной сборки. Введённые владельцем лежат в зашифрованном
+   * хранилище и принадлежат ему одному, поэтому перекрывают сборочные.
+   *
+   * `null` — данных нет ни там, ни там.
+   */
+  async #readTenderlyCredentials(): Promise<ITenderlyCredentials | null> {
+    const stored = await Promise.all([
+      this.#storage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyAccount),
+      this.#storage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyProject),
+      this.#storage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyAccessKey),
+    ])
+
+    const account = nonEmpty(stored[0])
+    const project = nonEmpty(stored[1])
+    const accessKey = nonEmpty(stored[2])
+
+    /* Все три либо ничего: два значения из трёх — это не «настроено
+       наполовину», а неработающая связка, о которой лучше сказать
+       «не настроено», чем отправлять заведомо отказной запрос. */
+    if (account !== null && project !== null && accessKey !== null) {
+      return { account, project, accessKey }
+    }
+
+    return this.#buildCredentials
+  }
+
+  /**
+   * Собирает службу симуляции.
+   *
+   * СТОРОННИЙ ИСТОЧНИК ДОБАВЛЯЕТСЯ ТОЛЬКО ПРИ ДВУХ УСЛОВИЯХ СРАЗУ:
+   * учётные данные введены И согласие дано. Проверка стоит здесь,
+   * а не в интерфейсе: путь к симуляции появится и из других мест —
+   * подтверждение перевода, запрос приложения, разбор вызова, — и
+   * правило, соблюдение которого зависит от каждого вызывающего,
+   * нарушается при первом же добавлении такого места.
+   */
+  async #buildSimulation(): Promise<void> {
+    const credentials = await this.#readTenderlyCredentials()
+    const isEnabled = await this.#readSimulationConsent()
+
+    const sources =
+      credentials === null || !isEnabled
+        ? []
+        : [new TenderlySimulationProvider({ credentials, logger: this.#logger })]
+
+    this.#simulation = new SimulationService({ logger: this.#logger, sources })
+  }
+
+  /** Пересобирает службу и сообщает экрану новое состояние источника. */
+  async #refreshSimulation(): Promise<void> {
+    await this.#buildSimulation()
+
+    this.#publish({
+      ...this.#snapshot,
+      isTenderlyConfigured: (await this.#readTenderlyCredentials()) !== null,
+      isSimulationSourceEnabled: await this.#readSimulationConsent(),
+      simulationSourceName: this.#simulation?.activeSourceName() ?? null,
+    })
   }
 
   /**
@@ -1956,12 +2117,19 @@ export class WalletSession implements IWalletSession {
     }
 
     try {
-      return await simulateTransaction(await this.#providers.get(network), {
+      const request = {
         from: transaction.from,
         to: transaction.to,
         data: transaction.data,
         value: transaction.value,
-      })
+      }
+      const provider = await this.#providers.get(network)
+
+      /* Служба может отсутствовать только у неоткрытой сессии; для этого
+         случая остаётся прямой путь к узлу, а не отказ от проверки. */
+      return this.#simulation === null
+        ? await simulateTransaction(provider, request)
+        : await this.#simulation.simulate(provider, request, network.chainId)
     } catch (error) {
       this.#logger.warn('The transaction could not be simulated before signing', {
         reason: error instanceof Error ? error.message : String(error),
@@ -2018,4 +2186,21 @@ function appendTransfers(
   const seen = new Set<string>(shown.map((record) => record.id))
 
   return [...shown, ...earlier.filter((record) => !seen.has(record.id))]
+}
+
+/**
+ * Строка без пробелов по краям либо `null`.
+ *
+ * Пустое значение и отсутствующее равнозначны: и то и другое означает
+ * «не задано». Пробелы срезаются, потому что ключ доступа обычно
+ * приходит вставкой из буфера обмена вместе с переводом строки.
+ */
+function nonEmpty(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+
+  return trimmed === '' ? null : trimmed
 }

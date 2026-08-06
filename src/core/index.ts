@@ -622,6 +622,17 @@ export {
   type TransferSource,
 } from './history'
 
+/* --- Симуляция --- */
+export {
+  SimulationService,
+  TenderlySimulationProvider,
+  parseSimulation,
+  type ISimulationServiceDependencies,
+  type ISimulationSource,
+  type ITenderlyCredentials,
+  type ITenderlyOptions,
+} from './simulation'
+
 /* --- Транзакции --- */
 export {
   FEE_PRIORITY,

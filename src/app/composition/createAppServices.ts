@@ -2,6 +2,7 @@ import {
   AlchemyHistoryProvider,
   AlchemyProvider,
   CoinGeckoPriceProvider,
+  type ITenderlyCredentials,
   ConsoleLogger,
   LogScanHistoryProvider,
   CustomRpcProvider,
@@ -98,6 +99,7 @@ export function createAppServices(): IAppServices {
     rpcProviders: createRpcProviders(secureStorage),
     historyProviders: createHistoryProviders(),
     priceProvider: createPriceProvider(),
+    tenderlyCredentials: readTenderlyCredentials(),
     connectHardware: connectLedger,
   })
 
@@ -213,6 +215,35 @@ function createDappSessions(
  * выше, и адреса уходят пакетами: меньше запросов означает и меньше
  * следов, и меньший расход лимита.
  */
+/**
+ * Учётные данные Tenderly из окружения сборки.
+ *
+ * ЧИТАЮТСЯ ЗДЕСЬ, А НЕ В ЯДРЕ. `import.meta.env` — особенность сборщика;
+ * ядро обязано собираться и там, где его нет, — в тестах и в служебном
+ * процессе расширения.
+ *
+ * ЭТО ПУТЬ ДЛЯ ПРОВЕРКИ НА СВОЕЙ МАШИНЕ. Значение из `.env` попадает
+ * в текст выложенной программы и достаётся каждому, кто её открыл;
+ * ключ доступа при этом даёт право тратить квоту проекта. Поэтому
+ * введённые владельцем данные из зашифрованного хранилища перекрывают
+ * эти, а не наоборот.
+ *
+ * `null` — рабочее состояние: следствия транзакции считает узел.
+ */
+function readTenderlyCredentials(): ITenderlyCredentials | null {
+  const account = import.meta.env.VITE_TENDERLY_ACCOUNT ?? ''
+  const project = import.meta.env.VITE_TENDERLY_PROJECT ?? ''
+  const accessKey = import.meta.env.VITE_TENDERLY_ACCESS_KEY ?? ''
+
+  /* Все три либо ничего: двух значений из трёх достаточно для запроса,
+     который заведомо получит отказ. */
+  if (account === '' || project === '' || accessKey === '') {
+    return null
+  }
+
+  return { account, project, accessKey }
+}
+
 function createPriceProvider(): CoinGeckoPriceProvider {
   const apiKey = import.meta.env.VITE_COINGECKO_API_KEY ?? null
   const hasKey = apiKey !== null && apiKey !== ''

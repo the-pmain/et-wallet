@@ -21,6 +21,7 @@ import {
   AddNetworkForm,
   NetworkList,
   RpcSettings,
+  SimulationSettings,
   useWallet,
   useWalletSnapshot,
   type IAccountDiscoverySummary,
@@ -270,6 +271,16 @@ export function SettingsPage() {
         onCheckHealth={() => session.checkRpcHealth()}
         onAdd={(url: string) => session.addRpcEndpoint(url)}
         onRemove={(url: string) => session.removeRpcEndpoint(url)}
+      />
+
+      <SimulationSettings
+        isConfigured={snapshot.isTenderlyConfigured}
+        isEnabled={snapshot.isSimulationSourceEnabled}
+        activeSourceName={snapshot.simulationSourceName}
+        onSave={(credentials) => session.setTenderlyCredentials(credentials)}
+        onClear={() => session.clearTenderlyCredentials()}
+        onEnable={() => session.enableSimulationSource()}
+        onDisable={() => session.disableSimulationSource()}
       />
 
       <Card>
