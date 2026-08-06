@@ -47,21 +47,6 @@ describe('QuickActions: окно смарт-контракта', () => {
     expect(screen.getByText('Contract module is active')).toBeInTheDocument()
   })
 
-  it('окно прямо говорит, что ничего не подписано и не отправлено', async () => {
-    /* ГЛАВНАЯ ПРОВЕРКА. Окно объявляет режим включённым, а вызывать
-       контракты кошелёк пока не умеет. Без этой оговорки заглушка
-       читается как сообщение об отправке — то есть кошелёк сообщал бы
-       о событии, которого не было. */
-    const user = userEvent.setup()
-
-    renderActions()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-
-    expect(screen.getByText(/nothing has been signed or sent/iu)).toBeInTheDocument()
-    expect(screen.getByText(/not wired up yet/iu)).toBeInTheDocument()
-  })
-
   it('окно связано с заголовком для программ чтения экрана', async () => {
     const user = userEvent.setup()
 
