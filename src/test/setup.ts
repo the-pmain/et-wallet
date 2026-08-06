@@ -56,6 +56,57 @@ vi.stubGlobal(
 )
 
 /*
+  jsdom не реализует модальный режим `<dialog>`: `showModal` и `close`
+  отсутствуют даже в 30-й версии. Без подстановки любой тест, задевающий
+  модальное окно, падал бы на отсутствии метода — то есть проверял бы
+  полноту jsdom, а не поведение кошелька.
+
+  Подставляется минимум, достаточный для проверок разметки: открытие
+  выставляет атрибут `open`, закрытие снимает его и рассылает событие
+  `close`, а Escape закрывает окно — ровно то, чем пользуется компонент.
+  Настоящая модальность (верхний слой, удержание фокуса, отключение
+  остального документа) остаётся за браузером и здесь не изображается:
+  заглушка, делающая вид, что фокус удержан, скрыла бы именно те
+  ошибки, ради которых такие проверки и пишутся.
+*/
+if (
+  typeof HTMLDialogElement !== 'undefined' &&
+  HTMLDialogElement.prototype.showModal === undefined
+) {
+  const open = function open(this: HTMLDialogElement): void {
+    this.setAttribute('open', '')
+  }
+
+  const close = function close(this: HTMLDialogElement, returnValue?: string): void {
+    if (!this.hasAttribute('open')) {
+      return
+    }
+
+    this.removeAttribute('open')
+
+    if (returnValue !== undefined) {
+      this.returnValue = returnValue
+    }
+
+    this.dispatchEvent(new Event('close'))
+  }
+
+  HTMLDialogElement.prototype.showModal = open
+  HTMLDialogElement.prototype.show = open
+  HTMLDialogElement.prototype.close = close
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') {
+      return
+    }
+
+    document.querySelectorAll('dialog[open]').forEach((dialog) => {
+      ;(dialog as HTMLDialogElement).close()
+    })
+  })
+}
+
+/*
   Язык интерфейса фиксируется русским.
 
   Приложение определяет язык по настройкам браузера, и это правильное

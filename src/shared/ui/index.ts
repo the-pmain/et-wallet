@@ -7,6 +7,7 @@ export { Button, type ButtonProps } from './button'
 export { buttonVariants } from './button-variants'
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card'
 export { Checkbox, type CheckboxProps } from './checkbox'
+export { Dialog } from './dialog'
 export { DonutChart, type DonutChartProps, type IDonutSlice } from './donut-chart'
 export { EmptyState, type EmptyStateProps } from './empty-state'
 export {

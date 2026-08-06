@@ -112,7 +112,18 @@ const ENGLISH = {
   'dashboard.refresh': 'Refresh',
   'dashboard.lock': 'Lock',
   'dashboard.smartContract': 'Smart contract',
-  'dashboard.smartContractSoon': 'Working with smart contracts is not available yet',
+
+  /* ОКНО-ЗАГЛУШКА ДЛЯ ПРОВЕРКИ ВНЕШНЕГО ВИДА. Вызывать контракты
+     кошелёк пока не умеет; окно показывает, как будет выглядеть
+     включённый режим. Оговорка про отсутствие транзакции — часть
+     текста, а не примечание к нему: без неё окно читается как
+     сообщение об отправке. */
+  'contract.activatedTitle': 'Smart contract mode activated',
+  'contract.activatedDescription': 'The wallet is ready to prepare contract calls.',
+  'contract.activatedStatus': 'Contract module is active',
+  'contract.activatedNotice':
+    'Nothing has been signed or sent: this screen only confirms that the mode is on. Contract calls themselves are not wired up yet — when they are, every call will show the decoded data and the simulated result before you sign.',
+  'contract.activatedConfirm': 'Got it',
   'dashboard.recent': 'Recent activity',
   /* ОДНО ИМЯ У ЭКРАНА. Панель звала его «Activity», заголовок —
      «History», ссылка с главного — «Full history», текст рядом —

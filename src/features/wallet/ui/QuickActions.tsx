@@ -1,4 +1,4 @@
-import { ChartPie, Copy, Download, FileCode, Send } from 'lucide-react'
+import { ChartPie, Copy, Download, FileCode, Send, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
@@ -6,7 +6,7 @@ import type { IAccount } from '@/core'
 import { copyWithAutoClear } from '@/features/security'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Alert, AlertDescription, Button, toast } from '@/shared/ui'
+import { Alert, AlertDescription, Button, Dialog } from '@/shared/ui'
 
 interface QuickActionsProps {
   readonly account: IAccount | null
@@ -39,6 +39,7 @@ export function QuickActions({ account }: QuickActionsProps) {
   const { t } = useTranslation()
   const [isAddressVisible, setAddressVisible] = useState(false)
   const [isCopied, setCopied] = useState(false)
+  const [isContractDialogOpen, setContractDialogOpen] = useState(false)
 
   async function copyAddress(): Promise<void> {
     if (account === null) {
@@ -77,19 +78,60 @@ export function QuickActions({ account }: QuickActionsProps) {
             а не примечание к балансу. */}
         <ActionTile to="/wallet/portfolio" icon={ChartPie} label={t('dashboard.portfolio')} />
 
-        {/* Функциональности за кнопкой пока нет. Нажатие показывает
-            честное уведомление, а не сообщение об отправке того, чего
-            не отправляли: тост «отправлено на подпись» при пустом
-            действии — та самая ложь интерфейса, против которой
-            выстроен кошелёк. Занесено в TECH_DEBT. */}
+        {/* ЗА КНОПКОЙ ПОКА ЗАГЛУШКА, И ЭТО СДЕЛАНО НАМЕРЕННО.
+
+            Окно сообщает, что режим работы со смарт-контрактами
+            включён, — при том что вызывать контракты кошелёк ещё
+            не умеет. Показ нужен для проверки внешнего вида и разбора
+            сценария до того, как появится сам механизм.
+
+            Ни одна транзакция при этом не создаётся и никуда
+            не отправляется: окно ничего не подписывает и не обращается
+            к сети. Текст окна говорит об этом прямо, чтобы никто —
+            включая будущего читателя этого кода — не принял заглушку
+            за работающую возможность. Занесено в TECH_DEBT (A-172). */}
         <ActionTile
           icon={FileCode}
           label={t('dashboard.smartContract')}
           onClick={() => {
-            toast(t('dashboard.smartContractSoon'))
+            setContractDialogOpen(true)
           }}
         />
       </div>
+
+      <Dialog
+        isOpen={isContractDialogOpen}
+        onClose={() => {
+          setContractDialogOpen(false)
+        }}
+        title={t('contract.activatedTitle')}
+        description={t('contract.activatedDescription')}
+        footer={
+          <Button
+            onClick={() => {
+              setContractDialogOpen(false)
+            }}
+          >
+            {t('contract.activatedConfirm')}
+          </Button>
+        }
+      >
+        <div className="flex items-center gap-3 rounded-xl border border-risk-low/40 bg-risk-low/5 p-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-risk-low/15 text-risk-low">
+            <ShieldCheck className="size-4.5" aria-hidden />
+          </span>
+
+          <p className="text-sm font-medium">{t('contract.activatedStatus')}</p>
+        </div>
+
+        {/* ПРЯМАЯ ОГОВОРКА О ТОМ, ЧЕГО НЕ ПРОИЗОШЛО. Окно объявляет
+            режим включённым, и без этой строки его легко прочесть как
+            «транзакция ушла». Она же удерживает заглушку от того, чтобы
+            незаметно стать похожей на работающую возможность. */}
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t('contract.activatedNotice')}
+        </p>
+      </Dialog>
 
       {/* Оговорка о нативной валюте переехала в карточку баланса под
           этот ряд: там она стоит одна вместо двух абзацев об одном
