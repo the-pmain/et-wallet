@@ -13,7 +13,7 @@ import {
   type Timestamp,
 } from '@/core'
 
-import { estimateNativeValue } from './native-value'
+import { estimateNativeValue } from './asset-value'
 
 const ETHEREUM = toChainId(1n)
 const BNB_CHAIN = toChainId(56n)

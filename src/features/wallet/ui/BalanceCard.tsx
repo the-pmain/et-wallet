@@ -9,7 +9,7 @@ import { cn } from '@/shared/lib/utils'
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
 
 import { formatTokenAmount } from '../lib/format'
-import { estimateNativeValue } from '../lib/native-value'
+import { estimateNativeValue } from '../lib/asset-value'
 import { formatFiat, formatQuoteTime } from '../lib/portfolio-display'
 
 interface BalanceCardProps {

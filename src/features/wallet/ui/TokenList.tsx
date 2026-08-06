@@ -1,11 +1,13 @@
 import { safeText } from '@/core'
 import { RefreshCw, Trash2 } from 'lucide-react'
 
-import type { Address, ChainId } from '@/core'
+import type { Address, ChainId, IPortfolioSummary } from '@/core'
 import { UntrustedText } from '@/features/security'
 import { Button } from '@/shared/ui'
 
+import { estimateValue, findQuote } from '../lib/asset-value'
 import { formatTokenAmount, shortenAddress } from '../lib/format'
+import { formatFiat } from '../lib/portfolio-display'
 import type { ITokenBalance } from '../model/contracts'
 import { TokenAvatar } from './TokenAvatar'
 import { TokenTrustBadge } from './TokenTrustBadge'
@@ -23,6 +25,15 @@ interface TokenListProps {
    * разные контракты.
    */
   readonly chainId: ChainId | null
+
+  /**
+   * Сводка портфеля. Отсюда берутся только курсы: оценка считается
+   * от показанного количества.
+   *
+   * `null` — курсы неизвестны либо согласия на них нет. Тогда столбец
+   * оценки не появляется вовсе; нулей вместо неизвестного не бывает.
+   */
+  readonly portfolio?: IPortfolioSummary | null
 }
 
 /**
@@ -37,7 +48,13 @@ interface TokenListProps {
  * Пометка не мешает пользоваться, но не даёт спутать подделку
  * с нативной валютой сети, чья конфигурация проверена.
  */
-export function TokenList({ tokens, isLoading, onRemove, chainId }: TokenListProps) {
+export function TokenList({
+  tokens,
+  isLoading,
+  onRemove,
+  chainId,
+  portfolio = null,
+}: TokenListProps) {
   /* `aria-busy` по той же причине, что и на карточке баланса: пока
      количество читается, на его месте вращается значок и больше
      ничего — зрячий это видит, слушающий страницу нет. */
@@ -72,24 +89,47 @@ export function TokenList({ tokens, isLoading, onRemove, chainId }: TokenListPro
                 не давал сжаться всей колонке, и ограничитель на самом
                 числе не действовал: ширину диктовало содержимое. */}
           <span className="flex min-w-0 items-center gap-1">
-            {/* Количество — то, ради чего список открывают, и потому
-                весит больше имени. Табличные цифры плюс выравнивание
-                по правому краю: разряды обязаны встать друг под друга.
+            <span className="flex min-w-0 flex-col items-end gap-0.5">
+              {/* Количество — то, ради чего список открывают, и потому
+                  весит больше имени. Табличные цифры плюс выравнивание
+                  по правому краю: разряды обязаны встать друг под друга.
 
-                `min-w-0` и перенос по символам — защита от предельного
-                числа: измерено, что баланс спам-токена растягивал
-                строку до 1738 пикселей при доступных 734. Обрезать
-                сумму нельзя, поэтому она переносится. */}
-            <span className="min-w-0 text-right text-base font-semibold break-all tabular-nums">
-              {entry.balance === null ? (
-                isLoading ? (
-                  <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                  `min-w-0` и перенос по символам — защита от предельного
+                  числа: измерено, что баланс спам-токена растягивал
+                  строку до 1738 пикселей при доступных 734. Обрезать
+                  сумму нельзя, поэтому она переносится. */}
+              <span className="min-w-0 text-right text-base font-semibold break-all tabular-nums">
+                {entry.balance === null ? (
+                  isLoading ? (
+                    <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )
                 ) : (
-                  <span className="text-muted-foreground">—</span>
-                )
-              ) : (
-                formatTokenAmount(entry.balance, entry.token.decimals)
-              )}
+                  formatTokenAmount(entry.balance, entry.token.decimals)
+                )}
+              </span>
+
+              {/* ОЦЕНКА ПОД КОЛИЧЕСТВОМ, А НЕ ВМЕСТО НЕГО. Настоящая
+                  величина — та, что в монетах: она точна, она
+                  подписывается, она не зависит от чужого сервиса.
+                  Долларовая производная и набрана мельче именно
+                  поэтому.
+
+                  Строки нет там, где курс неизвестен: у токена вне
+                  реестра источника, при отсутствии согласия на курсы
+                  и при неполученном балансе. Прочерк в этих случаях
+                  добавил бы столбец пустых прочерков во всю длину
+                  списка, ничего не сообщая; отсутствие строки читается
+                  так же и не занимает места. Что именно выпало
+                  из оценки и почему — перечислено на экране портфеля. */}
+              <AssetValue
+                balance={entry.balance}
+                decimals={entry.token.decimals}
+                chainId={chainId}
+                address={entry.token.address}
+                portfolio={portfolio}
+              />
             </span>
 
             {/* МЕСТО ПОД КНОПКУ ЗАНЯТО ДАЖЕ ТАМ, ГДЕ КНОПКИ НЕТ.
@@ -122,5 +162,28 @@ export function TokenList({ tokens, isLoading, onRemove, chainId }: TokenListPro
         </li>
       ))}
     </ul>
+  )
+}
+
+interface AssetValueProps {
+  readonly balance: bigint | null
+  readonly decimals: number
+  readonly chainId: ChainId | null
+  readonly address: Address | null
+  readonly portfolio: IPortfolioSummary | null
+}
+
+/** Оценка одной строки списка. Ничего не рисует, когда курс неизвестен. */
+function AssetValue({ balance, decimals, chainId, address, portfolio }: AssetValueProps) {
+  const value = estimateValue(balance, decimals, findQuote(portfolio, chainId, address))
+
+  if (value === null) {
+    return null
+  }
+
+  return (
+    <span className="text-right text-xs break-words text-muted-foreground tabular-nums">
+      ≈ {formatFiat(value)}
+    </span>
   )
 }

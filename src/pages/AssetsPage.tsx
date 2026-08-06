@@ -1,5 +1,6 @@
 import { Info, Plus, RefreshCw, X } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import type { Address } from '@/core'
 import { ImportTokenForm, TokenList, useWallet, useWalletSnapshot } from '@/features/wallet'
@@ -83,6 +84,10 @@ export function AssetsPage() {
             tokens={snapshot.tokenBalances}
             isLoading={snapshot.isTokensLoading}
             chainId={snapshot.activeNetwork?.chainId ?? null}
+            /* Оценка собирается из уже имеющегося снимка: курсы
+               запрашиваются тем же обходом, что балансы, и только при
+               данном согласии. Экран активов сам наружу не ходит. */
+            portfolio={snapshot.portfolio}
             onRemove={(address: Address) => {
               void session.removeToken(address)
             }}
@@ -106,14 +111,41 @@ export function AssetsPage() {
           предупреждением там, где предупреждать не о чем, обесценивает
           настоящие предупреждения — их перестают отличать от фона.
 
-          Текст сохранён дословно: он объясняет отсутствие привычной
-          колонки, и без него список выглядит недоделанным. */}
+          ТЕКСТ ЗАВИСИТ ОТ СОГЛАСИЯ, И ЭТО НЕ УКРАШЕНИЕ. Прежняя редакция
+          утверждала, что стоимость в валюте не показывается вовсе. После
+          появления оценки это стало неправдой, а сноска, описывающая
+          не то, что на экране, хуже отсутствующей: по ней перестают
+          сверяться. */}
       <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        <span>
-          Asset value in fiat is not shown: that needs an external price source, which would receive
-          your addresses. Choosing such a source is the wallet owner’s decision.
-        </span>
+
+        {snapshot.arePricesEnabled ? (
+          <span>
+            The value is approximate: it comes from a third-party price source and is not a sum
+            anyone promised to pay. Assets whose rate is unknown carry no value here — what was left
+            out of the valuation, and why, is listed in the{' '}
+            <Link
+              to="/wallet/portfolio"
+              className="focus-ring rounded-sm underline-offset-4 hover:underline"
+            >
+              portfolio
+            </Link>
+            .
+          </span>
+        ) : (
+          <span>
+            Asset value in fiat is not shown: that needs an external price source, which would
+            receive your addresses. Choosing such a source is the wallet owner’s decision — it is
+            made in the{' '}
+            <Link
+              to="/wallet/portfolio"
+              className="focus-ring rounded-sm underline-offset-4 hover:underline"
+            >
+              portfolio
+            </Link>
+            .
+          </span>
+        )}
       </p>
     </div>
   )

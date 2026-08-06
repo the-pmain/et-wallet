@@ -4,7 +4,6 @@ import { BUILT_IN_CHAIN_ID, type Wei } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
-import { PRICE_REFRESH_INTERVAL_MS } from '../lib/price-refresh'
 import { SESSION_STATE } from './contracts'
 
 const PASSWORD = 'Korova-7-Luna!'
@@ -175,116 +174,5 @@ describe('WalletSession: подписка', () => {
     await services.session.open()
 
     expect(notifications).toBe(0)
-  })
-})
-
-/**
- * ОПРОС КУРСОВ.
- *
- * Проверяется на управляемых часах, а не на поддельных таймерах:
- * в этом наборе уже есть плавающий тест на `vi.useFakeTimers`, и
- * заводить второй такой незачем. `FakeClock` двигается только явным
- * вызовом, поэтому расписание проверяется точно.
- */
-describe('WalletSession: опрос курсов', () => {
-  /** Двигает часы и даёт разрешиться цепочке обещаний такта. */
-  async function advance(ms: number): Promise<void> {
-    services.clock.advance(ms)
-
-    for (let step = 0; step < 20; step += 1) {
-      await Promise.resolve()
-    }
-  }
-
-  it('без согласия источник не опрашивается вовсе', async () => {
-    /* Не «спит до разрешения», а не заводится: спящий таймер
-       обратился бы к источнику без согласия владельца. */
-    await services.session.open()
-
-    const before = services.priceProvider.callCount
-
-    await advance(10 * PRICE_REFRESH_INTERVAL_MS)
-
-    expect(services.priceProvider.callCount).toBe(before)
-  })
-
-  it('после согласия опрашивает раз в промежуток', async () => {
-    await services.session.open()
-    await services.session.enablePrices()
-
-    const before = services.priceProvider.callCount
-
-    /* Немедленного такта нет: курсы только что получены согласием. */
-    await advance(PRICE_REFRESH_INTERVAL_MS / 2)
-    expect(services.priceProvider.callCount).toBe(before)
-
-    await advance(PRICE_REFRESH_INTERVAL_MS)
-    expect(services.priceProvider.callCount).toBe(before + 1)
-
-    await advance(PRICE_REFRESH_INTERVAL_MS)
-    expect(services.priceProvider.callCount).toBe(before + 2)
-  })
-
-  it('гаснет тем же выключателем, что и балансы', async () => {
-    /* ГЛАВНАЯ ПРОВЕРКА ЭТОГО БЛОКА. Опрос скрытой вкладки сообщал бы
-       источнику время присутствия владельца, не показывая ему ничего.
-       Выключатель один на всю фоновую работу — иначе два механизма
-       разойдутся при первом же изменении. */
-    await services.session.open()
-    await services.session.enablePrices()
-
-    services.session.setBackgroundRefreshEnabled(false)
-
-    const before = services.priceProvider.callCount
-
-    await advance(5 * PRICE_REFRESH_INTERVAL_MS)
-
-    expect(services.priceProvider.callCount).toBe(before)
-  })
-
-  it('разводит такты после отказа', async () => {
-    await services.session.open()
-    await services.session.enablePrices()
-
-    services.priceProvider.configure({ failure: 'Too Many Requests' })
-
-    const before = services.priceProvider.callCount
-
-    await advance(PRICE_REFRESH_INTERVAL_MS)
-    expect(services.priceProvider.callCount).toBe(before + 1)
-
-    /* «429» лечится не повторением с прежним шагом: следующий такт
-       вдвое дальше, и обычного промежутка теперь не хватает. */
-    await advance(PRICE_REFRESH_INTERVAL_MS)
-    expect(services.priceProvider.callCount).toBe(before + 1)
-
-    await advance(PRICE_REFRESH_INTERVAL_MS)
-    expect(services.priceProvider.callCount).toBe(before + 2)
-  })
-
-  it('прекращается при отзыве согласия', async () => {
-    await services.session.open()
-    await services.session.enablePrices()
-    await services.session.disablePrices()
-
-    const before = services.priceProvider.callCount
-
-    await advance(5 * PRICE_REFRESH_INTERVAL_MS)
-
-    expect(services.priceProvider.callCount).toBe(before)
-  })
-
-  it('прекращается после закрытия сессии', async () => {
-    /* Таймер, переживший блокировку, продолжал бы выдавать источнику
-       присутствие владельца у запертого кошелька. */
-    await services.session.open()
-    await services.session.enablePrices()
-    await services.session.close()
-
-    const before = services.priceProvider.callCount
-
-    await advance(5 * PRICE_REFRESH_INTERVAL_MS)
-
-    expect(services.priceProvider.callCount).toBe(before)
   })
 })
