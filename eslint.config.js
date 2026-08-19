@@ -91,27 +91,29 @@ const FORBIDDEN_STORAGE_GLOBALS = [
 
 export default tseslint.config(
   {
-    /* Сервис — отдельный пакет со своей средой исполнения, своим
-       tsconfig и своим набором правил: у него запрещён вывод в консоль
-       мимо журнала и запрещены библиотеки подписи, а правила React
-       неприменимы. Проверяется он собственной командой `verify`. */
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.vite/**', 'server/**'],
+    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.vite/**'],
   },
 
   /* Базовые наборы правил. */
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
 
-  /* Общие настройки для всего исходного кода. */
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      ecmaVersion: 2023,
-      globals: globals.browser,
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+  },
+
+  /* Общие настройки для исходного кода кошелька (браузер). */
+  {
+    files: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.browser,
     },
     plugins: {
       'react-hooks': reactHooks,
@@ -190,6 +192,88 @@ export default tseslint.config(
     },
   })),
 
+  /* Node-слой: Fastify. Не React, не DOM, не слои кошелька. */
+  {
+    files: ['server/src/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/return-await': ['error', 'always'],
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      '@typescript-eslint/no-implied-eval': 'error',
+      'no-console': 'error',
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'prefer-const': 'error',
+      'no-var': 'error',
+      'object-shorthand': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'ethers',
+              message: 'Node-слой не подписывает транзакции.',
+            },
+            {
+              name: 'web3',
+              message: 'Node-слой не подписывает транзакции.',
+            },
+            {
+              name: 'viem',
+              message: 'Node-слой не подписывает транзакции.',
+            },
+            {
+              name: '@noble/curves',
+              message: 'Node-слой не выводит ключи.',
+            },
+            {
+              name: '@scure/bip32',
+              message: 'Node-слой не выводит ключи.',
+            },
+            {
+              name: '@scure/bip39',
+              message: 'Node-слой не выводит ключи.',
+            },
+            {
+              name: 'bip39',
+              message: 'Node-слой не выводит ключи.',
+            },
+            {
+              name: 'bip32',
+              message: 'Node-слой не выводит ключи.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    files: ['server/src/index.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   /* Конфигурационные файлы и служебные сценарии выполняются в Node. */
   {
     files: ['*.config.{js,ts}', 'build/**/*.ts', 'scripts/**/*.{js,mjs,ts}'],
@@ -212,6 +296,8 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       'no-restricted-imports': 'off',
     },
   },

@@ -9,7 +9,10 @@ import { createUsersStore } from './users/createUsersStore.ts'
 loadLocalEnv()
 
 /**
- * Точка входа.
+ * Точка входа Node-процесса.
+ *
+ * Это тот же репозиторий, что и интерфейс кошелька: `npm start` из корня
+ * поднимает Fastify, а он раздаёт `/v1` и собранный UI из `dist/`.
  *
  * ОШИБКА НАСТРОЙКИ ИЛИ КАТАЛОГА ОСТАНАВЛИВАЕТ ЗАПУСК. Сервис, поднявшийся
  * с испорченным каталогом, раздаёт неверные адреса контрактов всем
@@ -57,13 +60,21 @@ main().catch((error: unknown) => {
 })
 
 /**
- * Читает `server/.env` в `process.env`, не затирая уже заданные переменные.
+ * Читает корневой `.env`, затем `server/.env`, не затирая уже заданные
+ * переменные.
  *
- * Скрипт `dev` не обязан знать про `--env-file`: файл может отсутствовать.
+ * Vite забирает из `.env` только `VITE_*`. Остальное — для этого процесса.
+ * `server/.env` оставлен, чтобы локальные секреты не пришлось переносить
+ * в тот же файл, что и клиентские ключи.
  */
 function loadLocalEnv(): void {
-  const path = join(dirname(fileURLToPath(import.meta.url)), '../.env')
+  const here = dirname(fileURLToPath(import.meta.url))
 
+  applyEnvFile(join(here, '../../.env'))
+  applyEnvFile(join(here, '../.env'))
+}
+
+function applyEnvFile(path: string): void {
   if (!existsSync(path)) {
     return
   }

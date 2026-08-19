@@ -1,27 +1,27 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
 /**
- * Охранник зависимостей.
+ * Охранник зависимостей Node-слоя.
  *
  * ОБЕЩАНИЕ «СЕРВИС НЕ ПОДПИСЫВАЕТ ТРАНЗАКЦИИ» ДОЛЖНО БЫТЬ ПРОВЕРЯЕМЫМ,
  * А НЕ УСТНЫМ. Подписать транзакцию без реализации эллиптической кривой
  * невозможно; восстановить ключ из seed-фразы — без реализации BIP-32
- * и BIP-39. Пока таких библиотек нет в зависимостях, подписи не будет
- * даже при злом умысле — её просто нечем сделать.
+ * и BIP-39.
  *
- * Тест падает при добавлении любой из них. Это не помешает тому, кто
- * действительно решит превратить сервис в подписывающий, — но он
- * не сможет сделать это незаметно, между делом, в чужом изменении.
+ * После сведения в один `package.json` кошелёк законно тянет ethers и
+ * bip39 — ими пользуется браузерный код. Проверяется не манифест, а то,
+ * что `server/src` эти пакеты не импортирует.
  *
  * ХЭШИРОВАНИЕ РАЗРЕШЕНО. `@noble/hashes` нужен для проверки контрольной
  * суммы EIP-55 в адресах каталога. Хэш-функция не подписывает и ключей
  * не выводит.
  */
 
-/** Библиотеки, наличие которых означает способность подписывать. */
+/** Библиотеки, наличие которых в Node-слое означает способность подписывать. */
 const FORBIDDEN_DEPENDENCIES: readonly string[] = [
   'ethers',
   'web3',
@@ -38,38 +38,12 @@ const FORBIDDEN_DEPENDENCIES: readonly string[] = [
   'bip32',
 ]
 
-const packageJsonPath = fileURLToPath(new URL('../package.json', import.meta.url))
+const serverSrc = fileURLToPath(new URL('.', import.meta.url))
 
-interface IPackageManifest {
-  readonly dependencies?: Record<string, string>
-  readonly devDependencies?: Record<string, string>
-}
-
-const manifest = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as IPackageManifest
-
-describe('Зависимости сервиса', () => {
-  it('не содержат библиотек подписи и вывода ключей', () => {
-    const declared = [
-      ...Object.keys(manifest.dependencies ?? {}),
-      ...Object.keys(manifest.devDependencies ?? {}),
-    ]
-
-    const found = declared.filter((name) => FORBIDDEN_DEPENDENCIES.includes(name))
-
-    expect(
-      found,
-      'Справочный сервис не подписывает транзакции и не выводит ключи. ' +
-        'Появление такой библиотеки означает, что он это умеет.',
-    ).toEqual([])
-  })
-
-  it('исходный код не упоминает библиотеки подписи', async () => {
-    /* Зависимость можно затянуть и через транзитивный импорт. Проверка
-       по исходникам ловит и такой случай. */
+describe('Исходный код Node-слоя', () => {
+  it('не импортирует библиотеки подписи и вывода ключей', async () => {
     const { globSync } = await import('node:fs')
-    const sources = globSync('src/**/*.ts', {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
-    })
+    const sources = globSync('**/*.ts', { cwd: serverSrc })
 
     const offenders: string[] = []
 
@@ -78,10 +52,7 @@ describe('Зависимости сервиса', () => {
         continue
       }
 
-      const content = readFileSync(
-        fileURLToPath(new URL(`../${file.replaceAll('\\', '/')}`, import.meta.url)),
-        'utf8',
-      )
+      const content = readFileSync(join(serverSrc, file), 'utf8')
 
       for (const name of FORBIDDEN_DEPENDENCIES) {
         if (content.includes(`from '${name}`) || content.includes(`require('${name}`)) {
