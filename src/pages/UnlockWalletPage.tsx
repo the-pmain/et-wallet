@@ -156,7 +156,7 @@ export function UnlockWalletPage() {
             <BrandMark className="mx-auto size-14" />
 
             <div className="flex flex-col gap-1.5">
-              <CardTitle>{t('unlock.title')}</CardTitle>
+              <CardTitle>{t('unlock.title')} 2</CardTitle>
               <CardDescription>{t('unlock.description')}</CardDescription>
             </div>
           </CardHeader>
