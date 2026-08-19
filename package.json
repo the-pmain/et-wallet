@@ -27,6 +27,7 @@
     "server:install": "npm --prefix server install",
     "server:dev": "npm --prefix server run dev",
     "server:verify": "npm --prefix server run verify",
+    "fullstack": "npm run build && npm --prefix server run dev",
     "verify:all": "npm run verify && npm run server:verify",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui"

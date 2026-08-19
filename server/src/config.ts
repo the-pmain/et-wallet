@@ -1,3 +1,5 @@
+import { resolveStaticRoot } from './lib/staticRoot.ts'
+
 /**
  * Настройки сервиса из окружения.
  *
@@ -53,6 +55,13 @@ export interface IServerConfig {
 
   /** Анонимный ключ проекта. Живёт только на сервере. */
   readonly supabaseAnonKey: string | null
+
+  /**
+   * Каталог собранного кошелька (`index.html`).
+   *
+   * `null` — сервис отвечает только JSON. Тогда `GET /` это 404.
+   */
+  readonly staticRoot: string | null
 }
 
 const DEFAULT_PORT = 8080
@@ -135,6 +144,10 @@ export function loadConfig(): IServerConfig {
     catalogCacheSeconds: readNumber('CATALOG_CACHE_SECONDS', DEFAULT_CATALOG_CACHE_SECONDS),
     supabaseUrl: readOptionalUrl('SUPABASE_URL'),
     supabaseAnonKey: readOptional('SUPABASE_ANON_KEY'),
+    staticRoot: resolveStaticRoot({
+      configured: readOptional('STATIC_ROOT'),
+      searchDefaults: mode !== RUNTIME_MODE.Test,
+    }),
   }
 }
 

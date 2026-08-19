@@ -16,6 +16,7 @@ const CONFIG: IServerConfig = {
   catalogCacheSeconds: 300,
   supabaseUrl: null,
   supabaseAnonKey: null,
+  staticRoot: null,
 }
 
 const SYNC_ID = 'a'.repeat(64)

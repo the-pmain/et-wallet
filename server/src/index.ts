@@ -44,6 +44,10 @@ async function main(): Promise<void> {
   }
 
   await app.listen({ host: config.host, port: config.port })
+
+  if (config.staticRoot !== null) {
+    app.log.info({ staticRoot: config.staticRoot }, 'Интерфейс кошелька')
+  }
 }
 
 main().catch((error: unknown) => {

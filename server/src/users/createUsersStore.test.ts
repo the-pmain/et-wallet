@@ -15,6 +15,7 @@ const BASE: IServerConfig = {
   catalogCacheSeconds: 300,
   supabaseUrl: null,
   supabaseAnonKey: null,
+  staticRoot: null,
 }
 
 describe('createUsersStore', () => {

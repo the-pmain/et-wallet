@@ -4,19 +4,19 @@ import rateLimit from '@fastify/rate-limit'
 import type { FastifyInstance } from 'fastify'
 
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
+import { API_CONTENT_SECURITY_POLICY, isApiUrl } from '../lib/ui.ts'
 
 /**
  * Защитная обвязка.
  *
- * ЗАГОЛОВКИ. Сервис отдаёт только JSON и не должен исполняться
- * в браузере как страница: `Content-Security-Policy` запрещает всё,
- * `X-Frame-Options` — встраивание, `X-Content-Type-Options` — угадывание
- * типа. Ответ JSON, истолкованный браузером как HTML, — известный путь
- * к исполнению чужого кода.
+ * ЗАГОЛОВКИ. JSON (`/v1`) не должен исполняться как страница:
+ * `Content-Security-Policy` для этих ответов запрещает всё.
+ * Страница кошелька, если она раздаётся с того же процесса, получает
+ * отдельную политику в `plugins/ui.ts` — иначе бандл не запустится.
  *
  * ОГРАНИЧЕНИЕ ЧАСТОТЫ. Справочный сервис без ограничения ложится
- * от одного скрипта. Отдельно и жёстче ограничивается синхронизация
- * настроек: у неё есть запись, а значит и стоимость.
+ * от одного скрипта. Статика кошелька в лимит не входит: иначе
+ * загрузка бандла сожгла бы квоту API.
  *
  * CORS. Для чтения каталога это не защита — данные и так публичны, —
  * а ограничение поверхности. Существенно другое: сервис не пользуется
@@ -26,27 +26,18 @@ import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
  */
 export async function registerSecurity(app: FastifyInstance, config: IServerConfig): Promise<void> {
   await app.register(helmet, {
-    /* Сервис не отдаёт разметку. Политика запрещает всё: если ответ
-       когда-нибудь окажется истолкован как страница, исполнять
-       в ней будет нечего. */
-    contentSecurityPolicy: {
-      /* Директивы по умолчанию НЕ подмешиваются. Они рассчитаны
-         на сайт: разрешают `script-src 'self'`, шрифты, изображения
-         и `'unsafe-inline'` для стилей. Сервису, отдающему только JSON,
-         не нужно ничего из этого, а разрешение, которого никто
-         не запрашивал, — это разрешение, о котором никто не помнит. */
-      useDefaults: false,
-      directives: {
-        defaultSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        baseUri: ["'none'"],
-        formAction: ["'none'"],
-      },
-    },
+    contentSecurityPolicy: false,
     /* По умолчанию `SAMEORIGIN`, то есть встраивание с того же источника
-       разрешено. Сервису нечего показывать в рамке ни при каких условиях. */
+       разрешено. Ни JSON, ни кошелёк не должны показываться в рамке. */
     xFrameOptions: { action: 'deny' },
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginResourcePolicy: false,
+  })
+
+  app.addHook('onSend', async (request, reply) => {
+    if (isApiUrl(request.url)) {
+      void reply.header('content-security-policy', API_CONTENT_SECURITY_POLICY)
+      void reply.header('cross-origin-resource-policy', 'cross-origin')
+    }
   })
 
   await app.register(cors, {
@@ -65,6 +56,7 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
   await app.register(rateLimit, {
     max: config.rateLimit.max,
     timeWindow: config.rateLimit.windowMs,
+    allowList: (request) => !isApiUrl(request.url),
     /* Ответ об ограничении не рассказывает, кто и сколько потратил:
        это сведения о других пользователях того же адреса. */
     errorResponseBuilder: () => ({

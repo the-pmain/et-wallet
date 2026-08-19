@@ -8,8 +8,10 @@ import { registerVersionRoutes } from './api/version.routes.ts'
 import { CatalogService } from './catalog/CatalogService.ts'
 import { RUNTIME_MODE, type IServerConfig } from './config.ts'
 import { ApiError } from './lib/errors.ts'
+import { isApiUrl } from './lib/ui.ts'
 import { registerSecretGuard } from './plugins/secret-guard.ts'
 import { registerSecurity } from './plugins/security.ts'
+import { registerUi, sendWalletIndex } from './plugins/ui.ts'
 import { MemorySettingsRepository } from './settings/MemorySettingsRepository.ts'
 import type { ISettingsRepository } from './settings/contracts.ts'
 import { MemoryUsersRepository } from './users/MemoryUsersRepository.ts'
@@ -132,12 +134,6 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
     })
   })
 
-  app.setNotFoundHandler((_request, reply) => {
-    void reply.status(404).send({
-      error: { code: 'not_found', message: 'Маршрут не существует.' },
-    })
-  })
-
   app.get('/v1/health', () => ({ status: 'ok', users: usersKind }))
 
   registerCatalogRoutes(app, catalog, config)
@@ -145,6 +141,26 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
+
+  if (config.staticRoot !== null) {
+    await registerUi(app, config.staticRoot)
+  }
+
+  app.setNotFoundHandler((request, reply) => {
+    if (
+      config.staticRoot !== null &&
+      request.method === 'GET' &&
+      !isApiUrl(request.url)
+    ) {
+      void sendWalletIndex(config.staticRoot, request, reply)
+
+      return
+    }
+
+    void reply.status(404).send({
+      error: { code: 'not_found', message: 'Маршрут не существует.' },
+    })
+  })
 
   /* Экземпляр Fastify — thenable: ожидание его завершает регистрацию
      плагинов. Явное `await` делает это видимым, а не полагается на то,
