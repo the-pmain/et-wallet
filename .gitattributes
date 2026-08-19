@@ -1,12 +1,12 @@
-# Перевод строки в репозитории — всегда LF.
+# Line endings in the repository are always LF.
 #
-# Без этого правила Windows записывает CRLF, и любой файл, тронутый
-# на другой системе, показывается изменённым целиком: разбор правок
-# становится невозможным. Значение согласовано с `.editorconfig`
-# и с настройкой Prettier.
+# Without this rule Windows writes CRLF, and any file touched
+# on another system shows as entirely changed: reviewing edits
+# becomes impossible. This value is consistent with `.editorconfig`
+# and with the Prettier setting.
 * text=auto eol=lf
 
-# Двоичные файлы не нормализуются: перевод строки в них — это данные.
+# Binary files are not normalized: newlines in them are data.
 *.png binary
 *.woff2 binary
 *.ico binary

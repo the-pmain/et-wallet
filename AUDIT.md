@@ -1,148 +1,147 @@
-# Полный аудит ETWallet
+# Full ETWallet Audit
 
-**Дата:** 3 августа 2026. **Ревизия:** `ee0644d`.
-**Отношение к предыдущему аудиту:** документ заменяет отчёт этапа 25
-целиком и учитывает работы этапа 26 — слежение за транзакциями, замену
-зависших, отправку ERC-20, коллекционные токены.
+**Date:** August 3, 2026. **Revision:** `ee0644d`.
+**Relationship to the previous audit:** This document replaces the Stage 25 report
+in its entirety and takes into account the work of Stage 26 – transaction monitoring, replacing
+stuck transactions, sending ERC-20s, and collectible tokens.
 
-Все числа в отчёте **измерены**, а не оценены. Команды воспроизведения
-указаны рядом с показателями.
+All numbers in the report are **measured**, not estimated. Replay commands
+are listed next to the metrics.
 
 ---
 
-## Итог одной страницей
+## One-page summary
 
-| Направление | Оценка | Главное |
+| Focus | Rating | Main |
 | --- | --- | --- |
-| Безопасность | **хорошо, с одним дефектом** | Найдено расхождение показанного с подписываемым в пути dApp (S-62). Криптография, хранение секретов и подпись — без замечаний |
-| Архитектура | **хорошо** | Слои разделены и проверяются линтером; два узла разрослись до предела управляемости |
-| Производительность | **приемлемо** | Начальная загрузка 202 КБ gzip; чтение истории линейно и уже заметно на 500 записях |
-| Масштабируемость | **ограниченно** | Хранилище без индексов, RPC без батчинга и дедупликации |
-| Качество кода | **высокое** | 1602 теста, покрытие 87.58 %, `any` — ноль, подавлений линтера — два, оба обоснованы |
-| Практики кошельков | **не хватает трёх вещей** | Нет управления разрешениями, списка проверенных контрактов, аппаратных кошельков |
+| Security | **good, with one defect** | Discrepancy found between the displayed data and the dApp being signed in transit (S-62). Cryptography, secret storage, and signature – no issues |
+| Architecture | **good** | Layers are separated and checked by a linter; two nodes have grown to the limit of manageability |
+| Performance | **acceptable** | Initial load 202 KB gzip; history reading is linear and already noticeable at 500 records |
+| Scalability | **limited** | Storage without indices, RPC without batching and deduplication |
+| Code Quality | **high** | 1602 tests, 87.58% coverage, 'any' — zero, two linter suppressions, both justified |
+| Wallet Practices | **three things missing** | No permission management, no list of verified contracts, no hardware wallets |
 
-**Вердикт по пригодности.** Кошелёк пригоден для тестовых сетей
-и небольших сумм в основной сети. Для средств, потеря которых
-чувствительна, не готов: не закрыт S-62, нет управления выданными
-разрешениями (S-54) и списка проверенных контрактов (S-38).
+**Suitability Verdict.** The wallet is suitable for testnets
+and small amounts on the mainnet. For assets whose loss is
+sensitive, not ready: S-62 is not closed, there is no management of issued
+permissions (S-54), and no list of verified contracts (S-38).
 
 ---
 
-## 1. Что измерено
+## 1. What was measured
 
 ```bash
-npm run verify        # формат, линтер, типы, 1602 теста
-npx playwright test   # 20 сквозных проверок в Chromium
-npm audit             # 0 уязвимостей
-npm run build         # размеры чанков
+npm run verify # format, linter, types, 1602 tests
+npx playwright test # 20 end-to-end checks in Chromium
+npm audit # 0 vulnerabilities
+npm run build # chunk sizes
 ```
 
-| Показатель | Значение | Было (этап 25) |
+| Metric | Value | Was (stage 25) |
 | --- | --- | --- |
-| Строк кода (`src` + `e2e`) | 59 258 | ~52 000 |
-| Модульных и интеграционных тестов | 1602 | 1495 |
-| Сквозных тестов | 20 | 19 |
-| Покрытие операторов | 87.58 % | 86.73 % |
-| Покрытие ветвлений | 77.55 % | — |
-| Начальная загрузка | 202.1 КБ gzip | 190.6 КБ gzip |
-| Уязвимости зависимостей | 0 | 0 |
-| Прямых зависимостей | 17 | 17 |
-| Записей технического долга | 193 (155 открытых) | 165 |
+| Lines of code (`src` + `e2e`) | 59,258 | ~52,000 |
+| Unit and integration tests | 1602 | 1495 |
+| End-to-end tests | 20 | 19 |
+| Statement Coverage | 87.58% | 86.73% |
+| Branch Coverage | 77.55% | — |
+| Bootstrap | 202.1 KB gzip | 190.6 KB gzip |
+| Dependency Vulnerabilities | 0 | 0 |
+| Direct Dependencies | 17 | 17 |
+| Technical Debt Items | 193 (155 Open) | 165 |
 
-Начальная загрузка складывается из шести файлов: `index` 172.4 КБ,
-`Address` 16.3 КБ, CSS 10.0 КБ, `utils` 1.7 КБ, `ErrorCode` 1.1 КБ,
-runtime 0.5 КБ. Рост на 11.5 КБ — цена трёх новых возможностей этапа 26.
+The bootstrap consists of six files: `index` 172.4 KB,
+`Address` 16.3 KB, CSS 10.0 KB, `utils` 1.7 KB, `ErrorCode` 1.1 KB,
+runtime 0.5 KB. An 11.5 KB increase is the price of three new features in Stage 26.
 
 ---
 
-## 2. Безопасность
+## 2. Security
 
-### 2.1 Дефект: dApp может подписать не то, что показано (S-62, высокий)
+### 2.1 Defect: dApp may sign something other than what is shown (S-62, high)
 
-**Где:** [WalletSession.ts:846](src/features/wallet/model/WalletSession.ts:846).
+**Where:** [WalletSession.ts:846](src/features/wallet/model/WalletSession.ts:846).
 
 ```ts
 to: payload.transaction.to ?? payload.transaction.from,
 ```
 
-**Что происходит.** Приложение присылает транзакцию без получателя —
-по стандарту это развёртывание контракта. Кошелёк распознаёт случай
-и показывает предупреждение «создаёт контракт»
+**What's happening:** The application sends a transaction without a recipient—
+by default, this is a contract deployment. The wallet recognizes this case
+and displays a warning "creating a contract"
 ([request-risk.ts](src/core/dapp/request-risk.ts), `ContractDeployment`).
-Но при исполнении подставляет в поле `to` адрес **отправителя**.
+However, upon execution, it substitutes the **sender's** address in the `to` field.
 
-**Последствия.** Подписывается не то, что подтвердил пользователь:
-вместо развёртывания контракта — перевод самому себе с байт-кодом
-в данных вызова. Средства не уходят чужому, но газ списывается
-полностью, а операция, которую человек одобрил, не выполняется. Это
-ровно тот класс расхождений, против которого выстроены остальные
-экраны кошелька.
+**Consequences.** Something other than the user's approved contract is signed:
+instead of deploying the contract, the user transfers it to themselves with the bytecode
+in the call data. The funds don't go to the other party, but the gas is debited in full, and the operation the user approved isn't executed. This is
+exactly the type of discrepancy that the other
+wallet screens are designed to prevent.
 
-**Как чинить.** Передавать `to: null` в `prepare` — он это поддерживает
-(`#estimateGasLimit` разбирает случай развёртывания отдельно). Либо,
-если развёртывание контрактов не входит в задачи кошелька, отвергать
-такой запрос на входе с внятным отказом. Второе честнее: развёртывание
-из кошелька — редкость, а поддержка непроверенного пути дороже отказа.
+**How ​​to fix.** Pass `to: null` to `prepare`—it supports this
+(`#estimateGasLimit` handles the deployment case separately). Or,
+if contract deployment isn't part of the wallet's functionality, reject
+such a request at the outset with a clear refusal. The latter is more honest: deployment
+from the wallet is rare, and supporting an unverified path is more expensive than a refusal.
 
-### 2.2 Криптография — замечаний нет
+### 2.2 Cryptography — no comments
 
-Проверено чтением всех точек, где встречаются примитивы:
+Verified by reading all points where primitives occur:
 
-| Операция | Чем выполняется | Своей реализации |
+| Operation | What is performed | Custom implementation |
 | --- | --- | --- |
-| Вывод ключа из пароля | `crypto.subtle` PBKDF2-SHA-256, 600 000 итераций | нет |
-| Шифрование хранилища | `crypto.subtle` AES-256-GCM, `extractable: false` | нет |
-| Случайность | `crypto.getRandomValues` | нет |
-| secp256k1 | `@noble/curves` через `SigningKey` ethers | нет |
-| keccak256 | `@noble/hashes` | нет |
-| BIP-32/39 | `@scure/bip32`, `@scure/bip39` | нет |
-| RLP, EIP-2718, EIP-712 | ethers | нет |
+| Key derivation from password | `crypto.subtle` PBKDF2-SHA-256, 600,000 iterations | no |
+| Storage encryption | `crypto.subtle` AES-256-GCM, `extractable: false` | no |
+| Randomness | `crypto.getRandomValues` | no |
+| secp256k1 | `@noble/curves` via `SigningKey` ethers | no |
+| keccak256 | `@noble/hashes` | no |
+| BIP-32/39 | `@scure/bip32`, `@scure/bip39` | no |
+| RLP, EIP-2718, EIP-712 | ethers | no |
 
-Две независимые реализации secp256k1 в одном приложении отсутствуют:
-модуль адресов и модуль подписи используют одну и ту же библиотеку.
+There are no two independent secp256k1 implementations in a single application:
+the address module and signature module use the same library.
 
-Соль и IV генерируются на каждую операцию, IV никогда не переиспользуется
-(в AES-GCM повтор пары «ключ + IV» раскрывает и содержимое, и ключ).
-Число итераций при расшифровке сверяется с минимумом — понижение
-параметров злоумышленником, получившим доступ к файлу хранилища,
-не проходит.
+The salt and IV are generated for each operation; the IV is never reused.
+(In AES-GCM, repeating a key + IV pair reveals both the contents and the key.)
+The number of iterations during decryption is checked against the minimum—lowering
+parameters by an attacker who has gained access to the storage file
+does not work.
 
-### 2.3 Подпись — три сверки, каждая закрывает свой класс атак
+### 2.3 Signature — three checks, each covering a different class of attacks.
 
 [SigningService.ts](src/core/signing/SigningService.ts):
 
-1. **`chainId > 0`** — транзакция без него подписана по формату
-   до EIP-155 и действительна во всех сетях EVM одновременно. Перевод,
-   подписанный в тестовой сети, повторяется в основной.
-2. **Адрес из ключа сверяется с `from`** — иначе подпись пройдёт чужим
-   ключом, и средства уйдут не с того аккаунта, который показан.
-3. **`chainId` структуры EIP-712 сверяется с активной сетью** до создания
-   ключа: непригодные данные не доходят до криптографии.
+1. **`chainId > 0`** — a transaction without it is signed according to the format
+before EIP-155 and is valid on all EVM networks simultaneously. A transfer
+signed on the testnet is repeated on the mainnet.
+2. **The address from the key is checked against `from`** — Otherwise, the signature will be passed with someone else's
+key, and the funds will be transferred from an account other than the one shown.
+3. The **`chainId`` of the EIP-712 structure is verified against the active network** before creating a
+key: invalid data does not reach the cryptography.
 
-### 2.4 Хранение секретов
+### 2.4 Storing Secrets
 
-| Что | Где | Как |
+| What | Where | How |
 | --- | --- | --- |
-| Seed-фраза | `vault` | AES-256-GCM |
-| Импортированные ключи | `vault` | AES-256-GCM |
-| Адреса и имена аккаунтов | `accounts` | AES-256-GCM |
-| Отслеживаемые токены | `tokens` | AES-256-GCM |
-| История транзакций | `transactions` | AES-256-GCM |
-| Конфигурации сетей, включая адреса узлов | `networks-encrypted` | AES-256-GCM (этап 28) |
-| Настройки, выбор активной сети | `settings` | **открыто** |
+| Seed phrase | `vault` | AES-256-GCM |
+| Imported keys | `vault` | AES-256-GCM |
+| Account addresses and names | `accounts` | AES-256-GCM |
+| Tracked tokens | `tokens` | AES-256-GCM |
+| Transaction history | `transactions` | AES-256-GCM |
+| Network configurations, including node addresses | `networks-encrypted` | AES-256-GCM (stage 28) |
+| Settings, active network selection | `settings` | **open** |
 
-Открытое хранение конфигураций сетей — осознанный компромисс: они
-нужны до разблокировки. Но список пользовательских RPC-адресов лежит
-там же, а такой адрес может содержать ключ доступа прямо в URL.
-**Рекомендация:** перенести пользовательские адреса в зашифрованное
-пространство, оставив встроенные открытыми.
+Open storage of network configurations is a deliberate compromise: they
+are needed until unblocking. However, the list of user RPC addresses is stored
+in the same place, and such an address can contain the access key directly in the URL.
+**Recommendation:** Move user addresses to encrypted
+space, leaving the built-in ones open.
 
-`localStorage` и `sessionStorage` запрещены линтером на уровне глобальных
-имён — не соглашением, а правилом, которое нельзя обойти незаметно.
+`localStorage` and `sessionStorage` are prohibited by the linter at the global
+name level—not by convention, but by a rule that cannot be bypassed.
 
-### 2.5 Периметр браузера
+### 2.5 Browser Perimeter
 
-CSP из сборки (проверено в `dist/index.html`):
+CSP from the build (tested in `dist/index.html`):
 
 ```
 default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self';
@@ -150,210 +149,203 @@ form-action 'none'; frame-src 'none'; worker-src 'none'; child-src 'none';
 require-trusted-types-for 'script'; connect-src 'self' https:
 ```
 
-`script-src 'self'` без `unsafe-inline` и `unsafe-eval`; `eval`,
-`new Function`, `innerHTML` запрещены линтером; карты кода в сборку
-не попадают. `connect-src https:` остаётся широким — это S-1, открытая
-запись долга: сузить до конкретных RPC-доменов мешает возможность
-добавить свой узел.
+`script-src 'self'` without `unsafe-inline` and `unsafe-eval`; `eval`,
+`new Function`, and `innerHTML` are prohibited by the linter; source maps
+are not included in the build. `connect-src https:` remains wide - this is S-1, an open
+debt record: narrowing it to specific RPC domains is prevented by the ability
+to add a custom node.
 
-`Referrer-Policy: no-referrer` установлен.
+`Referrer-Policy: no-referrer` is set.
 
-### 2.6 Логи
+### 2.6 Logs
 
-Уровень по умолчанию — `warn`. Проверены все вызовы логгера в ядре:
-адреса, суммы, фразы и ключи в контекст не попадают — пишутся `chainId`,
-причина отказа и порядковый номер аккаунта. `console.*` в боевом коде
-отсутствует.
+Default level is `warn`. All kernel logger calls have been checked:
+addresses, amounts, phrases, and keys are not included in the context; the `chainId`,
+the reason for refusal, and the account serial number are written. `console.*` is missing from the production code.
 
-### 2.7 Метод `eth_sign` принимается (S-63, средний)
+### 2.7 The `eth_sign` method is accepted (S-63, medium)
 
-[request-mapping.ts](src/features/dapp/model/request-mapping.ts) обрабатывает
-`eth_sign` наравне с `personal_sign`. Исторически это опаснейший метод:
-он задуман как подпись произвольного 32-байтового хэша, и приложение
-может подсунуть хэш транзакции.
+[request-mapping.ts](src/features/dapp/model/request-mapping.ts) processes
+`eth_sign` equally as `personal_sign`. Historically, this is a very dangerous method:
+it is intended as a signature for an arbitrary 32-byte hash, and an application
+can spoof the transaction hash.
 
-**Фактического пролома нет:** подпись всё равно идёт через `hashMessage`
-с префиксом EIP-191, поэтому результат не является подписью сырого хэша
-и не годится для подмены транзакции. Но это несоответствие спецификации,
-работающее в безопасную сторону по совпадению, а не по замыслу.
+**No actual breach:** the signature still goes via `hashMessage`
+with the EIP-191 prefix, so the result isn't a raw hash signature
+and isn't suitable for spoofing a transaction. However, this is a specification non-compliance,
+working in a secure direction by coincidence, not by design.
 
-**Рекомендация:** отвергать `eth_sign` на входе. MetaMask отключил его
-по умолчанию, а затем удалил; вслед за ним это сделали остальные.
+**Recommendation:** reject `eth_sign` at input. MetaMask disabled it
+by default, and then removed it; others followed suit.
 
-### 2.8 Чего в защите нет
+### 2.8 What's missing in the protection
 
-| Пробел | Долг | Почему важно |
+| Space | Debt | Why is it important |
 | --- | --- | --- |
-| Управление выданными разрешениями | S-54 | Основной способ увода токенов сегодня — не кража ключа, а забытое `approve` без ограничения суммы. Кошелёк предупреждает при выдаче, но показать и отозвать выданные не умеет |
-| Список проверенных контрактов | S-38, S-51 | Символ токена задаёт автор контракта; отличить настоящий USDC от поддельного можно только по адресу, и сверять его пользователю приходится глазами |
-| Список фишинговых доменов | нет записи | Подключение к поддельному сайту ничем не отличается от подключения к настоящему |
-| Аппаратные кошельки | точка расширения есть, реализации нет | Ключ живёт в памяти вкладки; для крупных сумм это неприемлемо |
-| Симуляция транзакции | нет записи | Пользователь видит данные вызова, но не последствия. `OpaqueCallData` честно говорит «смысл не разобран» — этого мало |
+| Managing issued permissions | S-54 | The main way token theft today isn't key theft, but a forgotten `approve` with no amount limit. The wallet warns upon issuance, but can't display or revoke issued ones |
+| List of verified contracts | S-38, S-51 | The token symbol is set by the contract author; real USDC can only be distinguished from counterfeit by the address, and the user must verify it visually |
+| List of phishing domains | no entry | Connecting to a fake site is no different from connecting to a real one |
+| Hardware wallets | extension point present, no implementation | The key resides in the tab's memory; this is unacceptable for large amounts |
+| Transaction simulation | no entry | The user sees the call data, but not the consequences. `OpaqueCallData` honestly says "the meaning is unclear" - that's not enough |
 
-Первые два — то, что отделяет учебный кошелёк от рабочего.
+The first two are what separate a training wallet from a working one.
 
 ---
 
-## 3. Архитектура
+## 3. Architecture
 
-### 3.1 Слои соблюдаются
+### 3.1 Layers are respected
 
 ```
 shared ← core ← features ← pages ← app
 ```
 
-Границы проверяются `no-restricted-imports` в ESLint, а не соглашением.
-`core` не импортирует React и DOM — это условие переносимости
-в service worker расширения MV3, и оно выполняется по факту, а не на словах.
+Boundaries are checked by ESLint's `no-restricted-imports`, not by convention.
+`core` does not import React and DOM—this is a portability requirement
+in the MV3 extension's service worker, and it is implemented in practice, not just in words.
 
-Ядро — 35 822 строки, 60 % кода. Интерфейс тонкий: страницы читают
-единый снимок и вызывают методы сессии.
+The core is 35,822 lines, 60% of the code. The interface is thin: pages read a single snapshot and call session methods.
 
-### 3.2 Два узла на пределе управляемости (A-122, средний)
+### 3.2 Two nodes at the limit of manageability (A-122, medium)
 
-| Файл | Строк | Публичных методов | Приватных полей |
+| File | Strings | Public methods | Private fields |
 | --- | --- | --- | --- |
 | `WalletSession.ts` | 1565 | 34 | 27 |
 | `TransactionService.ts` | 1001 | 14 | — |
 
-`WalletSession` владеет всеми сервисами сессии и всеми путями данных
-интерфейса: аккаунты, сети, балансы, токены, история, NFT, курсы, ENS,
-RPC, запросы приложений, подготовка четырёх видов транзакций. Это ещё
-не God Object — обязанность одна и внятная («время жизни разблокированной
-сессии»), но следующая возможность сделает его им.
+`WalletSession` owns all session services and all data paths
+of the interface: accounts, networks, balances, tokens, history, NFTs, rates, ENS,
+RPC, application requests, and the preparation of four types of transactions. It's not yet a God Object—it has a single, clear responsibility ("the lifetime of an unlocked
+session"), but the next feature will make it so.
 
-**Рекомендация:** выделить из сессии три фасада по областям данных
-(активы, история, транзакции), оставив сессии владение временем жизни
-и публикацию снимка. Делать это до следующей крупной возможности,
-а не после.
+**Recommendation:** separate three facades from the session by data areas
+(assets, history, transactions), leaving the session with ownership of the lifetime
+and snapshot publishing. Do this until the next major feature,
+not after.
 
-`TransactionService` вырос за счёт четырёх путей подготовки (обычный,
-токен, предмет, замена) и слежения. Слежение — самостоятельная
-обязанность с собственным таймером и состоянием; его стоит вынести
-в `TransactionTracker`.
+`TransactionService` has grown by adding four preparation paths (regular,
+token, item,, replacement) and tracking. Tracking is a separate
+function with its own timer and state; it should be moved
+to `TransactionTracker`.
 
-### 3.3 Дублирование кодировки ABI (A-123, средний)
+### 3.3 Duplicate ABI encoding (A-123, medium)
 
-`WORD_LENGTH`, `ADDRESS_LENGTH`, `MAX_UINT256` и чтение адреса из слова
-объявлены дважды: в [erc20.ts](src/core/token/erc20.ts) и
-в [nft/abi.ts](src/core/nft/abi.ts). Логика проверки нулевых старших
-байтов повторена в `decodeTransfer` и `decodeSafeTransferRecipient`.
+`WORD_LENGTH`, `ADDRESS_LENGTH`, `MAX_UINT256`, and reading an address from a word
+are declared twice: in [erc20.ts](src/core/token/erc20.ts) and
+in [nft/abi.ts](src/core/nft/abi.ts). The logic for checking for high-order zero bytes
+is repeated in `decodeTransfer` and `decodeSafeTransferRecipient`.
 
-Это не косметика: расхождение между двумя копиями проверки адреса даёт
-показ неверного получателя на экране подтверждения.
+This isn't cosmetic: a discrepancy between the two copies of the address check results in
+an incorrect recipient being displayed on the confirmation screen.
 
-**Рекомендация:** выделить `core/abi` с примитивами кодировки, оставив
-в модулях токенов и предметов только знание стандартов.
+**Recommendation:** Separate `core/abi` with encoding primitives, leaving only the knowledge of standards in the token and item modules.
 
-### 3.4 Что сделано правильно
+### 3.4 What's Done Right
 
-- **Ядро не подписывает и не хранит ключи** — этим владеет `Keyring`;
-  транзакционный слой получает готовую подпись.
-- **Один путь к подписи.** Запросы приложений проходят через ту же
-  `prepare`, что и отправка из кошелька: второй путь означал бы вторую
-  точку, где проверки можно забыть.
-- **Брендированные типы** (`Address`, `Wei`, `ChainId`, `TxHash`)
-  не дают перепутать величины: `Wei` нельзя получить приведением типа,
-  только через `toWei` с проверкой диапазона.
-- **Снимок вместо геттеров** — `useSyncExternalStore` сравнивает по ссылке,
-  и целостность экрана следует из устройства, а не из дисциплины.
-- **Неизвестное не подменяется нулём** — проведено последовательно:
-  баланс, курс, число знаков токена, стойкость хранилища, принадлежность
-  предмета. Это главное отличие проекта от типовой реализации.
+- **The core doesn't sign or store keys** — `Keyring` handles that;
+the transaction layer receives the completed signature.
+- **Single path to signature.** Application requests go through the same
+`prepare` as sending from the wallet: a second path would mean a second
+point where checks could be forgotten.
+- **Branded types** (`Address`, `Wei`, `ChainId`, `TxHash`)
+prevent value confusion: `Wei` cannot be obtained by type casting,
+only via `toWei` with a range check.
+- **Snapshot instead of getters** — `useSyncExternalStore` compares by reference,
+and screen integrity is inferred from the device, not the discipline.
+- **Unknown is not replaced by zero** — the following are performed sequentially:
+balance, exchange rate, token digit count, storage durability, and ownership of
+the item. This is the main difference between this project and a typical implementation.
 
 ---
 
-## 4. Производительность
+## 4. Performance
 
-### 4.1 Начальная загрузка
+### 4.1 Initial Load
 
-202.1 КБ gzip. Ленивыми чанками вынесены: ENS-нормализация, WalletConnect
-(437 КБ → 131 КБ gzip, грузится только при подключении), EIP-712, RPC-клиент,
-все экраны кроме главного.
+202.1 KB gzip. Lazy chunks include: ENS normalization, WalletConnect
+(437 KB → 131 KB gzip, loaded only upon connection), EIP-712, RPC client,
+all screens except the main one.
 
-Предупреждение сборщика о чанке больше 500 КБ относится к `index`
-до сжатия; после gzip это 172 КБ.
+The collector's warning about a chunk larger than 500 KB refers to the `index`
+before compression; after gzip, it is 172 KB.
 
-### 4.2 Измеренная проблема: чтение истории линейно (A-124, высокий)
+### 4.2 Measured issue: linear history reading (A-124, high)
 
-Замер на реальном шифровании (`EncryptionService`, не дублёр):
+Measurement on real encryption (`EncryptionService`, not a stand-in):
 
-| Записей в хранилище | Одно чтение `findByAddress` |
+| Storage records | One `findByAddress` read |
 | --- | --- |
-| 100 | 8.4 мс |
-| 500 | 69.6 мс |
+| 100 | 8.4 ms |
+| 500 | 69.6 ms |
 
-Рост линейный, ≈0.14 мс на запись. Причина — `#readAll()`
-в [TransactionRepository.ts:157](src/core/transaction/TransactionRepository.ts:157):
-все записи читаются по одной и расшифровываются на **каждый** вызов.
+Linear growth, ≈0.14 ms per write. Cause: `#readAll()`
+in [TransactionRepository.ts:157](src/core/transaction/TransactionRepository.ts:157):
+all records are read one at a time and decrypted on **every** call.
 
-Это не единичный вызов: слежение за транзакциями дёргает
-`findUnsettled` **каждые 12 секунд**, и он тоже читает всё. При 500
-записях это 70 мс работы каждые 12 секунд, при 2000 — почти 300 мс.
+This isn't a one-time call: transaction tracking triggers
+`findUnsettled` **every 12 seconds**, and it also reads everything. With 500
+records, this is 70 ms of work every 12 seconds; with 2000, it's almost 300 ms.
 
-**Рекомендация:** хранить отдельным ключом индекс «адрес + сеть → хэши»
-и читать только нужные записи; либо перейти на индексы IndexedDB
-(шифрование не мешает: индексировать можно по открытым полям конверта).
-Второе правильнее, но требует миграции.
+**Recommendation:** Store the "address + network → hashes" index in a separate key
+and read only the required records; or switch to IndexedDB indexes
+(encryption doesn't interfere: indexing can be done by open envelope fields).
+The latter is more correct, but requires migration.
 
-### 4.3 Сетевой слой без батчинга и дедупликации (A-125, средний)
+### 4.3 Network layer without batching and deduplication (A-125, medium)
 
-Проверено: карт запросов «в полёте», дедупликации одинаковых обращений
-и JSON-RPC batch в проекте нет.
+Tested: there are no "in-flight" request maps, no deduplication of identical requests, and no JSON-RPC batch in the project.
 
-Следствия, измеримые в числах запросов:
+Consequences measurable in number of requests:
 
-- список токенов — по одному `balanceOf` на токен;
-- поиск предметов — 3 выборки журналов плюс до 60 вызовов контрактов
-  волнами по 8;
-- параллельные экраны (главный и портфель) запрашивают один и тот же
-  баланс дважды, если промежуток больше 15 секунд свежести кэша.
+- token list — one `balanceOf` per token;
+- item search — 3 log selections plus up to 60 contract calls
+in waves of 8;
+- Parallel screens (main and portfolio) request the same balance twice if the interval is greater than 15 seconds of cache freshness.
 
-Публичные узлы ограничивают частоту; при десятке токенов и открытом
-разделе NFT отказ по лимитам вероятен.
+Public nodes limit the frequency; with a dozen tokens and an open
+NFT section, a limit-based failure is likely.
 
-**Рекомендация:** дедупликация одинаковых запросов в полёте (дёшево,
-даёт эффект сразу) и `eth_call` пачками через JSON-RPC batch там, где
-узел это поддерживает.
+**Recommendation:** Deduplication of identical requests in flight (cheap,
+effective immediately) and batch eth_calls via JSON-RPC batch where
+the node supports it.
 
-### 4.4 Интерфейс
+### 4.4 Interface
 
-Мемоизация применена в 32 местах; длинные списки виртуализованы
-(`VirtualList`). Список предметов NFT не виртуализован — при ограничении
-в 60 записей это оправдано.
+Memoization is applied in 32 places; long lists are virtualized (`VirtualList`). The NFT list is not virtualized – with a limit
+of 60 entries, this is justified.
 
-Интервалы опроса: балансы 30 с, свежесть кэша 15 с, транзакции 12 с,
-курсы 60 с, ENS-кэш 5 мин, новые блоки 4 с. Фоновое обновление
-останавливается, когда вкладка скрыта.
+Polling intervals: balances 30 sec, cache freshness 15 sec, transactions 12 sec,
+rates 60 sec, ENS cache 5 min, new blocks 4 sec. Background refresh
+stops when the tab is hidden.
 
 ---
 
-## 5. Масштабируемость
+## 5. Scalability
 
-| Измерение | Состояние |
+| Measurement | State |
 | --- | --- |
-| Число сетей | Ограничений нет; данные разделены по `chainId` везде, где это имеет смысл |
-| Число аккаунтов | HD-дерево, порождение по индексу; поиска занятых адресов при восстановлении нет (A-16) |
-| Число токенов | Линейно по запросам, см. 4.3 |
-| Число транзакций | **Узкое место**, см. 4.2 |
-| Число предметов NFT | Жёсткий предел 60 проверок за раз, честно показывается пользователю (A-118) |
-| Портирование в расширение MV3 | Ядро свободно от DOM; сессия держит таймеры, которые в service worker живут иначе |
-| Многовкладочность | Не проверялась: две вкладки с одним хранилищем IndexedDB могут разойтись в состоянии |
+| Number of Networks | No limit; data is split by `chainId` wherever it makes sense |
+| Number of Accounts | HD tree, index-based generation; no lookup of occupied addresses during recovery (A-16) |
+| Number of Tokens | Linear by requests, see 4.3 |
+| Number of Transactions | **Bottleneck**, see 4.2 |
+| Number of NFT Items | Hard limit of 60 checks at a time, displayed fairly to the user (A-118) |
+| Porting to the MV3 extension | DOM-free core; the session maintains timers, which are different in service workers |
+| Multi-tab support | Not tested: two tabs with the same IndexedDB storage may have different states |
 
-Многовкладочность стоит проверить отдельно — это не теоретический риск,
-а обычный сценарий: кошелёк открыт в двух вкладках, в одной идёт отправка.
+Multi-tab support should be tested separately—it's not a theoretical risk,
+but a common scenario: a wallet is open in two tabs, and a transfer is in progress in one.
 
 ---
 
-## 6. Качество кода
+## 6. Code Quality
 
-| Метрика | Значение |
+| Metric | Value |
 | --- | --- |
-| `any` в боевом коде | 0 |
+| `any` in production code | 0 |
 | `@ts-ignore` / `@ts-expect-error` | 0 |
-| Подавления линтера | 2, оба с обоснованием в комментарии |
+| Linter suppressions | 2, both with justification in a comment |
 | `TODO` / `FIXME` / `HACK` | 0 |
-| Файлов длиннее 500 строк | 15, из них боевых 8 |
+| File length 500 строк | 15, из них боевых 8 |
 | Покрытие операторов | 87.58 % |
 | Покрытие ветвлений | 77.55 % |
 
