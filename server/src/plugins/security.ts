@@ -54,7 +54,7 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
       config.allowedOrigins.length === 0 && config.mode !== RUNTIME_MODE.Production
         ? true
         : [...config.allowedOrigins],
-    methods: ['GET', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     /* Полномочия не передаются: ни cookie, ни заголовка авторизации
        сервис не использует. Разрешить их значило бы дать браузеру
        подставлять к запросам то, о чём пользователь не знает. */

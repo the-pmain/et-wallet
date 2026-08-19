@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
+import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
 
 const CONFIG: IServerConfig = {
   mode: RUNTIME_MODE.Test,
@@ -13,16 +14,20 @@ const CONFIG: IServerConfig = {
   rateLimit: { max: 10_000, windowMs: 60_000 },
   maxBodyBytes: 64 * 1024,
   catalogCacheSeconds: 300,
+  supabaseUrl: null,
+  supabaseAnonKey: null,
 }
 
 const SYNC_ID = 'a'.repeat(64)
 
 let app: FastifyInstance
 let settings: MemorySettingsRepository
+let users: MemoryUsersRepository
 
 beforeEach(async () => {
   settings = new MemorySettingsRepository()
-  app = await buildApp({ config: CONFIG, settings })
+  users = new MemoryUsersRepository()
+  app = await buildApp({ config: CONFIG, settings, users })
 })
 
 afterEach(async () => {
@@ -278,6 +283,44 @@ describe('Синхронизация настроек', () => {
     const response = await app.inject({ method: 'DELETE', url: `/v1/settings/${SYNC_ID}` })
 
     expect(response.statusCode).toBe(204)
+  })
+})
+
+describe('Пользователи', () => {
+  it('записывает имя, баланс и the_p', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { username: 'James', balance: '0', the_p: 'demo' },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json<{ username: string; balance: string }>().username).toBe('James')
+    expect(response.json<{ the_p?: unknown; password?: unknown }>()).not.toHaveProperty('the_p')
+    expect(response.json<{ password?: unknown }>()).not.toHaveProperty('password')
+    expect(users.records).toHaveLength(1)
+    expect(users.records[0]?.theP).toBe('demo')
+  })
+
+  it('подставляет нулевой баланс, если его не передали', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { username: 'Maria' },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json<{ balance: string }>().balance).toBe('0')
+  })
+
+  it('запрещает кэширование ответа', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { username: 'James' },
+    })
+
+    expect(response.headers['cache-control']).toBe('no-store')
   })
 })
 

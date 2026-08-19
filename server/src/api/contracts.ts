@@ -163,6 +163,18 @@ export interface ISettingsResponse {
   readonly updatedAt: string
 }
 
+/**
+ * Пользователь в таблице `public.users`.
+ *
+ * Колонка `the_p` в ответ не входит: она пишется в таблицу, но не возвращается.
+ */
+export interface IUserResponse {
+  readonly id: string
+  readonly username: string | null
+  readonly balance: string | null
+  readonly createdAt: string
+}
+
 /** Ответ при отказе. Одинаков для всех маршрутов. */
 export interface IErrorResponse {
   readonly error: {

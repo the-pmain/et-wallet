@@ -49,6 +49,13 @@ export default defineConfig({
   server: {
     port: DEV_SERVER_PORT,
     strictPort: true,
+    proxy: {
+      /* Wallet create/import and the mock POST /v1/users in dev. */
+      '/v1': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
   },
 
   preview: {

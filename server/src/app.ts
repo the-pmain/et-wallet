@@ -3,6 +3,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { registerCatalogRoutes } from './api/catalog.routes.ts'
 import { registerNotificationRoutes } from './api/notifications.routes.ts'
 import { registerSettingsRoutes } from './api/settings.routes.ts'
+import { registerUserRoutes } from './api/users.routes.ts'
 import { registerVersionRoutes } from './api/version.routes.ts'
 import { CatalogService } from './catalog/CatalogService.ts'
 import { RUNTIME_MODE, type IServerConfig } from './config.ts'
@@ -11,6 +12,8 @@ import { registerSecretGuard } from './plugins/secret-guard.ts'
 import { registerSecurity } from './plugins/security.ts'
 import { MemorySettingsRepository } from './settings/MemorySettingsRepository.ts'
 import type { ISettingsRepository } from './settings/contracts.ts'
+import { MemoryUsersRepository } from './users/MemoryUsersRepository.ts'
+import { USERS_STORE_KIND, type IUsersRepository, type UsersStoreKind } from './users/contracts.ts'
 
 /**
  * Зависимости приложения.
@@ -22,6 +25,8 @@ export interface IAppDependencies {
   readonly config: IServerConfig
   readonly catalog?: CatalogService
   readonly settings?: ISettingsRepository
+  readonly users?: IUsersRepository
+  readonly usersKind?: UsersStoreKind
 }
 
 /**
@@ -95,6 +100,8 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
      обязан не подняться, а не начать раздавать неверные адреса. */
   const catalog = dependencies.catalog ?? new CatalogService()
   const settings = dependencies.settings ?? new MemorySettingsRepository()
+  const users = dependencies.users ?? new MemoryUsersRepository()
+  const usersKind = dependencies.usersKind ?? USERS_STORE_KIND.Memory
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
@@ -131,12 +138,13 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
     })
   })
 
-  app.get('/v1/health', () => ({ status: 'ok' }))
+  app.get('/v1/health', () => ({ status: 'ok', users: usersKind }))
 
   registerCatalogRoutes(app, catalog, config)
   registerNotificationRoutes(app, catalog)
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
+  registerUserRoutes(app, users)
 
   /* Экземпляр Fastify — thenable: ожидание его завершает регистрацию
      плагинов. Явное `await` делает это видимым, а не полагается на то,

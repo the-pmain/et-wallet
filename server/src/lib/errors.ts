@@ -43,6 +43,17 @@ export class ConflictError extends ApiError {
 }
 
 /**
+ * Сервис не может выполнить запрос: нет подключения к базе
+ * либо база отвергла запись.
+ */
+export class ServiceUnavailableError extends ApiError {
+  constructor(message: string) {
+    super(503, 'database_unavailable', message)
+    this.name = 'ServiceUnavailableError'
+  }
+}
+
+/**
  * Каталог не прошёл проверку при загрузке.
  *
  * Это ошибка развёртывания, а не выполнения: сервис с испорченным

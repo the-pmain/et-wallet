@@ -18,7 +18,12 @@ import {
   type IStorageService,
 } from '@/core'
 import { DappSessionService, SecureSessionStorage, WalletConnectTransport } from '@/features/dapp'
-import { OnboardingService, WalletBroadcast, type IOnboardingService } from '@/features/onboarding'
+import {
+  OnboardingService,
+  RemoteUserDirectory,
+  WalletBroadcast,
+  type IOnboardingService,
+} from '@/features/onboarding'
 import { SecuritySettingsRepository } from '@/features/security'
 import { WalletSession, type IWalletSession } from '@/features/wallet'
 import { APP_CONFIG } from '@/shared/config'
@@ -105,6 +110,7 @@ export function createAppServices(): IAppServices {
 
   const broadcast = new WalletBroadcast()
   const dappSessions = createDappSessions(session, secureStorage, logger)
+  const userDirectory = createUserDirectory(logger)
 
   notifyDappsOnWalletChange(session, dappSessions)
 
@@ -116,6 +122,7 @@ export function createAppServices(): IAppServices {
          работать до разблокировки, когда ключ дешифрования ещё
          не выведен. */
       unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
+      ...(userDirectory === undefined ? {} : { userDirectory }),
     }),
     session,
     broadcast,
@@ -198,6 +205,22 @@ function createDappSessions(
     execute: (request) => session.executeDappRequest(request),
     preflight: (request) => session.checkDappRequest(request),
   })
+}
+
+/**
+ * Справочник пользователей на Fastify.
+ *
+ * В тестах не подключается: иначе `importWallet` ходил бы на живой сервер.
+ * Пустой base URL шлёт `POST /v1/users` на тот же origin — Vite проксирует на 8080.
+ */
+function createUserDirectory(logger: ConsoleLogger) {
+  if (import.meta.env.MODE === 'test') {
+    return undefined
+  }
+
+  const configured = import.meta.env.VITE_SERVER_URL?.trim() ?? ''
+
+  return new RemoteUserDirectory({ baseUrl: configured, logger })
 }
 
 /**

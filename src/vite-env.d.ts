@@ -65,6 +65,14 @@ interface ImportMetaEnv {
    * и объяснит, что не настроен. Остальной кошелёк работает.
    */
   readonly VITE_WALLETCONNECT_PROJECT_ID?: string
+
+  /**
+   * Адрес Fastify (`server/`).
+   *
+   * Публичен: это URL, а не секрет. Кошелёк вызывает `POST /v1/users`.
+   * Пустое значение — тот же origin, Vite проксирует на порт 8080.
+   */
+  readonly VITE_SERVER_URL?: string
 }
 
 interface ImportMeta {

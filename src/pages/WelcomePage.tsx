@@ -1,6 +1,7 @@
 import { ArrowRight, Download, Fingerprint, ShieldCheck, Zap } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { MockUsersLogin } from '@/features/onboarding/ui/MockUsersLogin'
 import { APP_CONFIG, TEST_MODE } from '@/shared/config'
 import { useTranslation } from '@/shared/i18n'
 import { Alert, AlertDescription, BrandMark, Button } from '@/shared/ui'
@@ -102,6 +103,10 @@ export function WelcomePage() {
             </Link>
           </Button>
         )}
+      </div>
+
+      <div className="w-full max-w-sm">
+        <MockUsersLogin />
       </div>
 
       {/*

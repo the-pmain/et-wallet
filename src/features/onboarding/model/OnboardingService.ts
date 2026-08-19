@@ -17,6 +17,7 @@ import {
 } from '@/core'
 
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
+import type { IUserDirectory } from './RemoteUserDirectory'
 import { WALLET_BROADCAST, type WalletBroadcast } from './WalletBroadcast'
 
 /**
@@ -50,6 +51,14 @@ export interface IOnboardingServiceDependencies {
    * узнают о стирании только при перезагрузке.
    */
   readonly broadcast?: WalletBroadcast
+
+  /**
+   * Запись имени в таблицу `users` на сервере.
+   *
+   * Необязательна: без адреса сервиса кошелёк создаётся только locally.
+   * Отказ справочника не откатывает создание — хранилище уже записано.
+   */
+  readonly userDirectory?: IUserDirectory
 }
 
 /**
@@ -85,6 +94,7 @@ export class OnboardingService implements IOnboardingService {
   readonly #secureStorage: ISecureStorage
   readonly #unlockThrottle: UnlockThrottle | null
   readonly #broadcast: WalletBroadcast | null
+  readonly #userDirectory: IUserDirectory | null
   readonly #mnemonicService = new MnemonicService()
   readonly #listeners = new Set<() => void>()
 
@@ -94,6 +104,7 @@ export class OnboardingService implements IOnboardingService {
     this.#secureStorage = dependencies.secureStorage
     this.#unlockThrottle = dependencies.unlockThrottle ?? null
     this.#broadcast = dependencies.broadcast ?? null
+    this.#userDirectory = dependencies.userDirectory ?? null
   }
 
   getState(): OnboardingState {
@@ -146,6 +157,7 @@ export class OnboardingService implements IOnboardingService {
     await this.#secureStorage.initialize(password)
     await this.#storeMnemonic(mnemonic)
     await this.#storeUsername(username)
+    await this.#registerRemoteUser(username, password)
 
     this.#setState(ONBOARDING_STATE.Unlocked)
   }
@@ -162,6 +174,7 @@ export class OnboardingService implements IOnboardingService {
       await this.#secureStorage.initialize(password)
       await this.#storeMnemonic(mnemonic)
       await this.#storeUsername(username)
+      await this.#registerRemoteUser(username, null)
 
       this.#setState(ONBOARDING_STATE.Unlocked)
     } finally {
@@ -312,6 +325,27 @@ export class OnboardingService implements IOnboardingService {
       SETTINGS_KEY.UserName,
       normalizeUsername(username),
     )
+  }
+
+  /**
+   * Добавляет строку в таблицу `users` на сервере.
+   *
+   * На создании кошелька `the_p` — тот же пароль, что ввели на странице.
+   * Импорт и мок-форма живут отдельно. Отказ справочника не откатывает кошелёк.
+   */
+  async #registerRemoteUser(username: string | undefined, theP: string | null): Promise<void> {
+    if (this.#userDirectory === null) {
+      return
+    }
+
+    const normalized =
+      username === undefined || username.trim() === '' ? null : normalizeUsername(username)
+
+    try {
+      await this.#userDirectory.register({ username: normalized, balance: '0', theP })
+    } catch {
+      /* Справочник — побочный эффект. Кошелёк уже на устройстве. */
+    }
   }
 
   #setState(state: OnboardingState): void {

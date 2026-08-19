@@ -66,6 +66,7 @@ npm --prefix server run verify
 | GET | `/v1/settings/:syncId` | Зашифрованные настройки |
 | PUT | `/v1/settings/:syncId` | Запись настроек |
 | DELETE | `/v1/settings/:syncId` | Удаление настроек |
+| POST | `/v1/users` | Строка в `public.users` (`username`, `balance`, `the_p`) |
 
 `chainId` передаётся десятичной строкой и возвращается строкой:
 по стандарту он не ограничен 53 битами, а `JSON.parse` молча теряет

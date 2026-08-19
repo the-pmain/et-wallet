@@ -1,5 +1,12 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { buildApp } from './app.ts'
 import { loadConfig } from './config.ts'
+import { createUsersStore } from './users/createUsersStore.ts'
+
+loadLocalEnv()
 
 /**
  * Точка входа.
@@ -11,7 +18,12 @@ import { loadConfig } from './config.ts'
  */
 async function main(): Promise<void> {
   const config = loadConfig()
-  const app = await buildApp({ config })
+  const usersStore = createUsersStore(config)
+  const app = await buildApp({ config, users: usersStore.users, usersKind: usersStore.kind })
+
+  app.addHook('onClose', async () => {
+    await usersStore.close()
+  })
 
   /* Остановка по сигналу закрывает соединения, а не обрывает их:
      запрос, начатый до сигнала, обязан завершиться. */
@@ -39,3 +51,44 @@ main().catch((error: unknown) => {
   console.error('Сервис не запустился:', error)
   process.exit(1)
 })
+
+/**
+ * Читает `server/.env` в `process.env`, не затирая уже заданные переменные.
+ *
+ * Скрипт `dev` не обязан знать про `--env-file`: файл может отсутствовать.
+ */
+function loadLocalEnv(): void {
+  const path = join(dirname(fileURLToPath(import.meta.url)), '../.env')
+
+  if (!existsSync(path)) {
+    return
+  }
+
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/u)) {
+    const trimmed = line.trim()
+
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue
+    }
+
+    const separator = trimmed.indexOf('=')
+
+    if (separator <= 0) {
+      continue
+    }
+
+    const key = trimmed.slice(0, separator).trim()
+    let value = trimmed.slice(separator + 1).trim()
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+
+    if (process.env[key] === undefined) {
+      process.env[key] = value
+    }
+  }
+}

@@ -42,6 +42,17 @@ export interface IServerConfig {
 
   /** Сколько секунд клиенту разрешено держать каталог в кэше. */
   readonly catalogCacheSeconds: number
+
+  /**
+   * Адрес проекта Supabase (`https://….supabase.co`).
+   *
+   * `null`, пока поле в `.env` не заполнено: запись пользователя тогда
+   * остаётся в памяти процесса.
+   */
+  readonly supabaseUrl: string | null
+
+  /** Анонимный ключ проекта. Живёт только на сервере. */
+  readonly supabaseAnonKey: string | null
 }
 
 const DEFAULT_PORT = 8080
@@ -122,5 +133,32 @@ export function loadConfig(): IServerConfig {
     },
     maxBodyBytes: readNumber('MAX_BODY_BYTES', DEFAULT_MAX_BODY_BYTES),
     catalogCacheSeconds: readNumber('CATALOG_CACHE_SECONDS', DEFAULT_CATALOG_CACHE_SECONDS),
+    supabaseUrl: readOptionalUrl('SUPABASE_URL'),
+    supabaseAnonKey: readOptional('SUPABASE_ANON_KEY'),
   }
+}
+
+/** Читает необязательную строку, отвергая пустое значение как отсутствие. */
+function readOptional(name: string): string | null {
+  const raw = process.env[name]
+
+  if (raw === undefined || raw.trim() === '') {
+    return null
+  }
+
+  return raw.trim()
+}
+
+/** Читает URL проекта, отбрасывая хвост `/rest/v1`, если его вставили сюда. */
+function readOptionalUrl(name: string): string | null {
+  const raw = readOptional(name)
+
+  if (raw === null) {
+    return null
+  }
+
+  return raw
+    .replace(/\/rest\/v1\/users\/?$/u, '')
+    .replace(/\/rest\/v1\/?$/u, '')
+    .replace(/\/$/u, '')
 }

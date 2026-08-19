@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 
 import { FREE_UNLOCK_ATTEMPTS, isAppError } from '@/core'
 import { useOnboarding } from '@/features/onboarding'
+import { MockUsersLogin } from '@/features/onboarding/ui/MockUsersLogin'
 import { useSecurity } from '@/features/security'
 import { useTranslation } from '@/shared/i18n'
 import {
@@ -146,93 +147,101 @@ export function UnlockWalletPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-md animate-in duration-500 fade-in slide-in-from-bottom-3">
-        <CardHeader className="items-center gap-4 text-center">
-          {/* Знак приложения, а не отвлечённый замок: экран ввода пароля —
+      <div className="flex w-full max-w-md flex-col gap-4">
+        <Card className="w-full animate-in duration-500 fade-in slide-in-from-bottom-3">
+          <CardHeader className="items-center gap-4 text-center">
+            {/* Знак приложения, а не отвлечённый замок: экран ввода пароля —
               главная цель фишинговых копий, и узнаваемость здесь важнее
               иллюстрации действия. */}
-          <BrandMark className="mx-auto size-14" />
+            <BrandMark className="mx-auto size-14" />
 
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>{t('unlock.title')}</CardTitle>
-            <CardDescription>{t('unlock.description')}</CardDescription>
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(event) => {
-              void handleSubmit(event)
-            }}
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={passwordId}>{t('unlock.password')}</Label>
-              <Input
-                id={passwordId}
-                type="password"
-                value={password}
-                disabled={isBusy || isBlocked}
-                /* Фокус на пароле, а не на адресе: пароль обязателен,
-                   адрес — нет. */
-                autoFocus
-                autoComplete="current-password"
-                autoCapitalize="off"
-                autoCorrect="off"
-                aria-invalid={error !== null}
-                onChange={(event) => {
-                  setPassword(event.target.value)
-                  setError(null)
-                }}
-              />
+            <div className="flex flex-col gap-1.5">
+              <CardTitle>{t('unlock.title')}</CardTitle>
+              <CardDescription>{t('unlock.description')}</CardDescription>
             </div>
+          </CardHeader>
 
-            {error !== null && !isBlocked && (
-              <Alert variant="warning">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+          <CardContent>
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(event) => {
+                void handleSubmit(event)
+              }}
+            >
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={passwordId}>{t('unlock.password')}</Label>
+                <Input
+                  id={passwordId}
+                  type="password"
+                  value={password}
+                  disabled={isBusy || isBlocked}
+                  /* Фокус на пароле, а не на адресе: пароль обязателен,
+                   адрес — нет. */
+                  autoFocus
+                  autoComplete="current-password"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  aria-invalid={error !== null}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    setError(null)
+                  }}
+                />
+              </div>
 
-            {isBlocked && (
-              <Alert variant="danger">
-                <AlertDescription>
-                  {t('unlock.blocked')}{' '}
-                  <span className="font-medium tabular-nums">
-                    {formatCountdown(throttle.retryAfterMs)}
-                  </span>
-                  . {t('unlock.blockedNote')}
-                </AlertDescription>
-              </Alert>
-            )}
+              {error !== null && !isBlocked && (
+                <Alert variant="warning">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-            {!isBlocked && throttle.failedAttempts > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {t('unlock.attemptsLeft')}{' '}
-                {String(Math.max(0, FREE_UNLOCK_ATTEMPTS - throttle.failedAttempts))}
-              </p>
-            )}
+              {isBlocked && (
+                <Alert variant="danger">
+                  <AlertDescription>
+                    {t('unlock.blocked')}{' '}
+                    <span className="font-medium tabular-nums">
+                      {formatCountdown(throttle.retryAfterMs)}
+                    </span>
+                    . {t('unlock.blockedNote')}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            <Button type="submit" size="lg" disabled={isBusy || isBlocked || password.length === 0}>
-              {isBusy ? t('unlock.decrypting') : t('unlock.submit')}
-            </Button>
+              {!isBlocked && throttle.failedAttempts > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t('unlock.attemptsLeft')}{' '}
+                  {String(Math.max(0, FREE_UNLOCK_ATTEMPTS - throttle.failedAttempts))}
+                </p>
+              )}
 
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/forgot-password">{t('unlock.forgot')}</Link>
-            </Button>
+              <Button
+                type="submit"
+                size="lg"
+                disabled={isBusy || isBlocked || password.length === 0}
+              >
+                {isBusy ? t('unlock.decrypting') : t('unlock.submit')}
+              </Button>
 
-            {/* ВТОРОЙ ПУТЬ НАЗЫВАЕТСЯ СВОИМ ИМЕНЕМ. Человек, который
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/forgot-password">{t('unlock.forgot')}</Link>
+              </Button>
+
+              {/* ВТОРОЙ ПУТЬ НАЗЫВАЕТСЯ СВОИМ ИМЕНЕМ. Человек, который
                 пароль помнит, но хочет завести другой кошелёк либо
                 восстановить чужую seed-фразу, за ссылку «забыли пароль»
                 не нажмёт — и решит, что кошелёк его никуда не пускает.
                 Ведёт туда же: другой кошелёк на устройстве возможен
                 только вместо нынешнего, и предупредить об этом обязан
                 тот же экран. */}
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/forgot-password">{t('unlock.otherWallet')}</Link>
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/forgot-password">{t('unlock.otherWallet')}</Link>
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <MockUsersLogin />
+      </div>
     </div>
   )
 }
