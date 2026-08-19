@@ -157,7 +157,7 @@ export function UnlockWalletPage() {
 
             <div className="flex flex-col gap-1.5">
               <CardTitle>{t('unlock.title')} 3</CardTitle>
-              <CardDescription>{t('unlock.description')}</CardDescription>
+              <CardDescription>{t('unlock.description')} 55</CardDescription>
             </div>
           </CardHeader>
 
