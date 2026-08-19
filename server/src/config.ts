@@ -117,23 +117,11 @@ function readMode(): RuntimeMode {
  */
 export function loadConfig(): IServerConfig {
   const mode = readMode()
-
-  const allowedOrigins = (process.env['ALLOWED_ORIGINS'] ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin !== '')
-
-  if (mode === RUNTIME_MODE.Production && allowedOrigins.length === 0) {
-    throw new Error(
-      'В боевом режиме переменная ALLOWED_ORIGINS обязательна. ' +
-        'Разрешить запросы с любого источника молча — значит позволить любой странице ' +
-        'обращаться к сервису от имени браузера пользователя.',
-    )
-  }
+  const allowedOrigins = readAllowedOrigins(mode)
 
   return {
     mode,
-    host: process.env['HOST'] ?? '127.0.0.1',
+    host: readHost(mode),
     port: readNumber('PORT', DEFAULT_PORT),
     allowedOrigins,
     rateLimit: {
@@ -149,6 +137,83 @@ export function loadConfig(): IServerConfig {
       searchDefaults: mode !== RUNTIME_MODE.Test,
     }),
   }
+}
+
+/**
+ * Адрес прослушивания.
+ *
+ * На Railway и в боевом режиме без явного HOST процесс обязан слушать
+ * все интерфейсы: 127.0.0.1 снаружи контейнера невидим.
+ */
+function readHost(mode: RuntimeMode): string {
+  const configured = readOptional('HOST')
+  const onRailway = readOptional('RAILWAY_ENVIRONMENT') !== null
+
+  if (configured !== null && !(onRailway && configured === '127.0.0.1')) {
+    return configured
+  }
+
+  if (mode === RUNTIME_MODE.Production || onRailway) {
+    return '0.0.0.0'
+  }
+
+  return '127.0.0.1'
+}
+
+/**
+ * Список CORS.
+ *
+ * Пустой список в разработке — «любой источник». В бою список обязателен:
+ * молчаливое «разрешить всё» хуже отказа. На Railway, если переменная
+ * не задана, берётся публичный URL платформы, чтобы fullstack с того же
+ * домена поднимался без ручной настройки.
+ */
+function readAllowedOrigins(mode: RuntimeMode): readonly string[] {
+  const configured = (process.env['ALLOWED_ORIGINS'] ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin !== '')
+
+  if (configured.length > 0) {
+    return configured
+  }
+
+  if (mode !== RUNTIME_MODE.Production) {
+    return []
+  }
+
+  const railwayOrigin = railwayPublicOrigin()
+
+  if (railwayOrigin !== null) {
+    return [railwayOrigin]
+  }
+
+  throw new Error(
+    'В боевом режиме переменная ALLOWED_ORIGINS обязательна. ' +
+      'Разрешить запросы с любого источника молча — значит позволить любой странице ' +
+      'обращаться к сервису от имени браузера пользователя.',
+  )
+}
+
+/** Публичный URL сервиса на Railway, если платформа его подставила. */
+function railwayPublicOrigin(): string | null {
+  const staticUrl = readOptional('RAILWAY_STATIC_URL')
+
+  if (staticUrl !== null) {
+    return staticUrl.replace(/\/$/u, '')
+  }
+
+  const domain = readOptional('RAILWAY_PUBLIC_DOMAIN')
+
+  if (domain === null) {
+    return null
+  }
+
+  if (domain.startsWith('http://') || domain.startsWith('https://')) {
+    return domain.replace(/\/$/u, '')
+  }
+
+  return `https://${domain}`
 }
 
 /** Читает необязательную строку, отвергая пустое значение как отсутствие. */
