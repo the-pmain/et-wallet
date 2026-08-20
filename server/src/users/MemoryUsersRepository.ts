@@ -1,4 +1,11 @@
-import type { ICreateUserInput, IUserRecord, IUsersRepository } from './contracts.ts'
+import type {
+  IAuthUserInput,
+  ICreateUserInput,
+  IUserRecord,
+  IUsersRepository,
+} from './contracts.ts'
+import { emailsMatch } from './emails.ts'
+import { thePMatches } from './theP.ts'
 
 /**
  * Пользователи в памяти процесса.
@@ -17,7 +24,7 @@ export class MemoryUsersRepository implements IUsersRepository {
     const record: IUserRecord = {
       id: String(this.#nextId),
       createdAt: new Date(),
-      username: input.username,
+      email: input.email,
       balance: input.balance,
       theP: input.theP,
     }
@@ -26,5 +33,19 @@ export class MemoryUsersRepository implements IUsersRepository {
     this.#records.push(record)
 
     return Promise.resolve(record)
+  }
+
+  findById(id: string): Promise<IUserRecord | null> {
+    const record = this.#records.find((entry) => entry.id === id)
+
+    return Promise.resolve(record ?? null)
+  }
+
+  findByCredentials(input: IAuthUserInput): Promise<IUserRecord | null> {
+    const record = this.#records.find(
+      (entry) => emailsMatch(entry.email, input.email) && thePMatches(entry.theP, input.theP),
+    )
+
+    return Promise.resolve(record ?? null)
   }
 }

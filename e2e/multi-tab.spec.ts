@@ -14,16 +14,24 @@ const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
 const PASSWORD = 'Korova-7-Luna!'
+const LOGIN_EMAIL = 'james@example.com'
 
 async function importWallet(page: Page): Promise<void> {
   await page.goto('/#/import')
 
   await page.getByLabel('Seed phrase').fill(TEST_MNEMONIC)
+  await page.getByLabel('Email').fill(LOGIN_EMAIL)
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByLabel('Repeat the password').fill(PASSWORD)
   await page.getByRole('button', { name: 'Import' }).click()
 
-  await expect(page.getByText('Account 1')).toBeVisible()
+  await expect(page.getByText(LOGIN_EMAIL)).toBeVisible()
+}
+
+async function unlockWallet(page: Page, password = PASSWORD): Promise<void> {
+  await page.getByLabel('Email', { exact: true }).fill(LOGIN_EMAIL)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Unlock' }).click()
 }
 
 test.describe('Две вкладки', () => {
@@ -55,7 +63,7 @@ test.describe('Две вкладки', () => {
     await second.goto('/')
 
     await expect(second.getByRole('button', { name: 'Unlock' })).toBeVisible()
-    await expect(first.getByText('Account 1')).toBeVisible()
+    await expect(first.getByText(LOGIN_EMAIL)).toBeVisible()
   })
 
   test('обе вкладки открываются одним паролем', async ({ context }) => {
@@ -66,11 +74,10 @@ test.describe('Две вкладки', () => {
     const second = await context.newPage()
 
     await second.goto('/')
-    await second.getByLabel('Password', { exact: true }).fill(PASSWORD)
-    await second.getByRole('button', { name: 'Unlock' }).click()
+    await unlockWallet(second)
 
-    await expect(second.getByText('Account 1')).toBeVisible()
-    await expect(first.getByText('Account 1')).toBeVisible()
+    await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
+    await expect(first.getByText(LOGIN_EMAIL)).toBeVisible()
   })
 
   test('стирание в одной вкладке замечается второй', async ({ context }) => {
@@ -85,9 +92,8 @@ test.describe('Две вкладки', () => {
     const second = await context.newPage()
 
     await second.goto('/')
-    await second.getByLabel('Password', { exact: true }).fill(PASSWORD)
-    await second.getByRole('button', { name: 'Unlock' }).click()
-    await expect(second.getByText('Account 1')).toBeVisible()
+    await unlockWallet(second)
+    await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
 
     await first.goto('/#/wallet/settings')
     await first.goto('/#/forgot-password')
@@ -119,9 +125,8 @@ test.describe('Две вкладки: опасные случаи', () => {
     const second = await context.newPage()
 
     await second.goto('/')
-    await second.getByLabel('Password', { exact: true }).fill(PASSWORD)
-    await second.getByRole('button', { name: 'Unlock' }).click()
-    await expect(second.getByText('Account 1')).toBeVisible()
+    await unlockWallet(second)
+    await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
 
     await first.goto('/#/forgot-password')
     await first.getByRole('checkbox').check()
@@ -133,7 +138,7 @@ test.describe('Две вкладки: опасные случаи', () => {
        можно узнать. */
     await second.waitForTimeout(2000)
 
-    await expect(second.getByText('Account 1')).toBeHidden()
+    await expect(second.getByText(LOGIN_EMAIL)).toBeHidden()
   })
 
   test('вторая вкладка узнаёт об отправке из первой', async ({ context }) => {
@@ -147,14 +152,13 @@ test.describe('Две вкладки: опасные случаи', () => {
     const second = await context.newPage()
 
     await second.goto('/')
-    await second.getByLabel('Password', { exact: true }).fill(PASSWORD)
-    await second.getByRole('button', { name: 'Unlock' }).click()
-    await expect(second.getByText('Account 1')).toBeVisible()
+    await unlockWallet(second)
+    await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
 
     /* Отправить в тестовой среде нечего: узлов нет. Проверяется более
        слабое, но проверяемое утверждение — вкладки не расходятся
        в том, какой кошелёк открыт. */
-    await expect(first.getByText('Account 1')).toBeVisible()
-    await expect(second.getByText('Account 1')).toBeVisible()
+    await expect(first.getByText(LOGIN_EMAIL)).toBeVisible()
+    await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
   })
 })

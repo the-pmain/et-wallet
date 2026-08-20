@@ -166,11 +166,11 @@ export interface ISettingsResponse {
 /**
  * Пользователь в таблице `public.users`.
  *
- * Колонка `the_p` в ответ не входит: она пишется в таблицу, но не возвращается.
+ * Колонка `the_p` в ответ не входит: по ней и по `email` сверяют вход.
  */
 export interface IUserResponse {
   readonly id: string
-  readonly username: string | null
+  readonly email: string | null
   readonly balance: string | null
   readonly createdAt: string
 }

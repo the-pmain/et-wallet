@@ -1,17 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EncryptionService, type Wei } from '@/core'
 import { APP_CONFIG, TEST_MODE } from '@/shared/config'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { readLoginCredentials, writeLoginCredentials } from '@/features/onboarding'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-const USERNAME = 'Дмитрий'
+const USERNAME = 'james@example.com'
 
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -38,6 +39,7 @@ function renderApp() {
 
 beforeEach(() => {
   window.location.hash = ''
+  localStorage.clear()
   services = createTestAppServices()
   services.providerFactory.configure({ balance: 0n as Wei })
   service = services.onboarding
@@ -79,27 +81,209 @@ describe('Экран приветствия', () => {
       ),
     ).toBeInTheDocument()
   })
+
+  it('не помечает пустые поля ошибкой при открытии', async () => {
+    renderApp()
+
+    const unlock = await screen.findByRole('button', { name: 'Unlock' })
+
+    expect(unlock).toBeDisabled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).not.toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Password')).not.toHaveAttribute('aria-invalid', 'true')
+  })
 })
 
-/** Заполняет первый шаг создания кошелька: имя и пароль. */
+describe('Вход в экран аккаунта', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  it('после успешного POST /v1/users/auth открывает кабинет', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            id: '7',
+            email: 'james@example.com',
+            balance: '12.5',
+            createdAt: '2026-08-19T12:00:00.000Z',
+          }),
+        ),
+    }) as typeof fetch
+
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.type(await screen.findByLabelText('Email'), 'james@example.com')
+    await user.type(screen.getByLabelText('Password'), 'demo')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
+    expect(screen.getByText('12.5')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.some(
+            ([url, init]) =>
+              (typeof url === 'string' ? url : '').endsWith('/v1/users/auth') &&
+              init?.method === 'POST',
+          ),
+      ).toBe(true)
+    })
+
+    const authCall = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.find(
+        ([url, init]) =>
+          (typeof url === 'string' ? url : '').endsWith('/v1/users/auth') &&
+          init?.method === 'POST',
+      )
+
+    expect(JSON.parse(String(authCall?.[1]?.body))).toEqual({
+      email: 'james@example.com',
+      the_p: 'demo',
+    })
+
+    expect(readLoginCredentials()).toEqual({
+      id: '7',
+      email: 'james@example.com',
+      theP: 'demo',
+    })
+    expect(readLoginCredentials()).not.toHaveProperty('balance')
+  })
+
+  it('при 401 не открывает кабинет', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve(JSON.stringify({ error: { code: 'unauthorized' } })),
+    }) as typeof fetch
+
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.type(await screen.findByLabelText('Email'), 'james@example.com')
+    await user.type(screen.getByLabelText('Password'), 'demo')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not unlock/i)
+    expect(screen.queryByRole('navigation', { name: 'Wallet sections' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
+    expect(readLoginCredentials()).toBeNull()
+  })
+
+  it('показывает ошибку, если почта составлена неверно', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.type(await screen.findByLabelText('Email'), 'not-an-email')
+    await user.type(screen.getByLabelText('Password'), 'demo')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/enter a valid email/i)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('при сохранённых учётных данных входит сам', async () => {
+    writeLoginCredentials({ id: '7', email: 'james@example.com', theP: '123456' })
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            id: '7',
+            email: 'james@example.com',
+            balance: '3',
+            createdAt: '2026-08-19T12:00:00.000Z',
+          }),
+        ),
+    }) as typeof fetch
+
+    renderApp()
+
+    expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(readLoginCredentials()).toEqual({
+      id: '7',
+      email: 'james@example.com',
+      theP: '123456',
+    })
+  })
+
+  it('при отказе входа стирает сохранённые учётные данные', async () => {
+    writeLoginCredentials({ id: '7', email: 'james@example.com', theP: 'wrong' })
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve(JSON.stringify({ error: { code: 'unauthorized' } })),
+    }) as typeof fetch
+
+    renderApp()
+
+    expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
+    expect(readLoginCredentials()).toBeNull()
+  })
+
+  it('кнопка блокировки стирает etwallet.login-credentials', async () => {
+    await service.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
+    writeLoginCredentials({ id: '7', email: USERNAME, theP: PASSWORD })
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            id: '7',
+            email: USERNAME,
+            balance: '0',
+            createdAt: '2026-08-19T12:00:00.000Z',
+          }),
+        ),
+    }) as typeof fetch
+
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(await screen.findByRole('button', { name: 'Lock the wallet' }))
+
+    expect(readLoginCredentials()).toBeNull()
+  })
+})
+
+/** Заполняет первый шаг создания кошелька: почту и пароль. */
 async function fillCreationForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
-  await user.type(screen.getByLabelText(/Your name/i), USERNAME)
+  await user.type(await screen.findByLabelText(/Email/i), USERNAME)
   await user.type(screen.getByLabelText('Password'), PASSWORD)
   await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 }
 
 describe('Создание кошелька', () => {
-  it('не пускает дальше со слабым паролем', async () => {
+  it('пускает дальше с простым паролем', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
-    /* Экран создания грузится отдельным чанком: до его появления
-       поля в документе нет. */
-    await user.type(await screen.findByLabelText('Password'), '123')
+    await user.type(await screen.findByLabelText(/Email/i), USERNAME)
+    await user.type(screen.getByLabelText('Password'), '123456')
+    await user.type(screen.getByLabelText('Repeat the password'), '123456')
 
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
   })
 
   it('не пускает дальше при несовпадении паролей', async () => {
@@ -114,7 +298,7 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('не пускает дальше без имени пользователя', async () => {
+  it('не пускает дальше без почты', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -125,30 +309,27 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('не пускает дальше с непригодным именем', async () => {
-    /* Один символ именем не считается: подпись кошелька из единственной
-       буквы не отличает его ни от чего. */
+  it('не пускает дальше с непригодной почтой', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
-    await user.type(await screen.findByLabelText(/Your name/i), 'Д')
+    await user.type(await screen.findByLabelText(/Email/i), 'not-an-email')
     await user.type(screen.getByLabelText('Password'), PASSWORD)
     await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('называет имя меткой, а не учётной записью', async () => {
-    /* Человек, привыкший к обычным сервисам, принимает имя за учётную
-       запись и ждёт восстановления доступа. Узнать, что восстанавливать
-       некому, он обязан здесь, а не после потери средств. */
+  it('просит почту, а не имя', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
 
-    expect(await screen.findByText(/not an account/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Your name/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/sign in with this email/i)).toBeInTheDocument()
   })
 
   it('показывает фразу только после явного действия', async () => {
@@ -225,7 +406,7 @@ describe('Создание кошелька', () => {
     expect(notice).toBeNull()
   })
 
-  it('создаёт кошелёк и подписывает его именем пользователя', async () => {
+  it('создаёт кошелёк и подписывает его почтой', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -312,6 +493,7 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
 
     await user.click(await screen.findByRole('link', { name: /import/i }))
     await user.type(await screen.findByLabelText('Seed phrase'), TEST_MNEMONIC)
+    await user.type(screen.getByLabelText(/Email/i), USERNAME)
     await user.type(screen.getByLabelText('Password'), PASSWORD)
     await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 
@@ -325,13 +507,14 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
 
     await user.click(await screen.findByRole('link', { name: /import/i }))
     await user.type(await screen.findByLabelText('Seed phrase'), TEST_MNEMONIC)
+    await user.type(screen.getByLabelText(/Email/i), USERNAME)
     await user.type(screen.getByLabelText('Password'), PASSWORD)
     await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
     await user.click(screen.getByRole('button', { name: 'Import' }))
 
     /* Признак разблокировки — появление панели кошелька с созданным
        из seed-фразы аккаунтом в шапке. */
-    expect(await screen.findByText('Account 1')).toBeInTheDocument()
+    expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 })
 
@@ -360,6 +543,7 @@ describe('Разблокировка', () => {
 
   /** Заполняет форму входа. */
   async function signIn(user: ReturnType<typeof userEvent.setup>, password: string): Promise<void> {
+    await user.type(await screen.findByLabelText('Email'), USERNAME)
     await user.type(await screen.findByLabelText('Password'), password)
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
   }
@@ -375,16 +559,12 @@ describe('Разблокировка', () => {
     expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 
-  it('вход не требует ничего, кроме пароля', async () => {
-    /* Имя лежит в том же зашифрованном хранилище и сверяться может лишь
-       после того, как пароль уже подошёл. Второе поле создавало бы
-       впечатление второго фактора, которого нет. */
+  it('вход требует почту и пароль', async () => {
     renderApp()
 
-    await screen.findByLabelText('Password')
-
-    expect(screen.queryByLabelText(/Your name/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Name$/i)).not.toBeInTheDocument()
   })
 
   it('сообщает об ошибке при неверном пароле', async () => {

@@ -114,11 +114,30 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
       return
     }
 
-    /* Отказ проверки схемы — ошибка клиента, и её причину сказать можно:
-       она относится к форме запроса, а не к устройству сервиса. */
+    /* Отказ проверки схемы — ошибка клиента. В журнал — имена полей
+       и код Ajv, не значения: среди полей есть `the_p`. */
     if (error.validation !== undefined) {
+      const keys = bodyKeys(request.body)
+
+      request.log.warn(
+        {
+          route: request.routeOptions.url,
+          keys,
+          validation: error.validation.map((item) => ({
+            keyword: item.keyword,
+            instancePath: item.instancePath,
+            params: item.params,
+          })),
+        },
+        'Тело запроса не прошло схему',
+      )
+
       void reply.status(400).send({
-        error: { code: 'invalid_request', message: 'Запрос не соответствует схеме.' },
+        error: {
+          code: 'invalid_request',
+          message: 'Запрос не соответствует схеме.',
+          ...(config.mode === RUNTIME_MODE.Development ? { receivedFields: keys } : {}),
+        },
       })
 
       return
@@ -134,7 +153,11 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
     })
   })
 
-  app.get('/v1/health', () => ({ status: 'ok', users: usersKind }))
+  app.get('/v1/health', () => ({
+    status: 'ok',
+    users: usersKind,
+    credentials: ['email', 'the_p'],
+  }))
 
   registerCatalogRoutes(app, catalog, config)
   registerNotificationRoutes(app, catalog)
@@ -166,4 +189,13 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
      плагинов. Явное `await` делает это видимым, а не полагается на то,
      что возврат из async-функции сделает то же самое неявно. */
   return await app
+}
+
+/** Имена полей тела без значений — чтобы `the_p` не попал в ответ и журнал. */
+function bodyKeys(body: unknown): readonly string[] {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return []
+  }
+
+  return Object.keys(body)
 }

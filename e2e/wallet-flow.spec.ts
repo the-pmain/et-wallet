@@ -10,6 +10,7 @@ const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
 const PASSWORD = 'Korova-7-Luna!'
+const LOGIN_EMAIL = 'james@example.com'
 
 /** Первый адрес тестовой фразы по пути `m/44'/60'/0'/0/0`. */
 const FIRST_ADDRESS = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
@@ -24,11 +25,18 @@ async function importWallet(page: Page): Promise<void> {
   await page.goto('/#/import')
 
   await page.getByLabel('Seed phrase').fill(TEST_MNEMONIC)
+  await page.getByLabel('Email').fill(LOGIN_EMAIL)
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByLabel('Repeat the password').fill(PASSWORD)
   await page.getByRole('button', { name: 'Import' }).click()
 
-  await expect(page.getByText('Account 1')).toBeVisible()
+  await expect(page.getByText(LOGIN_EMAIL)).toBeVisible()
+}
+
+async function unlockWallet(page: Page, password = PASSWORD): Promise<void> {
+  await page.getByLabel('Email', { exact: true }).fill(LOGIN_EMAIL)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Unlock' }).click()
 }
 
 test.describe('Сквозной путь: создание и работа кошелька', () => {
@@ -97,57 +105,44 @@ test.describe('Сквозной путь: создание и работа ко�
 
     await page.reload()
 
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible()
     await expect(page.getByLabel('Password')).toBeVisible()
     await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeHidden()
   })
 
-  test('подбор пароля упирается в растущую задержку', async ({ page }) => {
-    /*
-      Ограничитель попыток. Проверяется в собранном приложении, потому
-      что счётчик лежит в IndexedDB, а он и есть то, что делает задержку
-      непреодолимой перезагрузкой.
-
-      Число попыток берётся с запасом: точный порог задан в ядре
-      и проверен модульно, здесь важно, что задержка вообще наступает.
-    */
+  test('неудачный вход не закрывает форму и не считает попытки', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await page.getByLabel('Password').fill('Sobaka-9-Solnce!')
-      await page.getByRole('button', { name: 'Unlock' }).click()
+      await unlockWallet(page, 'Sobaka-9-Solnce!')
       await page.waitForTimeout(150)
     }
 
-    await expect(page.getByText(/Too many attempts/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Unlock' })).toBeDisabled()
+    await expect(page.getByText(/Attempts left before a delay/i)).toBeHidden()
+    await expect(page.getByText(/Too many attempts/i)).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
-  test('задержка переживает перезагрузку страницы', async ({ page }) => {
-    /* Ограничитель, обнуляемый обновлением страницы, не ограничивает
-       ничего: подбирающий нажимает F5 после каждой неудачи. */
+  test('после нескольких неудач верный пароль открывает кошелёк', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await page.getByLabel('Password').fill('Sobaka-9-Solnce!')
-      await page.getByRole('button', { name: 'Unlock' }).click()
+      await unlockWallet(page, 'Sobaka-9-Solnce!')
       await page.waitForTimeout(150)
     }
 
-    await expect(page.getByText(/Too many attempts/i)).toBeVisible()
+    await unlockWallet(page)
 
-    await page.reload()
-
-    await expect(page.getByText(/Too many attempts/i)).toBeVisible()
+    await expect(page.getByText('0x9858…aEda94')).toBeVisible()
   })
 
   test('после перезагрузки кошелёк открывается тем же паролем', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
-    await page.getByLabel('Password').fill(PASSWORD)
-    await page.getByRole('button', { name: /unlock/i }).click()
+    await unlockWallet(page)
 
     /* Тот же адрес, что и до перезагрузки: расшифрована та же фраза. */
     await expect(page.getByText('0x9858…aEda94')).toBeVisible()

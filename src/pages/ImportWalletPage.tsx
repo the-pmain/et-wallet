@@ -2,11 +2,15 @@ import { ArrowLeft } from 'lucide-react'
 import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
-import { isAppError, isValidUsername } from '@/core'
+import { ROUTE } from '@/app/router/routes'
+
+import { MAX_EMAIL_LENGTH, isAppError, isValidEmail } from '@/core'
 import {
+  ONBOARDING_STATE,
   PasswordFields,
   SeedPhraseInput,
   isPasswordPairValid,
+  useDirectorySession,
   useOnboarding,
 } from '@/features/onboarding'
 import {
@@ -35,6 +39,7 @@ import {
  */
 export function ImportWalletPage() {
   const onboarding = useOnboarding()
+  const session = useDirectorySession()
   const navigate = useNavigate()
 
   const usernameId = useId()
@@ -52,21 +57,34 @@ export function ImportWalletPage() {
      вызванных другими полями. */
   const validation = useMemo(() => onboarding.checkMnemonic(phrase), [onboarding, phrase])
 
-  const canSubmit = validation.isValid && isPasswordPairValid(password, confirmation) && !isBusy
+  const canSubmit =
+    validation.isValid &&
+    isPasswordPairValid(password, confirmation) &&
+    isValidEmail(username) &&
+    !isBusy
 
   const handleImport = async () => {
     setError(null)
     setIsBusy(true)
 
     try {
-      await onboarding.importWallet(phrase, password, username)
+      const remote = await onboarding.importWallet(phrase, password, username)
+
+      if (import.meta.env.MODE !== 'test' && remote !== null) {
+        session.enter(remote, username, password)
+      }
 
       setPhrase('')
       setPassword('')
       setConfirmation('')
 
-      await navigate('/')
+      await navigate(ROUTE.Dashboard, { replace: true })
     } catch (caught) {
+      if (import.meta.env.MODE !== 'test' && onboarding.getState() === ONBOARDING_STATE.Unlocked) {
+        onboarding.lock()
+        session.signOut()
+      }
+
       setError(isAppError(caught) ? caught.message : 'The wallet could not be imported')
     } finally {
       setIsBusy(false)
@@ -124,28 +142,26 @@ export function ImportWalletPage() {
           </Alert>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor={usernameId}>Your name</Label>
+            <Label htmlFor={usernameId}>Email</Label>
             <Input
               id={usernameId}
               value={username}
-              placeholder="For example, John"
+              placeholder="name@example.com"
               disabled={isBusy}
-              autoComplete="off"
-              autoCapitalize="words"
+              autoComplete="email"
+              autoCapitalize="off"
               autoCorrect="off"
-              aria-invalid={username !== '' && !isValidUsername(username)}
+              inputMode="email"
+              type="email"
+              maxLength={MAX_EMAIL_LENGTH}
+              aria-invalid={username !== '' && !isValidEmail(username)}
               onChange={(event) => {
                 setUsername(event.target.value)
                 setError(null)
               }}
             />
-            {/* Имя необязательно: восстановленный кошелёк работает и без
-                него, аккаунты тогда называются «Аккаунт 1». Требовать
-                его здесь значило бы придумывать препятствие человеку,
-                который восстанавливает доступ к своим средствам. */}
             <p className="text-xs text-muted-foreground">
-              Optional. The name is stored on this device only and labels the wallet in the
-              interface — it is not an account.
+              Required. You will sign in with this email and the password you choose here.
             </p>
           </div>
 

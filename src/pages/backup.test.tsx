@@ -10,8 +10,8 @@ import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
-/** Имя владельца: остаток прежнего поля почты, теперь это username. */
-const USERNAME = 'owner'
+/** Почта владельца: идентификатор входа, лежит в колонке `email`. */
+const USERNAME = 'owner@example.com'
 const WRONG_PASSWORD = 'Sobaka-9-Solnce!'
 
 const BALANCE = 1_000_000_000_000_000_000n as Wei

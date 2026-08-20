@@ -130,4 +130,6 @@ Object.defineProperty(navigator, 'languages', {
 */
 afterEach(() => {
   cleanup()
+  sessionStorage.clear()
+  localStorage.clear()
 })

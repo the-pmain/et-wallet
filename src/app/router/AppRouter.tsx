@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { HashRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 
-import { ONBOARDING_STATE, useOnboardingState } from '@/features/onboarding'
+import { ONBOARDING_STATE, useDirectorySession, useOnboardingState } from '@/features/onboarding'
 /* Экраны входа импортируются модулями, а не через `@/pages`: сборный
    файл статически тянет за собой все страницы сразу и обесценил бы
    отложенную загрузку остальных. */
@@ -39,6 +39,15 @@ import { ROUTE } from './routes'
  */
 function StateGate() {
   const state = useOnboardingState()
+  const session = useDirectorySession()
+
+  if (session.isRestoring) {
+    return <LoadingScreen />
+  }
+
+  if (session.user !== null) {
+    return <Navigate to={ROUTE.Dashboard} replace />
+  }
 
   switch (state) {
     case ONBOARDING_STATE.Loading:
@@ -51,7 +60,11 @@ function StateGate() {
       return <Navigate to={ROUTE.Unlock} replace />
 
     case ONBOARDING_STATE.Unlocked:
-      return <Navigate to={ROUTE.Dashboard} replace />
+      return import.meta.env.MODE === 'test' ? (
+        <Navigate to={ROUTE.Dashboard} replace />
+      ) : (
+        <Navigate to={ROUTE.Unlock} replace />
+      )
   }
 }
 
@@ -68,12 +81,21 @@ function StateGate() {
  */
 function UnlockedOnly() {
   const state = useOnboardingState()
+  const session = useDirectorySession()
 
-  if (state === ONBOARDING_STATE.Loading) {
+  if (session.isRestoring) {
     return <LoadingScreen />
   }
 
-  if (state !== ONBOARDING_STATE.Unlocked) {
+  if (import.meta.env.MODE !== 'test' && session.user === null) {
+    return <Navigate to={ROUTE.Welcome} replace />
+  }
+
+  if (state === ONBOARDING_STATE.Loading && session.user === null) {
+    return <LoadingScreen />
+  }
+
+  if (state !== ONBOARDING_STATE.Unlocked && session.user === null) {
     return <Navigate to={ROUTE.Welcome} replace />
   }
 

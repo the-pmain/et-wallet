@@ -12,7 +12,6 @@ import {
   PublicRpcProvider,
   SecureStorage,
   SystemClock,
-  UnlockThrottle,
   type IClock,
   type IHardwareDevice,
   type IStorageService,
@@ -118,10 +117,6 @@ export function createAppServices(): IAppServices {
     onboarding: new OnboardingService({
       secureStorage,
       broadcast,
-      /* Счётчик попыток лежит в незашифрованных настройках: он обязан
-         работать до разблокировки, когда ключ дешифрования ещё
-         не выведен. */
-      unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
       ...(userDirectory === undefined ? {} : { userDirectory }),
     }),
     session,

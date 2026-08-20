@@ -13,6 +13,7 @@ export {
   isValidUsername,
   normalizeUsername,
 } from './username'
+export { MAX_EMAIL_LENGTH, isValidEmail, normalizeEmail } from './email'
 export {
   CHARACTER_CLASS,
   MAX_PASSWORD_LENGTH,

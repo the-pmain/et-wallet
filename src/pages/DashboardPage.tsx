@@ -1,15 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 
-import {
-  BalanceCard,
-  QuickActions,
-  SESSION_STATE,
-  TransferList,
-  useWallet,
-  useWalletSnapshot,
-} from '@/features/wallet'
-import { useOnboarding } from '@/features/onboarding'
+import { useDirectorySession, useOnboarding, type IRemoteUser } from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
 import {
   Alert,
@@ -21,6 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/shared/ui'
+import {
+  BalanceCard,
+  QuickActions,
+  SESSION_STATE,
+  TransferList,
+  useWallet,
+  useWalletSnapshot,
+} from '@/features/wallet'
 
 /**
  * Главный экран разблокированного кошелька.
@@ -36,8 +36,17 @@ import {
 export function DashboardPage() {
   const session = useWallet()
   const onboarding = useOnboarding()
+  const directory = useDirectorySession()
   const snapshot = useWalletSnapshot()
   const { t } = useTranslation()
+
+  if (
+    snapshot.state !== SESSION_STATE.Open &&
+    snapshot.state !== SESSION_STATE.Opening &&
+    directory.user !== null
+  ) {
+    return <RemoteAccountHome user={directory.user} isRefreshing={directory.isRefreshing} />
+  }
 
   if (snapshot.state === SESSION_STATE.Failed) {
     return (
@@ -55,6 +64,7 @@ export function DashboardPage() {
         <Button
           variant="outline"
           onClick={() => {
+            directory.signOut()
             onboarding.lock()
           }}
         >
@@ -131,3 +141,68 @@ export function DashboardPage() {
  * за пределы видимой области, ради которого экран и открывают.
  */
 const RECENT_LIMIT = 5
+
+function RemoteAccountHome({
+  user,
+  isRefreshing,
+}: {
+  readonly user: IRemoteUser
+  readonly isRefreshing: boolean
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader className="flex-row items-start justify-between gap-4">
+          <CardTitle
+            as="h1"
+            className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+          >
+            {t('dashboard.balance')}
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-4" aria-busy={isRefreshing}>
+          <p className="text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl">
+            {user.balance ?? '—'}
+          </p>
+
+          <QuickActions account={null} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium text-muted-foreground">
+            {t('dashboard.recent')}
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-2 p-0 sm:p-0">
+          <TransferList
+            transfers={[]}
+            network={null}
+            isLoading={false}
+            emptyDescription={
+              <>
+                No operations were found for the available period. The full list and the limits of
+                the source are in the Activity section.
+              </>
+            }
+            emptyClassName="gap-2 py-6"
+          />
+
+          <div className="px-4 pb-4 sm:px-6">
+            <Button asChild variant="ghost" size="sm" className="w-full">
+              <Link to="/wallet/activity">
+                {t('dashboard.allActivity')}
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

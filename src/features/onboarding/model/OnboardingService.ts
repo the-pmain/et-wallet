@@ -6,18 +6,17 @@ import {
   VAULT_KEY,
   assertAcceptablePassword,
   checkMnemonic,
-  isValidUsername,
-  normalizeUsername,
+  isValidEmail,
+  normalizeEmail,
   type IMnemonicCheck,
   type ISecretBuffer,
   type ISecureStorage,
   type IUnlockThrottleState,
-  type UnlockThrottle,
   type MnemonicStrength,
 } from '@/core'
 
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
-import type { IUserDirectory } from './RemoteUserDirectory'
+import type { IRemoteUser, IUserDirectory } from './RemoteUserDirectory'
 import { WALLET_BROADCAST, type WalletBroadcast } from './WalletBroadcast'
 
 /**
@@ -35,16 +34,6 @@ export interface IOnboardingServiceDependencies {
   readonly secureStorage: ISecureStorage
 
   /**
-   * Ограничитель попыток ввода пароля.
-   *
-   * Необязателен: без него сервис работает как прежде. Отсутствие
-   * ограничителя — осознанный выбор вызывающего (например, в проверке,
-   * где перебор задержек только замедлил бы прогон), а не умолчание
-   * боевой сборки.
-   */
-  readonly unlockThrottle?: UnlockThrottle
-
-  /**
    * Оповещение соседних вкладок.
    *
    * Необязательно: без него кошелёк работает как прежде, а вкладки
@@ -53,28 +42,29 @@ export interface IOnboardingServiceDependencies {
   readonly broadcast?: WalletBroadcast
 
   /**
-   * Запись имени в таблицу `users` на сервере.
+   * Запись почты в колонку `email` таблицы `users` на сервере.
    *
    * Необязательна: без адреса сервиса кошелёк создаётся только locally.
-   * Отказ справочника не откатывает создание — хранилище уже записано.
+   * Если справочник задан, отказ записи останавливает создание —
+   * без строки в таблице входить некуда.
    */
   readonly userDirectory?: IUserDirectory
 }
 
 /**
- * Отвергает непригодное имя.
+ * Отвергает непригодный адрес почты.
  *
- * Пустое значение допустимо: имя необязательно, кошелёк работает
- * и без него — аккаунты тогда называются «Аккаунт 1». Отвергается
- * только то, что ломает интерфейс либо позволяет подделку.
+ * Пустое значение допустимо на уровне сервиса: кошелёк на устройстве
+ * работает и без справочника. Если адрес задан, он обязан быть почтой —
+ * в колонке `email` лежит идентификатор входа, не имя.
  */
 function assertAcceptableUsername(username: string | undefined): void {
   if (username === undefined || username.trim() === '') {
     return
   }
 
-  if (!isValidUsername(username)) {
-    throw new InvalidArgumentError('username', 'the name is not acceptable')
+  if (!isValidEmail(username)) {
+    throw new InvalidArgumentError('username', 'the email is not acceptable')
   }
 }
 
@@ -85,14 +75,9 @@ function assertAcceptableUsername(username: string | undefined): void {
  * Сессионный ключ шифрования при этом в хранилище не попадает —
  * он живёт в памяти и исчезает вместе со вкладкой, поэтому после
  * перезагрузки кошелёк оказывается заблокированным.
- *
- * ПОДБОР ПАРОЛЯ ОГРАНИЧЕН ОДНИМ СЧЁТЧИКОМ на вход и на подтверждение
- * перед выдачей секретов: разные счётчики означали бы, что подбирающий
- * выберет форму без ограничения.
  */
 export class OnboardingService implements IOnboardingService {
   readonly #secureStorage: ISecureStorage
-  readonly #unlockThrottle: UnlockThrottle | null
   readonly #broadcast: WalletBroadcast | null
   readonly #userDirectory: IUserDirectory | null
   readonly #mnemonicService = new MnemonicService()
@@ -102,7 +87,6 @@ export class OnboardingService implements IOnboardingService {
 
   constructor(dependencies: IOnboardingServiceDependencies) {
     this.#secureStorage = dependencies.secureStorage
-    this.#unlockThrottle = dependencies.unlockThrottle ?? null
     this.#broadcast = dependencies.broadcast ?? null
     this.#userDirectory = dependencies.userDirectory ?? null
   }
@@ -147,22 +131,32 @@ export class OnboardingService implements IOnboardingService {
     return this.#mnemonicService.findWordsByPrefix(prefix, limit)
   }
 
-  async createWallet(mnemonic: ISecretBuffer, password: string, username?: string): Promise<void> {
-    /* Пароль и имя проверяются до создания хранилища: иначе слабый
-       пароль либо непригодное имя обнаружились бы после того, как ключи
-       уже записаны, и кошелёк остался бы наполовину созданным. */
+  async createWallet(
+    mnemonic: ISecretBuffer,
+    password: string,
+    username?: string,
+  ): Promise<IRemoteUser | null> {
+    /* Пароль и почта проверяются до записи: иначе пустой пароль либо
+       непригодный адрес обнаружились бы после того, как ключи уже
+       лежат в хранилище. */
     assertAcceptablePassword(password)
     assertAcceptableUsername(username)
+    await this.#replaceExistingVault()
 
     await this.#secureStorage.initialize(password)
     await this.#storeMnemonic(mnemonic)
     await this.#storeUsername(username)
-    await this.#registerRemoteUser(username, password)
+    const remote = await this.#registerRemoteUser(username, password)
 
     this.#setState(ONBOARDING_STATE.Unlocked)
+    return remote
   }
 
-  async importWallet(phrase: string, password: string, username?: string): Promise<void> {
+  async importWallet(
+    phrase: string,
+    password: string,
+    username?: string,
+  ): Promise<IRemoteUser | null> {
     assertAcceptablePassword(password)
     assertAcceptableUsername(username)
 
@@ -171,12 +165,14 @@ export class OnboardingService implements IOnboardingService {
     const mnemonic = this.#mnemonicService.fromPhrase(phrase)
 
     try {
+      await this.#replaceExistingVault()
       await this.#secureStorage.initialize(password)
       await this.#storeMnemonic(mnemonic)
       await this.#storeUsername(username)
-      await this.#registerRemoteUser(username, null)
+      const remote = await this.#registerRemoteUser(username, password)
 
       this.#setState(ONBOARDING_STATE.Unlocked)
+      return remote
     } finally {
       mnemonic.wipe()
     }
@@ -192,20 +188,7 @@ export class OnboardingService implements IOnboardingService {
    * создавало бы впечатление второго фактора, которого нет.
    */
   async unlock(password: string): Promise<void> {
-    /* Проверка ДО вывода ключа: иначе каждая закрытая попытка всё равно
-       обходилась бы в 600 000 итераций PBKDF2, и ограничитель превратился
-       бы в способ нагрузить процессор владельца. */
-    await this.#unlockThrottle?.assertAllowed()
-
-    try {
-      await this.#secureStorage.unlock(password)
-    } catch (error) {
-      await this.#unlockThrottle?.recordFailure()
-
-      throw error
-    }
-
-    await this.#unlockThrottle?.recordSuccess()
+    await this.#secureStorage.unlock(password)
     this.#setState(ONBOARDING_STATE.Unlocked)
   }
 
@@ -231,32 +214,30 @@ export class OnboardingService implements IOnboardingService {
     return await this.#secureStorage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UserEmail)
   }
 
+  async getRemoteUserId(): Promise<string | null> {
+    const id = await this.#secureStorage.get<string>(
+      STORAGE_NAMESPACE.Settings,
+      SETTINGS_KEY.RemoteUserId,
+    )
+
+    if (typeof id !== 'string' || id.trim() === '') {
+      return null
+    }
+
+    return id.trim()
+  }
+
   /**
    * Проверяет пароль перед необратимым действием.
    *
-   * ОГРАНИЧИТЕЛЬ ТОТ ЖЕ, ЧТО У ВХОДА, И ЭТО НЕ СОВПАДЕНИЕ. Форма
-   * подтверждения перед выдачей seed-фразы принимает пароль с той же
-   * скоростью, что и экран разблокировки: без общего счётчика
-   * подбирающий просто выбрал бы ту форму, где ограничения нет.
-   *
-   * @throws TooManyAttemptsError если ввод временно закрыт.
+   * @returns `true`, если пароль подходит.
    */
   async verifyPassword(password: string): Promise<boolean> {
-    await this.#unlockThrottle?.assertAllowed()
-
-    const isValid = await this.#secureStorage.verifyPassword(password)
-
-    if (isValid) {
-      await this.#unlockThrottle?.recordSuccess()
-    } else {
-      await this.#unlockThrottle?.recordFailure()
-    }
-
-    return isValid
+    return await this.#secureStorage.verifyPassword(password)
   }
 
   async getUnlockThrottleState(): Promise<IUnlockThrottleState> {
-    return (await this.#unlockThrottle?.getState()) ?? { failedAttempts: 0, retryAfterMs: 0 }
+    return { failedAttempts: 0, retryAfterMs: 0 }
   }
 
   lock(): void {
@@ -323,28 +304,49 @@ export class OnboardingService implements IOnboardingService {
     await this.#secureStorage.set(
       STORAGE_NAMESPACE.Settings,
       SETTINGS_KEY.UserName,
-      normalizeUsername(username),
+      normalizeEmail(username),
     )
   }
 
   /**
    * Добавляет строку в таблицу `users` на сервере.
    *
-   * На создании кошелька `the_p` — тот же пароль, что ввели на странице.
-   * Импорт и мок-форма живут отдельно. Отказ справочника не откатывает кошелёк.
+   * На создании и импорте `the_p` — тот же пароль, что ввели на странице.
+   * Вызывается после локального хранилища: без кошелька на устройстве
+   * учётка в таблице не нужна.
    */
-  async #registerRemoteUser(username: string | undefined, theP: string | null): Promise<void> {
+  async #registerRemoteUser(
+    username: string | undefined,
+    theP: string,
+  ): Promise<IRemoteUser | null> {
     if (this.#userDirectory === null) {
-      return
+      return null
     }
 
-    const normalized =
-      username === undefined || username.trim() === '' ? null : normalizeUsername(username)
+    if (username === undefined || username.trim() === '' || !isValidEmail(username)) {
+      throw new InvalidArgumentError('username', 'the email is not acceptable')
+    }
 
-    try {
-      await this.#userDirectory.register({ username: normalized, balance: '0', theP })
-    } catch {
-      /* Справочник — побочный эффект. Кошелёк уже на устройстве. */
+    const remote = await this.#userDirectory.register({
+      email: normalizeEmail(username),
+      balance: '0',
+      theP,
+    })
+
+    await this.#secureStorage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.RemoteUserId, remote.id)
+
+    return remote
+  }
+
+  /**
+   * Убирает прежний кошелёк с устройства, если он уже есть.
+   *
+   * Экран создания больше не упирается в «already initialised»:
+   * человек явно начал новый кошелёк.
+   */
+  async #replaceExistingVault(): Promise<void> {
+    if (await this.#secureStorage.isInitialized()) {
+      await this.reset()
     }
   }
 

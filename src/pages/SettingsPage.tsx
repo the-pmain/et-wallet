@@ -14,7 +14,7 @@ import { Link } from 'react-router'
 
 import { APP_CONFIG } from '@/shared/config'
 import { HardwareAccountForm } from '@/features/hardware'
-import { useOnboarding } from '@/features/onboarding'
+import { useDirectorySession, useOnboarding } from '@/features/onboarding'
 import { AUTO_LOCK_OPTIONS, StorageDurabilityAlert, useSecurity } from '@/features/security'
 import {
   AccountList,
@@ -61,6 +61,7 @@ export function SettingsPage() {
   const session = useWallet()
   const snapshot = useWalletSnapshot()
   const onboarding = useOnboarding()
+  const directory = useDirectorySession()
   const { storageDurability } = useSecurity()
   const { theme, setTheme } = useTheme()
 
@@ -292,6 +293,7 @@ export function SettingsPage() {
             variant="outline"
             className="w-full"
             onClick={() => {
+              directory.signOut()
               onboarding.lock()
             }}
           >

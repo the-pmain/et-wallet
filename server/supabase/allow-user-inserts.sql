@@ -1,5 +1,5 @@
 -- Same permission pattern as Break Monitor: RLS + open policy + GRANT to anon.
--- Wallet table is public.users (username, balance, the_p). Not coworkers / breaks.
+-- Wallet table is public.users (email, balance, the_p). Not coworkers / breaks.
 
 alter table public.users add column if not exists the_p text;
 

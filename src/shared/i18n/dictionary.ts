@@ -43,15 +43,14 @@ const ENGLISH = {
     'Seed phrase sign-in is temporarily disabled for testing. There is currently no way to restore the wallet if you forget the password: save the phrase shown during creation.',
 
   'create.title': 'Create a wallet',
-  'create.description': 'The name labels the wallet, the password encrypts it',
+  'create.description': 'The email identifies the account, the password encrypts it',
   'create.phraseTitle': 'Save your seed phrase',
   'create.phraseDescription': 'Twelve words that restore access',
   'create.confirmTitle': 'Let us check what you wrote down',
   'create.confirmDescription': 'Pick the words that belong in the listed positions',
-  'create.username': 'Your name',
-  'create.usernamePlaceholder': 'For example, John',
-  'create.usernameNotice':
-    'The name is stored on this device only and labels the wallet in the interface. This is not an account: access cannot be restored by name, and there is nobody to ask.',
+  'create.username': 'Email',
+  'create.usernamePlaceholder': 'name@example.com',
+  'create.usernameNotice': 'You will sign in with this email and the password you choose here.',
   'create.passwordNotice':
     'The password protects the wallet on this device only. It does not restore access and does not replace the seed phrase.',
   'create.acknowledge':
@@ -62,15 +61,18 @@ const ENGLISH = {
   'create.failed': 'Could not create the wallet',
 
   'unlock.title': 'Welcome back',
-  'unlock.description': 'Enter your password to unlock the wallet',
+  'unlock.description': 'Enter your email and password',
+  'unlock.username': 'Email',
   'unlock.password': 'Password',
+  'unlock.emailInvalid': 'Enter a valid email',
   'unlock.submit': 'Unlock',
-  'unlock.decrypting': 'Decrypting…',
+  'unlock.decrypting': 'Unlock',
   'unlock.blocked': 'Too many attempts. Input reopens in',
   'unlock.blockedNote':
     'The delay grows with each failure and survives a page reload. It protects against password guessing by whoever got hold of the device.',
   'unlock.attemptsLeft': 'Attempts left before a delay:',
   'unlock.forgot': 'Forgot your password?',
+  'unlock.createAccount': 'Create account',
   'unlock.otherWallet': 'Create another wallet or restore from a seed phrase',
   'unlock.failed': 'Could not unlock the wallet',
 

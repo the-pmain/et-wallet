@@ -2,7 +2,15 @@ import { ArrowLeft } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
-import { MNEMONIC_STRENGTH, isAppError, isValidUsername, type ISecretBuffer } from '@/core'
+import { ROUTE } from '@/app/router/routes'
+
+import {
+  MNEMONIC_STRENGTH,
+  MAX_EMAIL_LENGTH,
+  isAppError,
+  isValidEmail,
+  type ISecretBuffer,
+} from '@/core'
 import {
   PasswordFields,
   SeedPhraseConfirmation,
@@ -10,7 +18,9 @@ import {
   createConfirmationChallenge,
   isConfirmationComplete,
   isPasswordPairValid,
+  useDirectorySession,
   useOnboarding,
+  ONBOARDING_STATE,
   type IConfirmationChallenge,
 } from '@/features/onboarding'
 import { APP_CONFIG } from '@/shared/config'
@@ -68,6 +78,7 @@ const STEP_DESCRIPTION: Readonly<Record<Step, TranslationKey>> = {
  */
 export function CreateWalletPage() {
   const onboarding = useOnboarding()
+  const session = useDirectorySession()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const usernameId = useId()
@@ -122,7 +133,11 @@ export function CreateWalletPage() {
     setIsBusy(true)
 
     try {
-      await onboarding.createWallet(mnemonic, password, username)
+      const remote = await onboarding.createWallet(mnemonic, password, username)
+
+      if (import.meta.env.MODE !== 'test' && remote !== null) {
+        session.enter(remote, username, password)
+      }
 
       mnemonic.wipe()
       mnemonicRef.current = null
@@ -130,8 +145,13 @@ export function CreateWalletPage() {
       setPassword('')
       setConfirmation('')
 
-      await navigate('/')
+      await navigate(ROUTE.Dashboard, { replace: true })
     } catch (caught) {
+      if (import.meta.env.MODE !== 'test' && onboarding.getState() === ONBOARDING_STATE.Unlocked) {
+        onboarding.lock()
+        session.signOut()
+      }
+
       setError(isAppError(caught) ? caught.message : t('create.failed'))
     } finally {
       setIsBusy(false)
@@ -162,19 +182,18 @@ export function CreateWalletPage() {
                   id={usernameId}
                   value={username}
                   placeholder={t('create.usernamePlaceholder')}
-                  autoComplete="off"
-                  autoCapitalize="words"
+                  autoComplete="email"
+                  autoCapitalize="off"
                   autoCorrect="off"
-                  aria-invalid={username !== '' && !isValidUsername(username)}
+                  inputMode="email"
+                  type="email"
+                  maxLength={MAX_EMAIL_LENGTH}
+                  aria-invalid={username !== '' && !isValidEmail(username)}
                   onChange={(event) => {
                     setUsername(event.target.value)
                   }}
                 />
-                {/* Прямое предупреждение против главного заблуждения:
-                    человек, привыкший к обычным сервисам, принимает имя
-                    за учётную запись и ждёт, что забытый пароль
-                    восстановят. Здесь восстанавливать некому, и узнать
-                    об этом он должен сейчас, а не после потери средств. */}
+                {/* Почта — идентификатор входа, не отображаемое имя. */}
                 <p className="text-xs text-muted-foreground">{t('create.usernameNotice')}</p>
               </div>
 
@@ -194,7 +213,7 @@ export function CreateWalletPage() {
                 disabled={
                   !isPasswordPairValid(password, confirmation) ||
                   username.trim() === '' ||
-                  !isValidUsername(username)
+                  !isValidEmail(username)
                 }
                 onClick={goToPhrase}
               >

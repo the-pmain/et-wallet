@@ -2,7 +2,7 @@ import { ChevronDown, Lock } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
-import { useOnboarding } from '@/features/onboarding'
+import { useOnboarding, useDirectorySession } from '@/features/onboarding'
 import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
@@ -28,9 +28,12 @@ import { NAVIGATION } from './navigation'
 export function AppShell() {
   const snapshot = useWalletSnapshot()
   const onboarding = useOnboarding()
+  const directory = useDirectorySession()
   const location = useLocation()
   const { t } = useTranslation()
   const { autoLock } = useSecurity()
+  const directoryUser = directory.user
+  const showShellContent = snapshot.state === SESSION_STATE.Open || directoryUser !== null
 
   /*
     ПЕРЕХОД МЕЖДУ ЭКРАНАМИ ПЕРЕВОДИТ ФОКУС В СОДЕРЖИМОЕ.
@@ -85,7 +88,16 @@ export function AppShell() {
 
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3 lg:ml-60">
-          {snapshot.activeAccount === null ? null : (
+          {snapshot.activeAccount === null ? (
+            directoryUser === null ? null : (
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold">
+                  {directoryUser.email ?? 'Account'}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">{directoryUser.id}</span>
+              </div>
+            )
+          ) : (
             /* ПЕРЕКЛЮЧАТЕЛЬ ВЫГЛЯДИТ НАЖИМАЕМЫМ. Прежде здесь стояли
                значок со стрелкой и текст без фона и без отклика на
                наведение: стрелка обещала выбор, вид его не подтверждал.
@@ -142,6 +154,7 @@ export function AppShell() {
               size="icon"
               aria-label="Lock the wallet"
               onClick={() => {
+                directory.signOut()
                 onboarding.lock()
               }}
             >
@@ -177,7 +190,7 @@ export function AppShell() {
         tabIndex={-1}
         className="relative z-10 mx-auto w-full max-w-3xl flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 focus:outline-none lg:ml-60 lg:pb-8"
       >
-        {snapshot.state === SESSION_STATE.Open ? <Outlet /> : <ShellPlaceholder />}
+        {showShellContent ? <Outlet /> : <ShellPlaceholder />}
       </main>
 
       {/*

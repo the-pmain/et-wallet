@@ -50,7 +50,7 @@ export default defineConfig({
     port: DEV_SERVER_PORT,
     strictPort: true,
     proxy: {
-      /* Wallet create/import and the mock POST /v1/users in dev. */
+      /* Wallet create/import and POST /v1/users/auth in dev. */
       '/v1': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,

@@ -34,6 +34,19 @@ export class BadRequestError extends ApiError {
   }
 }
 
+/**
+ * Предъявленное значение не подошло.
+ *
+ * Сообщение одно на все отказы входа: различать «нет записи» и
+ * «неверное значение» — подсказка тому, кто подбирает `the_p`.
+ */
+export class UnauthorizedError extends ApiError {
+  constructor(message: string) {
+    super(401, 'unauthorized', message)
+    this.name = 'UnauthorizedError'
+  }
+}
+
 /** Запись изменена другим устройством. */
 export class ConflictError extends ApiError {
   constructor(message: string) {

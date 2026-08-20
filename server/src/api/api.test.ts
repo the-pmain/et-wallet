@@ -288,17 +288,18 @@ describe('Синхронизация настроек', () => {
 })
 
 describe('Пользователи', () => {
-  it('записывает имя, баланс и the_p', async () => {
+  it('записывает почту, баланс и the_p', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { username: 'James', balance: '0', the_p: 'demo' },
+      payload: { email: 'james@example.com', balance: '0', the_p: 'demo' },
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json<{ username: string; balance: string }>().username).toBe('James')
+    expect(response.json<{ email: string; balance: string }>().email).toBe('james@example.com')
     expect(response.json<{ the_p?: unknown; password?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.json<{ password?: unknown }>()).not.toHaveProperty('password')
+    expect(response.json<{ username?: unknown }>()).not.toHaveProperty('username')
     expect(users.records).toHaveLength(1)
     expect(users.records[0]?.theP).toBe('demo')
   })
@@ -307,7 +308,7 @@ describe('Пользователи', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { username: 'Maria' },
+      payload: { email: 'maria@example.com', the_p: 'demo' },
     })
 
     expect(response.statusCode).toBe(201)
@@ -318,10 +319,78 @@ describe('Пользователи', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { username: 'James' },
+      payload: { email: 'james@example.com', the_p: 'demo' },
     })
 
     expect(response.headers['cache-control']).toBe('no-store')
+  })
+
+  it('принимает email длиной до 254 символов', async () => {
+    /* Без подряд идущих шестнадцатеричных символов: охранник входящих
+       данных принимает их за приватный ключ. */
+    const email = `${'q'.repeat(64)}@${'z'.repeat(176)}.io`
+
+    expect(email.length).toBeLessThanOrEqual(254)
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email, the_p: '123456' },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json<{ email: string }>().email).toBe(email)
+  })
+
+  it('отвергает создание с полем username вместо email', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { username: 'james@example.com', the_p: '123456' },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('invalid_request')
+  })
+
+  it('впускает при совпадении почты и the_p', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', balance: '12.5', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json()).toMatchObject({
+      email: 'james@example.com',
+      balance: '12.5',
+    })
+    expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
+    expect(response.body).not.toContain('demo')
+  })
+
+  it('отказывает, если the_p не совпала', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'other' },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('unauthorized')
   })
 })
 

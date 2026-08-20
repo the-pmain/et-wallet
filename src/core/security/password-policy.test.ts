@@ -11,23 +11,18 @@ import {
 } from './password-policy'
 
 describe('assessPassword: длина', () => {
-  it('отвергает пароль короче минимума', () => {
-    expect(assessPassword('Ab1!').issues).toContain(PASSWORD_ISSUE.TooShort)
+  it('отвергает пустой пароль', () => {
+    expect(assessPassword('').issues).toContain(PASSWORD_ISSUE.TooShort)
+    expect(assessPassword('').isAcceptable).toBe(false)
   })
 
-  it('принимает пароль ровно минимальной длины', () => {
-    expect(assessPassword('Abcdefg1234!'.slice(0, MIN_PASSWORD_LENGTH)).issues).not.toContain(
-      PASSWORD_ISSUE.TooShort,
-    )
+  it('принимает короткий простой пароль', () => {
+    expect(assessPassword('123456').isAcceptable).toBe(true)
+    expect(assessPassword('1').isAcceptable).toBe(true)
   })
 
-  it('минимум — восемь символов', () => {
-    /* Значение закреплено намеренно. Порог снижен с двенадцати, и
-       обратное движение обязано быть осознанным, а не случайным
-       следствием правки соседней строки. */
-    expect(MIN_PASSWORD_LENGTH).toBe(8)
-    expect(assessPassword('Abcdefg1').issues).not.toContain(PASSWORD_ISSUE.TooShort)
-    expect(assessPassword('Abcdef1').issues).toContain(PASSWORD_ISSUE.TooShort)
+  it('минимум — один символ', () => {
+    expect(MIN_PASSWORD_LENGTH).toBe(1)
   })
 
   it('отвергает чрезмерно длинный пароль', () => {
@@ -35,12 +30,14 @@ describe('assessPassword: длина', () => {
        Оно защищает от вставки мегабайтного текста, вывод ключа
        из которого подвесит интерфейс. */
     expect(assessPassword(`Ab1!${'x'.repeat(300)}`).issues).toContain(PASSWORD_ISSUE.TooLong)
+    expect(assessPassword(`Ab1!${'x'.repeat(300)}`).isAcceptable).toBe(false)
   })
 })
 
 describe('assessPassword: разновидности символов', () => {
-  it('требует не менее трёх разновидностей', () => {
+  it('отмечает мало разновидностей, но не отвергает пароль', () => {
     expect(assessPassword('abcdefghijklmnop').issues).toContain(PASSWORD_ISSUE.TooFewClasses)
+    expect(assessPassword('abcdefghijklmnop').isAcceptable).toBe(true)
   })
 
   it('принимает три разновидности', () => {
@@ -57,18 +54,18 @@ describe('assessPassword: разновидности символов', () => {
 })
 
 describe('assessPassword: заведомо плохие пароли', () => {
-  it('отвергает распространённый пароль', () => {
+  it('отмечает распространённый пароль, но не отвергает его', () => {
     expect(assessPassword('Password1234').issues).toContain(PASSWORD_ISSUE.Common)
+    expect(assessPassword('Password1234').isAcceptable).toBe(true)
   })
 
   it('находит распространённый фрагмент внутри пароля', () => {
     expect(assessPassword('MyPassword12!').issues).toContain(PASSWORD_ISSUE.Common)
   })
 
-  it('отвергает пароль из повторяющегося фрагмента', () => {
-    /* `abcabcabcabc` формально удовлетворяет длине, но перебирается
-       как четырёхсимвольный. */
+  it('отмечает пароль из повторяющегося фрагмента', () => {
     expect(assessPassword('Ab1!Ab1!Ab1!').issues).toContain(PASSWORD_ISSUE.Repetitive)
+    expect(assessPassword('Ab1!Ab1!Ab1!').isAcceptable).toBe(true)
   })
 
   it('не считает повторяющимся обычный пароль', () => {
@@ -89,20 +86,6 @@ describe('assessPassword: оценка качества', () => {
     expect(assessPassword('Korova-7-Luna-Reka!').strength).toBe(PASSWORD_STRENGTH.Strong)
   })
 
-  it('отсекает расхожие пароли короче прежнего порога', () => {
-    /* Словарь был написан под минимум в двенадцать символов и пароль
-       `Qwerty12` не замечал вовсе. После снижения порога такие
-       варианты стали достижимы. */
-    expect(assessPassword('Qwerty12').issues).toContain(PASSWORD_ISSUE.Common)
-    expect(assessPassword('Abc123!x').issues).toContain(PASSWORD_ISSUE.Common)
-    expect(assessPassword('Dragon1!').issues).toContain(PASSWORD_ISSUE.Common)
-  })
-
-  it('восьмисимвольный пароль без нарушений считается приемлемым', () => {
-    expect(assessPassword('Reka-7Lu').strength).toBe(PASSWORD_STRENGTH.Fair)
-    expect(assessPassword('Reka-7Lu').isAcceptable).toBe(true)
-  })
-
   it('признаёт пригодным пароль без нарушений', () => {
     expect(assessPassword('Korova-7-Luna!').isAcceptable).toBe(true)
   })
@@ -115,9 +98,18 @@ describe('assertAcceptablePassword', () => {
     }).not.toThrow()
   })
 
-  it('отвергает непригодный', () => {
+  it('пропускает простой пароль', () => {
+    expect(() => {
+      assertAcceptablePassword('123456')
+    }).not.toThrow()
     expect(() => {
       assertAcceptablePassword('123')
+    }).not.toThrow()
+  })
+
+  it('отвергает пустой пароль', () => {
+    expect(() => {
+      assertAcceptablePassword('')
     }).toThrow(WeakPasswordError)
   })
 
@@ -125,7 +117,7 @@ describe('assertAcceptablePassword', () => {
     expect.assertions(1)
 
     try {
-      assertAcceptablePassword('secret123')
+      assertAcceptablePassword(`secret123${'x'.repeat(300)}`)
     } catch (error) {
       expect((error as Error).message).not.toContain('secret123')
     }

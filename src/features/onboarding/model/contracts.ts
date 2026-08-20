@@ -1,5 +1,7 @@
 import type { IMnemonicCheck, ISecretBuffer, IUnlockThrottleState, MnemonicStrength } from '@/core'
 
+import type { IRemoteUser } from './RemoteUserDirectory'
+
 /** Состояние кошелька, определяющее доступный экран. */
 export const ONBOARDING_STATE = {
   /** Проверка ещё идёт. */
@@ -64,21 +66,29 @@ export interface IOnboardingService {
   /**
    * Создаёт кошелёк из показанной пользователю фразы.
    *
-   * @param username Имя пользователя как подпись кошелька.
-   *        Необязателен: кошелёк работает и без него. Учётной записью
-   *        он не является — сервера, который сверял бы пару
-   *        «адрес — пароль», не существует.
-   * @throws WeakPasswordError, WalletAlreadyInitializedError,
-   *         InvalidArgumentError если адрес задан и составлен неверно.
+   * Если на устройстве уже было хранилище, оно заменяется: экран
+   * создания не требует отдельного сброса.
+   *
+   * @param username Адрес почты. В таблице `users` он пишется в `email`.
+   *        Необязателен на уровне сервиса: без него кошелёк остаётся
+   *        только на устройстве. Если задан — это почта, не имя.
+   * @throws WeakPasswordError, InvalidArgumentError если адрес задан
+   *         и составлен неверно.
    */
-  createWallet(mnemonic: ISecretBuffer, password: string, username?: string): Promise<void>
+  createWallet(
+    mnemonic: ISecretBuffer,
+    password: string,
+    username?: string,
+  ): Promise<IRemoteUser | null>
 
   /**
    * Импортирует существующий кошелёк.
    *
-   * @throws InvalidMnemonicError, WeakPasswordError, WalletAlreadyInitializedError
+   * Прежнее хранилище на устройстве заменяется, как при создании.
+   *
+   * @throws InvalidMnemonicError, WeakPasswordError, InvalidArgumentError
    */
-  importWallet(phrase: string, password: string, username?: string): Promise<void>
+  importWallet(phrase: string, password: string, username?: string): Promise<IRemoteUser | null>
 
   /**
    * Снимает блокировку.
@@ -98,6 +108,16 @@ export interface IOnboardingService {
   getUsername(): Promise<string | null>
 
   /**
+   * Идентификатор строки в таблице `users`, если кошелёк уже
+   * регистрировался на сервере.
+   *
+   * Available только после разблокировки: значение лежит
+   * в зашифрованном хранилище. `null` — справочника не было
+   * или запись ещё не создавалась.
+   */
+  getRemoteUserId(): Promise<string | null>
+
+  /**
    * Проверяет пароль, не меняя состояния блокировки.
    *
    * Нужен повторному подтверждению перед рискованным действием: оно
@@ -108,11 +128,9 @@ export interface IOnboardingService {
   verifyPassword(password: string): Promise<boolean>
 
   /**
-   * Состояние ограничителя попыток ввода пароля.
-   *
-   * Нужно экрану входа: форма, молча переставшая принимать пароль,
-   * оставляет владельца в недоумении, почему верный пароль
-   * не подходит. Без ограничителя возвращает нулевое состояние.
+   * Ограничитель попыток выключен: вход не считает неудачи
+   * и не закрывает форму. Метод оставлен, чтобы экран входа
+   * не зависел от того, подключён ли счётчик.
    */
   getUnlockThrottleState(): Promise<IUnlockThrottleState>
 

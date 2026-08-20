@@ -1,4 +1,4 @@
-import { MemoryStorageService, SecureStorage, UnlockThrottle, type IProviderFactory } from '@/core'
+import { MemoryStorageService, SecureStorage, type IProviderFactory } from '@/core'
 import { DappSessionService } from '@/features/dapp'
 import { bytesToHex } from '@noble/hashes/utils.js'
 
@@ -105,7 +105,6 @@ export function createTestAppServices(): ITestAppServices {
     onboarding: new OnboardingService({
       broadcast,
       secureStorage,
-      unlockThrottle: new UnlockThrottle({ storage, clock, logger }),
     }),
     session,
     broadcast,

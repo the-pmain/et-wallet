@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 
-import { OnboardingProvider } from '@/features/onboarding'
+import { OnboardingProvider, DirectorySessionProvider } from '@/features/onboarding'
 import { WalletProvider } from '@/features/wallet'
 
 import { createAppServices, type IAppServices } from '../composition/createAppServices'
@@ -53,22 +53,24 @@ export function AppProviders({ children, services }: AppProvidersProps) {
           оформления: язык нужен уже экрану загрузки, а от того, открыт
           ли кошелёк, он не зависит. */}
         <I18nProvider>
-          <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
-            {/* Модуль безопасности вложен в онбординг и охватывает сессию
-              кошелька: автоблокировка следит за состоянием блокировки,
-              а её срабатывание обязано закрыть сессию. */}
-            <SecurityProvider
-              clock={value.clock}
-              settingsRepository={value.securitySettings}
-              storage={value.storage}
-            >
-              <WalletProvider session={value.session}>
-                {/* Подключения вложены в сессию кошелька: запрос
-                  от приложения выполняется её ключами и в её сети. */}
-                <DappProvider service={value.dappSessions}>{children}</DappProvider>
-              </WalletProvider>
-            </SecurityProvider>
-          </OnboardingProvider>
+          <DirectorySessionProvider>
+            <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
+              {/* Модуль безопасности вложен в онбординг и охватывает сессию
+                кошелька: автоблокировка следит за состоянием блокировки,
+                а её срабатывание обязано закрыть сессию. */}
+              <SecurityProvider
+                clock={value.clock}
+                settingsRepository={value.securitySettings}
+                storage={value.storage}
+              >
+                <WalletProvider session={value.session}>
+                  {/* Подключения вложены в сессию кошелька: запрос
+                    от приложения выполняется её ключами и в её сети. */}
+                  <DappProvider service={value.dappSessions}>{children}</DappProvider>
+                </WalletProvider>
+              </SecurityProvider>
+            </OnboardingProvider>
+          </DirectorySessionProvider>
         </I18nProvider>
       </ThemeProvider>
     </AppErrorBoundary>

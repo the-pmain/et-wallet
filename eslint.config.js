@@ -299,6 +299,21 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       'no-restricted-imports': 'off',
+      'no-restricted-globals': 'off',
+    },
+  },
+
+  /*
+    Пара входа (`email` и `the_p`) лежит в localStorage намеренно:
+    её нужно прочитать до открытия зашифрованного хранилища кошелька,
+    иначе автоматический вход после перезагрузки не из чего повторить.
+    В запись не попадают баланс, id и профиль — только поля запроса
+    `POST /v1/users/auth`.
+  */
+  {
+    files: ['src/features/onboarding/model/login-credentials.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
     },
   },
 

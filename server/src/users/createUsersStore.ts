@@ -9,7 +9,7 @@ import { SupabaseRestUsersRepository } from './SupabaseRestUsersRepository.ts'
  *
  * Есть `SUPABASE_URL` и `SUPABASE_ANON_KEY` — запись идёт в таблицу
  * через REST. Иначе мок живёт в памяти процесса: `POST /v1/users`
- * всё равно отвечает 201.
+ * отвечает 201, `POST /v1/users/auth` сверяет `email` и `the_p`.
  */
 export function createUsersStore(config: IServerConfig): IUsersStore {
   if (config.supabaseUrl !== null && config.supabaseAnonKey !== null) {

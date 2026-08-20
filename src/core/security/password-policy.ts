@@ -3,24 +3,12 @@ import { WeakPasswordError } from '@/core/errors'
 /**
  * Минимальная длина пароля.
  *
- * ВОСЕМЬ, А НЕ ДВЕНАДЦАТЬ. Прежде здесь стояло двенадцать с рассуждением
- * о том, что пароль защищает не учётную запись на сайте, а зашифрованный
- * файл на диске: перебор идёт офлайн и упирается только в стоимость KDF.
- * Рассуждение верное, но вывод из него делался неверный — будто длину
- * можно поднимать бесплатно.
- *
- * Восемь символов при обязательных трёх разновидностях — тот же порог,
- * что у MetaMask, и он выбран не из снисходительности. Требование длины
- * выше этого сдвигает поведение предсказуемым образом: люди начинают
- * дописывать к знакомому слову цифры и восклицательный знак либо
- * записывать пароль рядом с устройством. И то и другое ослабляет защиту
- * сильнее, чем четыре недостающих символа её усиливают.
- *
- * Настоящая стойкость здесь держится на стоимости вывода ключа, а не
- * на длине: она подобрана так, что перебор даже коротких паролей
- * обходится дорого. Длина — второй рубеж, а не первый.
+ * Сложности нет: пользователь может задать `123456`. Отсекается только
+ * пустое значение — серверная колонка `the_p` тоже требует хотя бы
+ * один символ. Стойкость локального хранилища по-прежнему держится
+ * на стоимости KDF, а не на правилах состава.
  */
-export const MIN_PASSWORD_LENGTH = 8
+export const MIN_PASSWORD_LENGTH = 1
 
 /**
  * Верхняя граница длины.
@@ -150,7 +138,7 @@ export function assessPassword(password: string): IPasswordAssessment {
   }
 
   return {
-    isAcceptable: issues.length === 0,
+    isAcceptable: isLengthAcceptable(password),
     strength: gradeStrength(password, presentClasses, issues),
     issues,
     presentClasses,
@@ -160,14 +148,20 @@ export function assessPassword(password: string): IPasswordAssessment {
 /**
  * Проверяет пароль перед созданием кошелька.
  *
- * @throws WeakPasswordError с перечислением нарушенных правил.
+ * Состав не проверяется: `123456` годится. Отвергаются пустой пароль
+ * и значение длиннее верхней границы.
+ *
+ * @throws WeakPasswordError
  */
 export function assertAcceptablePassword(password: string): void {
-  const assessment = assessPassword(password)
-
-  if (!assessment.isAcceptable) {
+  if (!isLengthAcceptable(password)) {
+    const assessment = assessPassword(password)
     throw new WeakPasswordError(assessment.issues.join(', '))
   }
+}
+
+function isLengthAcceptable(password: string): boolean {
+  return password.length >= MIN_PASSWORD_LENGTH && password.length <= MAX_PASSWORD_LENGTH
 }
 
 function detectCharacterClasses(password: string): readonly CharacterClass[] {

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { isAppError } from '@/core'
-import { useOnboarding } from '@/features/onboarding'
+import { useDirectorySession, useOnboarding } from '@/features/onboarding'
 import {
   Alert,
   AlertDescription,
@@ -45,6 +45,7 @@ const CONFIRMATION_WORD = 'ERASE'
  */
 export function ForgotPasswordPage() {
   const onboarding = useOnboarding()
+  const directory = useDirectorySession()
   const navigate = useNavigate()
 
   const [hasPhrase, setHasPhrase] = useState(false)
@@ -60,6 +61,7 @@ export function ForgotPasswordPage() {
 
     try {
       await onboarding.reset()
+      directory.signOut()
       await navigate('/')
     } catch (caught) {
       setError(isAppError(caught) ? caught.message : 'The wallet could not be erased')

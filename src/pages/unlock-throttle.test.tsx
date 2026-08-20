@@ -1,8 +1,8 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { FREE_UNLOCK_ATTEMPTS, type Wei } from '@/core'
+import { type Wei } from '@/core'
 import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
@@ -22,11 +22,14 @@ function renderApp() {
   )
 }
 
-/** Вводит пароль и нажимает разблокировку. */
+/** Вводит имя, пароль и нажимает разблокировку. */
 async function attempt(password: string): Promise<void> {
   const user = userEvent.setup()
+  const nameField = await screen.findByLabelText('Email')
   const field = await screen.findByLabelText('Password')
 
+  await user.clear(nameField)
+  await user.type(nameField, 'james@example.com')
   await user.clear(field)
   await user.type(field, password)
   await user.click(screen.getByRole('button', { name: 'Unlock' }))
@@ -46,8 +49,8 @@ beforeEach(async () => {
   await openLockedWallet()
 })
 
-describe('Ограничение попыток входа', () => {
-  it('первые неудачи не закрывают ввод', async () => {
+describe('Вход без ограничения попыток', () => {
+  it('неудача не закрывает ввод и не показывает счётчик', async () => {
     renderApp()
 
     await attempt(WRONG_PASSWORD)
@@ -56,73 +59,41 @@ describe('Ограничение попыток входа', () => {
       expect(screen.getByText(/Wrong password/i)).toBeInTheDocument()
     })
 
+    expect(screen.queryByText(/Attempts left before a delay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Too many attempts/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
-  it('показывает, сколько попыток осталось до задержки', async () => {
-    /* Молчаливое приближение к порогу означало бы, что владелец
-       узнаёт о задержке только когда в неё упрётся. */
+  it('много неудач подряд оставляют форму открытой', async () => {
     renderApp()
 
-    await attempt(WRONG_PASSWORD)
-
-    expect(await screen.findByText(/Attempts left before a delay/i)).toBeInTheDocument()
-  })
-
-  it('закрывает ввод после исчерпания запаса', async () => {
-    renderApp()
-
-    for (let index = 0; index <= FREE_UNLOCK_ATTEMPTS; index += 1) {
+    for (let index = 0; index < 8; index += 1) {
       await attempt(WRONG_PASSWORD)
     }
 
-    expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Unlock' })).toBeDisabled()
+    expect(await screen.findByText(/Wrong password/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Attempts left before a delay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Too many attempts/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
-  it('показывает обратный отсчёт, а не молчаливый отказ', async () => {
+  it('верный пароль открывает кошелёк после нескольких неудач', async () => {
     renderApp()
 
-    for (let index = 0; index <= FREE_UNLOCK_ATTEMPTS; index += 1) {
+    for (let index = 0; index < 8; index += 1) {
       await attempt(WRONG_PASSWORD)
     }
-
-    /* Формат «мм:сс»: пользователь должен видеть, сколько ждать. */
-    expect(await screen.findByText(/^\d+:\d{2}$/)).toBeInTheDocument()
-  })
-
-  it('верный пароль после задержки открывает кошелёк', async () => {
-    renderApp()
-
-    for (let index = 0; index <= FREE_UNLOCK_ATTEMPTS; index += 1) {
-      await attempt(WRONG_PASSWORD)
-    }
-
-    await screen.findByText(/Too many attempts/i)
-
-    /* Управляемые часы двигают время вперёд: ждать пять секунд
-       по-настоящему означало бы замедлить весь набор. */
-    await act(async () => {
-      services.clock.advance(10_000)
-      await Promise.resolve()
-    })
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
-    })
 
     await attempt(PASSWORD)
 
     expect(await screen.findByText('Account 1')).toBeInTheDocument()
   })
 
-  it('успешный вход обнуляет счётчик', async () => {
+  it('счётчик остаётся пустым', async () => {
     renderApp()
 
     await attempt(WRONG_PASSWORD)
-    await attempt(PASSWORD)
-
-    await screen.findByText('Account 1')
+    await screen.findByText(/Wrong password/i)
 
     await expect(services.onboarding.getUnlockThrottleState()).resolves.toEqual({
       failedAttempts: 0,
@@ -131,30 +102,12 @@ describe('Ограничение попыток входа', () => {
   })
 })
 
-describe('Ограничитель переживает перезагрузку', () => {
-  it('состояние читается при открытии экрана', async () => {
-    /* Ограничитель, обнуляемый обновлением страницы, не ограничивает
-       ничего: подбирающий нажимает F5 после каждой неудачи. Здесь
-       перезагрузка изображается повторной отрисовкой поверх того же
-       хранилища. */
-    for (let index = 0; index <= FREE_UNLOCK_ATTEMPTS; index += 1) {
-      await expect(services.onboarding.unlock(WRONG_PASSWORD)).rejects.toThrow()
+describe('Подтверждение пароля не закрывает вход', () => {
+  it('неудачи проверки не мешают разблокировать кошелёк', async () => {
+    for (let index = 0; index < 8; index += 1) {
+      await expect(services.onboarding.verifyPassword(WRONG_PASSWORD)).resolves.toBe(false)
     }
 
-    renderApp()
-
-    expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()
-  })
-})
-
-describe('Ограничитель общий с подтверждением пароля', () => {
-  it('неудачи подтверждения закрывают и вход', async () => {
-    /* Разные счётчики означали бы, что подбирающий выберет форму
-       без ограничения. */
-    for (let index = 0; index <= FREE_UNLOCK_ATTEMPTS; index += 1) {
-      await services.onboarding.verifyPassword(WRONG_PASSWORD)
-    }
-
-    await expect(services.onboarding.unlock(PASSWORD)).rejects.toThrow(/Too many attempts/i)
+    await expect(services.onboarding.unlock(PASSWORD)).resolves.toBeUndefined()
   })
 })
