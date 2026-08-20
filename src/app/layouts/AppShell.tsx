@@ -77,7 +77,7 @@ export function AppShell() {
   }, [location.pathname])
 
   return (
-    <div className="relative flex min-h-svh flex-col bg-background">
+    <div className="relative flex min-h-svh min-w-0 flex-col overflow-x-clip bg-background">
       {/* Фон закреплён по окну просмотра и лежит под всем содержимым:
           шапка и панель навигации размывают его собственным фильтром,
           а карточки непрозрачны — текст читается на них, а не на нём. */}
@@ -87,7 +87,7 @@ export function AppShell() {
       <Toaster />
 
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3 lg:ml-60">
+        <div className="flex w-full min-w-0 items-center gap-3 px-4 py-3 lg:pl-64">
           {snapshot.activeAccount === null ? (
             directoryUser === null ? null : (
               <div className="flex min-w-0 flex-col">
@@ -171,7 +171,7 @@ export function AppShell() {
       {/* Предупреждение стоит над содержимым и вне ключа маршрута:
           переход между экранами не должен его сбрасывать — до блокировки
           осталось столько же, сколько было. */}
-      <div className="relative z-10 mx-auto w-full max-w-3xl px-4 pt-2 lg:ml-60">
+      <div className="relative z-10 w-full min-w-0 px-4 pt-2 lg:pl-64">
         <AutoLockWarning
           isVisible={autoLock.isWarning}
           remainingMs={autoLock.remainingMs}
@@ -180,7 +180,15 @@ export function AppShell() {
       </div>
 
       {/* `relative z-10` обязателен: фон позиционирован, и без явного
-          слоя непозиционированное содержимое ушло бы под него. */}
+          слоя непозиционированное содержимое ушло бы под него.
+
+          ШИРИНА — ВСЯ ОБЛАСТЬ РЯДОМ С ПАНЕЛЬЮ, БЕЗ ВЫХОДА ЗА ОКНО.
+          Отступ слева — внутренний (`pl`), а не поле снаружи (`ml`):
+          `w-full` плюс `ml-60` даёт ширину окна плюс ширину панели
+          и горизонтальную прокрутку страницы. Внутренний отступ
+          оставляет элемент шириной в окно, а содержимое начинается
+          правее панели. `min-w-0` не даёт широкой таблице растянуть
+          колонку. */}
       <main
         key={location.pathname}
         ref={contentRef}
@@ -188,7 +196,7 @@ export function AppShell() {
            клавишей в неё не попадают, и кольцо здесь было бы шумом
            на весь экран. */
         tabIndex={-1}
-        className="relative z-10 mx-auto w-full max-w-3xl flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 focus:outline-none lg:ml-60 lg:pb-8"
+        className="relative z-10 w-full min-w-0 flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 focus:outline-none lg:pr-6 lg:pb-8 lg:pl-64"
       >
         {showShellContent ? <Outlet /> : <ShellPlaceholder />}
       </main>

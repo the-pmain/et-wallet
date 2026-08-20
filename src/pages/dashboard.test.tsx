@@ -123,6 +123,15 @@ describe('Панель: операции', () => {
 
     expect(screen.getByRole('link', { name: /all activity/i })).toBeInTheDocument()
   })
+
+  it('ставит таблицу курсов перед недавними операциями', async () => {
+    renderApp()
+    await findDashboard()
+
+    expect(
+      await screen.findByRole('heading', { name: 'Cryptocurrency Prices' }),
+    ).toBeInTheDocument()
+  })
 })
 
 describe('Панель: быстрые действия', () => {

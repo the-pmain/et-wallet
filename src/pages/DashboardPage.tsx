@@ -15,6 +15,7 @@ import {
 } from '@/shared/ui'
 import {
   BalanceCard,
+  MarketPricesCard,
   QuickActions,
   SESSION_STATE,
   TransferList,
@@ -75,7 +76,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <BalanceCard
         balance={snapshot.balance}
         network={snapshot.activeNetwork}
@@ -83,9 +84,9 @@ export function DashboardPage() {
         error={snapshot.balanceError}
         onRefresh={() => void session.refreshBalance()}
         /* Оценка в долларах собирается из уже имеющегося снимка: курсы
-           запрашиваются тем же обходом, что балансы и токены, и только
-           при данном согласии. Ни одного лишнего обращения наружу
-           главный экран не делает. */
+           портфеля запрашиваются тем же обходом, что балансы и токены,
+           и только при данном согласии. Таблица рынка ниже — отдельный
+           публичный каталог: адресов владельца в нём нет. */
         portfolio={snapshot.portfolio}
         arePricesEnabled={snapshot.arePricesEnabled}
         isPortfolioLoading={snapshot.isPortfolioLoading}
@@ -96,6 +97,8 @@ export function DashboardPage() {
            пунктов предел для окна шириной 360 пикселей. */
         action={<QuickActions account={snapshot.activeAccount} />}
       />
+
+      <MarketPricesCard />
 
       <Card>
         <CardHeader>
@@ -152,7 +155,7 @@ function RemoteAccountHome({
   const { t } = useTranslation()
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <Card>
         <CardHeader className="flex-row items-start justify-between gap-4">
           <CardTitle
@@ -171,6 +174,8 @@ function RemoteAccountHome({
           <QuickActions account={null} />
         </CardContent>
       </Card>
+
+      <MarketPricesCard />
 
       <Card>
         <CardHeader>

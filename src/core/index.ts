@@ -472,15 +472,19 @@ export {
 
 /* --- Курсы --- */
 export {
+  CoinGeckoMarketClient,
   CoinGeckoPriceProvider,
   FIAT_CURRENCY,
   NullPriceProvider,
   PriceService,
   findCoinGeckoPlatform,
+  parseMarketList,
   priceRefKey,
   type FiatCurrency,
+  type ICoinGeckoMarketClientOptions,
   type ICoinGeckoOptions,
   type ICoinGeckoPlatform,
+  type IMarketCoin,
   type IPriceProvider,
   type IPriceQuote,
   type IPriceRef,

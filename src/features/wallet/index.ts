@@ -43,6 +43,11 @@ export { AccountAvatar } from './ui/AccountAvatar'
 export { AccountList } from './ui/AccountList'
 export { AddNetworkForm } from './ui/AddNetworkForm'
 export { BalanceCard } from './ui/BalanceCard'
+export {
+  MarketPricesCard,
+  MARKET_PREVIEW_COUNT,
+  type MarketPricesLoader,
+} from './ui/MarketPricesCard'
 export { NetworkList } from './ui/NetworkList'
 export { NftTransferCard } from './ui/NftTransferCard'
 export { PreflightNotice } from './ui/PreflightNotice'

@@ -133,3 +133,30 @@ afterEach(() => {
   sessionStorage.clear()
   localStorage.clear()
 })
+
+/*
+  Запрос публичного рынка на главном экране не должен уходить в сеть
+  из юнит-тестов: это медленно, недетерминированно и добавляет в
+  документ тикер ETH, из-за которого проверка баланса находит два
+  узла вместо одного.
+
+  Перехватывается только `/coins/markets`. Остальные обращения — к
+  своему серверу, к узлу — проходят как были. Проверки, которые
+  подменяют `fetch` целиком, перекрывают эту заглушку сами.
+*/
+const originalFetch = globalThis.fetch.bind(globalThis)
+
+vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+
+  if (url.includes('/coins/markets')) {
+    return Promise.resolve(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+  }
+
+  return originalFetch(input, init)
+}) as typeof fetch)

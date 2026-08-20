@@ -132,6 +132,25 @@ const ENGLISH = {
      состоявшееся: незавершённые отправки с кнопками «ускорить»
      и «отменить» — это не история. Имя выбрано по содержанию. */
   'dashboard.allActivity': 'All activity',
+
+  /* Публичный рынок, не портфель: запрос не называет адреса владельца. */
+  'dashboard.prices': 'Cryptocurrency Prices',
+  'dashboard.pricesCaption': 'Cryptocurrency market prices in US dollars',
+  'dashboard.pricesRank': '#',
+  'dashboard.pricesCoin': 'Coin',
+  'dashboard.pricesPrice': 'Price',
+  'dashboard.prices1h': '1h',
+  'dashboard.prices24h': '24h',
+  'dashboard.prices7d': '7d',
+  'dashboard.pricesVolume': '24h Volume',
+  'dashboard.pricesMarketCap': 'Market Cap',
+  'dashboard.pricesShowMore': 'Show more',
+  'dashboard.pricesRetry': 'Try again',
+  'dashboard.pricesFailedTitle': 'Prices are unavailable',
+  'dashboard.pricesFailed':
+    'The public market list could not be loaded. This is not your balance — your funds are not affected.',
+  'dashboard.pricesEmptyTitle': 'No coins in the list',
+  'dashboard.pricesEmpty': 'The source returned no coins.',
 } as const
 
 /** Ключ перевода. */
