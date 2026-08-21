@@ -85,10 +85,8 @@ function renderApp() {
 
 /** Открывает раздел коллекционных токенов. */
 async function openNft(): Promise<void> {
-  const user = userEvent.setup()
-
   await screen.findByText('Account 1')
-  await user.click(screen.getByRole('link', { name: /nft/i }))
+  window.location.hash = '#/wallet/nft'
   await screen.findByRole('heading', { level: 1, name: 'NFT' })
 }
 

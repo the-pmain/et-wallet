@@ -197,7 +197,16 @@ describe('Вход в экран аккаунта', () => {
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/enter a valid email/i)
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(
+      fetchMock.mock.calls.filter((call) => {
+        const url = String(call[0] instanceof Request ? call[0].url : call[0])
+        return (
+          !url.includes('api.coingecko.com') &&
+          !url.includes('api.coinbase.com') &&
+          !url.includes('frankfurter.app')
+        )
+      }),
+    ).toHaveLength(0)
   })
 
   it('при сохранённых учётных данных входит сам', async () => {
@@ -323,7 +332,13 @@ describe('Создание кошелька', () => {
     await user.type(screen.getByLabelText('Password'), PASSWORD)
     await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(screen.getByText('Enter a valid email')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(screen.getByRole('heading', { name: 'Create a wallet' })).toBeInTheDocument()
+    expect(screen.getAllByText('Enter a valid email').length).toBeGreaterThan(0)
   })
 
   it('просит почту, а не имя', async () => {

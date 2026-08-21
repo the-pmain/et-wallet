@@ -1,9 +1,8 @@
-import { safeText } from '@/core'
 import { RefreshCw, Trash2 } from 'lucide-react'
 
-import type { Address, ChainId, IPortfolioSummary } from '@/core'
+import { safeText, type Address, type ChainId, type IPortfolioSummary } from '@/core'
 import { UntrustedText } from '@/features/security'
-import { Button } from '@/shared/ui'
+import { Button, Skeleton } from '@/shared/ui'
 
 import { estimateValue, findQuote } from '../lib/asset-value'
 import { formatTokenAmount, shortenAddress } from '../lib/format'
@@ -11,6 +10,9 @@ import { formatFiat } from '../lib/portfolio-display'
 import type { ITokenBalance } from '../model/contracts'
 import { TokenAvatar } from './TokenAvatar'
 import { TokenTrustBadge } from './TokenTrustBadge'
+
+/** Сколько строк-заполнителей, пока список ещё пуст. */
+export const TOKEN_LIST_SKELETON_COUNT = 3
 
 interface TokenListProps {
   readonly tokens: readonly ITokenBalance[]
@@ -50,6 +52,8 @@ export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: Tok
      ничего — зрячий это видит, слушающий страницу нет. */
   return (
     <ul className="divide-y divide-border" aria-busy={isLoading}>
+      {isLoading && tokens.length === 0 ? <TokenListSkeleton /> : null}
+
       {tokens.map((entry) => (
         <li
           key={`${entry.token.chainId.toString()}:${entry.token.address ?? 'native'}`}
@@ -119,6 +123,7 @@ export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: Tok
                 chainId={entry.token.chainId}
                 address={entry.token.address}
                 portfolio={portfolio}
+                isLoading={isLoading}
               />
             </span>
 
@@ -161,19 +166,49 @@ interface AssetValueProps {
   readonly chainId: ChainId | null
   readonly address: Address | null
   readonly portfolio: IPortfolioSummary | null
+  readonly isLoading: boolean
 }
 
-/** Оценка одной строки списка. Ничего не рисует, когда курс неизвестен. */
-function AssetValue({ balance, decimals, chainId, address, portfolio }: AssetValueProps) {
+/** Оценка одной строки списка. Место под строку занято всегда. */
+function AssetValue({
+  balance,
+  decimals,
+  chainId,
+  address,
+  portfolio,
+  isLoading,
+}: AssetValueProps) {
   const value = estimateValue(balance, decimals, findQuote(portfolio, chainId, address))
 
-  if (value === null) {
-    return null
-  }
-
   return (
-    <span className="text-right text-xs break-words text-muted-foreground tabular-nums">
-      ≈ {formatFiat(value)}
+    <span className="flex h-3 min-h-3 items-center justify-end">
+      {value === null && isLoading ? <Skeleton className="h-3 w-14" /> : null}
+      {value === null ? null : (
+        <span className="text-right text-xs break-words text-muted-foreground tabular-nums">
+          ≈ {formatFiat(value)}
+        </span>
+      )}
     </span>
+  )
+}
+
+function TokenListSkeleton() {
+  return (
+    <>
+      {Array.from({ length: TOKEN_LIST_SKELETON_COUNT }, (_, index) => (
+        <li key={index} className="flex items-center gap-3 px-4 py-3.5 sm:px-6" aria-hidden>
+          <Skeleton className="size-9 shrink-0 rounded-full" />
+          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-3 w-28" />
+          </span>
+          <span className="flex min-w-0 flex-col items-end gap-1.5">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-14" />
+          </span>
+          <span className="size-8 shrink-0" />
+        </li>
+      ))}
+    </>
   )
 }

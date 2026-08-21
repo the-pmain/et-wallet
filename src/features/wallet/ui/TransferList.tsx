@@ -1,8 +1,8 @@
-import { Inbox, RefreshCw } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 import { useCallback, type ReactNode } from 'react'
 
 import type { INetworkConfig, ITransferRecord, TxHash } from '@/core'
-import { EmptyState, VirtualList } from '@/shared/ui'
+import { EmptyState, Skeleton, VirtualList } from '@/shared/ui'
 
 import type { ReplacementKind } from '../lib/replacement'
 import { TransferRow } from './TransferRow'
@@ -92,9 +92,22 @@ export function TransferList({
 
   if (isLoading && transfers.length === 0) {
     return (
-      <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-        <RefreshCw className="size-4 animate-spin" aria-hidden />
-        Loading the history…
+      <div className="divide-y divide-border" aria-busy>
+        {Array.from({ length: 3 }, (_, index) => (
+          <div
+            key={index}
+            className="flex h-16 items-center gap-3 px-4 sm:px-6"
+            style={{ height: ROW_HEIGHT }}
+            aria-hidden
+          >
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-4 w-16" />
+          </div>
+        ))}
       </div>
     )
   }

@@ -179,16 +179,12 @@ export interface IAssetTokenResponse {
   readonly name: string
   readonly decimals: number
   readonly balance: string
-  readonly priceUsd: string
-  readonly valueUsd: string
-  readonly change24hPercent: string
   readonly isVerified: boolean
 }
 
 export interface IUserAssetsResponse {
   readonly quoteCurrency: 'USD'
   readonly updatedAt: string
-  readonly totalValueUsd: string
   readonly tokens: readonly IAssetTokenResponse[]
 }
 

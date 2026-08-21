@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { MemoryUsersRepository } from './MemoryUsersRepository.ts'
-import { MOCK_USER_ASSETS } from './assets.ts'
+import { emptyAssets } from './assets.ts'
 
 describe('MemoryUsersRepository', () => {
   it('записывает почту, баланс и the_p', async () => {
@@ -17,7 +17,7 @@ describe('MemoryUsersRepository', () => {
     expect(record.email).toBe('james@example.com')
     expect(record.theP).toBe('demo')
     expect(record.wallets).toEqual([])
-    expect(record.assets).toEqual(MOCK_USER_ASSETS)
+    expect(record.assets).toEqual(emptyAssets())
     expect(users.records).toHaveLength(1)
   })
 
@@ -75,7 +75,7 @@ describe('MemoryUsersRepository', () => {
 
     expect(updated?.wallets).toEqual([{ key, value: '0' }])
     expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
-    expect(updated?.assets).toEqual(MOCK_USER_ASSETS)
+    expect(updated?.assets).toEqual(emptyAssets())
     expect(
       await users.addWallet({
         email: 'james@example.com',

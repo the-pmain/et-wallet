@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { FastEncryptionService } from '@/test/doubles'
 
+import { createStartingRemoteAssets, STARTING_REMOTE_TOKENS } from '../lib/starting-assets'
 import { OnboardingService } from './OnboardingService'
 import { INITIAL_WALLET_VALUE, type IUserDirectory, type IWalletEntry } from './RemoteUserDirectory'
 import { EMPTY_REMOTE_ASSETS } from './RemoteUserDirectory'
@@ -53,7 +54,15 @@ describe('OnboardingService: запись пользователя на серв
           key: expect.stringMatching(/^0x[0-9a-fA-F]{40}$/u),
           value: INITIAL_WALLET_VALUE,
         }),
+        assets: expect.objectContaining({
+          quoteCurrency: 'USD',
+          tokens: STARTING_REMOTE_TOKENS,
+        }),
       }),
+    )
+    expect(STARTING_REMOTE_TOKENS.every((token) => token.balance === '0')).toBe(true)
+    expect(JSON.stringify(createStartingRemoteAssets())).not.toMatch(
+      /priceUsd|valueUsd|totalValueUsd|change24hPercent/u,
     )
   })
 
@@ -70,6 +79,10 @@ describe('OnboardingService: запись пользователя на серв
       balance: '0',
       theP: PASSWORD,
       wallets: FIRST_WALLET,
+      assets: expect.objectContaining({
+        quoteCurrency: 'USD',
+        tokens: STARTING_REMOTE_TOKENS,
+      }),
     })
   })
 

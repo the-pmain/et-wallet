@@ -6,6 +6,7 @@ import {
   parseWallets,
   readWalletValue,
   readWalletsPayload,
+  withZeroBalances,
 } from './wallets.ts'
 
 const ADDRESS = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
@@ -58,5 +59,9 @@ describe('wallets', () => {
     expect(readWalletsPayload([{ key: ADDRESS, value: '0' }])).toEqual([ENTRY])
     expect(readWalletsPayload({ key: 'not-an-address', value: '0' })).toBeNull()
     expect(readWalletsPayload({ [ADDRESS]: '0' })).toBeNull()
+  })
+
+  it('обнуляет значения списка', () => {
+    expect(withZeroBalances([{ key: ADDRESS, value: '2500' }])).toEqual([ENTRY])
   })
 })

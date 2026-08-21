@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { ROUTE } from '@/app/router/routes'
@@ -106,6 +106,10 @@ export function CreateWalletPage() {
     }
   }, [])
 
+  const isEmailInvalid = username.trim() !== '' && !isValidEmail(username)
+  const canAttemptPasswordStep =
+    isPasswordPairValid(password, confirmation) && username.trim() !== ''
+
   const goToPhrase = () => {
     const mnemonic = onboarding.generateMnemonic(MNEMONIC_STRENGTH.Words12)
 
@@ -113,6 +117,22 @@ export function CreateWalletPage() {
     mnemonicRef.current = mnemonic
     setWords(onboarding.toWords(mnemonic))
     setStep(STEP.Phrase)
+  }
+
+  const handlePasswordStep = (event: FormEvent) => {
+    event.preventDefault()
+
+    if (!canAttemptPasswordStep) {
+      return
+    }
+
+    if (!isValidEmail(username)) {
+      setError(t('unlock.emailInvalid'))
+      return
+    }
+
+    setError(null)
+    goToPhrase()
   }
 
   const goToConfirm = () => {
@@ -175,7 +195,7 @@ export function CreateWalletPage() {
 
         <CardContent className="flex flex-col gap-6">
           {step === STEP.Password && (
-            <>
+            <form className="flex flex-col gap-6" noValidate onSubmit={handlePasswordStep}>
               <div className="flex flex-col gap-2">
                 <Label htmlFor={usernameId}>{t('create.username')}</Label>
                 <Input
@@ -186,40 +206,46 @@ export function CreateWalletPage() {
                   autoCapitalize="off"
                   autoCorrect="off"
                   inputMode="email"
-                  type="email"
+                  type="text"
                   maxLength={MAX_EMAIL_LENGTH}
-                  aria-invalid={username !== '' && !isValidEmail(username)}
+                  aria-invalid={isEmailInvalid || error !== null}
                   onChange={(event) => {
                     setUsername(event.target.value)
+                    setError(null)
                   }}
                 />
                 {/* Почта — идентификатор входа, не отображаемое имя. */}
                 <p className="text-xs text-muted-foreground">{t('create.usernameNotice')}</p>
+                {isEmailInvalid ? (
+                  <p className="text-xs text-risk-high">{t('unlock.emailInvalid')}</p>
+                ) : null}
               </div>
 
               <PasswordFields
                 password={password}
                 confirmation={confirmation}
-                onPasswordChange={setPassword}
-                onConfirmationChange={setConfirmation}
+                onPasswordChange={(value) => {
+                  setPassword(value)
+                  setError(null)
+                }}
+                onConfirmationChange={(value) => {
+                  setConfirmation(value)
+                  setError(null)
+                }}
               />
 
-              <Alert variant="warning">
-                <AlertDescription>{t('create.passwordNotice')}</AlertDescription>
-              </Alert>
+              <p className="text-xs text-muted-foreground">{t('create.passwordNotice')}</p>
 
-              <Button
-                size="lg"
-                disabled={
-                  !isPasswordPairValid(password, confirmation) ||
-                  username.trim() === '' ||
-                  !isValidEmail(username)
-                }
-                onClick={goToPhrase}
-              >
+              {error !== null && (
+                <Alert variant="danger">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" size="lg" disabled={!canAttemptPasswordStep}>
                 {t('common.next')}
               </Button>
-            </>
+            </form>
           )}
 
           {step === STEP.Phrase && (

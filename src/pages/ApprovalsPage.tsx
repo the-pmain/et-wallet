@@ -20,6 +20,7 @@ import {
   Card,
   CardContent,
   EmptyState,
+  Skeleton,
 } from '@/shared/ui'
 
 /** Что происходит с отзывом прямо сейчас. */
@@ -219,9 +220,22 @@ export function ApprovalsPage() {
       <Card>
         <CardContent className={items !== null && items.length > 0 ? 'p-0 sm:p-0' : undefined}>
           {snapshot.isApprovalsLoading && items === null ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-              <RefreshCw className="size-4 animate-spin" aria-hidden />
-              Checking the approvals…
+            <div className="divide-y divide-border" aria-busy>
+              {Array.from({ length: 3 }, (_, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-3 px-4 py-3.5 sm:px-6"
+                  aria-hidden
+                >
+                  <Skeleton className="size-9 shrink-0 rounded-full" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-8 w-16" />
+                </div>
+              ))}
+              <span className="sr-only">Checking the approvals…</span>
             </div>
           ) : items === null || items.length === 0 ? (
             <EmptyState

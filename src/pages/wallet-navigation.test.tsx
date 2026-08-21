@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -34,15 +34,17 @@ beforeEach(async () => {
 })
 
 describe('Навигация кошелька', () => {
-  it('показывает все пять разделов', async () => {
+  it('показывает четыре раздела', async () => {
     renderApp()
     await findDashboard()
 
     const navigation = screen.getByRole('navigation', { name: 'Wallet sections' })
 
-    for (const label of ['Wallet', 'Assets', 'NFT', 'Activity', 'Settings']) {
+    for (const label of ['Wallet', 'Assets', 'Activity', 'Settings']) {
       expect(within(navigation).getByRole('link', { name: label })).toBeInTheDocument()
     }
+
+    expect(within(navigation).queryByRole('link', { name: 'NFT' })).not.toBeInTheDocument()
   })
 
   it('открывает раздел активов', async () => {
@@ -57,12 +59,10 @@ describe('Навигация кошелька', () => {
   })
 
   it('открывает раздел NFT', async () => {
-    const user = userEvent.setup()
-
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'NFT' }))
+    window.location.hash = '#/wallet/nft'
 
     expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
   })
@@ -149,25 +149,26 @@ describe('Раздел NFT', () => {
   it('объясняет границы поиска вместо пустой галереи', async () => {
     /* Пустой список без объяснения читается владельцем как пропажа
        имущества: поиск охватывает окно блоков, а не всю цепь. */
-    const user = userEvent.setup()
-
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'NFT' }))
+    window.location.hash = '#/wallet/nft'
 
-    expect(await screen.findByText('No items found')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText('Searching for items…')).not.toBeInTheDocument()
+      expect(screen.getByText('No items found')).toBeInTheDocument()
+    })
     expect(screen.getByText(/scans the last/i)).toBeInTheDocument()
   })
 
   it('предупреждает о раскрытии IP при загрузке изображений', async () => {
-    const user = userEvent.setup()
-
     renderApp()
     await findDashboard()
 
-    await user.click(screen.getByRole('link', { name: 'NFT' }))
+    window.location.hash = '#/wallet/nft'
 
+    expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
     expect(await screen.findByText(/would see your IP address/i)).toBeInTheDocument()
   })
 })
@@ -195,7 +196,7 @@ describe('Раздел настроек', () => {
 
     expect(await screen.findByText('Accounts')).toBeInTheDocument()
     expect(screen.getByText('Networks')).toBeInTheDocument()
-    expect(screen.getByText('RPC nodes')).toBeInTheDocument()
+    expect(screen.queryByText('RPC nodes')).not.toBeInTheDocument()
   })
 
   it('даёт выбрать срок автоблокировки', async () => {

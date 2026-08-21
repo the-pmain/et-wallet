@@ -8,7 +8,6 @@ import type {
 const EMPTY_ASSETS: IRemoteAssets = {
   quoteCurrency: 'USD',
   updatedAt: '1970-01-01T00:00:00.000Z',
-  totalValueUsd: '0',
   tokens: [],
 }
 
@@ -338,36 +337,57 @@ function parseAssets(value: unknown): IRemoteAssets {
     return EMPTY_ASSETS
   }
 
-  if (typeof record['totalValueUsd'] !== 'string' || !Array.isArray(tokens)) {
+  if (!Array.isArray(tokens)) {
     return EMPTY_ASSETS
   }
 
   return {
     quoteCurrency: 'USD',
     updatedAt: record['updatedAt'],
-    totalValueUsd: record['totalValueUsd'],
-    tokens: tokens.filter(isRemoteAssetToken),
+    tokens: tokens.flatMap((item) => {
+      const token = readRemoteAssetToken(item)
+
+      return token === null ? [] : [token]
+    }),
   }
 }
 
-function isRemoteAssetToken(value: unknown): value is IRemoteAssetToken {
+function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return false
+    return null
   }
 
   const record = value as Record<string, unknown>
+  const chainId = record['chainId']
+  const standard = record['standard']
+  const address = record['address']
+  const symbol = record['symbol']
+  const name = record['name']
+  const decimals = record['decimals']
+  const balance = record['balance']
+  const isVerified = record['isVerified']
 
-  return (
-    typeof record['chainId'] === 'string' &&
-    (record['standard'] === 'native' || record['standard'] === 'ERC-20') &&
-    (record['address'] === null || typeof record['address'] === 'string') &&
-    typeof record['symbol'] === 'string' &&
-    typeof record['name'] === 'string' &&
-    typeof record['decimals'] === 'number' &&
-    typeof record['balance'] === 'string' &&
-    typeof record['priceUsd'] === 'string' &&
-    typeof record['valueUsd'] === 'string' &&
-    typeof record['change24hPercent'] === 'string' &&
-    typeof record['isVerified'] === 'boolean'
-  )
+  if (
+    typeof chainId !== 'string' ||
+    (standard !== 'native' && standard !== 'ERC-20') ||
+    (address !== null && typeof address !== 'string') ||
+    typeof symbol !== 'string' ||
+    typeof name !== 'string' ||
+    typeof decimals !== 'number' ||
+    typeof balance !== 'string' ||
+    typeof isVerified !== 'boolean'
+  ) {
+    return null
+  }
+
+  return {
+    chainId,
+    standard,
+    address,
+    symbol,
+    name,
+    decimals,
+    balance,
+    isVerified,
+  }
 }

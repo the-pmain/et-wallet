@@ -16,6 +16,9 @@ import 'fake-indexeddb/auto'
 import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
+import { appMarketCatalog } from '@/core'
+import { appFiatRates } from '@/features/wallet/model/fiat-rates-cache'
+
 /**
  * Глобальная подготовка тестовой среды.
  */
@@ -132,6 +135,8 @@ afterEach(() => {
   cleanup()
   sessionStorage.clear()
   localStorage.clear()
+  appMarketCatalog.reset()
+  appFiatRates.reset()
 })
 
 /*

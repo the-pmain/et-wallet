@@ -4,6 +4,7 @@ import type { IPortfolioSummary, ITokenAmount } from '@/core'
 
 import { mapRemoteAssets } from '../lib/map-remote-assets'
 import { useDirectorySession } from './directory-session'
+import { useRemoteAssetQuotes } from './use-remote-asset-quotes'
 
 /** Локальный снимок, которым пользуются, пока записи справочника нет. */
 export interface ILocalAssetSnapshot {
@@ -23,19 +24,18 @@ export interface IDisplayedAssets {
 /**
  * Один источник строк для экрана активов и для карточки на главном.
  *
- * ДВА ЭКРАНА НЕ ДОЛЖНЫ ХОДИТЬ ЗА ДАННЫМИ ПОРОЗНЬ. Иначе после входа
- * главный показал бы локальный ETH с нулём, а «Assets» — витрину
- * записи, и владелец решил бы, что это разные кошельки.
- *
- * ЗАПИСЬ СПРАВОЧНИКА ВАЖНЕЕ СНИМКА СЕССИИ. Пока идёт восстановление
- * входа, список пуст, а не подменяется локальным: мелькнувший чужой
- * ETH хуже короткой пустоты.
+ * ЗАПИСЬ СПРАВОЧНИКА ВАЖНЕЕ СНИМКА СЕССИИ. Курсы для неё берутся
+ * из снимка рынка, загруженного при открытии приложения.
  */
 export function useDisplayedAssets(local: ILocalAssetSnapshot): IDisplayedAssets {
   const directory = useDirectorySession()
+  const remoteTokens = directory.user?.assets.tokens ?? []
+  const { quotes, isLoading: isQuotesLoading } = useRemoteAssetQuotes(
+    directory.user === null ? [] : remoteTokens,
+  )
   const mapped = useMemo(
-    () => (directory.user === null ? null : mapRemoteAssets(directory.user.assets)),
-    [directory.user],
+    () => (directory.user === null ? null : mapRemoteAssets(directory.user.assets, quotes)),
+    [directory.user, quotes],
   )
   const isRemote = mapped !== null || directory.isRestoring
 
@@ -51,7 +51,7 @@ export function useDisplayedAssets(local: ILocalAssetSnapshot): IDisplayedAssets
   return {
     tokens: mapped?.tokens ?? [],
     portfolio: mapped?.portfolio ?? null,
-    isLoading: directory.isRefreshing || directory.isRestoring,
+    isLoading: directory.isRefreshing || directory.isRestoring || isQuotesLoading,
     isRemote: true,
   }
 }

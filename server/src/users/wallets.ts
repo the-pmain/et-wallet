@@ -9,6 +9,9 @@ export interface IWalletEntry {
 /** Список кошельков пользователя. Пустой список — ещё ни одного адреса. */
 export type IUserWallets = readonly IWalletEntry[]
 
+/** Начальное `value` созданного адреса. Не секрет. */
+export const INITIAL_WALLET_VALUE = '0'
+
 /** Длина `value`. Имя аккаунта в клиенте не длиннее 64. */
 export const WALLET_VALUE_MAX_LENGTH = 64
 
@@ -18,6 +21,11 @@ const WALLET_ENTRY_VALUE = 'value'
 /** Пустой список. */
 export function emptyWallets(): IUserWallets {
   return []
+}
+
+/** Все адреса с нулевым значением: так создаётся кошелёк. */
+export function withZeroBalances(wallets: IUserWallets): IUserWallets {
+  return wallets.map((entry) => ({ key: entry.key, value: INITIAL_WALLET_VALUE }))
 }
 
 /**

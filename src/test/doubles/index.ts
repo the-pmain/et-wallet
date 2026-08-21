@@ -18,3 +18,4 @@ export { FakeSessionTransport, type ISentResponse } from './FakeSessionTransport
 export { InMemoryStorageService } from './InMemoryStorageService'
 export { NullLogger, type ILogRecord } from './NullLogger'
 export { createSecureMemoryStorage } from './createSecureMemoryStorage'
+export { mockDirectoryAndPriceFetch } from './mockDirectoryAndPriceFetch'

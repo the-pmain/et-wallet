@@ -1,7 +1,12 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 
-import { useDirectorySession, useOnboarding, type IRemoteUser } from '@/features/onboarding'
+import {
+  useDirectorySession,
+  useDisplayedAssets,
+  useOnboarding,
+  type IRemoteUser,
+} from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
 import {
   Alert,
@@ -45,8 +50,13 @@ export function DashboardPage() {
   const directory = useDirectorySession()
   const snapshot = useWalletSnapshot()
 
-  if (directory.user !== null) {
-    return <RemoteAccountHome user={directory.user} isRefreshing={directory.isRefreshing} />
+  if (directory.user !== null || directory.isRestoring) {
+    return (
+      <RemoteAccountHome
+        user={directory.user}
+        isRefreshing={directory.isRefreshing || directory.isRestoring}
+      />
+    )
   }
 
   if (snapshot.state === SESSION_STATE.Failed) {
@@ -115,29 +125,43 @@ export function DashboardPage() {
  */
 const RECENT_LIMIT = 5
 
-/** Оценка из витрины `assets`, иначе колонка `balance`. */
-function remotePortfolioUsd(user: IRemoteUser): string {
+/** Оценка остатков по живым курсам, иначе колонка `balance`. */
+function remotePortfolioUsd(
+  user: IRemoteUser,
+  totalValue: number | null,
+  quotesReady: boolean,
+): number | null {
   if (user.assets.tokens.length > 0) {
-    return user.assets.totalValueUsd
+    return quotesReady ? totalValue : null
   }
 
-  return user.balance ?? '0'
+  return parseDisplayAmount(user.balance)
 }
 
 function RemoteAccountHome({
   user,
   isRefreshing,
 }: {
-  readonly user: IRemoteUser
+  readonly user: IRemoteUser | null
   readonly isRefreshing: boolean
 }) {
   const snapshot = useWalletSnapshot()
+  const displayed = useDisplayedAssets({
+    tokens: [],
+    portfolio: null,
+    isLoading: false,
+  })
+  const quotesReady = user !== null && !displayed.isLoading
+  const amountUsd =
+    user === null
+      ? null
+      : remotePortfolioUsd(user, displayed.portfolio?.totalValue ?? 0, quotesReady)
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <FiatBalanceCard
-        amountUsd={parseDisplayAmount(remotePortfolioUsd(user))}
-        isRefreshing={isRefreshing}
+        amountUsd={amountUsd}
+        isRefreshing={isRefreshing || displayed.isLoading}
         action={<QuickActions account={snapshot.activeAccount} />}
       />
 

@@ -4,7 +4,16 @@ import { useEffect, useRef, useState } from 'react'
 
 import { TOKEN_STANDARD, type INftItem, type TxHash } from '@/core'
 import { NftTransferCard, shortenAddress, useWallet, useWalletSnapshot } from '@/features/wallet'
-import { Alert, AlertDescription, Badge, Button, Card, CardContent, EmptyState } from '@/shared/ui'
+import {
+  Alert,
+  AlertDescription,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  EmptyState,
+  Skeleton,
+} from '@/shared/ui'
 
 /**
  * Коллекционные токены активного аккаунта.
@@ -133,9 +142,21 @@ export function NftPage() {
       <Card>
         <CardContent className={items !== null && items.length > 0 ? 'p-0 sm:p-0' : undefined}>
           {snapshot.isNftLoading && items === null ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-              <RefreshCw className="size-4 animate-spin" aria-hidden />
-              Searching for items…
+            <div className="divide-y divide-border" aria-busy>
+              {Array.from({ length: 3 }, (_, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-3 px-4 py-3.5 sm:px-6"
+                  aria-hidden
+                >
+                  <Skeleton className="size-10 shrink-0 rounded-lg" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              ))}
+              <span className="sr-only">Searching for items…</span>
             </div>
           ) : items === null || items.length === 0 ? (
             <EmptyState

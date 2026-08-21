@@ -2,12 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { NullLogger } from '@/test/doubles'
 
+import { createStartingRemoteAssets, STARTING_REMOTE_TOKENS } from '../lib/starting-assets'
 import { EMPTY_REMOTE_ASSETS, INITIAL_WALLET_VALUE, RemoteAuthError, RemoteUserDirectory } from './RemoteUserDirectory'
 
 const WALLET = {
   key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
   value: INITIAL_WALLET_VALUE,
 }
+
+const ASSETS = createStartingRemoteAssets(new Date('2026-08-20T12:00:00.000Z'))
 
 const USER_BODY = {
   id: '7',
@@ -40,6 +43,7 @@ describe('RemoteUserDirectory', () => {
       balance: '0',
       theP: 'demo',
       wallets: WALLET,
+      assets: ASSETS,
     })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users')
@@ -48,8 +52,69 @@ describe('RemoteUserDirectory', () => {
       balance: '0',
       the_p: 'demo',
       wallets: WALLET,
+      assets: ASSETS,
     })
+    expect(ASSETS.tokens.every((token) => token.balance === '0')).toBe(true)
+    expect(JSON.stringify(ASSETS)).not.toMatch(/priceUsd|valueUsd|totalValueUsd|change24hPercent/u)
+    expect(ASSETS.tokens).toEqual(STARTING_REMOTE_TOKENS)
     expect(user).toEqual(USER_BODY)
+  })
+
+  it('выбрасывает priceUsd и valueUsd из витрины записи', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(201, {
+        ...USER_BODY,
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-20T12:00:00.000Z',
+          totalValueUsd: '14790.76',
+          tokens: [
+            {
+              chainId: '1',
+              standard: 'native',
+              address: null,
+              symbol: 'ETH',
+              name: 'Ether',
+              decimals: 18,
+              balance: '1284700000000000000',
+              priceUsd: '3284.12',
+              valueUsd: '4219.11',
+              change24hPercent: '1.84',
+              isVerified: true,
+            },
+          ],
+        },
+      }),
+    )
+    const directory = new RemoteUserDirectory({
+      baseUrl: '',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const user = await directory.register({
+      email: 'james@example.com',
+      balance: '0',
+      theP: 'demo',
+      wallets: WALLET,
+      assets: ASSETS,
+    })
+
+    expect(user.assets).not.toHaveProperty('totalValueUsd')
+    expect(user.assets.tokens).toEqual([
+      {
+        chainId: '1',
+        standard: 'native',
+        address: null,
+        symbol: 'ETH',
+        name: 'Ether',
+        decimals: 18,
+        balance: '1284700000000000000',
+        isVerified: true,
+      },
+    ])
+    expect(user.assets.tokens[0]).not.toHaveProperty('priceUsd')
+    expect(user.assets.tokens[0]).not.toHaveProperty('valueUsd')
   })
 
   it('в разработке ходит на тот же origin через /v1/users', async () => {
@@ -65,6 +130,7 @@ describe('RemoteUserDirectory', () => {
       balance: '0',
       theP: 'demo',
       wallets: WALLET,
+      assets: ASSETS,
     })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/v1/users')
@@ -83,6 +149,7 @@ describe('RemoteUserDirectory', () => {
         balance: '0',
         theP: 'demo',
         wallets: WALLET,
+        assets: ASSETS,
       }),
     ).rejects.toBeInstanceOf(RemoteAuthError)
   })
@@ -104,6 +171,7 @@ describe('RemoteUserDirectory', () => {
         balance: '0',
         theP: 'demo',
         wallets: WALLET,
+        assets: ASSETS,
       }),
     ).rejects.toMatchObject({ name: 'RemoteAuthError', status: 400 })
   })

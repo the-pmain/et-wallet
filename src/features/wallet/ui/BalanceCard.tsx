@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import type { IBalance, INetworkConfig, IPortfolioSummary } from '@/core'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/shared/ui'
 
 import { formatTokenAmount } from '../lib/format'
 import { estimateNativeValue } from '../lib/asset-value'
@@ -147,14 +147,16 @@ export function BalanceCard({
             астрономическими количествами шлют на чужие адреса
             постоянно, так что случай не выдуманный. */}
         {balance === null ? (
-          <p className="text-4xl leading-none font-semibold tracking-tight text-muted-foreground tabular-nums sm:text-5xl">
-            {/* «Reading…», а не «Loading…»: во всём остальном
-                приложении надпись называет само действие — «Loading
-                the history…», «Searching for items…», «Checking the
-                approvals…». Здесь стояло единственное безымянное
-                «Loading…», да ещё и самым крупным кеглем экрана. */}
-            {isLoading ? 'Reading…' : '—'}
-          </p>
+          <div className="flex min-h-10 items-center text-4xl leading-none font-semibold tracking-tight text-muted-foreground tabular-nums sm:min-h-12 sm:text-5xl">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-10 w-52 sm:h-12" />
+                <span className="sr-only">Reading…</span>
+              </>
+            ) : (
+              '—'
+            )}
+          </div>
         ) : (
           /*
             СУММА ПОДТВЕРЖДАЕТ ПРИХОД НОВОГО ЗНАЧЕНИЯ.
@@ -270,10 +272,10 @@ interface BalanceValueProps {
 function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: BalanceValueProps) {
   const { t } = useTranslation()
 
-  /* Без баланса оценивать нечего, и строка не занимает места:
-     под надписью «Reading…» цена неизвестного числа бессмысленна. */
+  /* Без баланса оценивать нечего. Высота строки всё равно занята:
+     иначе появление оценки сдвигало бы действия под суммой. */
   if (balance === null) {
-    return null
+    return <div className="min-h-7" aria-hidden />
   }
 
   if (!arePricesEnabled) {
@@ -291,12 +293,17 @@ function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: Balan
   const value = estimateNativeValue(balance, portfolio)
 
   if (value === null) {
-    /* Пока курсы идут, «получить не удалось» было бы преждевременным
-       приговором, а молчание — обещанием, что оценки не будет вовсе. */
     return (
-      <p className="text-sm text-muted-foreground">
-        {isLoading ? t('dashboard.valueLoading') : t('dashboard.valueUnknown')}
-      </p>
+      <div className="min-h-7 text-sm text-muted-foreground">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-4 w-28" />
+            <span className="sr-only">{t('dashboard.valueLoading')}</span>
+          </>
+        ) : (
+          t('dashboard.valueUnknown')
+        )}
+      </div>
     )
   }
 

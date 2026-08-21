@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type Wei } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
 import { writeLoginCredentials } from '@/features/onboarding'
-import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import {
+  createTestAppServices,
+  mockDirectoryAndPriceFetch,
+  type ITestAppServices,
+} from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -96,16 +100,11 @@ describe('Панель: шапка', () => {
     expect(screen.getByRole('img', { name: 'Address fingerprint' })).toBeInTheDocument()
   })
 
-  it('называет активную сеть и у суммы, и в шапке', async () => {
+  it('называет активную сеть у суммы', async () => {
     renderApp()
     await findDashboard()
 
-    /* Дважды — намеренно, и это не тот дубль, что убирают. В шапке
-       сеть названа как общий признак положения, действующий на всех
-       экранах; у суммы — как ответ на вопрос, чьи это деньги. Один
-       адрес в разных сетях держит разные средства, и цифра без
-       указания сети неполна. */
-    expect(screen.getAllByText('Ethereum')).toHaveLength(2)
+    expect(screen.getAllByText('Ethereum')).toHaveLength(1)
   })
 })
 
@@ -257,56 +256,42 @@ describe('Панель: кабинет справочника', () => {
     expect(screen.getByRole('heading', { name: 'Assets' })).toBeInTheDocument()
     expect(screen.getByText('No assets yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
-    expect(screen.getAllByText('Account 1').length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('Account 1')).length).toBeGreaterThan(0)
   })
 
   it('на главном экране показывает токены из users.assets', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            id: '7',
-            email: 'james@example.com',
-            balance: '0',
-            createdAt: '2026-08-19T12:00:00.000Z',
-            assets: {
-              quoteCurrency: 'USD',
-              updatedAt: '2026-08-20T12:00:00.000Z',
-              totalValueUsd: '6700.00',
-              tokens: [
-                {
-                  chainId: '1',
-                  standard: 'native',
-                  address: null,
-                  symbol: 'ETH',
-                  name: 'Ether',
-                  decimals: 18,
-                  balance: '1284700000000000000',
-                  priceUsd: '3284.12',
-                  valueUsd: '4219.11',
-                  change24hPercent: '1.84',
-                  isVerified: true,
-                },
-                {
-                  chainId: '1',
-                  standard: 'ERC-20',
-                  address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-                  symbol: 'USDC',
-                  name: 'USD Coin',
-                  decimals: 6,
-                  balance: '2500000000',
-                  priceUsd: '1.0000',
-                  valueUsd: '2500.00',
-                  change24hPercent: '0.01',
-                  isVerified: true,
-                },
-              ],
-            },
-          }),
-        ),
-    }) as typeof fetch
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '0',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+          {
+            chainId: '1',
+            standard: 'ERC-20',
+            address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+            symbol: 'USDC',
+            name: 'USD Coin',
+            decimals: 6,
+            balance: '2500000000',
+            isVerified: true,
+          },
+        ],
+      },
+    })
 
     writeLoginCredentials({
       id: '7',
@@ -316,9 +301,9 @@ describe('Панель: кабинет справочника', () => {
 
     renderApp()
 
-    expect(await screen.findByText('$6,700.00')).toBeInTheDocument()
+    expect(await screen.findByText('$6,719.11')).toBeInTheDocument()
     expect(screen.getByText('Ether')).toBeInTheDocument()
-    expect(screen.getByText('USD Coin')).toBeInTheDocument()
+    expect(screen.getAllByText('USD Coin').length).toBeGreaterThan(0)
     expect(screen.getByText('1.2847')).toBeInTheDocument()
     expect(screen.getByText('2500')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(

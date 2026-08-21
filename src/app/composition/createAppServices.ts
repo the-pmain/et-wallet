@@ -1,7 +1,8 @@
 import {
   AlchemyHistoryProvider,
   AlchemyProvider,
-  CoinGeckoPriceProvider,
+  CatalogPriceProvider,
+  CoinGeckoMarketClient,
   type ITenderlyCredentials,
   ConsoleLogger,
   LogScanHistoryProvider,
@@ -12,6 +13,8 @@ import {
   PublicRpcProvider,
   SecureStorage,
   SystemClock,
+  appMarketCatalog,
+  fetchCoinbaseEthUsd,
   type IClock,
   type IHardwareDevice,
   type IStorageService,
@@ -225,21 +228,6 @@ function createUserDirectory(logger: ConsoleLogger) {
 }
 
 /**
- * Источник курсов.
- *
- * ПОДКЛЮЧЁН, НО НЕ ВКЛЮЧЁН. Объект создаётся всегда, а обращения к нему
- * не происходит, пока пользователь не дал явного согласия: запрос курса
- * называет сервису адрес контракта, то есть сообщает состав портфеля.
- * Согласие хранится в настройках и спрашивается на экране портфеля
- * с перечислением того, что именно уйдёт наружу.
- *
- * РАЗМЕР ПАКЕТА ЗАВИСИТ ОТ КЛЮЧА. Бесплатный публичный доступ принимает
- * один адрес контракта за запрос — проверено обращением к живому
- * сервису, ответ `10012`. С ключом демонстрационного доступа предел
- * выше, и адреса уходят пакетами: меньше запросов означает и меньше
- * следов, и меньший расход лимита.
- */
-/**
  * Учётные данные Tenderly из окружения сборки.
  *
  * ЧИТАЮТСЯ ЗДЕСЬ, А НЕ В ЯДРЕ. `import.meta.env` — особенность сборщика;
@@ -268,14 +256,27 @@ function readTenderlyCredentials(): ITenderlyCredentials | null {
   return { account, project, accessKey }
 }
 
-function createPriceProvider(): CoinGeckoPriceProvider {
+/**
+ * Источник курсов.
+ *
+ * ПУБЛИЧНЫЙ РЫНОК ЗАПРАШИВАЕТСЯ ОДИН РАЗ ПРИ ОТКРЫТИИ. `/coins/markets`
+ * не называет адреса владельца — это тот же каталог, что таблица на
+ * главном экране. Оценка портфеля и витрины читают этот снимок
+ * и больше к CoinGecko не ходят.
+ */
+function createPriceProvider(): CatalogPriceProvider {
   const apiKey = import.meta.env.VITE_COINGECKO_API_KEY ?? null
   const hasKey = apiKey !== null && apiKey !== ''
 
-  return new CoinGeckoPriceProvider({
-    ...(hasKey ? { apiKey } : {}),
-    contractBatchSize: hasKey ? 25 : 1,
+  appMarketCatalog.configure({
+    loadMarkets: (signal) =>
+      new CoinGeckoMarketClient({
+        ...(hasKey ? { apiKey } : {}),
+      }).getMarkets(signal),
+    loadEthUsd: fetchCoinbaseEthUsd,
   })
+
+  return new CatalogPriceProvider(appMarketCatalog)
 }
 
 /**

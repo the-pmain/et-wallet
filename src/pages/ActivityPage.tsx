@@ -1,4 +1,4 @@
-import { ChevronDown, Info, RefreshCw } from 'lucide-react'
+import { ChevronDown, RefreshCw } from 'lucide-react'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { TxHash } from '@/core'
@@ -212,27 +212,6 @@ export function ActivityPage() {
         </Alert>
       ) : null}
 
-      {limits?.nativeTransfersUnavailable === true ? (
-        <Alert variant="warning">
-          <AlertDescription>
-            {nativeSymbol ?? 'Native currency'} transfers are not shown here. The wallet reads the
-            history from node logs, and such transfers emit no events and are absent from the logs.
-            A full history needs an indexer — it receives your address and every operation on it.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {limits?.scannedBlocks === null || limits === null ? null : (
-        <Alert>
-          <Info />
-          <AlertDescription>
-            {limits.scannedBlocks.toLocaleString('en-GB')} blocks were scanned. A single node query
-            returns no more than that
-            {hasMore ? ', so earlier operations have to be loaded separately' : null}.
-          </AlertDescription>
-        </Alert>
-      )}
-
       <TransferFilterBar filter={filter} onChange={setFilter} nativeSymbol={nativeSymbol} />
 
       {hasFilter && transfers.length > 0 ? (
@@ -281,13 +260,7 @@ export function ActivityPage() {
                   Clear the filter to see everything that could be fetched.
                 </>
               ) : (
-                <>
-                  {hasMore
-                    ? 'Nothing was found in the part that has been loaded. This says nothing about the earlier part — it has not been fetched.'
-                    : 'No operations were found for the available period.'}{' '}
-                  The wallet shows transfers of the native currency, ERC-20 tokens and collectible
-                  tokens — as far as the connected source reports them.
-                </>
+                'No operations were found.'
               )
             }
           />

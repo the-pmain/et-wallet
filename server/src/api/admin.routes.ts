@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import { pinMatches } from '../admin/pin.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
-import { readAssetsPayload } from '../users/assets.ts'
+import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
 import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
 import { readWalletsPayload } from '../users/wallets.ts'
 import type { IUserResponse } from './contracts.ts'
@@ -212,6 +212,6 @@ function toUserResponse(record: IUserRecord): IUserResponse {
     balance: record.balance,
     createdAt: record.createdAt.toISOString(),
     wallets: record.wallets,
-    assets: record.assets,
+    assets: sanitizeAssets(record.assets),
   }
 }

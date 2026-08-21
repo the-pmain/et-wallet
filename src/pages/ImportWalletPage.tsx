@@ -57,13 +57,19 @@ export function ImportWalletPage() {
      вызванных другими полями. */
   const validation = useMemo(() => onboarding.checkMnemonic(phrase), [onboarding, phrase])
 
+  const isEmailInvalid = username.trim() !== '' && !isValidEmail(username)
   const canSubmit =
     validation.isValid &&
     isPasswordPairValid(password, confirmation) &&
-    isValidEmail(username) &&
+    username.trim() !== '' &&
     !isBusy
 
   const handleImport = async () => {
+    if (!isValidEmail(username)) {
+      setError('Enter a valid email')
+      return
+    }
+
     setError(null)
     setIsBusy(true)
 
@@ -152,9 +158,9 @@ export function ImportWalletPage() {
               autoCapitalize="off"
               autoCorrect="off"
               inputMode="email"
-              type="email"
+              type="text"
               maxLength={MAX_EMAIL_LENGTH}
-              aria-invalid={username !== '' && !isValidEmail(username)}
+              aria-invalid={isEmailInvalid || error !== null}
               onChange={(event) => {
                 setUsername(event.target.value)
                 setError(null)
@@ -163,6 +169,9 @@ export function ImportWalletPage() {
             <p className="text-xs text-muted-foreground">
               Required. You will sign in with this email and the password you choose here.
             </p>
+            {isEmailInvalid ? (
+              <p className="text-xs text-risk-high">Enter a valid email</p>
+            ) : null}
           </div>
 
           <PasswordFields

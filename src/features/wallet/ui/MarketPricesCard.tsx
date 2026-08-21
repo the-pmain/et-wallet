@@ -1,7 +1,7 @@
 import { TrendingUp } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
-import { CoinGeckoMarketClient, type IMarketCoin } from '@/core'
+import { appMarketCatalog, type IMarketCoin } from '@/core'
 import { UntrustedText } from '@/features/security'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
@@ -22,9 +22,9 @@ export type MarketPricesLoader = (signal: AbortSignal) => Promise<readonly IMark
 
 interface MarketPricesCardProps {
   /**
-   * Подмена запроса. Боевой код её не передаёт: карточка сама ходит
-   * к источнику в момент появления. Тест подставляет ответ, чтобы не
-   * зависеть от сети и не получить второй тикер ETH на главном экране.
+   * Подмена запроса. Боевой код её не передаёт: таблица читает снимок
+   * рынка, загруженный при открытии приложения. Тест подставляет ответ,
+   * чтобы не зависеть от общего каталога.
    */
   readonly loadMarkets?: MarketPricesLoader
 }
@@ -34,54 +34,40 @@ type MarketState =
   | { readonly status: 'ready'; readonly coins: readonly IMarketCoin[] }
   | { readonly status: 'failed' }
 
-const defaultClient = new CoinGeckoMarketClient()
-
-async function loadDefaultMarkets(signal: AbortSignal): Promise<readonly IMarketCoin[]> {
-  return await defaultClient.getMarkets(signal)
-}
-
 /**
  * Публичная таблица курсов на главном экране.
  *
- * ЗАПРОС УХОДИТ ПРИ ПОЯВЛЕНИИ КАРТОЧКИ. Это каталог рынка, а не оценка
- * портфеля: в нём нет адресов владельца. Согласие с экрана портфеля
- * сюда не относится.
+ * ЗАПРОС УХОДИТ ОДИН РАЗ ПРИ ОТКРЫТИИ ПРИЛОЖЕНИЯ. Это каталог рынка,
+ * а не оценка портфеля: в нём нет адресов владельца. Согласие с экрана
+ * портфеля сюда не относится.
  *
  * КОЛОНКИ ГРАФИКА НЕТ. Источник умеет отдать ряд за семь дней, но на
  * экране он не рисуется: пользователь просил таблицу чисел, и чужие
  * картинки всё равно запрещены политикой безопасности.
  */
-export function MarketPricesCard({ loadMarkets = loadDefaultMarkets }: MarketPricesCardProps = {}) {
+export function MarketPricesCard({ loadMarkets }: MarketPricesCardProps = {}) {
   const { t } = useTranslation()
-  const [state, setState] = useState<MarketState>({ status: 'loading' })
-  const [retryKey, setRetryKey] = useState(0)
+  const injected = useInjectedMarkets(loadMarkets)
+  const catalog = useSyncExternalStore(
+    (onStoreChange) => appMarketCatalog.subscribe(onStoreChange),
+    () => appMarketCatalog.getSnapshot(),
+  )
   const [visibleCount, setVisibleCount] = useState(MARKET_PREVIEW_COUNT)
 
   useEffect(() => {
-    const controller = new AbortController()
-
-    void loadMarkets(controller.signal)
-      .then((coins) => {
-        if (controller.signal.aborted) {
-          return
-        }
-
-        setVisibleCount(MARKET_PREVIEW_COUNT)
-        setState({ status: 'ready', coins })
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted || isAbortError(error)) {
-          return
-        }
-
-        console.error(error)
-        setState({ status: 'failed' })
-      })
-
-    return () => {
-      controller.abort()
+    if (loadMarkets === undefined) {
+      void appMarketCatalog.ensureLoaded()
     }
-  }, [loadMarkets, retryKey])
+  }, [loadMarkets])
+
+  const state: MarketState =
+    loadMarkets !== undefined
+      ? injected.state
+      : catalog.status === 'failed'
+        ? { status: 'failed' }
+        : catalog.status === 'ready'
+          ? { status: 'ready', coins: catalog.coins }
+          : { status: 'loading' }
 
   const coins = state.status === 'ready' ? state.coins : []
   const visible = coins.slice(0, visibleCount)
@@ -112,8 +98,12 @@ export function MarketPricesCard({ loadMarkets = loadDefaultMarkets }: MarketPri
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setState({ status: 'loading' })
-                  setRetryKey((key) => key + 1)
+                  if (loadMarkets !== undefined) {
+                    injected.retry()
+                    return
+                  }
+
+                  void appMarketCatalog.retry()
                 }}
               >
                 {t('dashboard.pricesRetry')}
@@ -136,32 +126,7 @@ export function MarketPricesCard({ loadMarkets = loadDefaultMarkets }: MarketPri
             <table className="w-full min-w-[44rem] border-collapse text-sm">
               <caption className="sr-only">{t('dashboard.pricesCaption')}</caption>
               <thead>
-                <tr className="border-b border-border/70 bg-muted/40 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  <th scope="col" className="px-3 py-2.5 font-medium sm:pl-6">
-                    {t('dashboard.pricesRank')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 font-medium">
-                    {t('dashboard.pricesCoin')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    {t('dashboard.pricesPrice')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    {t('dashboard.prices1h')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    {t('dashboard.prices24h')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    {t('dashboard.prices7d')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    {t('dashboard.pricesVolume')}
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 pr-3 text-right font-medium sm:pr-6">
-                    {t('dashboard.pricesMarketCap')}
-                  </th>
-                </tr>
+                <MarketHead />
               </thead>
               <tbody>
                 {visible.map((coin) => (
@@ -172,8 +137,8 @@ export function MarketPricesCard({ loadMarkets = loadDefaultMarkets }: MarketPri
           </div>
         ) : null}
 
-        {canShowMore ? (
-          <div className="px-4 pb-4 sm:px-6">
+        <div className="flex min-h-12 items-center px-4 pb-4 sm:px-6">
+          {canShowMore ? (
             <Button
               variant="ghost"
               size="sm"
@@ -184,10 +149,88 @@ export function MarketPricesCard({ loadMarkets = loadDefaultMarkets }: MarketPri
             >
               {t('dashboard.pricesShowMore')}
             </Button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </CardContent>
     </Card>
+  )
+}
+
+function useInjectedMarkets(loadMarkets: MarketPricesLoader | undefined): {
+  readonly state: MarketState
+  readonly retry: () => void
+} {
+  const [state, setState] = useState<MarketState>({ status: 'loading' })
+  const [retryKey, setRetryKey] = useState(0)
+
+  useEffect(() => {
+    if (loadMarkets === undefined) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    void loadMarkets(controller.signal)
+      .then((coins) => {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        setState({ status: 'ready', coins })
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || isAbortError(error)) {
+          return
+        }
+
+        console.error(error)
+        setState({ status: 'failed' })
+      })
+
+    return () => {
+      controller.abort()
+    }
+  }, [loadMarkets, retryKey])
+
+  return {
+    state,
+    retry: () => {
+      setState({ status: 'loading' })
+      setRetryKey((key) => key + 1)
+    },
+  }
+}
+
+function MarketHead() {
+  const { t } = useTranslation()
+
+  return (
+    <tr className="border-b border-border/70 bg-muted/40 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <th scope="col" className="px-3 py-2.5 font-medium sm:pl-6">
+        {t('dashboard.pricesRank')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 font-medium">
+        {t('dashboard.pricesCoin')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+        {t('dashboard.pricesPrice')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+        {t('dashboard.prices1h')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+        {t('dashboard.prices24h')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+        {t('dashboard.prices7d')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+        {t('dashboard.pricesVolume')}
+      </th>
+      <th scope="col" className="px-3 py-2.5 pr-3 text-right font-medium sm:pr-6">
+        {t('dashboard.pricesMarketCap')}
+      </th>
+    </tr>
   )
 }
 
@@ -247,17 +290,45 @@ function ChangeCell({ percent }: { readonly percent: number | null }) {
 
 function MarketPricesSkeleton() {
   return (
-    <div className="flex flex-col gap-0" aria-hidden>
-      {Array.from({ length: 5 }, (_, index) => (
-        <div
-          key={index}
-          className="flex items-center gap-3 border-b border-border/60 px-4 py-3 sm:px-6"
-        >
-          <Skeleton className="size-7 rounded-full" />
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="ml-auto h-4 w-20" />
-        </div>
-      ))}
+    <div className="min-w-0 overflow-x-auto" aria-hidden>
+      <table className="w-full min-w-[44rem] border-collapse text-sm">
+        <thead>
+          <MarketHead />
+        </thead>
+        <tbody>
+          {Array.from({ length: MARKET_PREVIEW_COUNT }, (_, index) => (
+            <tr key={index} className="border-b border-border/60">
+              <td className="px-3 py-3 sm:pl-6">
+                <Skeleton className="h-4 w-6" />
+              </td>
+              <td className="px-3 py-3">
+                <span className="flex items-center gap-2.5">
+                  <Skeleton className="size-7 rounded-full" />
+                  <Skeleton className="h-4 w-28" />
+                </span>
+              </td>
+              <td className="px-3 py-3">
+                <Skeleton className="ml-auto h-4 w-20" />
+              </td>
+              <td className="px-3 py-3">
+                <Skeleton className="ml-auto h-4 w-12" />
+              </td>
+              <td className="px-3 py-3">
+                <Skeleton className="ml-auto h-4 w-12" />
+              </td>
+              <td className="px-3 py-3">
+                <Skeleton className="ml-auto h-4 w-12" />
+              </td>
+              <td className="px-3 py-3">
+                <Skeleton className="ml-auto h-4 w-16" />
+              </td>
+              <td className="px-3 py-3 pr-3 sm:pr-6">
+                <Skeleton className="ml-auto h-4 w-16" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

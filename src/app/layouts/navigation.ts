@@ -1,4 +1,4 @@
-import { History, Images, LayoutGrid, Settings, Wallet } from 'lucide-react'
+import { History, LayoutGrid, Settings, Wallet } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import type { TranslationKey } from '@/shared/i18n'
@@ -26,14 +26,13 @@ export interface INavigationItem {
  * панелью на узком экране и боковой на широком. Две копии разошлись бы
  * при первом же добавлении раздела.
  *
- * ПЯТЬ ПУНКТОВ — ПРЕДЕЛ. Всплывающее окно расширения имеет ширину около
- * 360 пикселей; шестой пункт делает подписи нечитаемыми, а безымянные
+ * ЧЕТЫРЕ ПУНКТА — ПРЕДЕЛ. Всплывающее окно расширения имеет ширину около
+ * 360 пикселей; пятый пункт делает подписи нечитаемыми, а безымянные
  * значки в кошельке недопустимы: цена ошибочного нажатия слишком велика.
  */
 export const NAVIGATION: readonly INavigationItem[] = [
   { to: ROUTE.Dashboard, labelKey: 'nav.wallet', icon: Wallet },
   { to: ROUTE.Assets, labelKey: 'nav.assets', icon: LayoutGrid },
-  { to: ROUTE.Nft, labelKey: 'nav.nft', icon: Images },
   { to: ROUTE.Activity, labelKey: 'nav.activity', icon: History },
   { to: ROUTE.Settings, labelKey: 'nav.settings', icon: Settings },
 ]

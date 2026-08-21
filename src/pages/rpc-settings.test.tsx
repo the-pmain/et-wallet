@@ -44,7 +44,17 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Панель RPC: список узлов', () => {
+describe('Панель RPC', () => {
+  it('скрыта из настроек', async () => {
+    renderApp()
+    await openSettings()
+
+    expect(screen.queryByText('RPC nodes')).not.toBeInTheDocument()
+    expect(screen.queryByText('Transaction check')).not.toBeInTheDocument()
+  })
+})
+
+describe.skip('Панель RPC: список узлов', () => {
   it('показывает узлы активной сети с указанием источника', async () => {
     renderApp()
     await openSettings()
@@ -74,7 +84,7 @@ describe('Панель RPC: список узлов', () => {
   })
 })
 
-describe('Панель RPC: проверка доступности', () => {
+describe.skip('Панель RPC: проверка доступности', () => {
   it('показывает время ответа исправного узла', async () => {
     const user = userEvent.setup()
 
@@ -120,7 +130,7 @@ describe('Панель RPC: проверка доступности', () => {
   })
 })
 
-describe('Панель RPC: свой адрес', () => {
+describe.skip('Панель RPC: свой адрес', () => {
   it('добавляет узел и ставит его первым', async () => {
     const user = userEvent.setup()
 

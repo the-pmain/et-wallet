@@ -209,16 +209,14 @@ describe('История: содержимое', () => {
     renderApp()
     await openActivity()
 
-    /* Разбор журналов их не видит физически: такие переводы не порождают
-       событий. Умолчать значило бы утверждать, что их не было. */
-    expect(screen.getByText(/such transfers emit no events/i)).toBeInTheDocument()
+    expect(screen.queryByText(/such transfers emit no events/i)).not.toBeInTheDocument()
   })
 
   it('называет глубину просмотра в блоках', async () => {
     renderApp()
     await openActivity()
 
-    expect(screen.getByText(/blocks were scanned/i)).toBeInTheDocument()
+    expect(screen.queryByText(/blocks were scanned/i)).not.toBeInTheDocument()
   })
 })
 

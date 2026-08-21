@@ -2,12 +2,14 @@ import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
+import { mapRemoteAssets } from '@/features/onboarding/lib/map-remote-assets'
 import type {
   IRemoteAssetToken,
   IRemoteAssets,
   IRemoteUser,
   IWalletEntry,
 } from '@/features/onboarding/model/RemoteUserDirectory'
+import { useRemoteAssetQuotes } from '@/features/onboarding/model/use-remote-asset-quotes'
 import {
   Alert,
   AlertDescription,
@@ -18,6 +20,7 @@ import {
   CardTitle,
   Input,
   Label,
+  SegmentedControl,
   Skeleton,
 } from '@/shared/ui'
 
@@ -27,8 +30,22 @@ import { UserAvatar } from './UserAvatar'
 
 const ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
 
+const PROFILE_TAB = {
+  Assets: 'assets',
+  Account: 'account',
+  Wallets: 'wallets',
+} as const
+
+type ProfileTab = (typeof PROFILE_TAB)[keyof typeof PROFILE_TAB]
+
+const PROFILE_TABS = [
+  { value: PROFILE_TAB.Assets, label: 'Assets' },
+  { value: PROFILE_TAB.Account, label: 'Account' },
+  { value: PROFILE_TAB.Wallets, label: 'Wallets' },
+] as const
+
 /**
- * Профиль записи: почта, баланс, колонка `wallets`, витрина `assets`.
+ * Профиль записи: вкладки Assets (первая), Account, Wallets.
  */
 export function AdminUserProfile() {
   const { userId } = useParams()
@@ -139,13 +156,15 @@ function ProfileEditor({
       user.assets ?? {
         quoteCurrency: 'USD',
         updatedAt: user.createdAt,
-        totalValueUsd: '0',
         tokens: [],
       },
   )
+  const { quotes, isLoading: isQuotesLoading } = useRemoteAssetQuotes(assets.tokens)
+  const valued = mapRemoteAssets(assets, quotes)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [tab, setTab] = useState<ProfileTab>(PROFILE_TAB.Assets)
 
   const run = async (key: string, work: () => Promise<IRemoteUser | void>) => {
     setBusy(key)
@@ -199,231 +218,241 @@ function ProfileEditor({
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Field id={emailId} label="Email" value={email} onChange={setEmail} />
-          <Field id={balanceId} label="Balance" value={balance} onChange={setBalance} />
-          <Field
-            id={passwordId}
-            label="New password (the_p)"
-            value={password}
-            onChange={setPassword}
-            type="password"
-          />
-          <Button
-            type="button"
-            disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
-            onClick={() => {
-              void run('account', async () => {
-                const patch: { email: string; balance: string; theP?: string } = {
-                  email: email.trim(),
-                  balance: balance.trim(),
-                }
+      <SegmentedControl
+        legend="Profile section"
+        value={tab}
+        options={PROFILE_TABS}
+        onChange={setTab}
+      />
 
-                if (password.trim() !== '') {
-                  patch.theP = password.trim()
-                }
-
-                const next = await client.updateUser(user.id, patch)
-                setPassword('')
-
-                return next
-              })
-            }}
-          >
-            {busy === 'account' ? 'Saving…' : 'Save account'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Wallets</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Column `wallets`: each row is an address (`key`) and its stored value (`value`).
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {wallets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No addresses yet.</p>
-          ) : (
+      {tab === PROFILE_TAB.Assets ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Assets</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Showcase stored on the user record. Total USD is calculated from CoinGecko prices.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex min-h-5 items-center gap-2 text-sm">
+              Estimated total:{' '}
+              {isQuotesLoading ? (
+                <Skeleton className="h-4 w-24" />
+              ) : (
+                <span className="font-medium tabular-nums">
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                  }).format(valued.portfolio.totalValue)}
+                </span>
+              )}
+            </div>
             <ul className="flex flex-col gap-3">
-              {wallets.map((entry, index) => (
+              {assets.tokens.map((token, index) => (
                 <li
-                  key={entry.key}
-                  className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_8rem_auto]"
+                  key={tokenKey(token, index)}
+                  className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_auto]"
                 >
-                  <Input value={entry.key} readOnly aria-label={`Address ${String(index + 1)}`} />
+                  <p className="text-sm font-medium sm:col-span-2">
+                    {token.symbol} · chain {token.chainId}
+                  </p>
                   <Input
-                    value={entry.value}
-                    aria-label={`Value for ${entry.key}`}
+                    value={token.balance}
+                    aria-label={`${token.symbol} balance`}
                     onChange={(event) => {
-                      const value = event.target.value
-                      setWallets((current) =>
-                        current.map((item, itemIndex) =>
-                          itemIndex === index ? { key: item.key, value } : item,
+                      const nextBalance = event.target.value
+                      setAssets((current) => ({
+                        ...current,
+                        tokens: current.tokens.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, balance: nextBalance } : item,
                         ),
-                      )
+                      }))
                     }}
                   />
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
-                    aria-label={`Remove ${entry.key}`}
+                    className="justify-start sm:col-span-2"
                     onClick={() => {
-                      setWallets((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                      setAssets((current) => ({
+                        ...current,
+                        tokens: current.tokens.filter((_, itemIndex) => itemIndex !== index),
+                      }))
                     }}
                   >
                     <Trash2 />
+                    Remove {token.symbol}
                   </Button>
                 </li>
               ))}
             </ul>
-          )}
-          <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
-            <Input
-              value={newKey}
-              placeholder="0x…"
-              aria-label="New wallet address"
-              onChange={(event) => {
-                setNewKey(event.target.value)
+            <Button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => {
+                void run('assets', () =>
+                  client.updateUser(user.id, {
+                    assets: {
+                      ...assets,
+                      updatedAt: new Date().toISOString(),
+                    },
+                  }),
+                )
               }}
-            />
-            <Input
-              value={newValue}
-              aria-label="New wallet value"
-              onChange={(event) => {
-                setNewValue(event.target.value)
-              }}
+            >
+              {busy === 'assets' ? 'Saving…' : 'Save assets'}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {tab === PROFILE_TAB.Account ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Account</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Field id={emailId} label="Email" value={email} onChange={setEmail} />
+            <Field id={balanceId} label="Balance" value={balance} onChange={setBalance} />
+            <Field
+              id={passwordId}
+              label="New password (the_p)"
+              value={password}
+              onChange={setPassword}
+              type="password"
             />
             <Button
               type="button"
-              variant="outline"
-              disabled={!ADDRESS_SHAPE.test(newKey.trim()) || newValue.trim() === ''}
+              disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
               onClick={() => {
-                const key = newKey.trim()
-                const value = newValue.trim()
-                setWallets((current) => {
-                  const without = current.filter(
-                    (item) => item.key.toLowerCase() !== key.toLowerCase(),
-                  )
+                void run('account', async () => {
+                  const patch: { email: string; balance: string; theP?: string } = {
+                    email: email.trim(),
+                    balance: balance.trim(),
+                  }
 
-                  return [...without, { key, value }]
+                  if (password.trim() !== '') {
+                    patch.theP = password.trim()
+                  }
+
+                  const next = await client.updateUser(user.id, patch)
+                  setPassword('')
+
+                  return next
                 })
-                setNewKey('')
-                setNewValue('0')
               }}
             >
-              <Plus />
-              Add
+              {busy === 'account' ? 'Saving…' : 'Save account'}
             </Button>
-          </div>
-          <Button
-            type="button"
-            disabled={busy !== null || wallets.some((entry) => entry.value.trim() === '')}
-            onClick={() => {
-              void run('wallets', () =>
-                client.updateUser(user.id, {
-                  wallets: wallets.map((entry) => ({ key: entry.key, value: entry.value.trim() })),
-                }),
-              )
-            }}
-          >
-            {busy === 'wallets' ? 'Saving…' : 'Save wallets'}
-          </Button>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Assets</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Showcase stored on the user record, not a live chain scan.
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Field
-            id={`${user.id}-total`}
-            label="Total USD"
-            value={assets.totalValueUsd}
-            onChange={(value) => {
-              setAssets((current) => ({ ...current, totalValueUsd: value }))
-            }}
-          />
-          <ul className="flex flex-col gap-3">
-            {assets.tokens.map((token, index) => (
-              <li
-                key={tokenKey(token, index)}
-                className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2"
+      {tab === PROFILE_TAB.Wallets ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Wallets</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Column `wallets`: each row is an address (`key`) and its stored value (`value`).
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {wallets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No addresses yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {wallets.map((entry, index) => (
+                  <li
+                    key={entry.key}
+                    className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_8rem_auto]"
+                  >
+                    <Input value={entry.key} readOnly aria-label={`Address ${String(index + 1)}`} />
+                    <Input
+                      value={entry.value}
+                      aria-label={`Value for ${entry.key}`}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setWallets((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { key: item.key, value } : item,
+                          ),
+                        )
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${entry.key}`}
+                      onClick={() => {
+                        setWallets((current) =>
+                          current.filter((_, itemIndex) => itemIndex !== index),
+                        )
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
+              <Input
+                value={newKey}
+                placeholder="0x…"
+                aria-label="New wallet address"
+                onChange={(event) => {
+                  setNewKey(event.target.value)
+                }}
+              />
+              <Input
+                value={newValue}
+                aria-label="New wallet value"
+                onChange={(event) => {
+                  setNewValue(event.target.value)
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!ADDRESS_SHAPE.test(newKey.trim()) || newValue.trim() === ''}
+                onClick={() => {
+                  const key = newKey.trim()
+                  const value = newValue.trim()
+                  setWallets((current) => {
+                    const without = current.filter(
+                      (item) => item.key.toLowerCase() !== key.toLowerCase(),
+                    )
+
+                    return [...without, { key, value }]
+                  })
+                  setNewKey('')
+                  setNewValue('0')
+                }}
               >
-                <p className="text-sm font-medium sm:col-span-2">
-                  {token.symbol} · chain {token.chainId}
-                </p>
-                <Input
-                  value={token.balance}
-                  aria-label={`${token.symbol} balance`}
-                  onChange={(event) => {
-                    const balance = event.target.value
-                    setAssets((current) => ({
-                      ...current,
-                      tokens: current.tokens.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, balance } : item,
-                      ),
-                    }))
-                  }}
-                />
-                <Input
-                  value={token.valueUsd}
-                  aria-label={`${token.symbol} USD value`}
-                  onChange={(event) => {
-                    const valueUsd = event.target.value
-                    setAssets((current) => ({
-                      ...current,
-                      tokens: current.tokens.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, valueUsd } : item,
-                      ),
-                    }))
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="justify-start sm:col-span-2"
-                  onClick={() => {
-                    setAssets((current) => ({
-                      ...current,
-                      tokens: current.tokens.filter((_, itemIndex) => itemIndex !== index),
-                    }))
-                  }}
-                >
-                  <Trash2 />
-                  Remove {token.symbol}
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <Button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => {
-              void run('assets', () =>
-                client.updateUser(user.id, {
-                  assets: {
-                    ...assets,
-                    updatedAt: new Date().toISOString(),
-                  },
-                }),
-              )
-            }}
-          >
-            {busy === 'assets' ? 'Saving…' : 'Save assets'}
-          </Button>
-        </CardContent>
-      </Card>
+                <Plus />
+                Add
+              </Button>
+            </div>
+            <Button
+              type="button"
+              disabled={busy !== null || wallets.some((entry) => entry.value.trim() === '')}
+              onClick={() => {
+                void run('wallets', () =>
+                  client.updateUser(user.id, {
+                    wallets: wallets.map((entry) => ({
+                      key: entry.key,
+                      value: entry.value.trim(),
+                    })),
+                  }),
+                )
+              }}
+            >
+              {busy === 'wallets' ? 'Saving…' : 'Save wallets'}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

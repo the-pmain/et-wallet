@@ -51,6 +51,11 @@ export function PasswordFields({
             onPasswordChange(event.target.value)
           }}
         />
+        {isTooLong ? (
+          <p className="text-xs text-risk-high">
+            Use at most {String(MAX_PASSWORD_LENGTH)} characters.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">

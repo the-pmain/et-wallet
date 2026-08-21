@@ -8,7 +8,7 @@ import type {
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
-import { mockUserAssets, parseAssets } from './assets.ts'
+import { emptyAssets, parseAssets, sanitizeAssets } from './assets.ts'
 import { emailsMatch } from './emails.ts'
 import { thePMatches } from './theP.ts'
 import { emptyWallets, mergeWallet, parseWallets } from './wallets.ts'
@@ -60,7 +60,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
         balance: input.balance,
         the_p: input.theP,
         wallets: input.wallets ?? emptyWallets(),
-        assets: input.assets ?? mockUserAssets(),
+        assets: sanitizeAssets(input.assets ?? emptyAssets()),
       }),
     })
 
@@ -242,7 +242,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
     }
 
     if (patch.assets !== undefined) {
-      body['assets'] = patch.assets
+      body['assets'] = sanitizeAssets(patch.assets)
     }
 
     if (Object.keys(body).length === 0) {

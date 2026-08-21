@@ -15,13 +15,11 @@ import { Link } from 'react-router'
 import { APP_CONFIG } from '@/shared/config'
 import { HardwareAccountForm } from '@/features/hardware'
 import { useDirectorySession, useOnboarding } from '@/features/onboarding'
-import { AUTO_LOCK_OPTIONS, StorageDurabilityAlert, useSecurity } from '@/features/security'
+import { AUTO_LOCK_OPTIONS, useSecurity } from '@/features/security'
 import {
   AccountList,
   AddNetworkForm,
   NetworkList,
-  RpcSettings,
-  SimulationSettings,
   useWallet,
   useWalletSnapshot,
   type IAccountDiscoverySummary,
@@ -62,7 +60,6 @@ export function SettingsPage() {
   const snapshot = useWalletSnapshot()
   const onboarding = useOnboarding()
   const directory = useDirectorySession()
-  const { storageDurability } = useSecurity()
   const { theme, setTheme } = useTheme()
 
   /* Имя читается из зашифрованного хранилища, то есть асинхронно.
@@ -191,11 +188,6 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Предупреждение о ненадёжном хранилище стоит сразу под списком,
-          а не внутри строки: оно о состоянии устройства, а не о разделе,
-          и внутри строки-перехода читалось бы как её описание. */}
-      <StorageDurabilityAlert durability={storageDurability} />
-
       <SecuritySection />
 
       <AccountList
@@ -264,24 +256,6 @@ export function SettingsPage() {
            дождаться проверки узла и показать причину отказа, а не
            отправить запрос и забыть о нём. */
         addForm={<AddNetworkForm onAdd={(params) => session.addNetwork(params)} />}
-      />
-
-      <RpcSettings
-        endpoints={snapshot.rpcEndpoints}
-        activeEndpoint={snapshot.activeRpcEndpoint}
-        onCheckHealth={() => session.checkRpcHealth()}
-        onAdd={(url: string) => session.addRpcEndpoint(url)}
-        onRemove={(url: string) => session.removeRpcEndpoint(url)}
-      />
-
-      <SimulationSettings
-        isConfigured={snapshot.isTenderlyConfigured}
-        isEnabled={snapshot.isSimulationSourceEnabled}
-        activeSourceName={snapshot.simulationSourceName}
-        onSave={(credentials) => session.setTenderlyCredentials(credentials)}
-        onClear={() => session.clearTenderlyCredentials()}
-        onEnable={() => session.enableSimulationSource()}
-        onDisable={() => session.disableSimulationSource()}
       />
 
       <Card>

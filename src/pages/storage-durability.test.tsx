@@ -44,18 +44,12 @@ describe('Предупреждение о стойкости хранилища'
     await expect(services.storage.durability()).resolves.toBe(STORAGE_DURABILITY.Session)
   })
 
-  it('настройки предупреждают, что кошелёк не переживёт вкладку', async () => {
+  it('настройки больше не показывают предупреждение о стойкости хранилища', async () => {
     renderApp()
     await openSettings()
 
-    expect(await screen.findByText(/will not survive closing the tab/i)).toBeInTheDocument()
-  })
-
-  it('предупреждение называет seed-фразу единственным выходом', async () => {
-    renderApp()
-    await openSettings()
-
-    expect(await screen.findByText(/from the\s+seed phrase you wrote down/i)).toBeInTheDocument()
+    expect(screen.queryByText(/will not survive closing the tab/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/from the\s+seed phrase you wrote down/i)).not.toBeInTheDocument()
   })
 
   it('устаревшего утверждения про потерю доступа после перезагрузки больше нет', async () => {

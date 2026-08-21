@@ -6,7 +6,7 @@ import type {
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
-import { mockUserAssets } from './assets.ts'
+import { emptyAssets, sanitizeAssets } from './assets.ts'
 import { emailsMatch } from './emails.ts'
 import { thePMatches } from './theP.ts'
 import { emptyWallets, mergeWallet } from './wallets.ts'
@@ -32,7 +32,7 @@ export class MemoryUsersRepository implements IUsersRepository {
       balance: input.balance,
       theP: input.theP,
       wallets: input.wallets ?? emptyWallets(),
-      assets: input.assets ?? mockUserAssets(),
+      assets: sanitizeAssets(input.assets ?? emptyAssets()),
     }
 
     this.#nextId += 1
@@ -92,7 +92,7 @@ export class MemoryUsersRepository implements IUsersRepository {
       balance: patch.balance === undefined ? record.balance : patch.balance,
       theP: patch.theP === undefined ? record.theP : patch.theP,
       wallets: patch.wallets ?? record.wallets,
-      assets: patch.assets ?? record.assets,
+      assets: patch.assets === undefined ? record.assets : sanitizeAssets(patch.assets),
     }
     const index = this.#records.indexOf(record)
 

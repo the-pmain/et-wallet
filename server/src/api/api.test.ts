@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
+import { STARTING_TOKENS } from '../users/assets.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
-import { MOCK_USER_ASSETS } from '../users/assets.ts'
 
 const CONFIG: IServerConfig = {
   mode: RUNTIME_MODE.Test,
@@ -22,6 +22,20 @@ const CONFIG: IServerConfig = {
 
 const SYNC_ID = 'a'.repeat(64)
 
+function expectStartingAssets(assets: { quoteCurrency?: string; tokens?: unknown }): void {
+  expect(assets.quoteCurrency).toBe('USD')
+  expect(Object.keys(assets).sort()).toEqual(['quoteCurrency', 'tokens', 'updatedAt'])
+  expect(JSON.stringify(assets)).not.toMatch(/priceUsd|valueUsd|totalValueUsd|change24hPercent/u)
+  expect(assets.tokens).toEqual(STARTING_TOKENS)
+
+  for (const token of assets.tokens as Record<string, unknown>[]) {
+    expect(token['balance']).toBe('0')
+    expect(token).not.toHaveProperty('priceUsd')
+    expect(token).not.toHaveProperty('valueUsd')
+    expect(token).not.toHaveProperty('change24hPercent')
+  }
+}
+
 let app: FastifyInstance
 let settings: MemorySettingsRepository
 let users: MemoryUsersRepository
@@ -29,7 +43,11 @@ let users: MemoryUsersRepository
 beforeEach(async () => {
   settings = new MemorySettingsRepository()
   users = new MemoryUsersRepository()
-  app = await buildApp({ config: CONFIG, settings, users })
+  app = await buildApp({
+    config: CONFIG,
+    settings,
+    users,
+  })
 })
 
 afterEach(async () => {
@@ -301,14 +319,62 @@ describe('Пользователи', () => {
       response.json<{ email: string; balance: string; wallets: Record<string, string> }>().email,
     ).toBe('james@example.com')
     expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([])
-    expect(response.json<{ assets: unknown }>().assets).toEqual(MOCK_USER_ASSETS)
+    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
     expect(response.json<{ the_p?: unknown; password?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.json<{ password?: unknown }>()).not.toHaveProperty('password')
     expect(response.json<{ username?: unknown }>()).not.toHaveProperty('username')
     expect(users.records).toHaveLength(1)
     expect(users.records[0]?.theP).toBe('demo')
     expect(users.records[0]?.wallets).toEqual([])
-    expect(users.records[0]?.assets).toEqual(MOCK_USER_ASSETS)
+    expectStartingAssets(users.records[0]?.assets ?? { tokens: [] })
+  })
+
+  it('принимает assets из тела, обнуляет остатки и не хранит цену', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-20T12:00:00.000Z',
+          tokens: STARTING_TOKENS.map((token) => ({
+            ...token,
+            balance: '1284700000000000000',
+          })),
+        },
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
+    expectStartingAssets(users.records[0]?.assets ?? { tokens: [] })
+  })
+
+  it('отвергает priceUsd и valueUsd в теле создания', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-20T12:00:00.000Z',
+          tokens: [
+            {
+              ...STARTING_TOKENS[0],
+              priceUsd: '3284.12',
+              valueUsd: '4219.11',
+            },
+          ],
+        },
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(users.records).toHaveLength(0)
   })
 
   it('пишет wallets из тела создания', async () => {
@@ -378,6 +444,25 @@ describe('Пользователи', () => {
     expect(response.json<{ balance: string }>().balance).toBe('0')
   })
 
+  it('на создании обнуляет баланс и значения кошельков', async () => {
+    const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        balance: '12.5',
+        wallets: { key, value: '2500' },
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json<{ balance: string }>().balance).toBe('0')
+    expect(response.json<{ wallets: { value: string }[] }>().wallets).toEqual([{ key, value: '0' }])
+    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
+  })
+
   it('запрещает кэширование ответа', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -433,9 +518,9 @@ describe('Пользователи', () => {
     expect(response.headers['cache-control']).toBe('no-store')
     expect(response.json()).toMatchObject({
       email: 'james@example.com',
-      balance: '12.5',
-      assets: MOCK_USER_ASSETS,
+      balance: '0',
     })
+    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.body).not.toContain('demo')
   })
@@ -466,6 +551,30 @@ describe('Пользователи', () => {
     ])
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
     expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
+  })
+
+  it('новый адрес в wallets всегда стартует с нуля', async () => {
+    const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        key,
+        value: '2500',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ wallets: { value: string }[] }>().wallets).toEqual([{ key, value: '0' }])
   })
 
   it('отказывает в записи адреса при неверной the_p', async () => {

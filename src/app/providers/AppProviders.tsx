@@ -7,6 +7,7 @@ import { createAppServices, type IAppServices } from '../composition/createAppSe
 import { AppErrorBoundary } from './AppErrorBoundary'
 import { DappProvider } from './DappProvider'
 import { I18nProvider } from './I18nProvider'
+import { MarketDataBootstrap } from './MarketDataBootstrap'
 import { SecurityProvider } from './SecurityProvider'
 import { ThemeProvider } from './ThemeProvider'
 
@@ -53,24 +54,26 @@ export function AppProviders({ children, services }: AppProvidersProps) {
           оформления: язык нужен уже экрану загрузки, а от того, открыт
           ли кошелёк, он не зависит. */}
         <I18nProvider>
-          <DirectorySessionProvider>
-            <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
-              {/* Модуль безопасности вложен в онбординг и охватывает сессию
+          <MarketDataBootstrap>
+            <DirectorySessionProvider>
+              <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
+                {/* Модуль безопасности вложен в онбординг и охватывает сессию
                 кошелька: автоблокировка следит за состоянием блокировки,
                 а её срабатывание обязано закрыть сессию. */}
-              <SecurityProvider
-                clock={value.clock}
-                settingsRepository={value.securitySettings}
-                storage={value.storage}
-              >
-                <WalletProvider session={value.session}>
-                  {/* Подключения вложены в сессию кошелька: запрос
+                <SecurityProvider
+                  clock={value.clock}
+                  settingsRepository={value.securitySettings}
+                  storage={value.storage}
+                >
+                  <WalletProvider session={value.session}>
+                    {/* Подключения вложены в сессию кошелька: запрос
                     от приложения выполняется её ключами и в её сети. */}
-                  <DappProvider service={value.dappSessions}>{children}</DappProvider>
-                </WalletProvider>
-              </SecurityProvider>
-            </OnboardingProvider>
-          </DirectorySessionProvider>
+                    <DappProvider service={value.dappSessions}>{children}</DappProvider>
+                  </WalletProvider>
+                </SecurityProvider>
+              </OnboardingProvider>
+            </DirectorySessionProvider>
+          </MarketDataBootstrap>
         </I18nProvider>
       </ThemeProvider>
     </AppErrorBoundary>

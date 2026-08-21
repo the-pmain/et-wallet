@@ -42,7 +42,7 @@ describe('SupabaseRestUsersRepository', () => {
       wallets: [],
       assets: expect.objectContaining({
         quoteCurrency: 'USD',
-        tokens: expect.any(Array),
+        tokens: [],
       }),
     })
     expect(record.id).toBe('7')

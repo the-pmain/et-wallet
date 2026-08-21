@@ -7,6 +7,7 @@ import { Alert, AlertDescription, Input, Skeleton } from '@/shared/ui'
 
 import { AdminAuthError } from '../model/AdminClient'
 import { useAdminSession } from '../model/admin-context'
+import { userMatchesAdminQuery } from '../model/admin-query'
 import { UserAvatar } from './UserAvatar'
 
 /**
@@ -58,12 +59,7 @@ export function AdminUsersList() {
       return users
     }
 
-    return users.filter((user) => {
-      const email = user.email?.toLowerCase() ?? ''
-      const id = user.id.toLowerCase()
-
-      return email.includes(needle) || id.includes(needle)
-    })
+    return users.filter((user) => userMatchesAdminQuery(user, needle))
   }, [query, users])
 
   if (error !== null) {
@@ -95,7 +91,8 @@ export function AdminUsersList() {
       <Input
         type="search"
         value={query}
-        placeholder="Search email or id"
+        placeholder="Search email or Wallet address"
+        aria-label="Search email or Wallet address"
         onChange={(event) => {
           setQuery(event.target.value)
         }}

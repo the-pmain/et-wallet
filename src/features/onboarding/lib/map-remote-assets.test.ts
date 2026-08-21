@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { TOKEN_STANDARD, toAddress, toChainId } from '@/core'
+import {
+  TOKEN_STANDARD,
+  priceRefKey,
+  toAddress,
+  toChainId,
+  type IPriceQuote,
+  type PriceMap,
+  type Timestamp,
+} from '@/core'
 
 import {
   EMPTY_REMOTE_ASSETS,
@@ -21,9 +29,6 @@ function token(overrides: Partial<IRemoteAssetToken> = {}): IRemoteAssetToken {
     name: 'USD Coin',
     decimals: 6,
     balance: '2500000000',
-    priceUsd: '1.0000',
-    valueUsd: '2500.00',
-    change24hPercent: '0.01',
     isVerified: true,
     ...overrides,
   }
@@ -33,9 +38,23 @@ function assets(tokens: readonly IRemoteAssetToken[]): IRemoteAssets {
   return {
     quoteCurrency: 'USD',
     updatedAt: '2026-08-20T12:00:00.000Z',
-    totalValueUsd: '2500.00',
     tokens,
   }
+}
+
+function quotes(entries: readonly { chainId: bigint; address: string | null; price: number }[]): PriceMap {
+  const map = new Map<string, IPriceQuote>()
+
+  for (const entry of entries) {
+    const address = entry.address === null ? null : toAddress(entry.address)
+    map.set(priceRefKey({ chainId: toChainId(entry.chainId), address }), {
+      price: entry.price,
+      change24hPercent: 0.01,
+      updatedAt: 0 as Timestamp,
+    })
+  }
+
+  return map
 }
 
 describe('mapRemoteAssets', () => {
@@ -49,7 +68,6 @@ describe('mapRemoteAssets', () => {
           name: 'Ether',
           decimals: 18,
           balance: '1284700000000000000',
-          priceUsd: '3284.12',
         }),
         token(),
       ]),
@@ -93,13 +111,22 @@ describe('mapRemoteAssets', () => {
     ])
   })
 
-  it('кладёт курсы в сводку, чтобы список мог показать оценку', () => {
-    const mapped = mapRemoteAssets(assets([token()]))
+  it('кладёт переданные курсы в сводку', () => {
+    const mapped = mapRemoteAssets(
+      assets([token()]),
+      quotes([{ chainId: 1n, address: USDC, price: 1 }]),
+    )
     const position = mapped.portfolio.positions[0]
 
     expect(position?.quote?.price).toBe(1)
-    expect(position?.quote?.change24hPercent).toBe(0.01)
     expect(position?.value).toBe(2500)
+  })
+
+  it('без курсов не подставляет нулевую оценку', () => {
+    const mapped = mapRemoteAssets(assets([token()]))
+
+    expect(mapped.portfolio.positions[0]?.value).toBeNull()
+    expect(mapped.portfolio.totalValue).toBe(0)
   })
 
   it('пустую витрину оставляет пустым списком, а не нативной валютой', () => {

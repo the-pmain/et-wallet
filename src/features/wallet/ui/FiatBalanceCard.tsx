@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 
 import { useTranslation } from '@/shared/i18n'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
+import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/shared/ui'
 
 import {
   DISPLAY_CURRENCY,
@@ -31,10 +31,8 @@ interface FiatBalanceCardProps {
 /**
  * Баланс справочного аккаунта: фиат, а не монеты.
  *
- * СУММА НА СЕРВЕРЕ УЖЕ В ДОЛЛАРАХ. Это не оценка эфира и не курс
- * стороннего сервиса к нативной валюте — это записанная величина.
- * Поэтому она стоит самым крупным числом, а переключатель валют
- * меняет только подпись.
+ * СУММА СЧИТАЕТСЯ НА КЛИЕНТЕ: остатки записи × живой курс.
+ * Карточка не хранит доллары — только показывает оценку.
  */
 export function FiatBalanceCard({
   amountUsd,
@@ -63,9 +61,16 @@ export function FiatBalanceCard({
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4" aria-busy={isRefreshing}>
-        <p className="text-4xl leading-none font-semibold tracking-tight break-all tabular-nums sm:text-5xl">
-          {formatDisplayFiat(amountUsd, currency, rates)}
-        </p>
+        <div className="flex min-h-10 items-center text-4xl leading-none font-semibold tracking-tight break-all tabular-nums sm:min-h-12 sm:text-5xl">
+          {amountUsd === null && isRefreshing ? (
+            <>
+              <Skeleton className="h-10 w-52 sm:h-12" />
+              <span className="sr-only">{t('dashboard.valueLoading')}</span>
+            </>
+          ) : (
+            formatDisplayFiat(amountUsd, currency, rates)
+          )}
+        </div>
 
         {action}
       </CardContent>

@@ -1,4 +1,4 @@
-import type { ChainId } from '@/core/types'
+import { toChainId, type ChainId } from '@/core/types'
 
 /**
  * Соответствие сетей идентификаторам CoinGecko.
@@ -41,4 +41,15 @@ const PLATFORMS: ReadonlyMap<string, ICoinGeckoPlatform> = new Map([
  */
 export function findCoinGeckoPlatform(chainId: ChainId): ICoinGeckoPlatform | null {
   return PLATFORMS.get(chainId.toString()) ?? null
+}
+
+/** Сети, для которых есть соответствие в справочнике CoinGecko. */
+export function listCoinGeckoPlatforms(): ReadonlyArray<{
+  readonly chainId: ChainId
+  readonly platform: ICoinGeckoPlatform
+}> {
+  return [...PLATFORMS.entries()].map(([id, platform]) => ({
+    chainId: toChainId(id),
+    platform,
+  }))
 }

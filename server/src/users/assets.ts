@@ -3,12 +3,11 @@ import { hasAddressShape, toChecksumAddress } from '../lib/address.ts'
 /**
  * Снимок активов в колонке `assets`.
  *
- * ЧИСЛА — СТРОКИ. `JSON.parse` теряет точность на wei и на курсах
- * с большим числом знаков. Оценка в долларах тоже строка: это величина
- * для показа, из неё не строится перевод.
+ * ЧИСЛА — СТРОКИ. `JSON.parse` теряет точность на wei.
  *
- * ЭТО НЕ БАЛАНС С УЗЛА. Колонка хранит витрину токенов. На создании
- * пользователя сервер кладёт сюда демонстрационный состав.
+ * ЗДЕСЬ ТОЛЬКО ОСТАТКИ. Курс и оценка в долларах считаются на клиенте
+ * по живому источнику; в записи их нет, чтобы устаревшая сумма
+ * не выдавалась за текущую.
  */
 
 export const ASSET_STANDARD = {
@@ -20,7 +19,6 @@ export type AssetStandard = (typeof ASSET_STANDARD)[keyof typeof ASSET_STANDARD]
 
 const FUNGIBLE_STANDARDS = new Set<string>([ASSET_STANDARD.Native, ASSET_STANDARD.Erc20])
 
-const DECIMAL_STRING = /^-?\d+(?:\.\d+)?$/u
 const INTEGER_STRING = /^\d+$/u
 const MAX_TOKENS = 64
 const SYMBOL_MAX = 32
@@ -37,9 +35,6 @@ export interface IAssetToken {
   readonly decimals: number
   /** Остаток в минимальных единицах. */
   readonly balance: string
-  readonly priceUsd: string
-  readonly valueUsd: string
-  readonly change24hPercent: string
   readonly isVerified: boolean
 }
 
@@ -47,7 +42,6 @@ export interface IAssetToken {
 export interface IUserAssets {
   readonly quoteCurrency: 'USD'
   readonly updatedAt: string
-  readonly totalValueUsd: string
   readonly tokens: readonly IAssetToken[]
 }
 
@@ -56,8 +50,153 @@ export function emptyAssets(): IUserAssets {
   return {
     quoteCurrency: 'USD',
     updatedAt: '1970-01-01T00:00:00.000Z',
-    totalValueUsd: '0',
     tokens: [],
+  }
+}
+
+/**
+ * Стартовая витрина нового пользователя.
+ *
+ * Список токенов тот же, остаток у каждого — `"0"`.
+ * Курса, оценки и суточной динамики в записи нет.
+ */
+export const STARTING_TOKENS: readonly IAssetToken[] = [
+  holding('1', ASSET_STANDARD.Native, null, 'ETH', 'Ether', 18),
+  holding(
+    '1',
+    ASSET_STANDARD.Erc20,
+    '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    'USDC',
+    'USD Coin',
+    6,
+  ),
+  holding(
+    '1',
+    ASSET_STANDARD.Erc20,
+    '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    'USDT',
+    'Tether USD',
+    6,
+  ),
+  holding(
+    '1',
+    ASSET_STANDARD.Erc20,
+    '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    'DAI',
+    'Dai Stablecoin',
+    18,
+  ),
+  holding(
+    '1',
+    ASSET_STANDARD.Erc20,
+    '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+    'WBTC',
+    'Wrapped BTC',
+    8,
+  ),
+  holding(
+    '1',
+    ASSET_STANDARD.Erc20,
+    '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    'WETH',
+    'Wrapped Ether',
+    18,
+  ),
+  holding(
+    '10',
+    ASSET_STANDARD.Erc20,
+    '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
+    'USDC',
+    'USD Coin',
+    6,
+  ),
+  holding(
+    '10',
+    ASSET_STANDARD.Erc20,
+    '0x4200000000000000000000000000000000000006',
+    'WETH',
+    'Wrapped Ether',
+    18,
+  ),
+]
+
+const STORED_ASSET_KEYS = ['quoteCurrency', 'updatedAt', 'tokens'] as const
+const STORED_TOKEN_KEYS = [
+  'chainId',
+  'standard',
+  'address',
+  'symbol',
+  'name',
+  'decimals',
+  'balance',
+  'isVerified',
+] as const
+
+export const STORED_ASSET_FIELD_NAMES: readonly string[] = STORED_ASSET_KEYS
+export const STORED_TOKEN_FIELD_NAMES: readonly string[] = STORED_TOKEN_KEYS
+
+export function createStartingAssets(now: Date = new Date()): IUserAssets {
+  return withZeroTokenBalances(
+    sanitizeAssets({
+      quoteCurrency: 'USD',
+      updatedAt: now.toISOString(),
+      tokens: STARTING_TOKENS,
+    }),
+  )
+}
+
+/**
+ * Оставляет в витрине только хранимые поля.
+ *
+ * `priceUsd`, `valueUsd`, `totalValueUsd`, `change24hPercent` отбрасываются.
+ */
+export function sanitizeAssets(assets: IUserAssets): IUserAssets {
+  return {
+    quoteCurrency: 'USD',
+    updatedAt: assets.updatedAt,
+    tokens: assets.tokens.map(sanitizeToken),
+  }
+}
+
+/** Остаток каждой позиции — `"0"`, даже если в запросе пришло другое. */
+export function withZeroTokenBalances(assets: IUserAssets): IUserAssets {
+  return sanitizeAssets({
+    quoteCurrency: 'USD',
+    updatedAt: assets.updatedAt,
+    tokens: assets.tokens.map((token) => ({ ...token, balance: '0' })),
+  })
+}
+
+function sanitizeToken(token: IAssetToken): IAssetToken {
+  return {
+    chainId: token.chainId,
+    standard: token.standard,
+    address: token.address,
+    symbol: token.symbol,
+    name: token.name,
+    decimals: token.decimals,
+    balance: token.balance,
+    isVerified: token.isVerified,
+  }
+}
+
+function holding(
+  chainId: string,
+  standard: AssetStandard,
+  address: string | null,
+  symbol: string,
+  name: string,
+  decimals: number,
+): IAssetToken {
+  return {
+    chainId,
+    standard,
+    address,
+    symbol,
+    name,
+    decimals,
+    balance: '0',
+    isVerified: true,
   }
 }
 
@@ -66,6 +205,9 @@ export function emptyAssets(): IUserAssets {
  *
  * Битая запись не роняет вход: отдаём пустую витрину, а не отказ.
  * Иначе один испорченный jsonb закрыл бы кабинет.
+ *
+ * Поля `totalValueUsd`, `priceUsd`, `valueUsd` в старых строках
+ * игнорируются: оценка больше не хранится.
  */
 export function parseAssets(value: unknown): IUserAssets {
   const parsed = readAssets(value)
@@ -99,13 +241,8 @@ function readAssets(value: unknown): IUserAssets | null {
   }
 
   const updatedAt = record['updatedAt']
-  const totalValueUsd = record['totalValueUsd']
 
   if (typeof updatedAt !== 'string' || updatedAt === '') {
-    return null
-  }
-
-  if (typeof totalValueUsd !== 'string' || !DECIMAL_STRING.test(totalValueUsd)) {
     return null
   }
 
@@ -115,12 +252,11 @@ function readAssets(value: unknown): IUserAssets | null {
     return null
   }
 
-  return {
+  return sanitizeAssets({
     quoteCurrency: 'USD',
     updatedAt,
-    totalValueUsd,
     tokens,
-  }
+  })
 }
 
 function readTokenList(value: unknown): readonly IAssetToken[] | null {
@@ -155,9 +291,6 @@ function readToken(value: unknown): IAssetToken | null {
   const name = record['name']
   const decimals = record['decimals']
   const balance = record['balance']
-  const priceUsd = record['priceUsd']
-  const valueUsd = record['valueUsd']
-  const change24hPercent = record['change24hPercent']
   const isVerified = record['isVerified']
 
   if (typeof chainId !== 'string' || !INTEGER_STRING.test(chainId)) {
@@ -178,19 +311,18 @@ function readToken(value: unknown): IAssetToken | null {
     return null
   }
 
-  if (typeof decimals !== 'number' || !Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
+  if (
+    typeof decimals !== 'number' ||
+    !Number.isInteger(decimals) ||
+    decimals < 0 ||
+    decimals > 36
+  ) {
     return null
   }
 
   if (
     typeof balance !== 'string' ||
     !INTEGER_STRING.test(balance) ||
-    typeof priceUsd !== 'string' ||
-    !DECIMAL_STRING.test(priceUsd) ||
-    typeof valueUsd !== 'string' ||
-    !DECIMAL_STRING.test(valueUsd) ||
-    typeof change24hPercent !== 'string' ||
-    !DECIMAL_STRING.test(change24hPercent) ||
     typeof isVerified !== 'boolean'
   ) {
     return null
@@ -204,9 +336,6 @@ function readToken(value: unknown): IAssetToken | null {
     name,
     decimals,
     balance,
-    priceUsd,
-    valueUsd,
-    change24hPercent,
     isVerified,
   }
 }
@@ -225,126 +354,4 @@ function readTokenAddress(value: unknown, standard: string): string | null | und
 
 function isLabel(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max
-}
-
-/**
- * Витрина нового пользователя.
- *
- * Состав как у живого кошелька: ETH, стейблы, обёртки, те же адреса,
- * что в каталоге сервиса. Пишется при создании строки.
- */
-export const MOCK_USER_ASSETS: IUserAssets = {
-  quoteCurrency: 'USD',
-  updatedAt: '2026-08-20T12:00:00.000Z',
-  totalValueUsd: '14790.76',
-  tokens: [
-    {
-      chainId: '1',
-      standard: ASSET_STANDARD.Native,
-      address: null,
-      symbol: 'ETH',
-      name: 'Ether',
-      decimals: 18,
-      balance: '1284700000000000000',
-      priceUsd: '3284.12',
-      valueUsd: '4219.11',
-      change24hPercent: '1.84',
-      isVerified: true,
-    },
-    {
-      chainId: '1',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-      symbol: 'USDC',
-      name: 'USD Coin',
-      decimals: 6,
-      balance: '2500000000',
-      priceUsd: '1.0000',
-      valueUsd: '2500.00',
-      change24hPercent: '0.01',
-      isVerified: true,
-    },
-    {
-      chainId: '1',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-      symbol: 'USDT',
-      name: 'Tether USD',
-      decimals: 6,
-      balance: '1800500000',
-      priceUsd: '0.9998',
-      valueUsd: '1800.14',
-      change24hPercent: '-0.02',
-      isVerified: true,
-    },
-    {
-      chainId: '1',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-      symbol: 'DAI',
-      name: 'Dai Stablecoin',
-      decimals: 18,
-      balance: '400000000000000000000',
-      priceUsd: '1.0001',
-      valueUsd: '400.04',
-      change24hPercent: '0.00',
-      isVerified: true,
-    },
-    {
-      chainId: '1',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
-      symbol: 'WBTC',
-      name: 'Wrapped BTC',
-      decimals: 8,
-      balance: '4200000',
-      priceUsd: '64120.00',
-      valueUsd: '2693.04',
-      change24hPercent: '0.62',
-      isVerified: true,
-    },
-    {
-      chainId: '1',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-      symbol: 'WETH',
-      name: 'Wrapped Ether',
-      decimals: 18,
-      balance: '750000000000000000',
-      priceUsd: '3284.12',
-      valueUsd: '2463.09',
-      change24hPercent: '1.84',
-      isVerified: true,
-    },
-    {
-      chainId: '10',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
-      symbol: 'USDC',
-      name: 'USD Coin',
-      decimals: 6,
-      balance: '320250000',
-      priceUsd: '1.0000',
-      valueUsd: '320.25',
-      change24hPercent: '0.01',
-      isVerified: true,
-    },
-    {
-      chainId: '10',
-      standard: ASSET_STANDARD.Erc20,
-      address: '0x4200000000000000000000000000000000000006',
-      symbol: 'WETH',
-      name: 'Wrapped Ether',
-      decimals: 18,
-      balance: '120000000000000000',
-      priceUsd: '3284.12',
-      valueUsd: '394.09',
-      change24hPercent: '1.84',
-      isVerified: true,
-    },
-  ],
-}
-
-export function mockUserAssets(): IUserAssets {
-  return MOCK_USER_ASSETS
 }

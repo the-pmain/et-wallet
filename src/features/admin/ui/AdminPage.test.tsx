@@ -21,6 +21,15 @@ const USER = {
   assets: EMPTY_REMOTE_ASSETS,
 }
 
+const MARIA = {
+  id: '8',
+  email: 'maria@example.com',
+  balance: '0',
+  createdAt: '2026-08-20T12:00:00.000Z',
+  wallets: [],
+  assets: EMPTY_REMOTE_ASSETS,
+}
+
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
 
@@ -84,7 +93,7 @@ beforeEach(() => {
     }
 
     if (url.endsWith('/v1/admin/users') && method === 'GET') {
-      return Promise.resolve(jsonResponse(200, { users: [USER] }))
+      return Promise.resolve(jsonResponse(200, { users: [USER, MARIA] }))
     }
 
     if (url.endsWith('/v1/admin/users/7') && method === 'GET') {
@@ -152,6 +161,10 @@ describe('Кабинет администратора', () => {
 
     expect(await screen.findByRole('heading', { name: 'james@example.com' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Avatar for james@example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Assets' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(/Estimated total/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Wallets' }))
     const valueField = await screen.findByLabelText(`Value for ${KEY}`)
     await user.clear(valueField)
     await user.type(valueField, '2500')
@@ -159,5 +172,22 @@ describe('Кабинет администратора', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(window.location.hash).toContain('/admin/users/7')
+  })
+
+  it('ищет пользователя по адресу кошелька', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    expect(await screen.findByText('james@example.com')).toBeInTheDocument()
+    expect(screen.getByText('maria@example.com')).toBeInTheDocument()
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search email or Wallet address' }),
+      '5aaeb605',
+    )
+
+    expect(screen.getByText('james@example.com')).toBeInTheDocument()
+    expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
   })
 })

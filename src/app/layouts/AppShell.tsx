@@ -13,7 +13,7 @@ import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Badge, Button, Toaster } from '@/shared/ui'
+import { Button, Skeleton, Toaster } from '@/shared/ui'
 
 import { AmbientBackground } from './AmbientBackground'
 import { NAVIGATION } from './navigation'
@@ -40,7 +40,8 @@ export function AppShell() {
   const { t } = useTranslation()
   const { autoLock } = useSecurity()
   const directoryUser = directory.user
-  const showShellContent = snapshot.state === SESSION_STATE.Open || directoryUser !== null
+  const showShellContent =
+    snapshot.state === SESSION_STATE.Open || directoryUser !== null || directory.isRestoring
 
   /*
     Вход по почте открывает кабинет, не разблокируя хранилище на
@@ -118,7 +119,14 @@ export function AppShell() {
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="flex w-full min-w-0 items-center gap-3 px-4 py-3 lg:pl-64">
           {snapshot.activeAccount === null ? (
-            directoryUser === null ? null : (
+            directoryUser === null ? (
+              directory.isRestoring ? (
+                <div className="flex min-w-0 flex-col gap-1.5" aria-hidden>
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              ) : null
+            ) : (
               <div className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-semibold">
                   {directoryUser.email ?? 'Account'}
@@ -159,25 +167,6 @@ export function AppShell() {
           )}
 
           <div className="ml-auto flex items-center gap-2">
-            {snapshot.activeNetwork === null ? null : (
-              /* Точка перед именем сети. Цвет несёт то же, что и вариант
-                 значка, но виден раньше текста: боевая сеть или испытательная
-                 — первое, что нужно знать, глядя на сумму. */
-              <Badge
-                variant={snapshot.activeNetwork.isTestnet ? 'warning' : 'default'}
-                className="gap-1.5"
-              >
-                <span
-                  className={cn(
-                    'size-1.5 rounded-full',
-                    snapshot.activeNetwork.isTestnet ? 'bg-risk-medium' : 'bg-risk-low',
-                  )}
-                  aria-hidden
-                />
-                {snapshot.activeNetwork.name}
-              </Badge>
-            )}
-
             <Button
               variant="ghost"
               size="icon"
@@ -297,8 +286,27 @@ export function AppShell() {
  */
 function ShellPlaceholder() {
   return (
-    <div className="flex min-h-[50svh] items-center justify-center text-sm text-muted-foreground">
-      Opening the wallet…
+    <div className="flex min-w-0 flex-col gap-4" aria-busy>
+      <div className="rounded-xl border border-border/60 bg-card p-6 shadow-raised">
+        <Skeleton className="mb-6 h-4 w-24" />
+        <Skeleton className="h-10 w-52 sm:h-12" />
+        <Skeleton className="mt-4 h-10 w-full" />
+      </div>
+      <div className="rounded-xl border border-border/60 bg-card">
+        <div className="p-6 pb-3">
+          <Skeleton className="h-4 w-16" />
+        </div>
+        {Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="flex items-center gap-3 px-6 py-3.5">
+            <Skeleton className="size-9 rounded-full" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <Skeleton className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -1,19 +1,18 @@
 import {
   TOKEN_STANDARD,
   buildPortfolio,
-  priceRefKey,
   toAddress,
   toChainId,
   type IPortfolioSummary,
-  type IPriceQuote,
   type IToken,
   type ITokenAmount,
+  type PriceMap,
   type Timestamp,
 } from '@/core'
 
 import type { IRemoteAssetToken, IRemoteAssets } from '../model/RemoteUserDirectory'
 
-/** Балансы и курсы из витрины `assets`, в форме списка активов. */
+/** Балансы из витрины `assets` и сводка по переданным курсам. */
 export interface IMappedRemoteAssets {
   readonly tokens: readonly ITokenAmount[]
   readonly portfolio: IPortfolioSummary
@@ -22,17 +21,21 @@ export interface IMappedRemoteAssets {
 /**
  * Переносит витрину `users.assets` в то, что рисует список активов.
  *
+ * КУРСЫ СЮДА ПРИХОДЯТ СНАРУЖИ. В записи нет цены: оценка считается
+ * на клиенте. Без словаря котировок список всё равно показывает
+ * остатки, а столбец долларов пуст.
+ *
  * ПОРЯДОК СТРОК СОХРАНЯЕТСЯ. Сводка портфеля внутри себя сортирует
  * позиции по оценке — это её дело. Список показывает ровно то, что
- * лежит в записи, в том же порядке: иначе владелец увидел бы другую
- * витрину, чем та, которую сервер хранит.
+ * лежит в записи, в том же порядке.
  *
- * БИТАЯ СТРОКА ПРОПУСКАЕТСЯ, А НЕ РОНЯЕТ СПИСОК. Один неразборчивый
- * адрес или баланс не должен прятать остальные токены.
+ * БИТАЯ СТРОКА ПРОПУСКАЕТСЯ, А НЕ РОНЯЕТ СПИСОК.
  */
-export function mapRemoteAssets(assets: IRemoteAssets): IMappedRemoteAssets {
+export function mapRemoteAssets(
+  assets: IRemoteAssets,
+  prices: PriceMap = new Map(),
+): IMappedRemoteAssets {
   const tokens: ITokenAmount[] = []
-  const prices = new Map<string, IPriceQuote>()
   const quotedAt = parseTimestamp(assets.updatedAt)
 
   for (const entry of assets.tokens) {
@@ -43,10 +46,6 @@ export function mapRemoteAssets(assets: IRemoteAssets): IMappedRemoteAssets {
     }
 
     tokens.push({ token: mapped.token, balance: mapped.balance })
-
-    if (mapped.quote !== null) {
-      prices.set(priceRefKey(mapped.token), mapped.quote)
-    }
   }
 
   return {
@@ -58,7 +57,7 @@ export function mapRemoteAssets(assets: IRemoteAssets): IMappedRemoteAssets {
 function mapRemoteToken(
   entry: IRemoteAssetToken,
   quotedAt: Timestamp,
-): { readonly token: IToken; readonly balance: bigint; readonly quote: IPriceQuote | null } | null {
+): { readonly token: IToken; readonly balance: bigint } | null {
   if (!Number.isInteger(entry.decimals) || entry.decimals < 0 || entry.decimals > 36) {
     return null
   }
@@ -110,22 +109,21 @@ function mapRemoteToken(
     addedAt: quotedAt,
   }
 
-  return { token, balance, quote: readQuote(entry, quotedAt) }
+  return { token, balance }
 }
 
-function readQuote(entry: IRemoteAssetToken, quotedAt: Timestamp): IPriceQuote | null {
-  const price = Number.parseFloat(entry.priceUsd)
+export function remoteTokenPriceRef(entry: IRemoteAssetToken): {
+  readonly chainId: ReturnType<typeof toChainId>
+  readonly address: ReturnType<typeof toAddress> | null
+} | null {
+  try {
+    const chainId = toChainId(entry.chainId)
+    const address =
+      entry.standard === 'native' || entry.address === null ? null : toAddress(entry.address)
 
-  if (!Number.isFinite(price) || price < 0) {
+    return { chainId, address }
+  } catch {
     return null
-  }
-
-  const change = Number.parseFloat(entry.change24hPercent)
-
-  return {
-    price,
-    change24hPercent: Number.isFinite(change) ? change : null,
-    updatedAt: quotedAt,
   }
 }
 

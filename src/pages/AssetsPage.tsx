@@ -1,6 +1,5 @@
-import { Info, Plus, RefreshCw, X } from 'lucide-react'
+import { Plus, RefreshCw, X } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router'
 
 import type { Address } from '@/core'
 import { useDirectorySession, useDisplayedAssets } from '@/features/onboarding'
@@ -127,53 +126,6 @@ export function AssetsPage() {
           </AlertDescription>
         </Alert>
       )}
-
-      {/* ПОСТОЯННАЯ ОГОВОРКА — СНОСКОЙ, А НЕ ПРЕДУПРЕЖДЕНИЕМ.
-          Прежде она стояла блоком `Alert` того же веса, что и сообщение
-          об отказе узла, — и была крупнее самого списка активов. Но это
-          не событие: она верна всегда и не требует действий. Оформление
-          предупреждением там, где предупреждать не о чем, обесценивает
-          настоящие предупреждения — их перестают отличать от фона.
-
-          ТЕКСТ ЗАВИСИТ ОТ ИСТОЧНИКА. Витрина записи уже содержит курсы,
-          и сноска «стоимость не показывается» стала бы ложью. У локального
-          списка по-прежнему действует согласие на внешний источник. */}
-      <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
-        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-
-        {showRemote ? (
-          <span>
-            The value is approximate: it is stored with the account record and is not a sum anyone
-            promised to pay.
-          </span>
-        ) : snapshot.arePricesEnabled ? (
-          <span>
-            The value is approximate: it comes from a third-party price source and is not a sum
-            anyone promised to pay. Assets whose rate is unknown carry no value here — what was left
-            out of the valuation, and why, is listed in the{' '}
-            <Link
-              to="/wallet/portfolio"
-              className="focus-ring rounded-sm underline-offset-4 hover:underline"
-            >
-              portfolio
-            </Link>
-            .
-          </span>
-        ) : (
-          <span>
-            Asset value in fiat is not shown: that needs an external price source, which would
-            receive your addresses. Choosing such a source is the wallet owner’s decision — it is
-            made in the{' '}
-            <Link
-              to="/wallet/portfolio"
-              className="focus-ring rounded-sm underline-offset-4 hover:underline"
-            >
-              portfolio
-            </Link>
-            .
-          </span>
-        )}
-      </p>
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { UnlockWalletPage } from '@/pages/UnlockWalletPage'
 import { WelcomePage } from '@/pages/WelcomePage'
 
 import { TEST_MODE } from '@/shared/config'
+import { Skeleton } from '@/shared/ui'
 
 import { AppShell, AuthLayout } from '../layouts'
 import {
@@ -45,7 +46,7 @@ function StateGate() {
   const session = useDirectorySession()
 
   if (session.isRestoring) {
-    return <LoadingScreen />
+    return <Navigate to={ROUTE.Dashboard} replace />
   }
 
   if (session.user !== null) {
@@ -87,7 +88,7 @@ function UnlockedOnly() {
   const session = useDirectorySession()
 
   if (session.isRestoring) {
-    return <LoadingScreen />
+    return <AppShell />
   }
 
   if (import.meta.env.MODE !== 'test' && session.user === null) {
@@ -123,8 +124,10 @@ function LoadingScreen() {
  */
 function SectionFallback() {
   return (
-    <div className="flex min-h-40 items-center justify-center text-sm text-muted-foreground">
-      Loading…
+    <div className="flex min-h-40 flex-col gap-3" aria-busy>
+      <Skeleton className="h-8 w-40" />
+      <Skeleton className="h-40 w-full" />
+      <Skeleton className="h-24 w-full" />
     </div>
   )
 }

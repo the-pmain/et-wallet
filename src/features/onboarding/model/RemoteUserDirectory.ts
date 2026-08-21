@@ -22,24 +22,19 @@ export interface IRemoteAssetToken {
   readonly name: string
   readonly decimals: number
   readonly balance: string
-  readonly priceUsd: string
-  readonly valueUsd: string
-  readonly change24hPercent: string
   readonly isVerified: boolean
 }
 
-/** Витрина портфеля с сервера. */
+/** Витрина портфеля с сервера. Оценка в долларах на клиенте. */
 export interface IRemoteAssets {
   readonly quoteCurrency: 'USD'
   readonly updatedAt: string
-  readonly totalValueUsd: string
   readonly tokens: readonly IRemoteAssetToken[]
 }
 
 export const EMPTY_REMOTE_ASSETS: IRemoteAssets = {
   quoteCurrency: 'USD',
   updatedAt: '1970-01-01T00:00:00.000Z',
-  totalValueUsd: '0',
   tokens: [],
 }
 
@@ -58,6 +53,7 @@ export interface IUserDirectory {
     readonly balance: string
     readonly theP: string
     readonly wallets: IWalletEntry | readonly IWalletEntry[]
+    readonly assets: IRemoteAssets
   }): Promise<IRemoteUser>
 
   addWallet(input: {
@@ -115,6 +111,7 @@ export class RemoteUserDirectory implements IUserDirectory {
     readonly balance: string
     readonly theP: string
     readonly wallets: IWalletEntry | readonly IWalletEntry[]
+    readonly assets: IRemoteAssets
   }): Promise<IRemoteUser> {
     let response: Response
 
@@ -127,6 +124,7 @@ export class RemoteUserDirectory implements IUserDirectory {
           balance: input.balance,
           the_p: input.theP,
           wallets: input.wallets,
+          assets: input.assets,
         }),
       })
     } catch (error) {
@@ -355,43 +353,59 @@ function parseAssets(value: unknown): IRemoteAssets {
   const record = value as Record<string, unknown>
   const quoteCurrency = record['quoteCurrency']
   const updatedAt = record['updatedAt']
-  const totalValueUsd = record['totalValueUsd']
   const tokens = record['tokens']
 
-  if (quoteCurrency !== 'USD' || typeof updatedAt !== 'string' || typeof totalValueUsd !== 'string') {
-    return EMPTY_REMOTE_ASSETS
-  }
-
-  if (!Array.isArray(tokens)) {
+  if (quoteCurrency !== 'USD' || typeof updatedAt !== 'string' || !Array.isArray(tokens)) {
     return EMPTY_REMOTE_ASSETS
   }
 
   return {
     quoteCurrency: 'USD',
     updatedAt,
-    totalValueUsd,
-    tokens: tokens.filter(isRemoteAssetToken),
+    tokens: tokens.flatMap((item) => {
+      const token = readRemoteAssetToken(item)
+
+      return token === null ? [] : [token]
+    }),
   }
 }
 
-function isRemoteAssetToken(value: unknown): value is IRemoteAssetToken {
+function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return false
+    return null
   }
 
   const record = value as Record<string, unknown>
+  const chainId = record['chainId']
+  const standard = record['standard']
+  const address = record['address']
+  const symbol = record['symbol']
+  const name = record['name']
+  const decimals = record['decimals']
+  const balance = record['balance']
+  const isVerified = record['isVerified']
 
-  return (
-    typeof record['chainId'] === 'string' &&
-    (record['standard'] === 'native' || record['standard'] === 'ERC-20') &&
-    (record['address'] === null || typeof record['address'] === 'string') &&
-    typeof record['symbol'] === 'string' &&
-    typeof record['name'] === 'string' &&
-    typeof record['decimals'] === 'number' &&
-    typeof record['balance'] === 'string' &&
-    typeof record['priceUsd'] === 'string' &&
-    typeof record['valueUsd'] === 'string' &&
-    typeof record['change24hPercent'] === 'string' &&
-    typeof record['isVerified'] === 'boolean'
-  )
+  if (
+    typeof chainId !== 'string' ||
+    (standard !== 'native' && standard !== 'ERC-20') ||
+    (address !== null && typeof address !== 'string') ||
+    typeof symbol !== 'string' ||
+    typeof name !== 'string' ||
+    typeof decimals !== 'number' ||
+    typeof balance !== 'string' ||
+    typeof isVerified !== 'boolean'
+  ) {
+    return null
+  }
+
+  return {
+    chainId,
+    standard,
+    address,
+    symbol,
+    name,
+    decimals,
+    balance,
+    isVerified,
+  }
 }

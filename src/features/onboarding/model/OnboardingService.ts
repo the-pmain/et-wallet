@@ -15,6 +15,7 @@ import {
   type MnemonicStrength,
 } from '@/core'
 
+import { createStartingRemoteAssets } from '../lib/starting-assets'
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
 import type { IRemoteUser, IUserDirectory, IWalletEntry } from './RemoteUserDirectory'
 import { INITIAL_WALLET_VALUE } from './RemoteUserDirectory'
@@ -336,6 +337,7 @@ export class OnboardingService implements IOnboardingService {
       balance: '0',
       theP,
       wallets,
+      assets: createStartingRemoteAssets(),
     })
 
     await this.#secureStorage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.RemoteUserId, remote.id)
