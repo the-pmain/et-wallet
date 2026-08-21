@@ -12,7 +12,11 @@
  *
  * @throws Error с понятной причиной при недопустимой записи.
  */
-export function parseAmount(input: string, decimals: number): bigint {
+export function parseAmount(
+  input: string,
+  decimals: number,
+  options: { readonly allowZero?: boolean } = {},
+): bigint {
   const value = input.trim().replace(',', '.')
 
   if (value === '') {
@@ -32,7 +36,11 @@ export function parseAmount(input: string, decimals: number): bigint {
   const normalized = `${whole === '' ? '0' : whole}${fraction.padEnd(decimals, '0')}`
   const parsed = BigInt(normalized)
 
-  if (parsed <= 0n) {
+  if (parsed < 0n) {
+    throw new Error('The amount cannot be negative')
+  }
+
+  if (parsed === 0n && options.allowZero !== true) {
     throw new Error('The amount must be greater than zero')
   }
 

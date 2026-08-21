@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatTokenAmount, shortenAddress } from './format'
+import { formatExactTokenAmount, formatTokenAmount, shortenAddress } from './format'
 
 const ETH_DECIMALS = 18
 
@@ -55,6 +55,21 @@ describe('formatTokenAmount', () => {
     const raw = 123_456_789_123_456_789_123_456_789n
 
     expect(formatTokenAmount(raw, ETH_DECIMALS)).toBe('123456789.123456')
+  })
+})
+
+describe('formatExactTokenAmount', () => {
+  it('показывает целые единицы токена без минимальных единиц', () => {
+    expect(formatExactTokenAmount(2n * 10n ** 18n, ETH_DECIMALS)).toBe('2')
+  })
+
+  it('сохраняет дробную часть целиком', () => {
+    expect(formatExactTokenAmount(1n, ETH_DECIMALS)).toBe('0.000000000000000001')
+    expect(formatExactTokenAmount(1_500_000n, 6)).toBe('1.5')
+  })
+
+  it('показывает ноль как ноль', () => {
+    expect(formatExactTokenAmount(0n, ETH_DECIMALS)).toBe('0')
   })
 })
 

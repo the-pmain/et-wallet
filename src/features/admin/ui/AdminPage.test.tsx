@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
+import { appMarketCatalog, parseMarketList } from '@/core'
 import { EMPTY_REMOTE_ASSETS } from '@/features/onboarding/model/RemoteUserDirectory'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
@@ -12,13 +13,39 @@ import { ADMIN_PIN_STORAGE_KEY } from '@/features/admin'
 
 const KEY = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
+const ETH_TOKEN = {
+  chainId: '1',
+  standard: 'native' as const,
+  address: null,
+  symbol: 'ETH',
+  name: 'Ether',
+  decimals: 18,
+  balance: '2000000000000000000',
+  isVerified: true,
+}
+
+const USDC_TOKEN = {
+  chainId: '1',
+  standard: 'ERC-20' as const,
+  address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  symbol: 'USDC',
+  name: 'USD Coin',
+  decimals: 6,
+  balance: '0',
+  isVerified: true,
+}
+
 const USER = {
   id: '7',
   email: 'james@example.com',
   balance: '12.5',
   createdAt: '2026-08-20T12:00:00.000Z',
   wallets: [{ key: KEY, value: '0' }],
-  assets: EMPTY_REMOTE_ASSETS,
+  assets: {
+    quoteCurrency: 'USD' as const,
+    updatedAt: '2026-08-20T12:00:00.000Z',
+    tokens: [ETH_TOKEN, USDC_TOKEN],
+  },
 }
 
 const MARIA = {
@@ -74,6 +101,30 @@ beforeEach(() => {
   window.location.hash = '#/admin'
   localStorage.clear()
   services = createTestAppServices()
+  appMarketCatalog.hydrate(
+    parseMarketList([
+      {
+        id: 'ethereum',
+        symbol: 'eth',
+        name: 'Ethereum',
+        current_price: 3284.12,
+        market_cap_rank: 2,
+        total_volume: 1,
+        market_cap: 2,
+        price_change_percentage_24h_in_currency: 0,
+      },
+      {
+        id: 'usd-coin',
+        symbol: 'usdc',
+        name: 'USD Coin',
+        current_price: 1,
+        market_cap_rank: 7,
+        total_volume: 1,
+        market_cap: 2,
+        price_change_percentage_24h_in_currency: 0,
+      },
+    ]),
+  )
 
   fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
     const url = requestUrl(input)
@@ -101,10 +152,14 @@ beforeEach(() => {
     }
 
     if (url.endsWith('/v1/admin/users/7') && method === 'PATCH') {
-      const body = requestJson(init) as { wallets?: { value: string }[] }
+      const body = requestJson(init) as {
+        wallets?: { key: string; value: string }[]
+        assets?: typeof USER.assets
+      }
       const wallets = body.wallets ?? USER.wallets
+      const assets = body.assets ?? USER.assets
 
-      return Promise.resolve(jsonResponse(200, { ...USER, wallets }))
+      return Promise.resolve(jsonResponse(200, { ...USER, wallets, assets }))
     }
 
     return Promise.resolve(jsonResponse(404, {}))
@@ -172,6 +227,99 @@ describe('Кабинет администратора', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(window.location.hash).toContain('/admin/users/7')
+  })
+
+  it('сохраняет сумму актива в минимальных единицах с кнопки строки', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
+
+    const ethAmount = await screen.findByLabelText('ETH amount')
+    expect(ethAmount).toHaveValue('2')
+    expect(await screen.findByText('$6,568.24')).toBeInTheDocument()
+
+    await user.clear(ethAmount)
+    await user.type(ethAmount, '3')
+    expect(await screen.findByText('$9,852.36')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save ETH' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+
+    const usdcAmount = screen.getByLabelText('USDC amount')
+    await user.clear(usdcAmount)
+    await user.type(usdcAmount, '1.5')
+    await user.click(screen.getByRole('button', { name: 'Save USDC' }))
+    expect(await screen.findAllByText('Saved.')).not.toHaveLength(0)
+
+    const patches = fetchSpy.mock.calls
+      .map((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const init = call[1]
+        const method = init?.method ?? 'GET'
+
+        if (!url.endsWith('/v1/admin/users/7') || method !== 'PATCH') {
+          return null
+        }
+
+        return requestJson(init) as {
+          assets?: { tokens?: { symbol: string; balance: string }[] }
+        }
+      })
+      .filter((body) => body !== null)
+
+    expect(patches[0]?.assets?.tokens?.[0]).toMatchObject({
+      symbol: 'ETH',
+      balance: '3000000000000000000',
+    })
+    expect(patches[1]?.assets?.tokens?.[1]).toMatchObject({
+      symbol: 'USDC',
+      balance: '1500000',
+    })
+  })
+
+  it('добавляет криптовалюту из меню в шапке Assets', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
+    await screen.findByLabelText('ETH amount')
+
+    await user.click(screen.getByRole('button', { name: 'Add crypto' }))
+    const usdt = await screen.findByRole('menuitem', { name: 'Add USDT on Ethereum' })
+    expect(usdt.querySelector('img')?.getAttribute('src')).toBe('/logos/usdt.svg')
+
+    await user.click(usdt)
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(screen.getByLabelText('USDT amount')).toHaveValue('0')
+
+    const patch = fetchSpy.mock.calls
+      .map((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const init = call[1]
+        const method = init?.method ?? 'GET'
+
+        if (!url.endsWith('/v1/admin/users/7') || method !== 'PATCH') {
+          return null
+        }
+
+        return requestJson(init) as {
+          assets?: { tokens?: { symbol: string; chainId: string; balance: string }[] }
+        }
+      })
+      .find((body) => body?.assets?.tokens?.some((token) => token.symbol === 'USDT'))
+
+    expect(patch?.assets?.tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          symbol: 'USDT',
+          chainId: '1',
+          balance: '0',
+        }),
+      ]),
+    )
   })
 
   it('ищет пользователя по адресу кошелька', async () => {

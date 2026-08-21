@@ -73,7 +73,17 @@ describe('assets', () => {
       updatedAt: '2026-08-21T00:00:00.000Z',
       tokens: STARTING_TOKENS,
     })
-    expect(assets.tokens).toHaveLength(8)
+    expect(assets.tokens).toHaveLength(1)
+    expect(assets.tokens[0]).toMatchObject({
+      chainId: '1',
+      standard: 'native',
+      address: null,
+      symbol: 'ETH',
+      name: 'Ether',
+      decimals: 18,
+      balance: '0',
+      isVerified: true,
+    })
     expect(Object.keys(assets).sort()).toEqual([...STORED_ASSET_FIELD_NAMES].sort())
     expect(serialized).not.toMatch(/priceUsd|valueUsd|totalValueUsd|change24hPercent/u)
 

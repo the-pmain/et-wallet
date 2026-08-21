@@ -1,5 +1,5 @@
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { mapRemoteAssets } from '@/features/onboarding/lib/map-remote-assets'
@@ -10,6 +10,9 @@ import type {
   IWalletEntry,
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import { useRemoteAssetQuotes } from '@/features/onboarding/model/use-remote-asset-quotes'
+import { parseAmount } from '@/features/wallet/lib/amount-input'
+import { formatExactTokenAmount } from '@/features/wallet/lib/format'
+import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import {
   Alert,
   AlertDescription,
@@ -25,7 +28,9 @@ import {
 } from '@/shared/ui'
 
 import { AdminAuthError } from '../model/AdminClient'
+import { networkNameForChain, parseRemoteChainId, remoteAssetKey } from '../model/addable-assets'
 import { useAdminSession } from '../model/admin-context'
+import { AddAssetMenu } from './AddAssetMenu'
 import { UserAvatar } from './UserAvatar'
 
 const ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
@@ -159,8 +164,17 @@ function ProfileEditor({
         tokens: [],
       },
   )
+  const [draftAmounts, setDraftAmounts] = useState<string[]>(() =>
+    (user.assets?.tokens ?? []).map((token) =>
+      displayAmountFromStored(token.balance, token.decimals),
+    ),
+  )
+  const quotedAssets = useMemo(
+    () => ({ ...assets, tokens: withDraftBalances(assets.tokens, draftAmounts) }),
+    [assets, draftAmounts],
+  )
   const { quotes, isLoading: isQuotesLoading } = useRemoteAssetQuotes(assets.tokens)
-  const valued = mapRemoteAssets(assets, quotes)
+  const valued = mapRemoteAssets(quotedAssets, quotes)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -228,10 +242,45 @@ function ProfileEditor({
       {tab === PROFILE_TAB.Assets ? (
         <Card>
           <CardHeader>
-            <CardTitle>Assets</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Showcase stored on the user record. Total USD is calculated from CoinGecko prices.
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <CardTitle>Assets</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Amounts are in token units: 2 means 2 ETH, not wei. Each row saves on its own.
+                  Total USD is calculated from CoinGecko prices.
+                </p>
+              </div>
+              <AddAssetMenu
+                existing={assets.tokens}
+                disabled={busy !== null}
+                onAdd={(token) => {
+                  if (
+                    assets.tokens.some((item) => remoteAssetKey(item) === remoteAssetKey(token))
+                  ) {
+                    return
+                  }
+
+                  void run('asset-add', async () => {
+                    const nextAssets: IRemoteAssets = {
+                      ...assets,
+                      updatedAt: new Date().toISOString(),
+                      tokens: [...assets.tokens, token],
+                    }
+                    const next = await client.updateUser(user.id, { assets: nextAssets })
+                    setAssets(next.assets)
+                    setDraftAmounts((current) =>
+                      next.assets.tokens.map(
+                        (item, itemIndex) =>
+                          current[itemIndex] ??
+                          displayAmountFromStored(item.balance, item.decimals),
+                      ),
+                    )
+
+                    return next
+                  })
+                }}
+              />
+            </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex min-h-5 items-center gap-2 text-sm">
@@ -248,60 +297,113 @@ function ProfileEditor({
               )}
             </div>
             <ul className="flex flex-col gap-3">
-              {assets.tokens.map((token, index) => (
-                <li
-                  key={tokenKey(token, index)}
-                  className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_auto]"
-                >
-                  <p className="text-sm font-medium sm:col-span-2">
-                    {token.symbol} · chain {token.chainId}
-                  </p>
-                  <Input
-                    value={token.balance}
-                    aria-label={`${token.symbol} balance`}
-                    onChange={(event) => {
-                      const nextBalance = event.target.value
-                      setAssets((current) => ({
-                        ...current,
-                        tokens: current.tokens.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, balance: nextBalance } : item,
-                        ),
-                      }))
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="justify-start sm:col-span-2"
-                    onClick={() => {
-                      setAssets((current) => ({
-                        ...current,
-                        tokens: current.tokens.filter((_, itemIndex) => itemIndex !== index),
-                      }))
-                    }}
+              {assets.tokens.map((token, index) => {
+                const draft = draftAmounts[index] ?? ''
+                const parsed = tryParseAmount(draft, token.decimals)
+                const saveKey = `asset:${String(index)}`
+                const removeKey = `asset-remove:${String(index)}`
+
+                return (
+                  <li
+                    key={tokenKey(token, index)}
+                    className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
                   >
-                    <Trash2 />
-                    Remove {token.symbol}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            <Button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => {
-                void run('assets', () =>
-                  client.updateUser(user.id, {
-                    assets: {
-                      ...assets,
-                      updatedAt: new Date().toISOString(),
-                    },
-                  }),
+                    <div className="flex items-center gap-3 sm:col-span-2">
+                      <TokenAvatar
+                        address={token.address}
+                        symbol={token.symbol}
+                        chainId={parseRemoteChainId(token.chainId)}
+                        className="size-8"
+                      />
+                      <p className="min-w-0 text-sm font-medium">
+                        {token.symbol}
+                        <span className="font-normal text-muted-foreground">
+                          {' '}
+                          · {networkNameForChain(token.chainId)}
+                        </span>
+                      </p>
+                    </div>
+                    <Input
+                      value={draft}
+                      inputMode="decimal"
+                      placeholder="0"
+                      aria-label={`${token.symbol} amount`}
+                      onChange={(event) => {
+                        const nextAmount = event.target.value
+                        setDraftAmounts((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? nextAmount : item,
+                          ),
+                        )
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      disabled={busy !== null || parsed === null}
+                      aria-label={`Save ${token.symbol}`}
+                      onClick={() => {
+                        if (parsed === null) {
+                          setError(`Enter a valid ${token.symbol} amount.`)
+                          setMessage(null)
+
+                          return
+                        }
+
+                        void run(saveKey, async () => {
+                          const nextAssets: IRemoteAssets = {
+                            ...assets,
+                            updatedAt: new Date().toISOString(),
+                            tokens: assets.tokens.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, balance: parsed.toString() } : item,
+                            ),
+                          }
+                          const next = await client.updateUser(user.id, { assets: nextAssets })
+                          setAssets(next.assets)
+                          setDraftAmounts((current) =>
+                            next.assets.tokens.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? displayAmountFromStored(item.balance, item.decimals)
+                                : (current[itemIndex] ??
+                                  displayAmountFromStored(item.balance, item.decimals)),
+                            ),
+                          )
+
+                          return next
+                        })
+                      }}
+                    >
+                      <Save />
+                      {busy === saveKey ? 'Saving…' : 'Save'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="justify-start sm:col-span-2"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        void run(removeKey, async () => {
+                          const nextAssets: IRemoteAssets = {
+                            ...assets,
+                            updatedAt: new Date().toISOString(),
+                            tokens: assets.tokens.filter((_, itemIndex) => itemIndex !== index),
+                          }
+                          const next = await client.updateUser(user.id, { assets: nextAssets })
+                          setAssets(next.assets)
+                          setDraftAmounts((current) =>
+                            current.filter((_, itemIndex) => itemIndex !== index),
+                          )
+
+                          return next
+                        })
+                      }}
+                    >
+                      <Trash2 />
+                      Remove {token.symbol}
+                    </Button>
+                  </li>
                 )
-              }}
-            >
-              {busy === 'assets' ? 'Saving…' : 'Save assets'}
-            </Button>
+              })}
+            </ul>
           </CardContent>
         </Card>
       ) : null}
@@ -520,6 +622,37 @@ function Field({
       />
     </div>
   )
+}
+
+function displayAmountFromStored(balance: string, decimals: number): string {
+  try {
+    return formatExactTokenAmount(BigInt(balance), decimals)
+  } catch {
+    return '0'
+  }
+}
+
+function tryParseAmount(input: string, decimals: number): bigint | null {
+  try {
+    return parseAmount(input, decimals, { allowZero: true })
+  } catch {
+    return null
+  }
+}
+
+function withDraftBalances(
+  tokens: readonly IRemoteAssetToken[],
+  drafts: readonly string[],
+): IRemoteAssetToken[] {
+  return tokens.map((token, index) => {
+    const parsed = tryParseAmount(drafts[index] ?? '', token.decimals)
+
+    if (parsed === null) {
+      return token
+    }
+
+    return { ...token, balance: parsed.toString() }
+  })
 }
 
 function tokenKey(token: IRemoteAssetToken, index: number): string {

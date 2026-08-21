@@ -60,4 +60,13 @@ describe('findTokenLogo: знак полагается только провер
 
     expect(findTokenLogo(BUILT_IN_CHAIN_ID.Ethereum, weth)?.src).toBe('/logos/eth.svg')
   })
+
+  it('у моста Tether на Arbitrum тот же знак, что у USDT', () => {
+    /* Контракт отвечает символом `USD₮0` с типографским знаком тенге.
+       Это тот же Tether, и знак должен совпасть, иначе в меню
+       добавления эта строка осталась бы без иконки. */
+    const usdT0 = toAddress('0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9')
+
+    expect(findTokenLogo(BUILT_IN_CHAIN_ID.Arbitrum, usdT0)?.src).toBe('/logos/usdt.svg')
+  })
 })

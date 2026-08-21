@@ -36,6 +36,11 @@ describe('parseAmount', () => {
     expect(() => parseAmount('0.0', 18)).toThrow(/greater than zero/)
   })
 
+  it('принимает ноль, если это явно разрешено', () => {
+    expect(parseAmount('0', 18, { allowZero: true })).toBe(0n)
+    expect(parseAmount('0.0', 6, { allowZero: true })).toBe(0n)
+  })
+
   it('отвергает пустую строку', () => {
     expect(() => parseAmount('   ', 18)).toThrow(/Enter an amount/)
   })

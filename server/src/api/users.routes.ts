@@ -23,7 +23,8 @@ import type { IUserResponse, IWalletEntryResponse } from './contracts.ts'
  * Колонки входа: `email` и `the_p`. Поле `username` схема не принимает.
  * `POST /v1/users` — новая строка. Тело может содержать `assets`;
  * сервер оставляет только остатки, обнуляет `balance` у каждого токена
- * и отбрасывает `priceUsd` / `valueUsd`. Без поля — стартовая витрина.
+ * и отбрасывает `priceUsd` / `valueUsd`. Без поля — стартовая витрина
+ * из одного ETH.
  * `POST /v1/users/auth` — сверка `email` и `the_p`.
  * `POST /v1/users/wallets` — ещё один `{ key, value }` в уже существующий список.
  * Запрос не по схеме — 400, вход не выдаётся.

@@ -64,6 +64,7 @@ const LOGO_BY_VERIFIED_SYMBOL: Readonly<Record<string, string>> = {
   USDT0: 'usdt',
   USDt: 'usdt',
   'USD₮': 'usdt',
+  'USD₮0': 'usdt',
   DAI: 'dai',
   WETH: 'eth',
   WBTC: 'btc',

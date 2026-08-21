@@ -52,6 +52,35 @@ export function formatTokenAmount(
   return `${whole.toString()}.${trimmed}`
 }
 
+/**
+ * Полная запись суммы в единицах токена, без усечения.
+ *
+ * Для поля ввода: показать `2`, а не `2000000000000000000`, и не
+ * подменять крошечный остаток на `<0.000001`. Обратная сторона
+ * {@link parseAmount}.
+ */
+export function formatExactTokenAmount(raw: bigint, decimals: number): string {
+  if (raw < 0n) {
+    return `-${formatExactTokenAmount(-raw, decimals)}`
+  }
+
+  if (decimals === 0) {
+    return raw.toString()
+  }
+
+  const scale = 10n ** BigInt(decimals)
+  const whole = raw / scale
+  const remainder = raw % scale
+
+  if (remainder === 0n) {
+    return whole.toString()
+  }
+
+  const fraction = remainder.toString().padStart(decimals, '0').replace(/0+$/u, '')
+
+  return `${whole.toString()}.${fraction}`
+}
+
 /** Наименьшее значение, различимое при заданной точности. */
 function formatSmallestVisible(whole: bigint, fractionDigits: number): string {
   const fraction = '0'.repeat(Math.max(fractionDigits - 1, 0))

@@ -12,6 +12,7 @@ export {
 export {
   addressLabel,
   endpointHost,
+  formatExactTokenAmount,
   formatTimestamp,
   formatTokenAmount,
   shortenAddress,

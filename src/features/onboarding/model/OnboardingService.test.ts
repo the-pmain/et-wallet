@@ -60,6 +60,14 @@ describe('OnboardingService: запись пользователя на серв
         }),
       }),
     )
+    expect(STARTING_REMOTE_TOKENS).toHaveLength(1)
+    expect(STARTING_REMOTE_TOKENS[0]).toMatchObject({
+      chainId: '1',
+      standard: 'native',
+      address: null,
+      symbol: 'ETH',
+      balance: '0',
+    })
     expect(STARTING_REMOTE_TOKENS.every((token) => token.balance === '0')).toBe(true)
     expect(JSON.stringify(createStartingRemoteAssets())).not.toMatch(
       /priceUsd|valueUsd|totalValueUsd|change24hPercent/u,
