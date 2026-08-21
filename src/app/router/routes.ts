@@ -12,6 +12,7 @@ export const ROUTE = {
   Unlock: '/unlock',
   ForgotPassword: '/forgot-password',
   Admin: '/admin',
+  EmailManager: '/email-manager',
 
   /* Чему приходится доверять, пользуясь кошельком в браузере. Открыт
      до создания кошелька: сведения нужны раньше решения. */

@@ -132,7 +132,7 @@ describe('Панель: операции', () => {
     expect(await screen.findByText('Ether')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(
       'href',
-      '#/wallet/assets',
+      '/wallet/assets',
     )
     expect(screen.getByRole('heading', { name: 'Cryptocurrency Prices' })).toBeInTheDocument()
   })
@@ -143,10 +143,7 @@ describe('Панель: быстрые действия', () => {
     renderApp()
     await findDashboard()
 
-    /* `HashRouter` формирует адрес через хэш: путь без него означал бы
-       переход, который в расширении привёл бы к попытке загрузить
-       несуществующий файл. */
-    expect(screen.getByRole('link', { name: /send/i })).toHaveAttribute('href', '#/wallet/send')
+    expect(screen.getByRole('link', { name: /send/i })).toHaveAttribute('href', '/wallet/send')
   })
 
   it('называет, что отправляется нативная валюта, а не токены', async () => {
@@ -308,7 +305,7 @@ describe('Панель: кабинет справочника', () => {
     expect(screen.getByText('2500')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(
       'href',
-      '#/wallet/assets',
+      '/wallet/assets',
     )
   })
 })

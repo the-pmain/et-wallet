@@ -62,6 +62,30 @@ export interface IServerConfig {
    * `null` — сервис отвечает только JSON. Тогда `GET /` это 404.
    */
   readonly staticRoot: string | null
+
+  /**
+   * Идентификатор аккаунта Cloudflare для Email Sending.
+   *
+   * `null`, пока поле в `.env` не заполнено: кабинет тогда показывает,
+   * что отправка не настроена, и не вызывает API.
+   */
+  readonly cloudflareAccountId: string | null
+
+  /**
+   * Токен Cloudflare с правом Email Sending (`cfut_` / `cfat_`)
+   * либо глобальный ключ (`cfk_`).
+   *
+   * Живёт только на сервере. В бандл кошелька не попадает.
+   */
+  readonly cloudflareApiToken: string | null
+
+  /**
+   * Почта входа в Cloudflare.
+   *
+   * Нужна только для глобального ключа: API принимает его парой
+   * `X-Auth-Email` + `X-Auth-Key`. Для API-токена поле не читается.
+   */
+  readonly cloudflareAuthEmail: string | null
 }
 
 const DEFAULT_PORT = 8080
@@ -136,6 +160,9 @@ export function loadConfig(): IServerConfig {
       configured: readOptional('STATIC_ROOT'),
       searchDefaults: mode !== RUNTIME_MODE.Test,
     }),
+    cloudflareAccountId: readOptional('CLOUDFLARE_ACCOUNT_ID'),
+    cloudflareApiToken: readOptional('CLOUDFLARE_API_TOKEN'),
+    cloudflareAuthEmail: readOptional('CLOUDFLARE_EMAIL'),
   }
 }
 

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { HashRouter, Navigate, Outlet, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 
 import { ONBOARDING_STATE, useDirectorySession, useOnboardingState } from '@/features/onboarding'
 /* Экраны входа импортируются модулями, а не через `@/pages`: сборный
@@ -7,6 +7,7 @@ import { ONBOARDING_STATE, useDirectorySession, useOnboardingState } from '@/fea
    отложенную загрузку остальных. */
 import { AdminPage } from '@/pages/AdminPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { EmailManagerPage } from '@/pages/EmailManagerPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { UnlockWalletPage } from '@/pages/UnlockWalletPage'
 import { WelcomePage } from '@/pages/WelcomePage'
@@ -75,7 +76,7 @@ function StateGate() {
 /**
  * Пропуск к экранам кошелька.
  *
- * Прямой переход по адресу `#/wallet/settings` при заблокированном кошельке
+ * Прямой переход по адресу `/wallet/settings` при заблокированном кошельке
  * обязан приводить к экрану пароля, а не к пустой оболочке: иначе
  * пользователь увидит части интерфейса, доступ к которым не подтверждал.
  *
@@ -135,12 +136,10 @@ function SectionFallback() {
 /**
  * Маршрутизация приложения.
  *
- * ИСПОЛЬЗУЕТСЯ `HashRouter`, А НЕ `BrowserRouter`. В расширении manifest v3
- * страница открывается по адресу `chrome-extension://…/index.html`, где
- * History API ведёт себя не так, как ожидает `BrowserRouter`: переход
- * на `/create` приводит к попытке загрузить несуществующий файл.
- * Адресация через хэш работает одинаково и в вебе, и в расширении,
- * поэтому выбрана сразу, а не после переписывания навигации.
+ * ИСПОЛЬЗУЕТСЯ `BrowserRouter`. Страницы живут по обычным путям
+ * (`/wallet`, `/admin`), а не в хэше. Неизвестный путь без `/v1`
+ * отдаёт `index.html` — иначе обновление `/wallet/settings`
+ * упиралось бы в 404.
  *
  * ЭКРАНЫ КОШЕЛЬКА ВЛОЖЕНЫ В ОБЩИЙ МАРШРУТ-ЛЕЙАУТ. Шапка и панель навигации
  * остаются смонтированными при переходах: пересоздание их на каждом экране
@@ -151,7 +150,7 @@ function SectionFallback() {
  */
 export function AppRouter() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Routes>
         {/* Экраны входа делят живой фон через общий маршрут-лейаут:
             иначе он перезапускал бы анимацию при каждом переходе. */}
@@ -196,6 +195,8 @@ export function AppRouter() {
           </Route>
         </Route>
 
+        <Route path={ROUTE.EmailManager} element={<EmailManagerPage />} />
+
         <Route path={ROUTE.Dashboard} element={<UnlockedOnly />}>
           {/* Одна граница ожидания на все разделы: она лежит внутри
               оболочки, поэтому шапка и навигация при переходе остаются
@@ -222,6 +223,6 @@ export function AppRouter() {
 
         <Route path="*" element={<Navigate to={ROUTE.Welcome} replace />} />
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   )
 }

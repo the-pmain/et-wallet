@@ -16,6 +16,9 @@ const BASE: IServerConfig = {
   supabaseUrl: null,
   supabaseAnonKey: null,
   staticRoot: null,
+  cloudflareAccountId: null,
+  cloudflareApiToken: null,
+  cloudflareAuthEmail: null,
 }
 
 describe('createUsersStore', () => {

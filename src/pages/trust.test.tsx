@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -45,7 +46,7 @@ describe('Чему приходится доверять', () => {
     /* Это отличает веб-кошелёк от расширения и от настольного
        приложения, и умолчать об этом значит обещать безопасность,
        которой нет. */
-    window.location.hash = '#/trust'
+    openPath('/trust')
 
     renderApp()
 
@@ -56,7 +57,7 @@ describe('Чему приходится доверять', () => {
     /* Соблазн успокоить упоминанием шифрования велик, но подменённый
        код и есть кошелёк: шифровать он будет ровно так, как ему
        велели. */
-    window.location.hash = '#/trust'
+    openPath('/trust')
 
     renderApp()
 
@@ -66,7 +67,7 @@ describe('Чему приходится доверять', () => {
   })
 
   it('разделяет то, что кошелёк защищает, и то, чего не может', async () => {
-    window.location.hash = '#/trust'
+    openPath('/trust')
 
     renderApp()
 
@@ -77,7 +78,7 @@ describe('Чему приходится доверять', () => {
   it('даёт выполнимые советы, а не призыв не пользоваться', async () => {
     /* Решение принимает владелец средств: кошелёк обязан дать
        сведения, а не выбирать за него. */
-    window.location.hash = '#/trust'
+    openPath('/trust')
 
     renderApp()
 
@@ -88,7 +89,7 @@ describe('Чему приходится доверять', () => {
   it('оговаривает, что это свойство всех веб-кошельков', async () => {
     /* Иначе прочитанное выглядит как признание в собственной
        ненадёжности, а не как объяснение устройства. */
-    window.location.hash = '#/trust'
+    openPath('/trust')
 
     renderApp()
 

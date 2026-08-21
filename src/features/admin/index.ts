@@ -1,6 +1,7 @@
 export { AdminAuthError, AdminClient, type IAdminUserPatch } from './model/AdminClient'
-export { useAdminSession } from './model/admin-context'
+export { AdminSessionContext, useAdminSession } from './model/admin-context'
 export { AdminGate } from './ui/AdminGate'
+export { AdminPinForm } from './ui/AdminPinForm'
 export {
   ADMIN_PIN_STORAGE_KEY,
   clearAdminPin,

@@ -14,6 +14,8 @@ import {
 } from '@/shared/ui'
 
 interface AdminPinFormProps {
+  readonly title?: string
+  readonly description?: string
   readonly error: string | null
   readonly isBusy: boolean
   readonly onSubmit: (pin: string) => void
@@ -24,7 +26,13 @@ interface AdminPinFormProps {
  *
  * Значение сверяет сервер. Форма не знает правильного кода.
  */
-export function AdminPinForm({ error, isBusy, onSubmit }: AdminPinFormProps) {
+export function AdminPinForm({
+  title = 'Admin',
+  description = 'Enter the PIN to manage users and wallet balances.',
+  error,
+  isBusy,
+  onSubmit,
+}: AdminPinFormProps) {
   const pinId = useId()
   const [pin, setPin] = useState('')
   const canSubmit = pin.trim() !== '' && !isBusy
@@ -46,10 +54,8 @@ export function AdminPinForm({ error, isBusy, onSubmit }: AdminPinFormProps) {
           <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Shield aria-hidden />
           </div>
-          <CardTitle as="h1">Admin</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Enter the PIN to manage users and wallet balances.
-          </p>
+          <CardTitle as="h1">{title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{description}</p>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>

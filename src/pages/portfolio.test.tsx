@@ -295,7 +295,7 @@ describe('Портфель: вход с главного экрана', () => {
 
     expect(screen.getByRole('link', { name: /portfolio/i })).toHaveAttribute(
       'href',
-      '#/wallet/portfolio',
+      '/wallet/portfolio',
     )
   })
 

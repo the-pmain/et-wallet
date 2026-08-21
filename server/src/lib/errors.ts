@@ -67,6 +67,27 @@ export class ServiceUnavailableError extends ApiError {
 }
 
 /**
+ * Отправка писем не настроена: нет идентификатора аккаунта
+ * либо токена Cloudflare.
+ */
+export class EmailUnavailableError extends ApiError {
+  constructor(message: string) {
+    super(503, 'email_unavailable', message)
+    this.name = 'EmailUnavailableError'
+  }
+}
+
+/**
+ * Cloudflare принял запрос, но письмо не отправилось.
+ */
+export class EmailSendError extends ApiError {
+  constructor(statusCode: number, message: string) {
+    super(statusCode, 'email_send_failed', message)
+    this.name = 'EmailSendError'
+  }
+}
+
+/**
  * Каталог не прошёл проверку при загрузке.
  *
  * Это ошибка развёртывания, а не выполнения: сервис с испорченным

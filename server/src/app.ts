@@ -8,6 +8,8 @@ import { registerUserRoutes } from './api/users.routes.ts'
 import { registerVersionRoutes } from './api/version.routes.ts'
 import { CatalogService } from './catalog/CatalogService.ts'
 import { RUNTIME_MODE, type IServerConfig } from './config.ts'
+import { CloudflareEmailService } from './email/CloudflareEmailService.ts'
+import type { IEmailService } from './email/contracts.ts'
 import { ApiError } from './lib/errors.ts'
 import { isApiUrl } from './lib/ui.ts'
 import { registerSecretGuard } from './plugins/secret-guard.ts'
@@ -30,6 +32,7 @@ export interface IAppDependencies {
   readonly settings?: ISettingsRepository
   readonly users?: IUsersRepository
   readonly usersKind?: UsersStoreKind
+  readonly email?: IEmailService
 }
 
 /**
@@ -105,6 +108,13 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   const settings = dependencies.settings ?? new MemorySettingsRepository()
   const users = dependencies.users ?? new MemoryUsersRepository()
   const usersKind = dependencies.usersKind ?? USERS_STORE_KIND.Memory
+  const email =
+    dependencies.email ??
+    new CloudflareEmailService({
+      accountId: config.cloudflareAccountId,
+      apiToken: config.cloudflareApiToken,
+      authEmail: config.cloudflareAuthEmail,
+    })
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
@@ -165,7 +175,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
-  registerAdminRoutes(app, users)
+  registerAdminRoutes(app, users, email)
 
   if (config.staticRoot !== null) {
     await registerUi(app, config.staticRoot)

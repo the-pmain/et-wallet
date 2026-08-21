@@ -9,9 +9,9 @@ import { htmlForTransport, isHttpsRequest, pageContentSecurityPolicy } from '../
 /**
  * Раздача собранного кошелька с того же источника, что и `/v1`.
  *
- * `HashRouter` ходит на `/#/...`, поэтому точка входа — `GET /`.
- * Неизвестный путь без `/v1` тоже отдаёт `index.html`: закладка
- * без решётки не должна показывать JSON 404.
+ * `BrowserRouter` ходит на `/wallet`, `/admin` и остальные пути
+ * приложения. Неизвестный путь без `/v1` отдаёт `index.html`:
+ * обновление страницы не должно показывать JSON 404.
  */
 export async function registerUi(app: FastifyInstance, staticRoot: string): Promise<void> {
   await app.register(fastifyStatic, {

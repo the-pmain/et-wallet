@@ -21,6 +21,9 @@ function configWithStatic(staticRoot: string | null): IServerConfig {
     supabaseUrl: null,
     supabaseAnonKey: null,
     staticRoot,
+    cloudflareAccountId: null,
+    cloudflareApiToken: null,
+    cloudflareAuthEmail: null,
   }
 }
 
@@ -49,7 +52,7 @@ describe('isApiUrl', () => {
 
 describe('htmlForTransport', () => {
   it('на HTTP убирает upgrade-insecure-requests', () => {
-    const html = 'default-src \'self\'; upgrade-insecure-requests'
+    const html = "default-src 'self'; upgrade-insecure-requests"
 
     expect(htmlForTransport(html, false)).not.toContain('upgrade-insecure-requests')
     expect(htmlForTransport(html, true)).toContain('upgrade-insecure-requests')
@@ -81,7 +84,9 @@ describe('Раздача интерфейса', () => {
     expect(response.headers['content-type']).toContain('text/html')
     expect(response.body).toContain('wallet')
     expect(response.body).not.toContain('upgrade-insecure-requests')
-    expect(String(response.headers['content-security-policy'])).toBe(pageContentSecurityPolicy(false))
+    expect(String(response.headers['content-security-policy'])).toBe(
+      pageContentSecurityPolicy(false),
+    )
     expect(String(response.headers['content-security-policy'])).toContain("script-src 'self'")
   })
 

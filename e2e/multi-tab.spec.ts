@@ -17,7 +17,7 @@ const PASSWORD = 'Korova-7-Luna!'
 const LOGIN_EMAIL = 'james@example.com'
 
 async function importWallet(page: Page): Promise<void> {
-  await page.goto('/#/import')
+  await page.goto('/import')
 
   await page.getByLabel('Seed phrase').fill(TEST_MNEMONIC)
   await page.getByLabel('Email').fill(LOGIN_EMAIL)
@@ -95,8 +95,8 @@ test.describe('Две вкладки', () => {
     await unlockWallet(second)
     await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
 
-    await first.goto('/#/wallet/settings')
-    await first.goto('/#/forgot-password')
+    await first.goto('/wallet/settings')
+    await first.goto('/forgot-password')
     await first.getByRole('checkbox').check()
     await first.getByLabel(/Type the word/i).fill('ERASE')
     await first.getByRole('button', { name: 'Erase the wallet' }).click()
@@ -128,7 +128,7 @@ test.describe('Две вкладки: опасные случаи', () => {
     await unlockWallet(second)
     await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
 
-    await first.goto('/#/forgot-password')
+    await first.goto('/forgot-password')
     await first.getByRole('checkbox').check()
     await first.getByLabel(/Type the word/i).fill('ERASE')
     await first.getByRole('button', { name: 'Erase the wallet' }).click()

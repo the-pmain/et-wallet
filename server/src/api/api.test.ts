@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
+import type { IEmailMessage, IEmailSendResult, IEmailService } from '../email/contracts.ts'
+import { EmailUnavailableError } from '../lib/errors.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
 import { STARTING_TOKENS } from '../users/assets.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
@@ -18,6 +20,9 @@ const CONFIG: IServerConfig = {
   supabaseUrl: null,
   supabaseAnonKey: null,
   staticRoot: null,
+  cloudflareAccountId: null,
+  cloudflareApiToken: null,
+  cloudflareAuthEmail: null,
 }
 
 const SYNC_ID = 'a'.repeat(64)
@@ -319,7 +324,9 @@ describe('Пользователи', () => {
       response.json<{ email: string; balance: string; wallets: Record<string, string> }>().email,
     ).toBe('james@example.com')
     expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([])
-    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
+    expectStartingAssets(
+      response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets,
+    )
     expect(response.json<{ the_p?: unknown; password?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.json<{ password?: unknown }>()).not.toHaveProperty('password')
     expect(response.json<{ username?: unknown }>()).not.toHaveProperty('username')
@@ -348,7 +355,9 @@ describe('Пользователи', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
+    expectStartingAssets(
+      response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets,
+    )
     expectStartingAssets(users.records[0]?.assets ?? { tokens: [] })
   })
 
@@ -460,7 +469,9 @@ describe('Пользователи', () => {
     expect(response.statusCode).toBe(201)
     expect(response.json<{ balance: string }>().balance).toBe('0')
     expect(response.json<{ wallets: { value: string }[] }>().wallets).toEqual([{ key, value: '0' }])
-    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
+    expectStartingAssets(
+      response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets,
+    )
   })
 
   it('запрещает кэширование ответа', async () => {
@@ -520,7 +531,9 @@ describe('Пользователи', () => {
       email: 'james@example.com',
       balance: '0',
     })
-    expectStartingAssets(response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets)
+    expectStartingAssets(
+      response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets,
+    )
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.body).not.toContain('demo')
   })
@@ -779,7 +792,7 @@ describe('Кабинет администратора', () => {
     const ok = await app.inject({
       method: 'POST',
       url: '/v1/admin/auth',
-      payload: { pin: '9100' },
+      payload: { pin: '3100' },
     })
     const denied = await app.inject({
       method: 'POST',
@@ -804,7 +817,7 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/admin/users',
-      headers: { 'x-admin-pin': '9100' },
+      headers: { 'x-admin-pin': '3100' },
     })
 
     expect(response.statusCode).toBe(200)
@@ -819,7 +832,7 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'PATCH',
       url: `/v1/admin/users/${id}`,
-      headers: { 'x-admin-pin': '9100' },
+      headers: { 'x-admin-pin': '3100' },
       payload: {
         balance: '42.5',
         wallets: [{ key, value: '2500' }],
@@ -837,10 +850,177 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'DELETE',
       url: `/v1/admin/users/${id}`,
-      headers: { 'x-admin-pin': '9100' },
+      headers: { 'x-admin-pin': '3100' },
     })
 
     expect(response.statusCode).toBe(204)
     expect(users.records).toHaveLength(0)
   })
+
+  it('сообщает, что отправка писем не настроена', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/email',
+      headers: { 'x-admin-pin': '3100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ configured: boolean }>().configured).toBe(false)
+  })
+
+  it('не отправляет письмо без PIN', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      payload: {
+        to: 'recipient@example.com',
+        from: 'custom123@etwalletx.com',
+        subject: 'Welcome!',
+        html: '<h1>Hello</h1>',
+        text: 'Hello',
+      },
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('не отправляет письмо без ключей Cloudflare', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      headers: { 'x-admin-pin': '3100' },
+      payload: {
+        to: 'recipient@example.com',
+        from: 'custom123@etwalletx.com',
+        subject: 'Welcome!',
+        html: '<h1>Hello</h1>',
+        text: 'Hello',
+      },
+    })
+
+    expect(response.statusCode).toBe(503)
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('email_unavailable')
+  })
 })
+
+describe('Отправка писем кабинета', () => {
+  let mail: RecordingEmailService
+  let mailApp: FastifyInstance
+
+  beforeEach(async () => {
+    mail = new RecordingEmailService()
+    mailApp = await buildApp({
+      config: CONFIG,
+      settings,
+      users,
+      email: mail,
+    })
+  })
+
+  afterEach(async () => {
+    await mailApp.close()
+  })
+
+  it('отправляет письмо через службу', async () => {
+    const response = await mailApp.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      headers: { 'x-admin-pin': '3100' },
+      payload: {
+        to: 'recipient@example.com',
+        from: 'custom123@etwalletx.com',
+        subject: 'Welcome!',
+        html: '<h1>Hello</h1>',
+        text: 'Hello',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ delivered: string[] }>().delivered).toEqual(['recipient@example.com'])
+    expect(mail.sent).toEqual([
+      {
+        to: 'recipient@example.com',
+        from: 'custom123@etwalletx.com',
+        subject: 'Welcome!',
+        html: '<h1>Hello</h1>',
+        text: 'Hello',
+      },
+    ])
+  })
+
+  it('пропускает длинный текст письма мимо охранника секретов', async () => {
+    const response = await mailApp.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      headers: { 'x-admin-pin': '3100' },
+      payload: {
+        to: 'recipient@example.com',
+        from: 'custom123@etwalletx.com',
+        subject: 'Welcome!',
+        html: '<p>test test test test test test test test test test test junk</p>',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(mail.sent).toHaveLength(1)
+  })
+
+  it('отвергает неверный адрес отправителя', async () => {
+    const response = await mailApp.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      headers: { 'x-admin-pin': '3100' },
+      payload: {
+        to: 'recipient@example.com',
+        from: 'not-an-email',
+        subject: 'Welcome!',
+        html: '<p>Hello</p>',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(mail.sent).toHaveLength(0)
+  })
+
+  it('передаёт отказ службы кабинету', async () => {
+    mail.fail = new EmailUnavailableError(
+      'Email sending is not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.',
+    )
+
+    const response = await mailApp.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      headers: { 'x-admin-pin': '3100' },
+      payload: {
+        to: 'recipient@example.com',
+        from: 'custom123@etwalletx.com',
+        subject: 'Welcome!',
+        html: '<p>Hello</p>',
+      },
+    })
+
+    expect(response.statusCode).toBe(503)
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('email_unavailable')
+  })
+})
+
+class RecordingEmailService implements IEmailService {
+  readonly sent: IEmailMessage[] = []
+  fail: Error | null = null
+
+  readonly isConfigured = true
+
+  send(message: IEmailMessage): Promise<IEmailSendResult> {
+    if (this.fail !== null) {
+      return Promise.reject(this.fail)
+    }
+
+    this.sent.push(message)
+
+    return Promise.resolve({
+      delivered: [message.to],
+      queued: [],
+      permanentBounces: [],
+    })
+  }
+}

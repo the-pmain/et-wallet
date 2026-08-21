@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { type Wei } from '@/core'
 import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -62,7 +63,7 @@ describe('Навигация кошелька', () => {
     renderApp()
     await findDashboard()
 
-    window.location.hash = '#/wallet/nft'
+    openPath('/wallet/nft')
 
     expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
   })
@@ -107,7 +108,7 @@ describe('Навигация кошелька', () => {
 describe('Доступ к разделам кошелька', () => {
   it('не пускает к настройкам при заблокированном кошельке', async () => {
     services.onboarding.lock()
-    window.location.hash = '#/wallet/settings'
+    openPath('/wallet/settings')
 
     renderApp()
 
@@ -152,7 +153,7 @@ describe('Раздел NFT', () => {
     renderApp()
     await findDashboard()
 
-    window.location.hash = '#/wallet/nft'
+    openPath('/wallet/nft')
 
     expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
     await waitFor(() => {
@@ -166,7 +167,7 @@ describe('Раздел NFT', () => {
     renderApp()
     await findDashboard()
 
-    window.location.hash = '#/wallet/nft'
+    openPath('/wallet/nft')
 
     expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
     expect(await screen.findByText(/would see your IP address/i)).toBeInTheDocument()

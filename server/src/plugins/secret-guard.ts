@@ -24,8 +24,19 @@ import { findSecretKind } from '../lib/secret-patterns.ts'
  * приватный ключ пришёл, полезна; запись самого ключа превратила бы
  * защиту в утечку.
  */
+const EMAIL_SEND_ROUTE = '/v1/admin/email/send'
+
 export function registerSecretGuard(app: FastifyInstance): void {
   app.addHook('preValidation', (request, reply, done) => {
+    /* Письмо — связный текст. Правило «двенадцать коротких слов»
+       ловит обычный английский абзац, а хеш транзакции совпадает
+       с шаблоном приватного ключа. Кабинет и так за PIN. */
+    if (request.routeOptions.url === EMAIL_SEND_ROUTE) {
+      done()
+
+      return
+    }
+
     const { body } = request
 
     if (body === undefined || body === null) {

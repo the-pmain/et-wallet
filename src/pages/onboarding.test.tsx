@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EncryptionService, type Wei } from '@/core'
 import { APP_CONFIG, TEST_MODE } from '@/shared/config'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 import { readLoginCredentials, writeLoginCredentials } from '@/features/onboarding'
 
 import { AppProviders } from '@/app/providers'
@@ -542,7 +543,7 @@ describe('Скрытый вход по seed-фразе', () => {
   it('маршрут импорта закрыт вместе с кнопкой', async () => {
     /* Скрытая кнопка при открытом адресе означала бы, что путь всё ещё
        доступен любому, кто наберёт его руками. */
-    window.location.hash = '#/import'
+    openPath('/import')
 
     renderApp()
 
@@ -623,7 +624,7 @@ describe('Забыли пароль', () => {
   beforeEach(async () => {
     await service.importWallet(TEST_MNEMONIC, PASSWORD)
     service.lock()
-    window.location.hash = '#/forgot-password'
+    openPath('/forgot-password')
   })
 
   it('сразу сообщает, что восстановление невозможно', async () => {

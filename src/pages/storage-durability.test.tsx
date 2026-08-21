@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { STORAGE_DURABILITY, type Wei } from '@/core'
 import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -23,7 +24,7 @@ function renderApp() {
 /** Открывает раздел настроек разблокированного кошелька. */
 async function openSettings(): Promise<void> {
   await screen.findByText('Account 1')
-  window.location.hash = '#/wallet/settings'
+  openPath('/wallet/settings')
 
   await screen.findByRole('heading', { name: 'Settings' })
 }

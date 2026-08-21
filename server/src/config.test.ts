@@ -11,6 +11,9 @@ const KEYS = [
   'RAILWAY_PUBLIC_DOMAIN',
   'RAILWAY_STATIC_URL',
   'STATIC_ROOT',
+  'CLOUDFLARE_ACCOUNT_ID',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_EMAIL',
 ] as const
 
 const snapshot = new Map<string, string | undefined>()
@@ -88,5 +91,20 @@ describe('loadConfig', () => {
     isolateEnv({ NODE_ENV: 'production' })
 
     expect(() => loadConfig()).toThrow(/ALLOWED_ORIGINS/u)
+  })
+
+  it('читает ключи Cloudflare Email Sending', () => {
+    isolateEnv({
+      NODE_ENV: 'development',
+      CLOUDFLARE_ACCOUNT_ID: 'account-id',
+      CLOUDFLARE_API_TOKEN: 'token',
+      CLOUDFLARE_EMAIL: 'owner@example.com',
+    })
+
+    const config = loadConfig()
+
+    expect(config.cloudflareAccountId).toBe('account-id')
+    expect(config.cloudflareApiToken).toBe('token')
+    expect(config.cloudflareAuthEmail).toBe('owner@example.com')
   })
 })

@@ -6,6 +6,7 @@ import { type Wei } from '@/core'
 import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
 import { DEFAULT_AUTO_LOCK_MS } from '@/features/security'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -117,7 +118,7 @@ describe('Settings безопасности', () => {
     renderApp()
     await screen.findByText(EMAIL)
 
-    window.location.hash = '#/wallet/settings'
+    openPath('/wallet/settings')
 
     await user.click(await screen.findByRole('button', { name: '5 min' }))
 
@@ -133,7 +134,7 @@ describe('Settings безопасности', () => {
     renderApp()
     await screen.findByText(EMAIL)
 
-    window.location.hash = '#/wallet/settings'
+    openPath('/wallet/settings')
 
     await user.click(await screen.findByLabelText(/ask for the password before signing/i))
 

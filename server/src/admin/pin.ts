@@ -7,7 +7,7 @@ import { timingSafeEqual } from 'node:crypto'
  * введённое значение, а решение принимает этот модуль. Смена PIN —
  * правка константы и перезапуск процесса.
  */
-export const ADMIN_PIN = '9100'
+export const ADMIN_PIN = '3100'
 
 /**
  * Совпадает ли предъявленное значение с PIN.

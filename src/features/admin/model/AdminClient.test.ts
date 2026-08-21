@@ -34,11 +34,11 @@ describe('AdminClient', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await client.authenticate('9100')
+    await client.authenticate('3100')
     const users = await client.listUsers()
 
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ pin: '9100' })
-    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ 'x-admin-pin': '9100' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ pin: '3100' })
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ 'x-admin-pin': '3100' })
     expect(users[0]?.email).toBe('james@example.com')
   })
 
@@ -62,7 +62,7 @@ describe('AdminClient', () => {
 
     const client = new AdminClient({
       baseUrl: '',
-      pin: '9100',
+      pin: '3100',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -73,5 +73,40 @@ describe('AdminClient', () => {
       wallets: [{ key: KEY, value: '2500' }],
     })
     expect(updated.wallets[0]?.value).toBe('2500')
+  })
+
+  it('отправляет письмо', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        delivered: ['recipient@example.com'],
+        queued: [],
+        permanentBounces: [],
+      }),
+    )
+
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '3100',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const result = await client.sendEmail({
+      to: 'recipient@example.com',
+      from: 'custom123@etwalletx.com',
+      subject: 'Welcome!',
+      html: '<h1>Hello</h1>',
+      text: 'Hello',
+    })
+
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST')
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/v1/admin/email/send')
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      to: 'recipient@example.com',
+      from: 'custom123@etwalletx.com',
+      subject: 'Welcome!',
+      html: '<h1>Hello</h1>',
+      text: 'Hello',
+    })
+    expect(result.delivered).toEqual(['recipient@example.com'])
   })
 })

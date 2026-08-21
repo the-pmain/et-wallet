@@ -137,6 +137,9 @@ afterEach(() => {
   localStorage.clear()
   appMarketCatalog.reset()
   appFiatRates.reset()
+  /* Иначе следующий тест откроется на `/wallet/nft` после перехода
+     в предыдущем: `BrowserRouter` читает `pathname` при монтировании. */
+  window.history.replaceState(null, '', '/')
 })
 
 /*

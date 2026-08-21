@@ -14,6 +14,7 @@ import {
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
 import { TransactionRepository } from '@/core/transaction/TransactionRepository'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -48,7 +49,7 @@ function renderApp() {
  */
 async function openConnections(): Promise<void> {
   await screen.findByText('Account 1')
-  window.location.hash = '#/wallet/connections'
+  openPath('/wallet/connections')
 
   await screen.findByRole('heading', { name: 'Connections' })
 

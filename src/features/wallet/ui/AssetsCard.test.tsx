@@ -35,7 +35,7 @@ describe('AssetsCard', () => {
     expect(await screen.findByText('Ether')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(
       'href',
-      '#/wallet/assets',
+      '/wallet/assets',
     )
   })
 })

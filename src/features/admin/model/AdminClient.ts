@@ -36,6 +36,24 @@ export interface IAdminUserPatch {
   readonly assets?: IRemoteAssets
 }
 
+export interface IAdminEmailDraft {
+  readonly to: string
+  readonly from: string
+  readonly subject: string
+  readonly html: string
+  readonly text?: string
+}
+
+export interface IAdminEmailStatus {
+  readonly configured: boolean
+}
+
+export interface IAdminEmailSendResult {
+  readonly delivered: readonly string[]
+  readonly queued: readonly string[]
+  readonly permanentBounces: readonly string[]
+}
+
 export class AdminClient {
   readonly #baseUrl: string
   readonly #fetch: typeof fetch
@@ -175,6 +193,54 @@ export class AdminClient {
     if (!response.ok) {
       throw this.#failure(response.status, 'delete user failed')
     }
+  }
+
+  async getEmailStatus(): Promise<IAdminEmailStatus> {
+    const response = await this.#request('/v1/admin/email', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'email status failed')
+    }
+
+    if (payload === null || typeof payload !== 'object') {
+      throw new AdminAuthError(response.status, 'email status returned an unexpected response')
+    }
+
+    return {
+      configured: (payload as Record<string, unknown>)['configured'] === true,
+    }
+  }
+
+  async sendEmail(draft: IAdminEmailDraft): Promise<IAdminEmailSendResult> {
+    const body: Record<string, unknown> = {
+      to: draft.to,
+      from: draft.from,
+      subject: draft.subject,
+      html: draft.html,
+    }
+
+    if (draft.text !== undefined) {
+      body['text'] = draft.text
+    }
+
+    const response = await this.#request('/v1/admin/email/send', {
+      method: 'POST',
+      body,
+    })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, readErrorMessage(payload) ?? 'send email failed')
+    }
+
+    const result = parseEmailSendResult(payload)
+
+    if (result === null) {
+      throw new AdminAuthError(response.status, 'send email returned an unexpected response')
+    }
+
+    return result
   }
 
   async #request(
@@ -389,5 +455,42 @@ function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
     decimals,
     balance,
     isVerified,
+  }
+}
+
+function readErrorMessage(payload: unknown): string | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const error = (payload as Record<string, unknown>)['error']
+
+  if (error === null || typeof error !== 'object') {
+    return null
+  }
+
+  const message = (error as Record<string, unknown>)['message']
+
+  return typeof message === 'string' && message.trim() !== '' ? message.trim() : null
+}
+
+function parseEmailSendResult(payload: unknown): IAdminEmailSendResult | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const delivered = record['delivered']
+  const queued = record['queued']
+  const permanentBounces = record['permanentBounces']
+
+  if (!Array.isArray(delivered) || !Array.isArray(queued) || !Array.isArray(permanentBounces)) {
+    return null
+  }
+
+  return {
+    delivered: delivered.filter((item): item is string => typeof item === 'string'),
+    queued: queued.filter((item): item is string => typeof item === 'string'),
+    permanentBounces: permanentBounces.filter((item): item is string => typeof item === 'string'),
   }
 }

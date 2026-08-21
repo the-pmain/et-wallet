@@ -22,7 +22,7 @@ const FIRST_ADDRESS = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
  * с чистого состояния и разворачивает кошелёк заново.
  */
 async function importWallet(page: Page): Promise<void> {
-  await page.goto('/#/import')
+  await page.goto('/import')
 
   await page.getByLabel('Seed phrase').fill(TEST_MNEMONIC)
   await page.getByLabel('Email').fill(LOGIN_EMAIL)
@@ -60,16 +60,16 @@ test.describe('Сквозной путь: создание и работа ко�
        выглядит исправным: там `import()` разрешается немедленно. */
     await importWallet(page)
 
-    for (const [hash, heading] of [
-      ['#/wallet/activity', 'Activity'],
-      ['#/wallet/assets', 'Assets'],
-      ['#/wallet/portfolio', 'Portfolio'],
-      ['#/wallet/settings', 'Settings'],
-      ['#/wallet/nft', 'NFT'],
-      ['#/wallet/connections', 'Connections'],
-      ['#/wallet/backup', 'Backup'],
+    for (const [path, heading] of [
+      ['/wallet/activity', 'Activity'],
+      ['/wallet/assets', 'Assets'],
+      ['/wallet/portfolio', 'Portfolio'],
+      ['/wallet/settings', 'Settings'],
+      ['/wallet/nft', 'NFT'],
+      ['/wallet/connections', 'Connections'],
+      ['/wallet/backup', 'Backup'],
     ] as const) {
-      await page.goto(`/${hash}`)
+      await page.goto(path)
 
       /* Заголовок первого уровня, а не любой: на экране подключений
          есть карточка «Active connections», и нестрогий поиск
@@ -83,10 +83,10 @@ test.describe('Сквозной путь: создание и работа ко�
        приводить к экрану пароля, а не к содержимому. */
     await importWallet(page)
 
-    await page.goto('/#/wallet/settings')
+    await page.goto('/wallet/settings')
     await page.getByRole('button', { name: 'Lock the wallet' }).click()
 
-    await page.goto('/#/wallet/settings')
+    await page.goto('/wallet/settings')
 
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeHidden()
   })
@@ -152,7 +152,7 @@ test.describe('Сквозной путь: создание и работа ко�
 test.describe('Сквозной путь: отправка', () => {
   test('форма не пускает дальше с непригодным получателем', async ({ page }) => {
     await importWallet(page)
-    await page.goto('/#/wallet/send')
+    await page.goto('/wallet/send')
 
     await page.getByLabel(/Recipient address/).fill('0x123')
     await page.getByLabel(/Amount/).fill('1')
@@ -162,7 +162,7 @@ test.describe('Сквозной путь: отправка', () => {
 
   test('получатель с верным адресом принимается', async ({ page }) => {
     await importWallet(page)
-    await page.goto('/#/wallet/send')
+    await page.goto('/wallet/send')
 
     await page.getByLabel(/Recipient address/).fill(FIRST_ADDRESS)
     await page.getByLabel(/Amount/).fill('0.0001')
@@ -172,7 +172,7 @@ test.describe('Сквозной путь: отправка', () => {
 
   test('выбор актива предлагает нативную валюту', async ({ page }) => {
     await importWallet(page)
-    await page.goto('/#/wallet/send')
+    await page.goto('/wallet/send')
 
     /* Список активов собирается из отслеживаемых токенов, и нативная
        валюта в нём есть всегда: её нельзя убрать. Пустой список означал
@@ -184,7 +184,7 @@ test.describe('Сквозной путь: отправка', () => {
 test.describe('Сквозной путь: резервная копия', () => {
   test('seed-фраза не выдаётся без пароля и отметки', async ({ page }) => {
     await importWallet(page)
-    await page.goto('/#/wallet/backup')
+    await page.goto('/wallet/backup')
 
     await page.getByRole('button', { name: 'Show the seed phrase' }).click()
 
@@ -197,7 +197,7 @@ test.describe('Сквозной путь: резервная копия', () => 
      с обоими. */
   test('фраза выдаётся после отметки и верного пароля', async ({ page }) => {
     await importWallet(page)
-    await page.goto('/#/wallet/backup')
+    await page.goto('/wallet/backup')
 
     await page.getByRole('button', { name: 'Show the seed phrase' }).click()
     await page.getByRole('checkbox').check()
@@ -211,7 +211,7 @@ test.describe('Сквозной путь: резервная копия', () => 
 
   test('неверный пароль фразу не выдаёт', async ({ page }) => {
     await importWallet(page)
-    await page.goto('/#/wallet/backup')
+    await page.goto('/wallet/backup')
 
     await page.getByRole('button', { name: 'Show the seed phrase' }).click()
     await page.getByRole('checkbox').check()

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { type Wei } from '@/core'
 import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -29,7 +30,7 @@ function renderApp() {
 /** Открывает экран резервной копии. */
 async function openBackup(): Promise<void> {
   await screen.findByText(USERNAME)
-  window.location.hash = '#/wallet/backup'
+  openPath('/wallet/backup')
 
   await screen.findByRole('heading', { name: 'Backup' })
 }

@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import { pinMatches } from '../admin/pin.ts'
+import { isEmailAddress } from '../email/address.ts'
+import type { IEmailMessage, IEmailService } from '../email/contracts.ts'
+import { htmlToPlainText, isBlankHtml, wrapPlainTextAsHtml } from '../email/plain-text.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
 import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
 import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
@@ -48,6 +51,19 @@ const PATCH_USER_BODY = {
   },
 } as const
 
+const SEND_EMAIL_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['to', 'from', 'subject'],
+  properties: {
+    to: { type: 'string', minLength: 3, maxLength: 254 },
+    from: { type: 'string', minLength: 3, maxLength: 254 },
+    subject: { type: 'string', minLength: 1, maxLength: 200 },
+    html: { type: 'string', minLength: 1, maxLength: 32_000 },
+    text: { type: 'string', minLength: 1, maxLength: 32_000 },
+  },
+} as const
+
 interface IAuthBody {
   readonly pin: string
 }
@@ -60,11 +76,23 @@ interface IPatchUserBody {
   readonly assets?: Record<string, unknown>
 }
 
+interface ISendEmailBody {
+  readonly to: string
+  readonly from: string
+  readonly subject: string
+  readonly html?: string
+  readonly text?: string
+}
+
 interface IUserIdParams {
   readonly id: string
 }
 
-export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepository): void {
+export function registerAdminRoutes(
+  app: FastifyInstance,
+  users: IUsersRepository,
+  email: IEmailService,
+): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
     { schema: { body: AUTH_BODY } },
@@ -138,6 +166,38 @@ export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepositor
 
     void reply.status(204).header('cache-control', 'no-store')
   })
+
+  app.get('/v1/admin/email', (request, reply) => {
+    requireAdminPin(request)
+
+    void reply.header('cache-control', 'no-store')
+
+    return { configured: email.isConfigured }
+  })
+
+  app.post<{ Body: ISendEmailBody }>(
+    '/v1/admin/email/send',
+    { schema: { body: SEND_EMAIL_BODY } },
+    async (request, reply) => {
+      requireAdminPin(request)
+
+      const message = readSendEmail(request.body)
+
+      if (message === null) {
+        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+      }
+
+      const result = await email.send(message)
+
+      void reply.header('cache-control', 'no-store')
+
+      return {
+        delivered: result.delivered,
+        queued: result.queued,
+        permanentBounces: result.permanentBounces,
+      }
+    },
+  )
 }
 
 function requireAdminPin(request: FastifyRequest): void {
@@ -203,6 +263,32 @@ function readPatch(body: IPatchUserBody): IUpdateUserInput | null {
   }
 
   return patch
+}
+
+function readSendEmail(body: ISendEmailBody): IEmailMessage | null {
+  const to = body.to.trim()
+  const from = body.from.trim()
+  const subject = body.subject.trim()
+
+  if (!isEmailAddress(to) || !isEmailAddress(from) || subject === '') {
+    return null
+  }
+
+  const htmlRaw = body.html?.trim() ?? ''
+  const textRaw = body.text?.trim() ?? ''
+  const html =
+    htmlRaw === '' || isBlankHtml(htmlRaw)
+      ? textRaw === ''
+        ? ''
+        : wrapPlainTextAsHtml(textRaw)
+      : htmlRaw
+  const text = textRaw === '' ? htmlToPlainText(html) : textRaw
+
+  if (text === '' || isBlankHtml(html)) {
+    return null
+  }
+
+  return { to, from, subject, html, text }
 }
 
 function toUserResponse(record: IUserRecord): IUserResponse {
