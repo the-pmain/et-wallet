@@ -204,7 +204,8 @@ describe('Вход в экран аккаунта', () => {
         return (
           !url.includes('api.coingecko.com') &&
           !url.includes('api.coinbase.com') &&
-          !url.includes('frankfurter.app')
+          !url.includes('frankfurter.app') &&
+          !url.includes('frankfurter.dev')
         )
       }),
     ).toHaveLength(0)

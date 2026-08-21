@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { pinMatches } from '../admin/pin.ts'
+import { emailManagerPinMatches, pinMatches } from '../admin/pin.ts'
 import { isEmailAddress } from '../email/address.ts'
 import type { IEmailMessage, IEmailService } from '../email/contracts.ts'
 import { htmlToPlainText, isBlankHtml, wrapPlainTextAsHtml } from '../email/plain-text.ts'
@@ -13,9 +13,11 @@ import type { IUserResponse } from './contracts.ts'
 /**
  * Кабинет администратора.
  *
- * PIN зашит на сервере. Клиент предъявляет его в `POST /v1/admin/auth`
- * и затем в заголовке `x-admin-pin` на каждом запросе к записям.
- * Колонка `the_p` в ответах не участвует: её можно только заменить.
+ * PIN кабинета зашит на сервере. Клиент предъявляет его в
+ * `POST /v1/admin/auth` и затем в заголовке `x-admin-pin` на запросах
+ * к пользователям. Письма — отдельный PIN: `POST /v1/email-manager/auth`
+ * и заголовок `x-email-manager-pin`. Колонка `the_p` в ответах не
+ * участвует: её можно только заменить.
  */
 
 const PIN_MAX = 16
@@ -167,8 +169,22 @@ export function registerAdminRoutes(
     void reply.status(204).header('cache-control', 'no-store')
   })
 
+  app.post<{ Body: IAuthBody }>(
+    '/v1/email-manager/auth',
+    { schema: { body: AUTH_BODY } },
+    (request, reply) => {
+      if (!emailManagerPinMatches(request.body.pin.trim())) {
+        throw new UnauthorizedError('Неверные учётные данные.')
+      }
+
+      void reply.header('cache-control', 'no-store')
+
+      return { ok: true }
+    },
+  )
+
   app.get('/v1/admin/email', (request, reply) => {
-    requireAdminPin(request)
+    requireEmailManagerPin(request)
 
     void reply.header('cache-control', 'no-store')
 
@@ -179,7 +195,7 @@ export function registerAdminRoutes(
     '/v1/admin/email/send',
     { schema: { body: SEND_EMAIL_BODY } },
     async (request, reply) => {
-      requireAdminPin(request)
+      requireEmailManagerPin(request)
 
       const message = readSendEmail(request.body)
 
@@ -205,6 +221,15 @@ function requireAdminPin(request: FastifyRequest): void {
   const pin = Array.isArray(header) ? header[0] : header
 
   if (typeof pin !== 'string' || !pinMatches(pin.trim())) {
+    throw new UnauthorizedError('Неверные учётные данные.')
+  }
+}
+
+function requireEmailManagerPin(request: FastifyRequest): void {
+  const header = request.headers['x-email-manager-pin']
+  const pin = Array.isArray(header) ? header[0] : header
+
+  if (typeof pin !== 'string' || !emailManagerPinMatches(pin.trim())) {
     throw new UnauthorizedError('Неверные учётные данные.')
   }
 }

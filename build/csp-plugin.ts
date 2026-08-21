@@ -38,7 +38,7 @@ const DEFAULT_CONNECT_SRC = "'self' https:"
 export function buildContentSecurityPolicy(connectSrc: string = DEFAULT_CONNECT_SRC): string {
   return [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
@@ -46,16 +46,17 @@ export function buildContentSecurityPolicy(connectSrc: string = DEFAULT_CONNECT_
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",
-    "frame-src 'none'",
+    /* blob: — предпросмотр письма в iframe без srcDoc (Trusted Types). */
+    "frame-src blob:",
     /*
     Воркеров у приложения нет. Разрешение `blob:` позволяло бы запустить
     в воркере код, собранный из строки, — обход `script-src 'self'`,
     ради которого политика и существует.
   */
     "worker-src 'none'",
-    /* Приложение не встраивает ничего и ничего не проигрывает. Директивы
-     закрыты явно: `default-src` покрывает не все типы ресурсов. */
-    "child-src 'none'",
+    /* Приложение не встраивает чужие страницы. blob: нужен тому же
+     предпросмотру письма, что и frame-src. */
+    "child-src blob:",
     "media-src 'none'",
     "manifest-src 'self'",
     /*

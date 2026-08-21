@@ -34,11 +34,11 @@ describe('AdminClient', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await client.authenticate('3100')
+    await client.authenticate('9100')
     const users = await client.listUsers()
 
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ pin: '3100' })
-    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ 'x-admin-pin': '3100' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ pin: '9100' })
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ 'x-admin-pin': '9100' })
     expect(users[0]?.email).toBe('james@example.com')
   })
 
@@ -62,7 +62,7 @@ describe('AdminClient', () => {
 
     const client = new AdminClient({
       baseUrl: '',
-      pin: '3100',
+      pin: '9100',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -87,6 +87,8 @@ describe('AdminClient', () => {
     const client = new AdminClient({
       baseUrl: '',
       pin: '3100',
+      authPath: '/v1/email-manager/auth',
+      pinHeader: 'x-email-manager-pin',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -100,6 +102,9 @@ describe('AdminClient', () => {
 
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST')
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/v1/admin/email/send')
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'x-email-manager-pin': '3100',
+    })
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
       to: 'recipient@example.com',
       from: 'custom123@etwalletx.com',

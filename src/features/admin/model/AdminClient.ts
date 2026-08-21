@@ -12,10 +12,10 @@ const EMPTY_ASSETS: IRemoteAssets = {
 }
 
 /**
- * Клиент кабинета администратора.
+ * Клиент кабинета администратора и менеджера писем.
  *
- * PIN живёт только в заголовке `x-admin-pin`. Сервер сверяет его
- * с зашитым значением; клиент PIN не знает заранее.
+ * PIN живёт только в заголовке (`x-admin-pin` или `x-email-manager-pin`).
+ * Сервер сверяет его с зашитым значением; клиент PIN не знает заранее.
  */
 
 export class AdminAuthError extends Error {
@@ -57,16 +57,24 @@ export interface IAdminEmailSendResult {
 export class AdminClient {
   readonly #baseUrl: string
   readonly #fetch: typeof fetch
+  readonly #authPath: string
+  readonly #pinHeader: string
   #pin: string | null
 
   constructor(options: {
     readonly baseUrl: string
     readonly pin?: string | null
     readonly fetch?: typeof fetch
+    /** Путь сверки PIN. По умолчанию кабинет. */
+    readonly authPath?: string
+    /** Имя заголовка с PIN. По умолчанию кабинет. */
+    readonly pinHeader?: string
   }) {
     this.#baseUrl = options.baseUrl.replace(/\/$/u, '')
     this.#pin = options.pin ?? null
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
+    this.#authPath = options.authPath ?? '/v1/admin/auth'
+    this.#pinHeader = options.pinHeader ?? 'x-admin-pin'
   }
 
   setPin(pin: string): void {
@@ -78,7 +86,7 @@ export class AdminClient {
   }
 
   async authenticate(pin: string): Promise<void> {
-    const response = await this.#request('/v1/admin/auth', {
+    const response = await this.#request(this.#authPath, {
       method: 'POST',
       pin,
       body: { pin },
@@ -255,7 +263,7 @@ export class AdminClient {
     const headers: Record<string, string> = { accept: 'application/json' }
 
     if (pin !== null) {
-      headers['x-admin-pin'] = pin
+      headers[this.#pinHeader] = pin
     }
 
     if (options.body !== undefined) {

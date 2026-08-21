@@ -1,35 +1,36 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import {
-  AdminAuthError,
-  AdminClient,
-  AdminPinForm,
-  AdminSessionContext,
-  clearAdminPin,
-  readAdminPin,
-  writeAdminPin,
-} from '@/features/admin'
+import { AdminAuthError, AdminClient, AdminPinForm, AdminSessionContext } from '@/features/admin'
 
+import {
+  clearEmailManagerPin,
+  readEmailManagerPin,
+  writeEmailManagerPin,
+} from '../model/email-manager-pin'
 import { EmailManagerComposer } from './EmailManagerComposer'
 import { EmailManagerShell } from './EmailManagerShell'
 
-function createAdminClient(): AdminClient {
+function createEmailManagerClient(): AdminClient {
   const configured = import.meta.env.VITE_SERVER_URL?.trim() ?? ''
 
-  return new AdminClient({ baseUrl: configured })
+  return new AdminClient({
+    baseUrl: configured,
+    authPath: '/v1/email-manager/auth',
+    pinHeader: 'x-email-manager-pin',
+  })
 }
 
 /**
- * Страж менеджера писем: PIN на сервере, сессия — в `localStorage`.
+ * Страж менеджера писем: свой PIN, своё поле в `localStorage`.
  *
  * Пока PIN не принят, форма отправки не монтируется.
  */
 export function EmailManagerGate() {
-  const client = useMemo(() => createAdminClient(), [])
-  const [pin, setPin] = useState<string | null>(() => readAdminPin())
+  const client = useMemo(() => createEmailManagerClient(), [])
+  const [pin, setPin] = useState<string | null>(() => readEmailManagerPin())
   const [unlocked, setUnlocked] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isBusy, setBusy] = useState(() => readAdminPin() !== null)
+  const [isBusy, setBusy] = useState(() => readEmailManagerPin() !== null)
 
   useEffect(() => {
     if (pin === null) {
@@ -47,7 +48,7 @@ export function EmailManagerGate() {
           return
         }
 
-        writeAdminPin(pin)
+        writeEmailManagerPin(pin)
         setError(null)
         setUnlocked(true)
       })
@@ -56,7 +57,7 @@ export function EmailManagerGate() {
           return
         }
 
-        clearAdminPin()
+        clearEmailManagerPin()
         client.clearPin()
         setUnlocked(false)
         setPin(null)
@@ -79,7 +80,7 @@ export function EmailManagerGate() {
     () => ({
       client,
       lock: () => {
-        clearAdminPin()
+        clearEmailManagerPin()
         client.clearPin()
         setUnlocked(false)
         setPin(null)

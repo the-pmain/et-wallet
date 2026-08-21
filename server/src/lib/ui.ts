@@ -27,7 +27,7 @@ export const API_CONTENT_SECURITY_POLICY =
 export function pageContentSecurityPolicy(https: boolean): string {
   const directives = [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
@@ -35,9 +35,9 @@ export function pageContentSecurityPolicy(https: boolean): string {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",
-    "frame-src 'none'",
+    "frame-src blob:",
     "worker-src 'none'",
-    "child-src 'none'",
+    "child-src blob:",
     "media-src 'none'",
     "manifest-src 'self'",
     "require-trusted-types-for 'script'",

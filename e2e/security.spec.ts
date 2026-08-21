@@ -16,7 +16,7 @@ const REQUIRED_DIRECTIVES = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
-  "frame-src 'none'",
+  "frame-src blob:",
   "worker-src 'none'",
   "require-trusted-types-for 'script'",
 ]

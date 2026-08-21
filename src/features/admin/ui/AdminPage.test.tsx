@@ -135,12 +135,12 @@ beforeEach(() => {
 
     if (url.endsWith('/v1/admin/auth')) {
       const body = requestJson(init) as { pin?: string }
-      const accepted = body.pin === '3100'
+      const accepted = body.pin === '9100'
 
       return Promise.resolve(jsonResponse(accepted ? 200 : 401, accepted ? { ok: true } : {}))
     }
 
-    if (pin !== '3100') {
+    if (pin !== '9100') {
       return Promise.resolve(jsonResponse(401, {}))
     }
 
@@ -179,14 +179,14 @@ describe('Кабинет администратора', () => {
     renderAdmin()
 
     expect(await screen.findByRole('heading', { name: 'Admin' })).toBeInTheDocument()
-    await user.type(screen.getByLabelText('PIN'), '3100')
+    await user.type(screen.getByLabelText('PIN'), '9100')
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
     expect(await screen.findByText('james@example.com')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Avatar for james@example.com' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
-    expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('3100')
+    expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('9100')
   })
 
   it('не пускает с неверным PIN', async () => {
@@ -202,7 +202,7 @@ describe('Кабинет администратора', () => {
   })
 
   it('остаётся в кабинете по сохранённому PIN', async () => {
-    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '3100')
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
@@ -211,7 +211,7 @@ describe('Кабинет администратора', () => {
 
   it('открывает профиль и меняет значение кошелька', async () => {
     const user = userEvent.setup()
-    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '3100')
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
@@ -233,7 +233,7 @@ describe('Кабинет администратора', () => {
 
   it('сохраняет сумму актива в минимальных единицах с кнопки строки', async () => {
     const user = userEvent.setup()
-    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '3100')
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
@@ -283,7 +283,7 @@ describe('Кабинет администратора', () => {
 
   it('добавляет криптовалюту из меню в шапке Assets', async () => {
     const user = userEvent.setup()
-    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '3100')
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
@@ -326,7 +326,7 @@ describe('Кабинет администратора', () => {
 
   it('ищет пользователя по адресу кошелька', async () => {
     const user = userEvent.setup()
-    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '3100')
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
     expect(await screen.findByText('james@example.com')).toBeInTheDocument()

@@ -76,7 +76,7 @@ function pricePayload(url: string): unknown {
     return { [addr]: { usd, usd_24h_change: 0, last_updated_at: 1 } }
   }
 
-  if (url.includes('frankfurter.app')) {
+  if (url.includes('frankfurter.app') || url.includes('frankfurter.dev')) {
     return { rates: { EUR: 0.92, GBP: 0.78 } }
   }
 
@@ -87,7 +87,8 @@ function isPriceUrl(url: string): boolean {
   return (
     url.includes('api.coingecko.com') ||
     url.includes('api.coinbase.com') ||
-    url.includes('frankfurter.app')
+    url.includes('frankfurter.app') ||
+    url.includes('frankfurter.dev')
   )
 }
 

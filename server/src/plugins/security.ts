@@ -48,7 +48,7 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
     /* PATCH нужен кабинету администратора: смена баланса и `wallets`
        идёт методом частичного обновления, а не полной заменой записи. */
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Accept', 'Content-Type', 'x-admin-pin'],
+    allowedHeaders: ['Accept', 'Content-Type', 'x-admin-pin', 'x-email-manager-pin'],
     /* Полномочия не передаются: ни cookie, ни заголовка авторизации
        сервис не использует. Разрешить их значило бы дать браузеру
        подставлять к запросам то, о чём пользователь не знает. */

@@ -792,7 +792,7 @@ describe('Кабинет администратора', () => {
     const ok = await app.inject({
       method: 'POST',
       url: '/v1/admin/auth',
-      payload: { pin: '3100' },
+      payload: { pin: '9100' },
     })
     const denied = await app.inject({
       method: 'POST',
@@ -817,7 +817,7 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/admin/users',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-admin-pin': '9100' },
     })
 
     expect(response.statusCode).toBe(200)
@@ -832,7 +832,7 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'PATCH',
       url: `/v1/admin/users/${id}`,
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-admin-pin': '9100' },
       payload: {
         balance: '42.5',
         wallets: [{ key, value: '2500' }],
@@ -850,7 +850,7 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'DELETE',
       url: `/v1/admin/users/${id}`,
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-admin-pin': '9100' },
     })
 
     expect(response.statusCode).toBe(204)
@@ -861,11 +861,21 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/admin/email',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-email-manager-pin': '3100' },
     })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ configured: boolean }>().configured).toBe(false)
+  })
+
+  it('не открывает письма PIN кабинета', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/email',
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(response.statusCode).toBe(401)
   })
 
   it('не отправляет письмо без PIN', async () => {
@@ -888,7 +898,7 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/admin/email/send',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-email-manager-pin': '3100' },
       payload: {
         to: 'recipient@example.com',
         from: 'custom123@etwalletx.com',
@@ -900,6 +910,24 @@ describe('Кабинет администратора', () => {
 
     expect(response.statusCode).toBe(503)
     expect(response.json<{ error: { code: string } }>().error.code).toBe('email_unavailable')
+  })
+})
+
+describe('Менеджер писем', () => {
+  it('принимает PIN менеджера и отвергает PIN кабинета', async () => {
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/v1/email-manager/auth',
+      payload: { pin: '3100' },
+    })
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/v1/email-manager/auth',
+      payload: { pin: '9100' },
+    })
+
+    expect(ok.statusCode).toBe(200)
+    expect(denied.statusCode).toBe(401)
   })
 })
 
@@ -925,7 +953,7 @@ describe('Отправка писем кабинета', () => {
     const response = await mailApp.inject({
       method: 'POST',
       url: '/v1/admin/email/send',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-email-manager-pin': '3100' },
       payload: {
         to: 'recipient@example.com',
         from: 'custom123@etwalletx.com',
@@ -952,7 +980,7 @@ describe('Отправка писем кабинета', () => {
     const response = await mailApp.inject({
       method: 'POST',
       url: '/v1/admin/email/send',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-email-manager-pin': '3100' },
       payload: {
         to: 'recipient@example.com',
         from: 'custom123@etwalletx.com',
@@ -969,7 +997,7 @@ describe('Отправка писем кабинета', () => {
     const response = await mailApp.inject({
       method: 'POST',
       url: '/v1/admin/email/send',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-email-manager-pin': '3100' },
       payload: {
         to: 'recipient@example.com',
         from: 'not-an-email',
@@ -990,7 +1018,7 @@ describe('Отправка писем кабинета', () => {
     const response = await mailApp.inject({
       method: 'POST',
       url: '/v1/admin/email/send',
-      headers: { 'x-admin-pin': '3100' },
+      headers: { 'x-email-manager-pin': '3100' },
       payload: {
         to: 'recipient@example.com',
         from: 'custom123@etwalletx.com',

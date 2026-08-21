@@ -16,6 +16,8 @@ import {
  * Предпросмотр зашитого макета и кнопка отправки.
  *
  * Полей нет: отправитель, получатель и тело — константы.
+ * Предпросмотр идёт через `blob:` URL: `srcDoc` ломается на
+ * `require-trusted-types-for 'script'`.
  */
 export function EmailManagerComposer() {
   const { client, lock } = useAdminSession()
@@ -23,6 +25,16 @@ export function EmailManagerComposer() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const url = URL.createObjectURL(new Blob([EMAIL_HTML_TEMPLATE], { type: 'text/html' }))
+    setPreviewUrl(url)
+
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -133,12 +145,14 @@ export function EmailManagerComposer() {
         </Button>
       </div>
 
-      <iframe
-        title="Preview"
-        sandbox=""
-        srcDoc={EMAIL_HTML_TEMPLATE}
-        className="min-h-[640px] w-full rounded-xl border bg-[#0d0b18]"
-      />
+      {previewUrl !== null ? (
+        <iframe
+          title="Preview"
+          sandbox=""
+          src={previewUrl}
+          className="min-h-[640px] w-full rounded-xl border bg-[#0d0b18]"
+        />
+      ) : null}
     </div>
   )
 }

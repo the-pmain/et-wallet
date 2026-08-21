@@ -8,10 +8,10 @@ afterEach(() => {
 
 describe('admin-pin', () => {
   it('записывает и читает PIN', () => {
-    writeAdminPin('3100')
+    writeAdminPin('9100')
 
-    expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('3100')
-    expect(readAdminPin()).toBe('3100')
+    expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('9100')
+    expect(readAdminPin()).toBe('9100')
   })
 
   it('отвергает пустую запись', () => {
@@ -20,7 +20,7 @@ describe('admin-pin', () => {
   })
 
   it('стирает запись', () => {
-    writeAdminPin('3100')
+    writeAdminPin('9100')
     clearAdminPin()
     expect(readAdminPin()).toBeNull()
   })

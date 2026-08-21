@@ -8,7 +8,7 @@ import { openPath } from '@/test/open-path'
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
 
-import { ADMIN_PIN_STORAGE_KEY } from '@/features/admin'
+import { EMAIL_MANAGER_PIN_STORAGE_KEY } from '@/features/email-manager'
 
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
@@ -58,10 +58,10 @@ beforeEach(() => {
   fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
     const url = requestUrl(input)
     const headers = new Headers(init?.headers)
-    const pin = headers.get('x-admin-pin')
+    const pin = headers.get('x-email-manager-pin')
     const method = init?.method ?? 'GET'
 
-    if (url.endsWith('/v1/admin/auth')) {
+    if (url.endsWith('/v1/email-manager/auth')) {
       const body = requestJson(init) as { pin?: string }
       const accepted = body.pin === '3100'
 
@@ -107,7 +107,8 @@ describe('Менеджер писем', () => {
 
     expect(await screen.findByRole('button', { name: 'Send' })).toBeInTheDocument()
     expect(screen.getByTitle('Preview')).toBeInTheDocument()
-    expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('3100')
+    expect(localStorage.getItem(EMAIL_MANAGER_PIN_STORAGE_KEY)).toBe('3100')
+    expect(localStorage.getItem('etwallet.admin-pin')).toBeNull()
   })
 
   it('не пускает с неверным PIN', async () => {
@@ -115,23 +116,20 @@ describe('Менеджер писем', () => {
     renderEmailManager()
 
     await screen.findByLabelText('PIN')
-    await user.type(screen.getByLabelText('PIN'), '0000')
+    await user.type(screen.getByLabelText('PIN'), '9100')
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByText('That PIN is not accepted.')).toBeInTheDocument()
-    expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBeNull()
+    expect(localStorage.getItem(EMAIL_MANAGER_PIN_STORAGE_KEY)).toBeNull()
   })
 
   it('показывает макет и отправляет с зашитого адреса', async () => {
     const user = userEvent.setup()
-    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '3100')
+    localStorage.setItem(EMAIL_MANAGER_PIN_STORAGE_KEY, '3100')
     renderEmailManager()
 
     expect(await screen.findByRole('button', { name: 'Send' })).toBeInTheDocument()
-    expect(screen.getByTitle('Preview')).toHaveAttribute(
-      'srcdoc',
-      expect.stringContaining('[Your headline goes here]'),
-    )
+    expect(screen.getByTitle('Preview')).toHaveAttribute('src', expect.stringMatching(/^blob:/u))
 
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
@@ -144,6 +142,7 @@ describe('Менеджер писем', () => {
       return url.endsWith('/v1/admin/email/send') && method === 'POST'
     })
 
+    expect(new Headers(send?.[1]?.headers).get('x-email-manager-pin')).toBe('3100')
     expect(requestJson(send?.[1])).toMatchObject({
       to: 'support@etwalletx.com',
       from: 'support@etwalletx.com',

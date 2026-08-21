@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = 'https://api.frankfurter.app'
+const DEFAULT_BASE_URL = 'https://api.frankfurter.dev'
 const DEFAULT_TIMEOUT_MS = 10_000
 
 /** Курсы к доллару. */
