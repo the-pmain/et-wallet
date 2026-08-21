@@ -45,7 +45,10 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
       config.allowedOrigins.length === 0 && config.mode !== RUNTIME_MODE.Production
         ? true
         : [...config.allowedOrigins],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    /* PATCH нужен кабинету администратора: смена баланса и `wallets`
+       идёт методом частичного обновления, а не полной заменой записи. */
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Accept', 'Content-Type', 'x-admin-pin'],
     /* Полномочия не передаются: ни cookie, ни заголовка авторизации
        сервис не использует. Разрешить их значило бы дать браузеру
        подставлять к запросам то, о чём пользователь не знает. */

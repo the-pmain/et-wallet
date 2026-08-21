@@ -44,12 +44,24 @@ export interface IAddWalletInput {
   readonly value: string
 }
 
+/** Частичное обновление записи администратором. Непереданные поля не трогаются. */
+export interface IUpdateUserInput {
+  readonly email?: string | null
+  readonly balance?: string | null
+  readonly theP?: string
+  readonly wallets?: IUserWallets
+  readonly assets?: IUserAssets
+}
+
 /** Хранилище пользователей. */
 export interface IUsersRepository {
   create(input: ICreateUserInput): Promise<IUserRecord>
 
   /** Ищет запись по первичному ключу. `null` — строки нет. */
   findById(id: string): Promise<IUserRecord | null>
+
+  /** Все записи. Для кабинета администратора. */
+  list(): Promise<readonly IUserRecord[]>
 
   /**
    * Ищет запись, у которой совпали и `email`, и `the_p`.
@@ -65,6 +77,16 @@ export interface IUsersRepository {
    * `null` — совпадения нет. Повтор того же ключа заменяет значение.
    */
   addWallet(input: IAddWalletInput): Promise<IUserRecord | null>
+
+  /**
+   * Меняет поля записи по id.
+   *
+   * `null` — строки нет. `the_p` в ответ по-прежнему не входит.
+   */
+  update(id: string, patch: IUpdateUserInput): Promise<IUserRecord | null>
+
+  /** Удаляет запись. `false` — строки не было. */
+  remove(id: string): Promise<boolean>
 }
 
 export const USERS_STORE_KIND = {

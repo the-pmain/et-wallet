@@ -5,6 +5,7 @@ import { ONBOARDING_STATE, useDirectorySession, useOnboardingState } from '@/fea
 /* Экраны входа импортируются модулями, а не через `@/pages`: сборный
    файл статически тянет за собой все страницы сразу и обесценил бы
    отложенную загрузку остальных. */
+import { AdminPage } from '@/pages/AdminPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { UnlockWalletPage } from '@/pages/UnlockWalletPage'
@@ -26,6 +27,8 @@ import {
   SendPage,
   SettingsPage,
   TrustPage,
+  AdminUsersPage,
+  AdminUserPage,
 } from './lazy-pages'
 import { ROUTE } from './routes'
 
@@ -175,6 +178,19 @@ export function AppRouter() {
           <Route path={ROUTE.Unlock} element={<UnlockWalletPage />} />
           <Route path={ROUTE.Trust} element={<TrustPage />} />
           <Route path={ROUTE.ForgotPassword} element={<ForgotPasswordPage />} />
+        </Route>
+
+        <Route path={ROUTE.Admin} element={<AdminPage />}>
+          <Route
+            element={
+              <Suspense fallback={<SectionFallback />}>
+                <Outlet />
+              </Suspense>
+            }
+          >
+            <Route index element={<AdminUsersPage />} />
+            <Route path="users/:userId" element={<AdminUserPage />} />
+          </Route>
         </Route>
 
         <Route path={ROUTE.Dashboard} element={<UnlockedOnly />}>

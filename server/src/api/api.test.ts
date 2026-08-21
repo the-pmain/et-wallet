@@ -297,9 +297,9 @@ describe('Пользователи', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json<{ email: string; balance: string; wallets: Record<string, string> }>().email).toBe(
-      'james@example.com',
-    )
+    expect(
+      response.json<{ email: string; balance: string; wallets: Record<string, string> }>().email,
+    ).toBe('james@example.com')
     expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([])
     expect(response.json<{ assets: unknown }>().assets).toEqual(MOCK_USER_ASSETS)
     expect(response.json<{ the_p?: unknown; password?: unknown }>()).not.toHaveProperty('the_p')
@@ -325,7 +325,7 @@ describe('Пользователи', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json<{ wallets: typeof entry[] }>().wallets).toEqual([entry])
+    expect(response.json<{ wallets: (typeof entry)[] }>().wallets).toEqual([entry])
     expect(users.records[0]?.wallets).toEqual([entry])
   })
 
@@ -628,5 +628,110 @@ describe('Общее поведение сервиса', () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
 
     expect(response.headers['x-content-type-options']).toBe('nosniff')
+  })
+
+  it('разрешает CORS-предзапрос PATCH с кабинета на Vite', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/v1/admin/users/51',
+      headers: {
+        origin: 'http://localhost:3000',
+        'access-control-request-method': 'PATCH',
+        'access-control-request-headers': 'content-type,x-admin-pin',
+      },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(String(response.headers['access-control-allow-methods'])).toContain('PATCH')
+    expect(String(response.headers['access-control-allow-headers']).toLowerCase()).toContain(
+      'x-admin-pin',
+    )
+  })
+})
+
+describe('Кабинет администратора', () => {
+  const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+
+  async function seedUser(): Promise<string> {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        wallets: { key, value: '0' },
+      },
+    })
+
+    return response.json<{ id: string }>().id
+  }
+
+  it('принимает зашитый PIN и отвергает другой', async () => {
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/auth',
+      payload: { pin: '9100' },
+    })
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/auth',
+      payload: { pin: '0000' },
+    })
+
+    expect(ok.statusCode).toBe(200)
+    expect(ok.json<{ ok: boolean }>().ok).toBe(true)
+    expect(denied.statusCode).toBe(401)
+  })
+
+  it('не отдаёт список без PIN', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/admin/users' })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('отдаёт всех пользователей по PIN', async () => {
+    await seedUser()
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/users',
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ users: { email: string }[] }>().users[0]?.email).toBe(
+      'james@example.com',
+    )
+    expect(response.json<{ users: { the_p?: unknown }[] }>().users[0]).not.toHaveProperty('the_p')
+  })
+
+  it('меняет значение кошелька и баланс', async () => {
+    const id = await seedUser()
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/users/${id}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        balance: '42.5',
+        wallets: [{ key, value: '2500' }],
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ balance: string }>().balance).toBe('42.5')
+    expect(response.json<{ wallets: { value: string }[] }>().wallets[0]?.value).toBe('2500')
+    expect(users.records[0]?.wallets[0]?.value).toBe('2500')
+  })
+
+  it('удаляет пользователя', async () => {
+    const id = await seedUser()
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/v1/admin/users/${id}`,
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(users.records).toHaveLength(0)
   })
 })

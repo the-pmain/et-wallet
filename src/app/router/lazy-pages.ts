@@ -67,3 +67,11 @@ export const ApprovalsPage = lazy(async () => ({
 export const TrustPage = lazy(async () => ({
   default: (await import('@/pages/TrustPage')).TrustPage,
 }))
+
+export const AdminUsersPage = lazy(async () => ({
+  default: (await import('@/pages/AdminUsersPage')).AdminUsersPage,
+}))
+
+export const AdminUserPage = lazy(async () => ({
+  default: (await import('@/pages/AdminUserPage')).AdminUserPage,
+}))

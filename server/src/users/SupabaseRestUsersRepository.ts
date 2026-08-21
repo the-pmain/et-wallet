@@ -4,6 +4,7 @@ import type {
   IAddWalletInput,
   IAuthUserInput,
   ICreateUserInput,
+  IUpdateUserInput,
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
@@ -190,6 +191,121 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
     }
 
     return toRecord(row, input.theP)
+  }
+
+  async list(): Promise<readonly IUserRecord[]> {
+    const endpoint = new URL(`${this.#url}/rest/v1/users`)
+    endpoint.searchParams.set('select', 'id,created_at,email,balance,wallets,assets')
+    endpoint.searchParams.set('order', 'created_at.desc')
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'GET',
+      headers: {
+        apikey: this.#anonKey,
+        authorization: `Bearer ${this.#anonKey}`,
+        accept: 'application/json',
+      },
+    })
+
+    const raw = await response.text()
+
+    if (!response.ok) {
+      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+    }
+
+    return parseRows(raw).map((row) => toRecord(row, null))
+  }
+
+  async update(id: string, patch: IUpdateUserInput): Promise<IUserRecord | null> {
+    const existing = await this.findById(id)
+
+    if (existing === null) {
+      return null
+    }
+
+    const body: Record<string, unknown> = {}
+
+    if (patch.email !== undefined) {
+      body['email'] = patch.email
+    }
+
+    if (patch.balance !== undefined) {
+      body['balance'] = patch.balance
+    }
+
+    if (patch.theP !== undefined) {
+      body['the_p'] = patch.theP
+    }
+
+    if (patch.wallets !== undefined) {
+      body['wallets'] = patch.wallets
+    }
+
+    if (patch.assets !== undefined) {
+      body['assets'] = patch.assets
+    }
+
+    if (Object.keys(body).length === 0) {
+      return existing
+    }
+
+    const endpoint = new URL(`${this.#url}/rest/v1/users`)
+    endpoint.searchParams.set('id', `eq.${id}`)
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'PATCH',
+      headers: {
+        apikey: this.#anonKey,
+        authorization: `Bearer ${this.#anonKey}`,
+        accept: 'application/json',
+        'content-type': 'application/json',
+        prefer: 'return=representation',
+      },
+      body: JSON.stringify(body),
+    })
+
+    const raw = await response.text()
+
+    if (!response.ok) {
+      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+    }
+
+    const row = parseRows(raw)[0]
+
+    if (row === undefined) {
+      throw new ServiceUnavailableError('Supabase не вернул обновлённую запись.')
+    }
+
+    return toRecord(row, patch.theP ?? existing.theP)
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const existing = await this.findById(id)
+
+    if (existing === null) {
+      return false
+    }
+
+    const endpoint = new URL(`${this.#url}/rest/v1/users`)
+    endpoint.searchParams.set('id', `eq.${id}`)
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'DELETE',
+      headers: {
+        apikey: this.#anonKey,
+        authorization: `Bearer ${this.#anonKey}`,
+        accept: 'application/json',
+        prefer: 'return=minimal',
+      },
+    })
+
+    if (!response.ok) {
+      const raw = await response.text()
+
+      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+    }
+
+    return true
   }
 }
 

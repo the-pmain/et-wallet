@@ -1,5 +1,6 @@
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 
+import { registerAdminRoutes } from './api/admin.routes.ts'
 import { registerCatalogRoutes } from './api/catalog.routes.ts'
 import { registerNotificationRoutes } from './api/notifications.routes.ts'
 import { registerSettingsRoutes } from './api/settings.routes.ts'
@@ -164,17 +165,14 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
+  registerAdminRoutes(app, users)
 
   if (config.staticRoot !== null) {
     await registerUi(app, config.staticRoot)
   }
 
   app.setNotFoundHandler((request, reply) => {
-    if (
-      config.staticRoot !== null &&
-      request.method === 'GET' &&
-      !isApiUrl(request.url)
-    ) {
+    if (config.staticRoot !== null && request.method === 'GET' && !isApiUrl(request.url)) {
       void sendWalletIndex(config.staticRoot, request, reply)
 
       return

@@ -85,4 +85,47 @@ describe('MemoryUsersRepository', () => {
       }),
     ).toBeNull()
   })
+
+  it('отдаёт все записи списком', async () => {
+    const users = new MemoryUsersRepository()
+
+    await users.create({ email: 'james@example.com', balance: '1', theP: 'a' })
+    await users.create({ email: 'maria@example.com', balance: '2', theP: 'b' })
+
+    const listed = await users.list()
+
+    expect(listed.map((entry) => entry.email)).toEqual(['james@example.com', 'maria@example.com'])
+  })
+
+  it('меняет баланс и значение кошелька по id', async () => {
+    const users = new MemoryUsersRepository()
+    const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+
+    await users.create({
+      email: 'james@example.com',
+      balance: '0',
+      theP: 'demo',
+      wallets: [{ key, value: '0' }],
+    })
+
+    const updated = await users.update('1', {
+      balance: '12.5',
+      wallets: [{ key, value: '2500' }],
+    })
+
+    expect(updated?.balance).toBe('12.5')
+    expect(updated?.wallets).toEqual([{ key, value: '2500' }])
+    expect(updated?.email).toBe('james@example.com')
+    expect(await users.update('99', { balance: '1' })).toBeNull()
+  })
+
+  it('удаляет запись по id', async () => {
+    const users = new MemoryUsersRepository()
+
+    await users.create({ email: 'james@example.com', balance: '0', theP: 'demo' })
+
+    expect(await users.remove('1')).toBe(true)
+    expect(await users.list()).toEqual([])
+    expect(await users.remove('1')).toBe(false)
+  })
 })

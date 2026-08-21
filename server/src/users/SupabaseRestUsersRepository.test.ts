@@ -242,4 +242,119 @@ describe('SupabaseRestUsersRepository', () => {
       users.create({ email: 'james@example.com', balance: '0', theP: 'demo' }),
     ).rejects.toBeInstanceOf(ServiceUnavailableError)
   })
+
+  it('читает все записи без колонки the_p', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify([
+            {
+              id: 7,
+              created_at: '2026-08-19T12:00:00.000Z',
+              email: 'james@example.com',
+              balance: '12.5',
+              wallets: [],
+            },
+          ]),
+        ),
+    })
+
+    const users = new SupabaseRestUsersRepository({
+      supabaseUrl: 'https://example.supabase.co',
+      anonKey: 'anon',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const listed = await users.list()
+    const requested = String(fetchMock.mock.calls[0]?.[0])
+
+    expect(requested).toContain('/rest/v1/users')
+    expect(requested).toContain('order=created_at.desc')
+    expect(requested).not.toContain('the_p')
+    expect(listed).toHaveLength(1)
+    expect(listed[0]?.email).toBe('james@example.com')
+  })
+
+  it('меняет wallets по id', async () => {
+    const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([
+              {
+                id: 7,
+                created_at: '2026-08-19T12:00:00.000Z',
+                email: 'james@example.com',
+                balance: '0',
+                wallets: [{ key, value: '0' }],
+              },
+            ]),
+          ),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([
+              {
+                id: 7,
+                created_at: '2026-08-19T12:00:00.000Z',
+                email: 'james@example.com',
+                balance: '0',
+                wallets: [{ key, value: '2500' }],
+              },
+            ]),
+          ),
+      })
+
+    const users = new SupabaseRestUsersRepository({
+      supabaseUrl: 'https://example.supabase.co',
+      anonKey: 'anon',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const record = await users.update('7', { wallets: [{ key, value: '2500' }] })
+
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('PATCH')
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+      wallets: [{ key, value: '2500' }],
+    })
+    expect(record?.wallets).toEqual([{ key, value: '2500' }])
+  })
+
+  it('удаляет запись по id', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([
+              {
+                id: 7,
+                created_at: '2026-08-19T12:00:00.000Z',
+                email: 'james@example.com',
+                balance: '0',
+              },
+            ]),
+          ),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(''),
+      })
+
+    const users = new SupabaseRestUsersRepository({
+      supabaseUrl: 'https://example.supabase.co',
+      anonKey: 'anon',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    await expect(users.remove('7')).resolves.toBe(true)
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('DELETE')
+  })
 })

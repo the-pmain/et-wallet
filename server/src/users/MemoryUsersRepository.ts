@@ -2,6 +2,7 @@ import type {
   IAddWalletInput,
   IAuthUserInput,
   ICreateUserInput,
+  IUpdateUserInput,
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
@@ -72,5 +73,43 @@ export class MemoryUsersRepository implements IUsersRepository {
     this.#records[index] = updated
 
     return Promise.resolve(updated)
+  }
+
+  list(): Promise<readonly IUserRecord[]> {
+    return Promise.resolve([...this.#records])
+  }
+
+  update(id: string, patch: IUpdateUserInput): Promise<IUserRecord | null> {
+    const record = this.#records.find((entry) => entry.id === id)
+
+    if (record === undefined) {
+      return Promise.resolve(null)
+    }
+
+    const updated: IUserRecord = {
+      ...record,
+      email: patch.email === undefined ? record.email : patch.email,
+      balance: patch.balance === undefined ? record.balance : patch.balance,
+      theP: patch.theP === undefined ? record.theP : patch.theP,
+      wallets: patch.wallets ?? record.wallets,
+      assets: patch.assets ?? record.assets,
+    }
+    const index = this.#records.indexOf(record)
+
+    this.#records[index] = updated
+
+    return Promise.resolve(updated)
+  }
+
+  remove(id: string): Promise<boolean> {
+    const index = this.#records.findIndex((entry) => entry.id === id)
+
+    if (index < 0) {
+      return Promise.resolve(false)
+    }
+
+    this.#records.splice(index, 1)
+
+    return Promise.resolve(true)
   }
 }

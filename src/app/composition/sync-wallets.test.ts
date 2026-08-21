@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { toAddress } from '@/core/address'
 import { writeLoginCredentials } from '@/features/onboarding'
+import { SESSION_STATE, type IWalletSession, type IWalletSnapshot } from '@/features/wallet'
 import type { IAccount } from '@/core'
 
 import { syncCreatedWalletsToDirectory } from './sync-wallets'
@@ -13,21 +14,67 @@ function account(address: typeof OWNER_A | typeof OWNER_B, name: string): IAccou
   return { address, name } as IAccount
 }
 
-function fakeSession(accounts: readonly IAccount[]) {
+function snapshotOf(accounts: readonly IAccount[]): IWalletSnapshot {
+  return {
+    state: SESSION_STATE.Open,
+    error: null,
+    accounts,
+    activeAccount: accounts[0] ?? null,
+    networks: [],
+    activeNetwork: null,
+    balance: null,
+    balanceError: null,
+    isBalanceLoading: false,
+    transfers: [],
+    historyLimits: null,
+    historyCursor: null,
+    isHistoryLoading: false,
+    isHistoryLoadingMore: false,
+    tokenBalances: [],
+    isTokensLoading: false,
+    nfts: null,
+    nftLimits: null,
+    isNftLoading: false,
+    approvals: null,
+    approvalLimits: null,
+    isApprovalsLoading: false,
+    portfolio: null,
+    arePricesEnabled: false,
+    isPortfolioLoading: false,
+    priceError: null,
+    priceSourceName: '',
+    isTenderlyConfigured: false,
+    isSimulationSourceEnabled: false,
+    simulationSourceName: null,
+    ensNames: new Map(),
+    isEnsSupported: false,
+    rpcEndpoints: [],
+    activeRpcEndpoint: null,
+  }
+}
+
+function fakeSession(accounts: readonly IAccount[]): Pick<
+  IWalletSession,
+  'subscribe' | 'getSnapshot'
+> & {
+  set(next: readonly IAccount[]): void
+} {
   const listeners = new Set<() => void>()
-  let snapshot = { accounts }
+  let snapshot = snapshotOf(accounts)
 
   return {
     subscribe(listener: () => void) {
       listeners.add(listener)
 
-      return () => listeners.delete(listener)
+      return () => {
+        listeners.delete(listener)
+      }
     },
     getSnapshot() {
       return snapshot
     },
     set(next: readonly IAccount[]) {
-      snapshot = { accounts: next }
+      snapshot = snapshotOf(next)
 
       for (const listener of listeners) {
         listener()
