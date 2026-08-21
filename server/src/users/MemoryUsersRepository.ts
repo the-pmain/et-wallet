@@ -1,11 +1,14 @@
 import type {
+  IAddWalletInput,
   IAuthUserInput,
   ICreateUserInput,
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
+import { mockUserAssets } from './assets.ts'
 import { emailsMatch } from './emails.ts'
 import { thePMatches } from './theP.ts'
+import { emptyWallets, mergeWallet } from './wallets.ts'
 
 /**
  * Пользователи в памяти процесса.
@@ -27,6 +30,8 @@ export class MemoryUsersRepository implements IUsersRepository {
       email: input.email,
       balance: input.balance,
       theP: input.theP,
+      wallets: input.wallets ?? emptyWallets(),
+      assets: input.assets ?? mockUserAssets(),
     }
 
     this.#nextId += 1
@@ -47,5 +52,25 @@ export class MemoryUsersRepository implements IUsersRepository {
     )
 
     return Promise.resolve(record ?? null)
+  }
+
+  addWallet(input: IAddWalletInput): Promise<IUserRecord | null> {
+    const record = this.#records.find(
+      (entry) => emailsMatch(entry.email, input.email) && thePMatches(entry.theP, input.theP),
+    )
+
+    if (record === undefined) {
+      return Promise.resolve(null)
+    }
+
+    const updated: IUserRecord = {
+      ...record,
+      wallets: mergeWallet(record.wallets, input.key, input.value),
+    }
+    const index = this.#records.indexOf(record)
+
+    this.#records[index] = updated
+
+    return Promise.resolve(updated)
   }
 }

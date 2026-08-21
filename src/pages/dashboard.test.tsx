@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type Wei } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
+import { writeLoginCredentials } from '@/features/onboarding'
 import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
@@ -47,8 +48,8 @@ describe('Панель: баланс', () => {
     renderApp()
     await findDashboard()
 
-    expect(await screen.findByText('1.5')).toBeInTheDocument()
-    expect(screen.getByText('ETH')).toBeInTheDocument()
+    expect((await screen.findAllByText('1.5')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ETH').length).toBeGreaterThan(0)
   })
 
   it('называет, что показан баланс нативной валюты, и ведёт в портфель', async () => {
@@ -124,13 +125,17 @@ describe('Панель: операции', () => {
     expect(screen.getByRole('link', { name: /all activity/i })).toBeInTheDocument()
   })
 
-  it('ставит таблицу курсов перед недавними операциями', async () => {
+  it('ставит витрину активов и таблицу курсов перед недавними операциями', async () => {
     renderApp()
     await findDashboard()
 
-    expect(
-      await screen.findByRole('heading', { name: 'Cryptocurrency Prices' }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
+    expect(await screen.findByText('Ether')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(
+      'href',
+      '#/wallet/assets',
+    )
+    expect(screen.getByRole('heading', { name: 'Cryptocurrency Prices' })).toBeInTheDocument()
   })
 })
 
@@ -211,5 +216,114 @@ describe('Панель: переход между экранами', () => {
        не у всех экранов, а область есть всегда, и программа чтения
        начинает читать её сверху. */
     expect(document.activeElement).toBe(document.querySelector('main'))
+  })
+})
+
+describe('Панель: кабинет справочника', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    localStorage.clear()
+  })
+
+  it('после создания и после входа показывает фиат, а не эфир', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            id: '7',
+            email: 'james@example.com',
+            balance: '12.5',
+            createdAt: '2026-08-19T12:00:00.000Z',
+          }),
+        ),
+    }) as typeof fetch
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+
+    expect(await screen.findByText('$12.50')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
+    expect(screen.queryByText('1.5')).not.toBeInTheDocument()
+    expect(screen.queryByText('ETH')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Assets' })).toBeInTheDocument()
+    expect(screen.getByText('No assets yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
+    expect(screen.getAllByText('Account 1').length).toBeGreaterThan(0)
+  })
+
+  it('на главном экране показывает токены из users.assets', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            id: '7',
+            email: 'james@example.com',
+            balance: '0',
+            createdAt: '2026-08-19T12:00:00.000Z',
+            assets: {
+              quoteCurrency: 'USD',
+              updatedAt: '2026-08-20T12:00:00.000Z',
+              totalValueUsd: '6700.00',
+              tokens: [
+                {
+                  chainId: '1',
+                  standard: 'native',
+                  address: null,
+                  symbol: 'ETH',
+                  name: 'Ether',
+                  decimals: 18,
+                  balance: '1284700000000000000',
+                  priceUsd: '3284.12',
+                  valueUsd: '4219.11',
+                  change24hPercent: '1.84',
+                  isVerified: true,
+                },
+                {
+                  chainId: '1',
+                  standard: 'ERC-20',
+                  address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+                  symbol: 'USDC',
+                  name: 'USD Coin',
+                  decimals: 6,
+                  balance: '2500000000',
+                  priceUsd: '1.0000',
+                  valueUsd: '2500.00',
+                  change24hPercent: '0.01',
+                  isVerified: true,
+                },
+              ],
+            },
+          }),
+        ),
+    }) as typeof fetch
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+
+    expect(await screen.findByText('$6,700.00')).toBeInTheDocument()
+    expect(screen.getByText('Ether')).toBeInTheDocument()
+    expect(screen.getByText('USD Coin')).toBeInTheDocument()
+    expect(screen.getByText('1.2847')).toBeInTheDocument()
+    expect(screen.getByText('2500')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(
+      'href',
+      '#/wallet/assets',
+    )
   })
 })

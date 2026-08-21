@@ -14,8 +14,11 @@ import {
   CardTitle,
 } from '@/shared/ui'
 import {
+  AssetsCard,
   BalanceCard,
+  FiatBalanceCard,
   MarketPricesCard,
+  parseDisplayAmount,
   QuickActions,
   SESSION_STATE,
   TransferList,
@@ -26,10 +29,12 @@ import {
 /**
  * Главный экран разблокированного кошелька.
  *
- * ОТВЕЧАЕТ НА ДВА ВОПРОСА: сколько у меня и что происходит. Управление
- * аккаунтами, сетями и узлами перенесено в настройки: это изменения
- * устройства кошелька, и им не место на экране, куда пользователь заходит
- * посмотреть баланс.
+ * КАБИНЕТ СПРАВОЧНИКА И ЛОКАЛЬНЫЙ КОШЕЛЁК ДЕЛЯТ ОДИН ЭКРАН. После
+ * создания запись на сервере появляется вместе с открытой сессией
+ * на устройстве. Если смотреть на сессию раньше записи, владелец
+ * видит старую карточку с эфиром — а после входа, когда сессии ещё
+ * нет, ту же сумму в долларах. Порядок обратный: есть запись —
+ * кабинет, и создание с входом совпадают.
  *
  * ОШИБКА ОТКРЫТИЯ СЕССИИ ПОКАЗЫВАЕТСЯ, А НЕ ГЛОТАЕТСЯ. Пустой экран после
  * успешного ввода пароля выглядит как потеря кошелька.
@@ -39,13 +44,8 @@ export function DashboardPage() {
   const onboarding = useOnboarding()
   const directory = useDirectorySession()
   const snapshot = useWalletSnapshot()
-  const { t } = useTranslation()
 
-  if (
-    snapshot.state !== SESSION_STATE.Open &&
-    snapshot.state !== SESSION_STATE.Opening &&
-    directory.user !== null
-  ) {
+  if (directory.user !== null) {
     return <RemoteAccountHome user={directory.user} isRefreshing={directory.isRefreshing} />
   }
 
@@ -98,41 +98,11 @@ export function DashboardPage() {
         action={<QuickActions account={snapshot.activeAccount} />}
       />
 
+      <AssetsCard />
+
       <MarketPricesCard />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">
-            {t('dashboard.recent')}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="flex flex-col gap-2 p-0 sm:p-0">
-          <TransferList
-            transfers={snapshot.transfers.slice(0, RECENT_LIMIT)}
-            network={snapshot.activeNetwork}
-            isLoading={snapshot.isHistoryLoading}
-            emptyDescription={
-              <>
-                No operations were found for the available period. The full list and the limits of
-                the source are in the Activity section.
-              </>
-            }
-            /* Компактнее, чем на экране истории: там пустота — это
-               ответ экрана, а здесь она не должна вытеснять баланс. */
-            emptyClassName="gap-2 py-6"
-          />
-
-          <div className="px-4 pb-4 sm:px-6">
-            <Button asChild variant="ghost" size="sm" className="w-full">
-              <Link to="/wallet/activity">
-                {t('dashboard.allActivity')}
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <RecentActivity />
     </div>
   )
 }
@@ -145,6 +115,15 @@ export function DashboardPage() {
  */
 const RECENT_LIMIT = 5
 
+/** Оценка из витрины `assets`, иначе колонка `balance`. */
+function remotePortfolioUsd(user: IRemoteUser): string {
+  if (user.assets.tokens.length > 0) {
+    return user.assets.totalValueUsd
+  }
+
+  return user.balance ?? '0'
+}
+
 function RemoteAccountHome({
   user,
   isRefreshing,
@@ -152,62 +131,60 @@ function RemoteAccountHome({
   readonly user: IRemoteUser
   readonly isRefreshing: boolean
 }) {
-  const { t } = useTranslation()
+  const snapshot = useWalletSnapshot()
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Card>
-        <CardHeader className="flex-row items-start justify-between gap-4">
-          <CardTitle
-            as="h1"
-            className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-          >
-            {t('dashboard.balance')}
-          </CardTitle>
-        </CardHeader>
+      <FiatBalanceCard
+        amountUsd={parseDisplayAmount(remotePortfolioUsd(user))}
+        isRefreshing={isRefreshing}
+        action={<QuickActions account={snapshot.activeAccount} />}
+      />
 
-        <CardContent className="flex flex-col gap-4" aria-busy={isRefreshing}>
-          <p className="text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl">
-            {user.balance ?? '—'}
-          </p>
-
-          <QuickActions account={null} />
-        </CardContent>
-      </Card>
+      <AssetsCard />
 
       <MarketPricesCard />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-muted-foreground">
-            {t('dashboard.recent')}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="flex flex-col gap-2 p-0 sm:p-0">
-          <TransferList
-            transfers={[]}
-            network={null}
-            isLoading={false}
-            emptyDescription={
-              <>
-                No operations were found for the available period. The full list and the limits of
-                the source are in the Activity section.
-              </>
-            }
-            emptyClassName="gap-2 py-6"
-          />
-
-          <div className="px-4 pb-4 sm:px-6">
-            <Button asChild variant="ghost" size="sm" className="w-full">
-              <Link to="/wallet/activity">
-                {t('dashboard.allActivity')}
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <RecentActivity />
     </div>
+  )
+}
+
+function RecentActivity() {
+  const snapshot = useWalletSnapshot()
+  const { t } = useTranslation()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-medium text-muted-foreground">
+          {t('dashboard.recent')}
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="flex flex-col gap-2 p-0 sm:p-0">
+        <TransferList
+          transfers={snapshot.transfers.slice(0, RECENT_LIMIT)}
+          network={snapshot.activeNetwork}
+          isLoading={snapshot.isHistoryLoading}
+          emptyDescription={
+            <>
+              No operations were found for the available period. The full list and the limits of the
+              source are in the Activity section.
+            </>
+          }
+          emptyClassName="gap-2 py-6"
+        />
+
+        <div className="px-4 pb-4 sm:px-6">
+          <Button asChild variant="ghost" size="sm" className="w-full">
+            <Link to="/wallet/activity">
+              {t('dashboard.allActivity')}
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

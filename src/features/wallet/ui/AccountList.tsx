@@ -35,6 +35,12 @@ interface AccountListProps {
    * это при каждой перерисовке.
    */
   readonly ensNames?: ReadonlyMap<string, string>
+
+  /** Заголовок списка. Без него — «Accounts». */
+  readonly title?: string
+
+  /** Текст, когда список пуст. Без него пустой список молчит. */
+  readonly emptyMessage?: string
 }
 
 /**
@@ -60,6 +66,8 @@ export function AccountList({
   isDiscovering = false,
   isBusy,
   ensNames = EMPTY_ENS_NAMES,
+  title = 'Accounts',
+  emptyMessage,
 }: AccountListProps) {
   return (
     <Card>
@@ -68,7 +76,7 @@ export function AccountList({
           телефона и выталкивали строку за край. На широком экране всё
           возвращается в одну строку. */}
       <CardHeader className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-base font-medium text-muted-foreground">Accounts</CardTitle>
+        <CardTitle className="text-base font-medium text-muted-foreground">{title}</CardTitle>
         {/* Имя действия полное, а не «Добавить»: на экране есть вторая
             кнопка добавления — для RPC-узла. Одинаковые имена неразличимы
             в экранном дикторе и в списке элементов управления. */}
@@ -109,6 +117,10 @@ export function AccountList({
       </CardHeader>
 
       <CardContent>
+        {accounts.length === 0 && emptyMessage !== undefined ? (
+          <p className="px-2 py-3 text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : null}
+
         <ul className="flex flex-col gap-1">
           {accounts.map((account) => {
             const isActive = account.id === activeAccount?.id

@@ -83,6 +83,7 @@ const ENGLISH = {
   'nav.settings': 'Settings',
 
   'dashboard.balance': 'Balance',
+  'dashboard.displayCurrency': 'Display currency',
   /* Свод двух прежних оговорок в одну. Раньше на главном экране стояли
      подряд «Showing the native currency balance…» и «The native currency
      of the network is sent here…» — два абзаца об одном и том же в самом
@@ -132,6 +133,12 @@ const ENGLISH = {
      состоявшееся: незавершённые отправки с кнопками «ускорить»
      и «отменить» — это не история. Имя выбрано по содержанию. */
   'dashboard.allActivity': 'All activity',
+
+  /* Витрина активов на главном: те же строки, что на экране Assets. */
+  'dashboard.assets': 'Assets',
+  'dashboard.allAssets': 'All assets',
+  'dashboard.assetsEmptyTitle': 'No assets yet',
+  'dashboard.assetsEmpty': 'Tracked tokens of this account will appear here.',
 
   /* Публичный рынок, не портфель: запрос не называет адреса владельца. */
   'dashboard.prices': 'Cryptocurrency Prices',

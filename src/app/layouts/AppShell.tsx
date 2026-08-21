@@ -2,7 +2,13 @@ import { ChevronDown, Lock } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
-import { useOnboarding, useDirectorySession } from '@/features/onboarding'
+import {
+  ONBOARDING_STATE,
+  readLoginCredentials,
+  useDirectorySession,
+  useOnboarding,
+  useOnboardingState,
+} from '@/features/onboarding'
 import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
@@ -28,12 +34,35 @@ import { NAVIGATION } from './navigation'
 export function AppShell() {
   const snapshot = useWalletSnapshot()
   const onboarding = useOnboarding()
+  const onboardingState = useOnboardingState()
   const directory = useDirectorySession()
   const location = useLocation()
   const { t } = useTranslation()
   const { autoLock } = useSecurity()
   const directoryUser = directory.user
   const showShellContent = snapshot.state === SESSION_STATE.Open || directoryUser !== null
+
+  /*
+    Вход по почте открывает кабинет, не разблокируя хранилище на
+    устройстве: сохранённая сессия перескакивает экран пароля. Без
+    этого шага у отправки нет аккаунта, и кнопки остаются бессильными.
+    Пароль уже лежит в тех же учётных данных, что открыли кабинет.
+  */
+  useEffect(() => {
+    if (directoryUser === null || onboardingState !== ONBOARDING_STATE.Locked) {
+      return
+    }
+
+    const stored = readLoginCredentials()
+
+    if (stored === null) {
+      return
+    }
+
+    void onboarding.unlock(stored.theP).catch(() => {
+      /* Нет локального хранилища, либо пароль к нему другой. */
+    })
+  }, [directoryUser, onboarding, onboardingState])
 
   /*
     ПЕРЕХОД МЕЖДУ ЭКРАНАМИ ПЕРЕВОДИТ ФОКУС В СОДЕРЖИМОЕ.

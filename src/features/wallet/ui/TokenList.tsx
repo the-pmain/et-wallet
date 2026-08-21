@@ -15,16 +15,12 @@ import { TokenTrustBadge } from './TokenTrustBadge'
 interface TokenListProps {
   readonly tokens: readonly ITokenBalance[]
   readonly isLoading: boolean
-  readonly onRemove: (address: Address) => void
 
   /**
-   * Сеть, в которой действуют контракты списка.
-   *
-   * Нужна знаку монеты: он выдаётся по паре «сеть и адрес», сверенной
-   * со встроенным реестром, а один и тот же адрес в разных сетях —
-   * разные контракты.
+   * Удаление добавленного контракта. Нет обработчика — нет кнопки:
+   * витрина записи пользователя не правится с этого экрана.
    */
-  readonly chainId: ChainId | null
+  readonly onRemove?: (address: Address) => void
 
   /**
    * Сводка портфеля. Отсюда берутся только курсы: оценка считается
@@ -48,13 +44,7 @@ interface TokenListProps {
  * Пометка не мешает пользоваться, но не даёт спутать подделку
  * с нативной валютой сети, чья конфигурация проверена.
  */
-export function TokenList({
-  tokens,
-  isLoading,
-  onRemove,
-  chainId,
-  portfolio = null,
-}: TokenListProps) {
+export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: TokenListProps) {
   /* `aria-busy` по той же причине, что и на карточке баланса: пока
      количество читается, на его месте вращается значок и больше
      ничего — зрячий это видит, слушающий страницу нет. */
@@ -62,13 +52,13 @@ export function TokenList({
     <ul className="divide-y divide-border" aria-busy={isLoading}>
       {tokens.map((entry) => (
         <li
-          key={entry.token.address ?? 'native'}
+          key={`${entry.token.chainId.toString()}:${entry.token.address ?? 'native'}`}
           className="flex items-center gap-3 px-4 py-3.5 sm:px-6"
         >
           <TokenAvatar
             address={entry.token.address}
             symbol={entry.token.symbol}
-            chainId={chainId}
+            chainId={entry.token.chainId}
           />
 
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -126,7 +116,7 @@ export function TokenList({
               <AssetValue
                 balance={entry.balance}
                 decimals={entry.token.decimals}
-                chainId={chainId}
+                chainId={entry.token.chainId}
                 address={entry.token.address}
                 portfolio={portfolio}
               />
@@ -139,7 +129,7 @@ export function TokenList({
                 столбца и существуют табличные цифры, и распорка
                 шириной в кнопку — самый дешёвый способ его сохранить. */}
             <span className="flex size-8 shrink-0 items-center justify-center">
-              {entry.token.address === null ? null : (
+              {entry.token.address === null || onRemove === undefined ? null : (
                 <Button
                   variant="ghost"
                   size="icon"

@@ -1,13 +1,16 @@
 import { ServiceUnavailableError } from '../lib/errors.ts'
 
 import type {
+  IAddWalletInput,
   IAuthUserInput,
   ICreateUserInput,
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
+import { mockUserAssets, parseAssets } from './assets.ts'
 import { emailsMatch } from './emails.ts'
 import { thePMatches } from './theP.ts'
+import { emptyWallets, mergeWallet, parseWallets } from './wallets.ts'
 
 /** Строка, которую возвращает PostgREST. */
 interface IUserRow {
@@ -16,6 +19,8 @@ interface IUserRow {
   readonly email: string | null
   readonly balance: string | null
   readonly the_p?: string | null
+  readonly wallets?: unknown
+  readonly assets?: unknown
 }
 
 /**
@@ -53,6 +58,8 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
         email: input.email,
         balance: input.balance,
         the_p: input.theP,
+        wallets: input.wallets ?? emptyWallets(),
+        assets: input.assets ?? mockUserAssets(),
       }),
     })
 
@@ -74,7 +81,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
   async findById(id: string): Promise<IUserRecord | null> {
     const endpoint = new URL(`${this.#url}/rest/v1/users`)
-    endpoint.searchParams.set('select', 'id,created_at,email,balance')
+    endpoint.searchParams.set('select', 'id,created_at,email,balance,wallets,assets')
     endpoint.searchParams.set('id', `eq.${id}`)
     endpoint.searchParams.set('limit', '1')
 
@@ -110,7 +117,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
    */
   async findByCredentials(input: IAuthUserInput): Promise<IUserRecord | null> {
     const endpoint = new URL(`${this.#url}/rest/v1/users`)
-    endpoint.searchParams.set('select', 'id,created_at,email,balance,the_p')
+    endpoint.searchParams.set('select', 'id,created_at,email,balance,the_p,wallets,assets')
     endpoint.searchParams.set('email', `ilike.${escapeIlike(input.email)}`)
     endpoint.searchParams.set('the_p', `eq.${input.theP}`)
     endpoint.searchParams.set('limit', '1')
@@ -146,6 +153,44 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     return toRecord(row, input.theP)
   }
+
+  async addWallet(input: IAddWalletInput): Promise<IUserRecord | null> {
+    const existing = await this.findByCredentials(input)
+
+    if (existing === null) {
+      return null
+    }
+
+    const wallets = mergeWallet(existing.wallets, input.key, input.value)
+    const endpoint = new URL(`${this.#url}/rest/v1/users`)
+    endpoint.searchParams.set('id', `eq.${existing.id}`)
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'PATCH',
+      headers: {
+        apikey: this.#anonKey,
+        authorization: `Bearer ${this.#anonKey}`,
+        accept: 'application/json',
+        'content-type': 'application/json',
+        prefer: 'return=representation',
+      },
+      body: JSON.stringify({ wallets }),
+    })
+
+    const raw = await response.text()
+
+    if (!response.ok) {
+      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+    }
+
+    const row = parseRows(raw)[0]
+
+    if (row === undefined) {
+      throw new ServiceUnavailableError('Supabase не вернул обновлённую запись.')
+    }
+
+    return toRecord(row, input.theP)
+  }
 }
 
 /** Экранирует символы шаблона `ilike`, чтобы адрес искался буквально. */
@@ -160,6 +205,8 @@ function toRecord(row: IUserRow, fallbackTheP: string | null): IUserRecord {
     email: row.email,
     balance: row.balance,
     theP: row.the_p ?? fallbackTheP,
+    wallets: parseWallets(row.wallets),
+    assets: parseAssets(row.assets),
   }
 }
 

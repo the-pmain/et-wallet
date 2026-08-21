@@ -1,5 +1,15 @@
 export { parseAmount } from './lib/amount-input'
 export {
+  DISPLAY_CURRENCY,
+  DISPLAY_CURRENCIES,
+  USD_ONLY_RATES,
+  convertFromUsd,
+  formatDisplayFiat,
+  parseDisplayAmount,
+  type DisplayCurrency,
+  type IFiatRates,
+} from './lib/display-currency'
+export {
   addressLabel,
   endpointHost,
   formatTimestamp,
@@ -40,9 +50,12 @@ export {
 export { WalletContext, useWallet, useWalletSnapshot } from './model/wallet-context'
 export { WalletSession, type IWalletSessionDependencies } from './model/WalletSession'
 export { AccountAvatar } from './ui/AccountAvatar'
+export { AssetsCard } from './ui/AssetsCard'
 export { AccountList } from './ui/AccountList'
 export { AddNetworkForm } from './ui/AddNetworkForm'
 export { BalanceCard } from './ui/BalanceCard'
+export { FiatBalanceCard } from './ui/FiatBalanceCard'
+export { CurrencySwitch } from './ui/CurrencySwitch'
 export {
   MarketPricesCard,
   MARKET_PREVIEW_COUNT,

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 
 import { ROUTE } from '@/app/router/routes'
-import { DirectorySignInForm, useDirectorySession } from '@/features/onboarding'
+import { DirectorySignInForm, useDirectorySession, useOnboarding } from '@/features/onboarding'
 import { TEST_MODE } from '@/shared/config'
 import { useTranslation } from '@/shared/i18n'
 import {
@@ -24,6 +24,7 @@ import {
 export function WelcomePage() {
   const { t } = useTranslation()
   const session = useDirectorySession()
+  const onboarding = useOnboarding()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
@@ -46,6 +47,13 @@ export function WelcomePage() {
 
     try {
       await session.signIn(username, password)
+
+      try {
+        await onboarding.unlock(password)
+      } catch {
+        /* Локального хранилища может не быть — кабинет открыт по сессии. */
+      }
+
       await navigate(ROUTE.Dashboard, { replace: true })
     } catch {
       setError(t('unlock.failed'))

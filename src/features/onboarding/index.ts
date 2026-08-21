@@ -14,15 +14,25 @@ export {
 export { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './model/contracts'
 export { OnboardingContext, useOnboarding, useOnboardingState } from './model/onboarding-context'
 export { OnboardingService, type IOnboardingServiceDependencies } from './model/OnboardingService'
+export { mapRemoteAssets, type IMappedRemoteAssets } from './lib/map-remote-assets'
 export {
   RemoteUserDirectory,
   RemoteAuthError,
+  INITIAL_WALLET_VALUE,
   type IUserDirectory,
   type IRemoteUser,
+  type IWalletEntry,
+  type IRemoteAssetToken,
+  type IRemoteAssets,
 } from './model/RemoteUserDirectory'
 export { OnboardingProvider } from './ui/OnboardingProvider'
 export { DirectorySignInForm } from './ui/DirectorySignInForm'
 export { DirectorySessionProvider, useDirectorySession } from './model/directory-session'
+export {
+  useDisplayedAssets,
+  type IDisplayedAssets,
+  type ILocalAssetSnapshot,
+} from './model/use-displayed-assets'
 export { PasswordFields } from './ui/PasswordFields'
 export { SeedPhraseConfirmation } from './ui/SeedPhraseConfirmation'
 export { SeedPhraseDisplay } from './ui/SeedPhraseDisplay'

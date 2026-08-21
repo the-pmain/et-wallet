@@ -27,6 +27,8 @@ import { SecuritySettingsRepository } from '@/features/security'
 import { WalletSession, type IWalletSession } from '@/features/wallet'
 import { APP_CONFIG } from '@/shared/config'
 
+import { syncCreatedWalletsToDirectory } from './sync-wallets'
+
 /** Сервисы, живущие всё время работы приложения. */
 export interface IAppServices {
   readonly onboarding: IOnboardingService
@@ -112,6 +114,10 @@ export function createAppServices(): IAppServices {
   const userDirectory = createUserDirectory(logger)
 
   notifyDappsOnWalletChange(session, dappSessions)
+
+  if (userDirectory !== undefined) {
+    syncCreatedWalletsToDirectory(session, userDirectory)
+  }
 
   return {
     onboarding: new OnboardingService({

@@ -4,11 +4,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { FastEncryptionService } from '@/test/doubles'
 
 import { OnboardingService } from './OnboardingService'
-import type { IUserDirectory } from './RemoteUserDirectory'
+import { INITIAL_WALLET_VALUE, type IUserDirectory, type IWalletEntry } from './RemoteUserDirectory'
+import { EMPTY_REMOTE_ASSETS } from './RemoteUserDirectory'
 
 const PASSWORD = 'Korova-7-Luna!'
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+const FIRST_ADDRESS = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
+const FIRST_WALLET: IWalletEntry = { key: FIRST_ADDRESS, value: INITIAL_WALLET_VALUE }
 
 function remoteUser(email: string) {
   return {
@@ -16,10 +19,12 @@ function remoteUser(email: string) {
     email,
     balance: '0',
     createdAt: '2026-08-19T12:00:00.000Z',
+    wallets: [FIRST_WALLET],
+    assets: EMPTY_REMOTE_ASSETS,
   }
 }
 
-function createService(userDirectory?: IUserDirectory) {
+function createService(userDirectory?: Pick<IUserDirectory, 'register'>) {
   const storage = new MemoryStorageService()
   const secureStorage = new SecureStorage(storage, new FastEncryptionService())
 
@@ -30,7 +35,7 @@ function createService(userDirectory?: IUserDirectory) {
 }
 
 describe('OnboardingService: запись пользователя на сервер', () => {
-  it('передаёт почту, нулевой баланс и пароль после создания кошелька', async () => {
+  it('передаёт почту, нулевой баланс, пароль и первый адрес после создания кошелька', async () => {
     const register = vi
       .fn()
       .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
@@ -38,14 +43,21 @@ describe('OnboardingService: запись пользователя на серв
 
     await service.createWallet(service.generateMnemonic(128), PASSWORD, 'james@example.com')
 
-    expect(register).toHaveBeenCalledWith({
-      email: 'james@example.com',
-      balance: '0',
-      theP: PASSWORD,
-    })
+    expect(register).toHaveBeenCalledTimes(1)
+    expect(register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'james@example.com',
+        balance: '0',
+        theP: PASSWORD,
+        wallets: expect.objectContaining({
+          key: expect.stringMatching(/^0x[0-9a-fA-F]{40}$/u),
+          value: INITIAL_WALLET_VALUE,
+        }),
+      }),
+    )
   })
 
-  it('передаёт почту и пароль после импорта', async () => {
+  it('передаёт почту, пароль и первый адрес после импорта', async () => {
     const register = vi
       .fn()
       .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
@@ -57,6 +69,7 @@ describe('OnboardingService: запись пользователя на серв
       email: 'maria@example.com',
       balance: '0',
       theP: PASSWORD,
+      wallets: FIRST_WALLET,
     })
   })
 
@@ -68,11 +81,13 @@ describe('OnboardingService: запись пользователя на серв
 
     await service.createWallet(service.generateMnemonic(128), '123456', 'james@example.com')
 
-    expect(register).toHaveBeenCalledWith({
-      email: 'james@example.com',
-      balance: '0',
-      theP: '123456',
-    })
+    expect(register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'james@example.com',
+        balance: '0',
+        theP: '123456',
+      }),
+    )
     expect(service.getState()).toBe('unlocked')
   })
 
@@ -99,11 +114,13 @@ describe('OnboardingService: запись пользователя на серв
 
     expect(service.getState()).toBe('unlocked')
     expect(register).toHaveBeenCalledTimes(2)
-    expect(register).toHaveBeenLastCalledWith({
-      email: 'maria@example.com',
-      balance: '0',
-      theP: '123456',
-    })
+    expect(register).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        email: 'maria@example.com',
+        balance: '0',
+        theP: '123456',
+      }),
+    )
   })
 
   it('запоминает id созданной записи', async () => {

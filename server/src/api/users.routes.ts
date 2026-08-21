@@ -2,16 +2,29 @@ import type { FastifyInstance } from 'fastify'
 
 import { BadRequestError, UnauthorizedError } from '../lib/errors.ts'
 import type { IUserRecord, IUsersRepository } from '../users/contracts.ts'
-
-import type { IUserResponse } from './contracts.ts'
+import { isWalletKey, readWalletValue, readWalletsPayload } from '../users/wallets.ts'
+import type { IUserResponse, IWalletEntryResponse } from './contracts.ts'
 
 /**
  * Пользователи в таблице `public.users`.
  *
  * Колонки входа: `email` и `the_p`. Поле `username` схема не принимает.
- * `POST /v1/users` — новая строка. `POST /v1/users/auth` — сверка
- * `email` и `the_p`. Запрос не по схеме — 400, вход не выдаётся.
+ * `POST /v1/users` — новая строка, `wallets` — `{ key, value }` или список,
+ * `assets` заполняет сервер витриной портфеля.
+ * `POST /v1/users/auth` — сверка `email` и `the_p`.
+ * `POST /v1/users/wallets` — ещё один `{ key, value }` в уже существующий список.
+ * Запрос не по схеме — 400, вход не выдаётся.
  */
+
+const WALLET_ENTRY_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['key', 'value'],
+  properties: {
+    key: { type: 'string', minLength: 42, maxLength: 42 },
+    value: { type: 'string', minLength: 1, maxLength: 64 },
+  },
+} as const
 
 const CREATE_USER_BODY = {
   type: 'object',
@@ -21,6 +34,9 @@ const CREATE_USER_BODY = {
     email: { type: 'string', minLength: 1, maxLength: 254 },
     balance: { type: 'string', minLength: 1, maxLength: 64 },
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
+    wallets: {
+      oneOf: [WALLET_ENTRY_BODY, { type: 'array', items: WALLET_ENTRY_BODY }],
+    },
   },
 } as const
 
@@ -34,15 +50,35 @@ const AUTH_USER_BODY = {
   },
 } as const
 
+const ADD_WALLET_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['email', 'the_p', 'key', 'value'],
+  properties: {
+    email: { type: 'string', minLength: 1, maxLength: 254 },
+    the_p: { type: 'string', minLength: 1, maxLength: 256 },
+    key: { type: 'string', minLength: 42, maxLength: 42 },
+    value: { type: 'string', minLength: 1, maxLength: 64 },
+  },
+} as const
+
 interface ICreateUserBody {
   readonly email: string
   readonly balance?: string
   readonly the_p: string
+  readonly wallets?: IWalletEntryResponse | readonly IWalletEntryResponse[]
 }
 
 interface IAuthUserBody {
   readonly email: string
   readonly the_p: string
+}
+
+interface IAddWalletBody {
+  readonly email: string
+  readonly the_p: string
+  readonly key: string
+  readonly value: string
 }
 
 export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository): void {
@@ -68,6 +104,43 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
     },
   )
 
+  app.post<{ Body: IAddWalletBody }>(
+    '/v1/users/wallets',
+    { schema: { body: ADD_WALLET_BODY } },
+    async (request, reply) => {
+      const credentials = readCredentials(request.body)
+
+      if (credentials === null) {
+        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+      }
+
+      if (!isWalletKey(request.body.key)) {
+        throw new BadRequestError('invalid_request', 'Ключ должен быть адресом EVM.')
+      }
+
+      const value = readWalletValue(request.body.value)
+
+      if (value === null) {
+        throw new BadRequestError('invalid_request', 'Значение кошелька непригодно.')
+      }
+
+      const record = await users.addWallet({
+        email: credentials.email,
+        theP: credentials.theP,
+        key: request.body.key,
+        value,
+      })
+
+      if (record === null) {
+        throw new UnauthorizedError('Неверные учётные данные.')
+      }
+
+      void reply.header('cache-control', 'no-store')
+
+      return toUserResponse(record)
+    },
+  )
+
   app.post<{ Body: ICreateUserBody }>(
     '/v1/users',
     { schema: { body: CREATE_USER_BODY } },
@@ -78,10 +151,18 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
         throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
       }
 
+      const balance = emptyToNull(request.body.balance) ?? '0'
+      const wallets = readWalletsPayload(request.body.wallets)
+
+      if (wallets === null) {
+        throw new BadRequestError('invalid_request', 'Список кошельков непригоден.')
+      }
+
       const record = await users.create({
         email: credentials.email,
-        balance: emptyToNull(request.body.balance) ?? '0',
+        balance,
         theP: credentials.theP,
+        wallets,
       })
 
       void reply.status(201).header('cache-control', 'no-store')
@@ -106,13 +187,15 @@ function readCredentials(body: { readonly email: string; readonly the_p: string 
   return { email, theP }
 }
 
-/** Публичный снимок записи: колонка `the_p` в ответ не входит. */
+/** Публичный снимок записи: колонка `the_p` не входит. */
 function toUserResponse(record: IUserRecord): IUserResponse {
   return {
     id: record.id,
     email: record.email,
     balance: record.balance,
     createdAt: record.createdAt.toISOString(),
+    wallets: record.wallets,
+    assets: record.assets,
   }
 }
 

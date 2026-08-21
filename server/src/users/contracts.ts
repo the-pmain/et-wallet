@@ -1,9 +1,14 @@
 /**
  * Пользователи в таблице `public.users`.
  *
- * Поля: id, created_at, email, balance, the_p.
- * Создание пишет строку. Вход читает её по `id`.
+ * Поля: id, created_at, email, balance, the_p, wallets, assets.
+ * Создание пишет строку. Вход читает её по почте и `the_p`.
+ * `wallets` — jsonb-список `{ key, value }`: ключ — `0x…`, значение — строка.
+ * `assets` — jsonb-витрина портфеля: список токенов, как в криптокошельке.
  */
+
+import type { IUserAssets } from './assets.ts'
+import type { IUserWallets } from './wallets.ts'
 
 /** Запись, как её отдаёт хранилище. */
 export interface IUserRecord {
@@ -12,6 +17,8 @@ export interface IUserRecord {
   readonly email: string | null
   readonly balance: string | null
   readonly theP: string | null
+  readonly wallets: IUserWallets
+  readonly assets: IUserAssets
 }
 
 /** Поля, которые клиент может задать при создании. */
@@ -19,12 +26,22 @@ export interface ICreateUserInput {
   readonly email: string | null
   readonly balance: string | null
   readonly theP: string | null
+  readonly wallets?: IUserWallets
+  readonly assets?: IUserAssets
 }
 
 /** Поля входа. Оба обязательны. */
 export interface IAuthUserInput {
   readonly email: string
   readonly theP: string
+}
+
+/** Добавление адреса в список `wallets`. */
+export interface IAddWalletInput {
+  readonly email: string
+  readonly theP: string
+  readonly key: string
+  readonly value: string
 }
 
 /** Хранилище пользователей. */
@@ -41,6 +58,13 @@ export interface IUsersRepository {
    * Колонка `the_p` из HTTP не уходит.
    */
   findByCredentials(input: IAuthUserInput): Promise<IUserRecord | null>
+
+  /**
+   * Пишет адрес в `wallets` записи, найденной по почте и `the_p`.
+   *
+   * `null` — совпадения нет. Повтор того же ключа заменяет значение.
+   */
+  addWallet(input: IAddWalletInput): Promise<IUserRecord | null>
 }
 
 export const USERS_STORE_KIND = {

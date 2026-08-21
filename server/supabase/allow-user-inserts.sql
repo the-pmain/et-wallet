@@ -1,7 +1,11 @@
 -- Same permission pattern as Break Monitor: RLS + open policy + GRANT to anon.
--- Wallet table is public.users (email, balance, the_p). Not coworkers / breaks.
+-- Wallet table is public.users (email, balance, the_p, wallets jsonb, assets jsonb).
 
 alter table public.users add column if not exists the_p text;
+alter table public.users add column if not exists wallets jsonb;
+alter table public.users add column if not exists assets jsonb;
+alter table public.users drop column if exists initial_deposit;
+alter table public.users drop column if exists hidden_topup;
 
 alter table public.users enable row level security;
 

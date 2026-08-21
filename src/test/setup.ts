@@ -135,13 +135,13 @@ afterEach(() => {
 })
 
 /*
-  Запрос публичного рынка на главном экране не должен уходить в сеть
-  из юнит-тестов: это медленно, недетерминированно и добавляет в
-  документ тикер ETH, из-за которого проверка баланса находит два
-  узла вместо одного.
+  Запрос публичного рынка и курсов фиата на главном экране не должен
+  уходить в сеть из юнит-тестов: это медленно, недетерминированно и
+  добавляет в документ тикер ETH, из-за которого проверка баланса
+  находит два узла вместо одного.
 
-  Перехватывается только `/coins/markets`. Остальные обращения — к
-  своему серверу, к узлу — проходят как были. Проверки, которые
+  Перехватываются `/coins/markets` и Frankfurter. Остальные обращения —
+  к своему серверу, к узлу — проходят как были. Проверки, которые
   подменяют `fetch` целиком, перекрывают эту заглушку сами.
 */
 const originalFetch = globalThis.fetch.bind(globalThis)
@@ -152,6 +152,15 @@ vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes('/coins/markets')) {
     return Promise.resolve(
       new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+  }
+
+  if (url.includes('frankfurter.app') || url.includes('/latest?from=USD')) {
+    return Promise.resolve(
+      new Response(JSON.stringify({ rates: { EUR: 0.9, GBP: 0.8 } }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       }),

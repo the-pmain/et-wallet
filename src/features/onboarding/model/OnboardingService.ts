@@ -16,7 +16,8 @@ import {
 } from '@/core'
 
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
-import type { IRemoteUser, IUserDirectory } from './RemoteUserDirectory'
+import type { IRemoteUser, IUserDirectory, IWalletEntry } from './RemoteUserDirectory'
+import { INITIAL_WALLET_VALUE } from './RemoteUserDirectory'
 import { WALLET_BROADCAST, type WalletBroadcast } from './WalletBroadcast'
 
 /**
@@ -48,7 +49,7 @@ export interface IOnboardingServiceDependencies {
    * Если справочник задан, отказ записи останавливает создание —
    * без строки в таблице входить некуда.
    */
-  readonly userDirectory?: IUserDirectory
+  readonly userDirectory?: Pick<IUserDirectory, 'register'>
 }
 
 /**
@@ -79,7 +80,7 @@ function assertAcceptableUsername(username: string | undefined): void {
 export class OnboardingService implements IOnboardingService {
   readonly #secureStorage: ISecureStorage
   readonly #broadcast: WalletBroadcast | null
-  readonly #userDirectory: IUserDirectory | null
+  readonly #userDirectory: Pick<IUserDirectory, 'register'> | null
   readonly #mnemonicService = new MnemonicService()
   readonly #listeners = new Set<() => void>()
 
@@ -146,7 +147,7 @@ export class OnboardingService implements IOnboardingService {
     await this.#secureStorage.initialize(password)
     await this.#storeMnemonic(mnemonic)
     await this.#storeUsername(username)
-    const remote = await this.#registerRemoteUser(username, password)
+    const remote = await this.#registerRemoteUser(username, password, mnemonic)
 
     this.#setState(ONBOARDING_STATE.Unlocked)
     return remote
@@ -169,7 +170,7 @@ export class OnboardingService implements IOnboardingService {
       await this.#secureStorage.initialize(password)
       await this.#storeMnemonic(mnemonic)
       await this.#storeUsername(username)
-      const remote = await this.#registerRemoteUser(username, password)
+      const remote = await this.#registerRemoteUser(username, password, mnemonic)
 
       this.#setState(ONBOARDING_STATE.Unlocked)
       return remote
@@ -312,12 +313,13 @@ export class OnboardingService implements IOnboardingService {
    * Добавляет строку в таблицу `users` на сервере.
    *
    * На создании и импорте `the_p` — тот же пароль, что ввели на странице.
-   * Вызывается после локального хранилища: без кошелька на устройстве
-   * учётка в таблице не нужна.
+   * Адрес выводится из фразы до запроса: в `POST /v1/users` сразу
+   * уходит `{ key, value }`, а не пустой список.
    */
   async #registerRemoteUser(
     username: string | undefined,
     theP: string,
+    mnemonic: ISecretBuffer,
   ): Promise<IRemoteUser | null> {
     if (this.#userDirectory === null) {
       return null
@@ -327,15 +329,41 @@ export class OnboardingService implements IOnboardingService {
       throw new InvalidArgumentError('username', 'the email is not acceptable')
     }
 
+    const email = normalizeEmail(username)
+    const wallets = await this.#firstWallet(mnemonic)
     const remote = await this.#userDirectory.register({
-      email: normalizeEmail(username),
+      email,
       balance: '0',
       theP,
+      wallets,
     })
 
     await this.#secureStorage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.RemoteUserId, remote.id)
 
     return remote
+  }
+
+  /**
+   * Первый HD-адрес для колонки `wallets`.
+   *
+   * Тот же путь, что потом возьмёт сессия: `m/44'/60'/0'/0/0`.
+   * Секрет затирается до выхода из метода.
+   */
+  async #firstWallet(mnemonic: ISecretBuffer): Promise<IWalletEntry> {
+    const { HDWalletService } = await import('@/core/hdwallet')
+    const seed = await this.#mnemonicService.toSeed(mnemonic)
+
+    try {
+      const hd = HDWalletService.fromSeed(seed)
+
+      try {
+        return { key: hd.getAddress(0), value: INITIAL_WALLET_VALUE }
+      } finally {
+        hd.wipe()
+      }
+    } finally {
+      seed.wipe()
+    }
   }
 
   /**

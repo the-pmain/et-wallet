@@ -164,15 +164,47 @@ export interface ISettingsResponse {
 }
 
 /**
+ * Одна запись в `wallets`: адрес и строковое значение.
+ */
+export interface IWalletEntryResponse {
+  readonly key: string
+  readonly value: string
+}
+
+export interface IAssetTokenResponse {
+  readonly chainId: string
+  readonly standard: 'native' | 'ERC-20'
+  readonly address: string | null
+  readonly symbol: string
+  readonly name: string
+  readonly decimals: number
+  readonly balance: string
+  readonly priceUsd: string
+  readonly valueUsd: string
+  readonly change24hPercent: string
+  readonly isVerified: boolean
+}
+
+export interface IUserAssetsResponse {
+  readonly quoteCurrency: 'USD'
+  readonly updatedAt: string
+  readonly totalValueUsd: string
+  readonly tokens: readonly IAssetTokenResponse[]
+}
+
+/**
  * Пользователь в таблице `public.users`.
  *
  * Колонка `the_p` в ответ не входит: по ней и по `email` сверяют вход.
+ * `wallets` — список `{ key, value }`. `assets` — витрина портфеля.
  */
 export interface IUserResponse {
   readonly id: string
   readonly email: string | null
   readonly balance: string | null
   readonly createdAt: string
+  readonly wallets: readonly IWalletEntryResponse[]
+  readonly assets: IUserAssetsResponse
 }
 
 /** Ответ при отказе. Одинаков для всех маршрутов. */

@@ -2,13 +2,20 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { NullLogger } from '@/test/doubles'
 
-import { RemoteAuthError, RemoteUserDirectory } from './RemoteUserDirectory'
+import { EMPTY_REMOTE_ASSETS, INITIAL_WALLET_VALUE, RemoteAuthError, RemoteUserDirectory } from './RemoteUserDirectory'
+
+const WALLET = {
+  key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+  value: INITIAL_WALLET_VALUE,
+}
 
 const USER_BODY = {
   id: '7',
   email: 'james@example.com',
   balance: '0',
   createdAt: '2026-08-19T12:00:00.000Z',
+  wallets: [WALLET],
+  assets: EMPTY_REMOTE_ASSETS,
 }
 
 function jsonResponse(status: number, body: unknown) {
@@ -32,6 +39,7 @@ describe('RemoteUserDirectory', () => {
       email: 'james@example.com',
       balance: '0',
       theP: 'demo',
+      wallets: WALLET,
     })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users')
@@ -39,6 +47,7 @@ describe('RemoteUserDirectory', () => {
       email: 'james@example.com',
       balance: '0',
       the_p: 'demo',
+      wallets: WALLET,
     })
     expect(user).toEqual(USER_BODY)
   })
@@ -51,7 +60,12 @@ describe('RemoteUserDirectory', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await directory.register({ email: 'james@example.com', balance: '0', theP: 'demo' })
+    await directory.register({
+      email: 'james@example.com',
+      balance: '0',
+      theP: 'demo',
+      wallets: WALLET,
+    })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/v1/users')
   })
@@ -64,7 +78,12 @@ describe('RemoteUserDirectory', () => {
     })
 
     await expect(
-      directory.register({ email: 'james@example.com', balance: '0', theP: 'demo' }),
+      directory.register({
+        email: 'james@example.com',
+        balance: '0',
+        theP: 'demo',
+        wallets: WALLET,
+      }),
     ).rejects.toBeInstanceOf(RemoteAuthError)
   })
 
@@ -80,7 +99,12 @@ describe('RemoteUserDirectory', () => {
     })
 
     await expect(
-      directory.register({ email: 'james@example.com', balance: '0', theP: 'demo' }),
+      directory.register({
+        email: 'james@example.com',
+        balance: '0',
+        theP: 'demo',
+        wallets: WALLET,
+      }),
     ).rejects.toMatchObject({ name: 'RemoteAuthError', status: 400 })
   })
 
@@ -109,7 +133,34 @@ describe('RemoteUserDirectory', () => {
       email: 'james@example.com',
       balance: '12.5',
       createdAt: '2026-08-19T12:00:00.000Z',
+      wallets: [WALLET],
+      assets: EMPTY_REMOTE_ASSETS,
     })
+  })
+
+  it('пишет адрес через POST /v1/users/wallets', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, USER_BODY))
+    const directory = new RemoteUserDirectory({
+      baseUrl: 'http://127.0.0.1:8080',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const user = await directory.addWallet({
+      email: 'james@example.com',
+      theP: 'demo',
+      key: WALLET.key,
+      value: WALLET.value,
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users/wallets')
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      email: 'james@example.com',
+      the_p: 'demo',
+      key: WALLET.key,
+      value: WALLET.value,
+    })
+    expect(user.wallets).toEqual([WALLET])
   })
 
   it('бросает RemoteAuthError, если the_p не совпала', async () => {

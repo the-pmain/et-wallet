@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 
 import type { Address } from '@/core'
+import { useDirectorySession, useDisplayedAssets } from '@/features/onboarding'
 import { ImportTokenForm, TokenList, useWallet, useWalletSnapshot } from '@/features/wallet'
 import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
 
@@ -15,11 +16,24 @@ import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
  * угодно и почти бесплатно, а показанный в кошельке токен выглядит
  * одобренным.
  *
+ * ЗАПИСЬ СПРАВОЧНИКА ВАЖНЕЕ ЛОКАЛЬНОГО СНИМКА. После входа витрина
+ * лежит в `users.assets`; показывать вместо неё один ETH с нулём —
+ * прятать хранимые токены. Локальный список остаётся для кошелька
+ * без записи.
+ *
  * НЕПРОЧИТАННЫЙ БАЛАНС НЕ ПОКАЗЫВАЕТСЯ НУЛЁМ — см. `TokenList`.
  */
 export function AssetsPage() {
   const session = useWallet()
   const snapshot = useWalletSnapshot()
+  const directory = useDirectorySession()
+  const displayed = useDisplayedAssets({
+    tokens: snapshot.tokenBalances,
+    portfolio: snapshot.portfolio,
+    isLoading: snapshot.isTokensLoading,
+  })
+  const showRemote = displayed.isRemote
+  const isListLoading = displayed.isLoading
 
   const [isImporting, setImporting] = useState(false)
 
@@ -32,39 +46,45 @@ export function AssetsPage() {
           <Button
             variant="ghost"
             size="sm"
-            disabled={snapshot.isTokensLoading}
-            onClick={() => void session.refreshTokens()}
+            disabled={isListLoading}
+            onClick={() => {
+              if (showRemote) {
+                void directory.refresh()
+                return
+              }
+
+              void session.refreshTokens()
+            }}
           >
-            <RefreshCw
-              className={snapshot.isTokensLoading ? 'size-4 animate-spin' : 'size-4'}
-              aria-hidden
-            />
+            <RefreshCw className={isListLoading ? 'size-4 animate-spin' : 'size-4'} aria-hidden />
             Refresh
           </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setImporting((current) => !current)
-            }}
-          >
-            {isImporting ? (
-              <>
-                <X className="size-4" aria-hidden />
-                Cancel
-              </>
-            ) : (
-              <>
-                <Plus className="size-4" aria-hidden />
-                Import a token
-              </>
-            )}
-          </Button>
+          {showRemote ? null : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setImporting((current) => !current)
+              }}
+            >
+              {isImporting ? (
+                <>
+                  <X className="size-4" aria-hidden />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <Plus className="size-4" aria-hidden />
+                  Import a token
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </header>
 
-      {isImporting ? (
+      {isImporting && !showRemote ? (
         <Card>
           <CardContent>
             <ImportTokenForm
@@ -81,21 +101,25 @@ export function AssetsPage() {
       <Card>
         <CardContent className="p-0 sm:p-0">
           <TokenList
-            tokens={snapshot.tokenBalances}
-            isLoading={snapshot.isTokensLoading}
-            chainId={snapshot.activeNetwork?.chainId ?? null}
+            tokens={displayed.tokens}
+            isLoading={isListLoading}
             /* Оценка собирается из уже имеющегося снимка: курсы
                запрашиваются тем же обходом, что балансы, и только при
-               данном согласии. Экран активов сам наружу не ходит. */
-            portfolio={snapshot.portfolio}
-            onRemove={(address: Address) => {
-              void session.removeToken(address)
-            }}
+               данном согласии. Экран активов сам наружу не ходит.
+               У записи справочника курсы уже лежат в витрине. */
+            portfolio={displayed.portfolio}
+            {...(showRemote
+              ? {}
+              : {
+                  onRemove: (address: Address) => {
+                    void session.removeToken(address)
+                  },
+                })}
           />
         </CardContent>
       </Card>
 
-      {snapshot.balanceError === null ? null : (
+      {showRemote || snapshot.balanceError === null ? null : (
         <Alert variant="danger">
           <AlertDescription>
             The node did not answer. The values shown may be stale — that does not mean the funds
@@ -111,15 +135,18 @@ export function AssetsPage() {
           предупреждением там, где предупреждать не о чем, обесценивает
           настоящие предупреждения — их перестают отличать от фона.
 
-          ТЕКСТ ЗАВИСИТ ОТ СОГЛАСИЯ, И ЭТО НЕ УКРАШЕНИЕ. Прежняя редакция
-          утверждала, что стоимость в валюте не показывается вовсе. После
-          появления оценки это стало неправдой, а сноска, описывающая
-          не то, что на экране, хуже отсутствующей: по ней перестают
-          сверяться. */}
+          ТЕКСТ ЗАВИСИТ ОТ ИСТОЧНИКА. Витрина записи уже содержит курсы,
+          и сноска «стоимость не показывается» стала бы ложью. У локального
+          списка по-прежнему действует согласие на внешний источник. */}
       <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
 
-        {snapshot.arePricesEnabled ? (
+        {showRemote ? (
+          <span>
+            The value is approximate: it is stored with the account record and is not a sum anyone
+            promised to pay.
+          </span>
+        ) : snapshot.arePricesEnabled ? (
           <span>
             The value is approximate: it comes from a third-party price source and is not a sum
             anyone promised to pay. Assets whose rate is unknown carry no value here — what was left

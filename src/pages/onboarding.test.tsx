@@ -124,8 +124,13 @@ describe('Вход в экран аккаунта', () => {
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
-    expect(screen.getByText('12.5')).toBeInTheDocument()
+    expect(screen.getByText('$12.50')).toBeInTheDocument()
+    expect(screen.queryByText('12.5')).not.toBeInTheDocument()
+    expect(screen.queryByText('ETH')).not.toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Display currency' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
 
     await waitFor(() => {
       expect(
@@ -215,7 +220,7 @@ describe('Вход в экран аккаунта', () => {
     renderApp()
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('$3.00')).toBeInTheDocument()
     expect(readLoginCredentials()).toEqual({
       id: '7',
       email: 'james@example.com',

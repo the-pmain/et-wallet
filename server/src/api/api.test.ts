@@ -5,6 +5,7 @@ import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
+import { MOCK_USER_ASSETS } from '../users/assets.ts'
 
 const CONFIG: IServerConfig = {
   mode: RUNTIME_MODE.Test,
@@ -296,12 +297,74 @@ describe('Пользователи', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json<{ email: string; balance: string }>().email).toBe('james@example.com')
+    expect(response.json<{ email: string; balance: string; wallets: Record<string, string> }>().email).toBe(
+      'james@example.com',
+    )
+    expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([])
+    expect(response.json<{ assets: unknown }>().assets).toEqual(MOCK_USER_ASSETS)
     expect(response.json<{ the_p?: unknown; password?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.json<{ password?: unknown }>()).not.toHaveProperty('password')
     expect(response.json<{ username?: unknown }>()).not.toHaveProperty('username')
     expect(users.records).toHaveLength(1)
     expect(users.records[0]?.theP).toBe('demo')
+    expect(users.records[0]?.wallets).toEqual([])
+    expect(users.records[0]?.assets).toEqual(MOCK_USER_ASSETS)
+  })
+
+  it('пишет wallets из тела создания', async () => {
+    const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+    const entry = { key, value: '0' }
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        wallets: entry,
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json<{ wallets: typeof entry[] }>().wallets).toEqual([entry])
+    expect(users.records[0]?.wallets).toEqual([entry])
+  })
+
+  it('пишет список wallets из тела создания', async () => {
+    const first = {
+      key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+      value: '0',
+    }
+    const second = {
+      key: '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359',
+      value: '0',
+    }
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        wallets: [first, second],
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([first, second])
+  })
+
+  it('отвергает wallets с ключом, который не является адресом', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        wallets: { key: '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz', value: '0' },
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(users.records).toHaveLength(0)
   })
 
   it('подставляет нулевой баланс, если его не передали', async () => {
@@ -371,9 +434,81 @@ describe('Пользователи', () => {
     expect(response.json()).toMatchObject({
       email: 'james@example.com',
       balance: '12.5',
+      assets: MOCK_USER_ASSETS,
     })
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
     expect(response.body).not.toContain('demo')
+  })
+
+  it('пишет созданный адрес в wallets', async () => {
+    const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        key,
+        value: '0',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ wallets: { key: string; value: string }[] }>().wallets).toEqual([
+      { key, value: '0' },
+    ])
+    expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
+    expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
+  })
+
+  it('отказывает в записи адреса при неверной the_p', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'other',
+        key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+        value: 'Account 1',
+      },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(users.records[0]?.wallets).toEqual([])
+  })
+
+  it('отвергает ключ, который не является адресом', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        key: '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+        value: 'Account 1',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
   })
 
   it('отказывает, если the_p не совпала', async () => {
