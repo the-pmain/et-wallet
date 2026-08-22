@@ -195,7 +195,7 @@ function SendingRow({
         <TokenAvatar
           address={asset?.token.address ?? null}
           symbol={symbol}
-          chainId={asset?.chainId}
+          chainId={asset?.chainId ?? null}
           className="size-8"
         />
         <span className="flex min-w-0 flex-col gap-1">
