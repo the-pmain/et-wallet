@@ -238,20 +238,23 @@ describe('Кабинет администратора', () => {
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
 
-    const ethAmount = await screen.findByLabelText('ETH amount')
-    expect(ethAmount).toHaveValue('2')
+    const ethUsd = await screen.findByLabelText('ETH value in USD')
+    expect(ethUsd).toHaveValue('6568.24')
     expect(await screen.findByText('$6,568.24')).toBeInTheDocument()
+    expect(screen.getByText('≈ 2 ETH')).toBeInTheDocument()
 
-    await user.clear(ethAmount)
-    await user.type(ethAmount, '3')
+    await user.clear(ethUsd)
+    await user.type(ethUsd, '9852.36')
     expect(await screen.findByText('$9,852.36')).toBeInTheDocument()
+    expect(screen.getByText('≈ 3 ETH')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Save ETH' }))
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
 
-    const usdcAmount = screen.getByLabelText('USDC amount')
-    await user.clear(usdcAmount)
-    await user.type(usdcAmount, '1.5')
+    const usdcUsd = screen.getByLabelText('USDC value in USD')
+    await user.clear(usdcUsd)
+    await user.type(usdcUsd, '1.5')
+    expect(screen.getByText('≈ 1.5 USDC')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save USDC' }))
     expect(await screen.findAllByText('Saved.')).not.toHaveLength(0)
 
@@ -287,7 +290,7 @@ describe('Кабинет администратора', () => {
     renderAdmin()
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
-    await screen.findByLabelText('ETH amount')
+    await screen.findByLabelText('ETH value in USD')
 
     await user.click(screen.getByRole('button', { name: 'Add crypto' }))
     const usdt = await screen.findByRole('menuitem', { name: 'Add USDT on Ethereum' })
@@ -295,7 +298,7 @@ describe('Кабинет администратора', () => {
 
     await user.click(usdt)
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(screen.getByLabelText('USDT amount')).toHaveValue('0')
+    expect(screen.getByLabelText('USDT value in USD')).toHaveValue('0')
 
     const patch = fetchSpy.mock.calls
       .map((call) => {

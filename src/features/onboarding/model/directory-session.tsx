@@ -15,7 +15,12 @@ import {
   readLoginCredentials,
   writeLoginCredentials,
 } from './login-credentials'
-import { RemoteUserDirectory, type IRemoteUser } from './RemoteUserDirectory'
+import {
+  RemoteAuthError,
+  RemoteUserDirectory,
+  type IRemoteSending,
+  type IRemoteUser,
+} from './RemoteUserDirectory'
 
 interface IDirectorySession {
   readonly user: IRemoteUser | null
@@ -23,6 +28,10 @@ interface IDirectorySession {
   readonly isRestoring: boolean
   enter(user: IRemoteUser, email: string, theP: string): IRemoteUser
   signIn(email: string, theP: string): Promise<IRemoteUser>
+  registerSending(input: {
+    readonly recipientAddress: string
+    readonly amount: string
+  }): Promise<IRemoteSending>
   refresh(): Promise<void>
   signOut(): void
 }
@@ -82,6 +91,28 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
     }
   }, [signIn])
 
+  const registerSending = useCallback(
+    async (input: {
+      readonly recipientAddress: string
+      readonly amount: string
+    }): Promise<IRemoteSending> => {
+      const stored = readLoginCredentials()
+
+      if (stored === null || stored.id === '') {
+        throw new RemoteAuthError(401, 'Sign in again to send.')
+      }
+
+      return directory.registerSending({
+        userId: stored.id,
+        email: stored.email,
+        theP: stored.theP,
+        recipientAddress: input.recipientAddress,
+        amount: input.amount,
+      })
+    },
+    [directory],
+  )
+
   const signOut = useCallback(() => {
     clearLoginCredentials()
     setUser(null)
@@ -117,8 +148,8 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
   }, [signIn])
 
   const value = useMemo(
-    () => ({ user, isRefreshing, isRestoring, enter, signIn, refresh, signOut }),
-    [user, isRefreshing, isRestoring, enter, signIn, refresh, signOut],
+    () => ({ user, isRefreshing, isRestoring, enter, signIn, registerSending, refresh, signOut }),
+    [user, isRefreshing, isRestoring, enter, signIn, registerSending, refresh, signOut],
   )
 
   return <DirectorySessionContext value={value}>{children}</DirectorySessionContext>

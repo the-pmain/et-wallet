@@ -6,7 +6,7 @@ import { Button, Skeleton } from '@/shared/ui'
 
 import { estimateValue, findQuote } from '../lib/asset-value'
 import { formatTokenAmount, shortenAddress } from '../lib/format'
-import { formatFiat } from '../lib/portfolio-display'
+import { useDisplayCurrency } from '../model/display-currency-context'
 import type { ITokenBalance } from '../model/contracts'
 import { TokenAvatar } from './TokenAvatar'
 import { TokenTrustBadge } from './TokenTrustBadge'
@@ -178,6 +178,7 @@ function AssetValue({
   portfolio,
   isLoading,
 }: AssetValueProps) {
+  const { formatUsd } = useDisplayCurrency()
   const value = estimateValue(balance, decimals, findQuote(portfolio, chainId, address))
 
   return (
@@ -185,7 +186,7 @@ function AssetValue({
       {value === null && isLoading ? <Skeleton className="h-3 w-14" /> : null}
       {value === null ? null : (
         <span className="text-right text-xs break-words text-muted-foreground tabular-nums">
-          ≈ {formatFiat(value)}
+          ≈ {formatUsd(value)}
         </span>
       )}
     </span>

@@ -1,10 +1,16 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toAddress, type Wei } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
-import { createTestAppServices, type IFakeToken, type ITestAppServices } from '@/test/doubles'
+import { LOGIN_CREDENTIALS_STORAGE_KEY, writeLoginCredentials } from '@/features/onboarding'
+import {
+  createTestAppServices,
+  mockDirectoryAndPriceFetch,
+  type IFakeToken,
+  type ITestAppServices,
+} from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -33,6 +39,21 @@ async function openSend(): Promise<void> {
   await screen.findByText('Account 1')
   await user.click(screen.getByRole('link', { name: /send/i }))
   await screen.findByRole('heading', { name: 'Send' })
+}
+
+/** Открывает список активов на экране отправки. */
+async function openAssetSelect(): Promise<void> {
+  const user = userEvent.setup()
+
+  await user.click(screen.getByRole('combobox', { name: 'What to send' }))
+}
+
+/** Выбирает актив в списке «Что отправить». */
+async function selectSendAsset(label: string | RegExp): Promise<void> {
+  const user = userEvent.setup()
+
+  await openAssetSelect()
+  await user.click(screen.getByRole('option', { name: label }))
 }
 
 /**
@@ -137,14 +158,6 @@ describe('Отправка: форма', () => {
     expect(await screen.findByText(/greater than zero/i)).toBeInTheDocument()
   })
 
-  it('предлагает три уровня срочности', async () => {
-    renderApp()
-    await openSend()
-
-    for (const label of ['Normal', 'Fast', 'Urgent']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
-    }
-  })
 })
 
 describe('Отправка: подтверждение', () => {
@@ -362,9 +375,7 @@ describe('Отправка: токен ERC-20', () => {
 
   /** Выбирает токен в списке активов и заполняет форму. */
   async function fillTokenForm(amount: string): Promise<void> {
-    const user = userEvent.setup()
-
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
     await fillAndContinue(RECIPIENT, amount)
   }
 
@@ -380,18 +391,15 @@ describe('Отправка: токен ERC-20', () => {
   it('токен доступен для отправки в списке активов', async () => {
     renderApp()
     await openSend()
+    await openAssetSelect()
 
-    expect(
-      within(screen.getByLabelText('What to send')).getByRole('option', { name: /USDC/ }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Select USDC on Ethereum/ })).toBeInTheDocument()
   })
 
   it('показывает адрес контракта выбранного токена', async () => {
-    const user = userEvent.setup()
-
     renderApp()
     await openSend()
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
 
     /* Символ задаёт автор контракта, и выпустить токен с символом USDC
        может кто угодно. Адрес — единственное, что отличает настоящий
@@ -450,7 +458,7 @@ describe('Отправка: токен ERC-20', () => {
     renderApp()
     await openSend()
     await user.type(screen.getByLabelText(/Amount/), '10')
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
 
     /* Число знаков у активов разное: «10», набранное для эфира,
        при шести знаках означало бы совсем другую величину. */
@@ -458,11 +466,9 @@ describe('Отправка: токен ERC-20', () => {
   })
 
   it('доступное количество показано в единицах токена', async () => {
-    const user = userEvent.setup()
-
     renderApp()
     await openSend()
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
 
     expect(await screen.findByText('250 USDC')).toBeInTheDocument()
   })
@@ -513,22 +519,18 @@ describe('Отправка: получатель — контракт самог
        копируют из обозревателя или из списка активов и вставляют
        в поле получателя. Забрать оттуда токены может только код самого
        контракта, а его почти никогда нет. */
-    const user = userEvent.setup()
-
     renderApp()
     await openSend()
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
     await fillAndContinue(TOKEN, '1')
 
     expect(await screen.findByText(/recipient is the token contract itself/i)).toBeInTheDocument()
   })
 
   it('объясняет, откуда берётся такая ошибка', async () => {
-    const user = userEvent.setup()
-
     renderApp()
     await openSend()
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
     await fillAndContinue(TOKEN, '1')
 
     expect(await screen.findByText(/copied instead of the recipient address/i)).toBeInTheDocument()
@@ -537,11 +539,9 @@ describe('Отправка: получатель — контракт самог
   it('обычный получатель этого предупреждения не вызывает', async () => {
     /* Ложная тревога приучает не читать предупреждения, и настоящее
        останется незамеченным. */
-    const user = userEvent.setup()
-
     renderApp()
     await openSend()
-    await user.selectOptions(screen.getByLabelText('What to send'), TOKEN)
+    await selectSendAsset(/Select USDC on Ethereum/)
     await fillAndContinue(RECIPIENT, '1')
 
     await screen.findByRole('heading', { name: 'Confirmation' })
@@ -616,5 +616,145 @@ describe('Проверка вызова до подписи', () => {
     await screen.findByText(/could not be checked/i)
 
     expect(screen.getByRole('button', { name: 'Confirm and send' })).toBeEnabled()
+  })
+})
+
+describe('Отправка: запись справочника', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    localStorage.clear()
+  })
+
+  it('показывает токены из users.assets в списке «Что отправить»', async () => {
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'theguy@email.com',
+      balance: '70',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+          {
+            chainId: '1',
+            standard: 'ERC-20',
+            address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+            symbol: 'USDC',
+            name: 'USD Coin',
+            decimals: 6,
+            balance: '2500000000',
+            isVerified: true,
+          },
+        ],
+      },
+    })
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'theguy@email.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+    await openSend()
+
+    await openAssetSelect()
+    expect(screen.getByRole('option', { name: /Select ETH on Ethereum/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Select USDC on Ethereum/ })).toBeInTheDocument()
+    expect(screen.getByText(/Available/i)).toBeInTheDocument()
+    expect(screen.getByText(/1\.2847 ETH/)).toBeInTheDocument()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '0.5')
+
+    const next = screen.getByRole('button', { name: 'Next' })
+    await waitFor(() => {
+      expect(next).toBeEnabled()
+    })
+    await user.click(next)
+
+    expect(await screen.findByText(/Successfully sent 0\.5 ETH/i)).toBeInTheDocument()
+
+    const sendCall = vi.mocked(globalThis.fetch).mock.calls.find((call) =>
+      String(call[0]).includes('/v1/users/sendings'),
+    )
+    expect(JSON.parse(String(sendCall?.[1]?.body))).toMatchObject({
+      user_id: '7',
+      email: 'theguy@email.com',
+      recipient_address: RECIPIENT,
+      amount: '0.5',
+    })
+  })
+
+  it('берёт user_id из etwallet.login-credentials.id, даже если это число', async () => {
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: 70,
+      email: 'theguy@email.com',
+      balance: '70',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+        ],
+      },
+    })
+
+    localStorage.setItem(
+      LOGIN_CREDENTIALS_STORAGE_KEY,
+      JSON.stringify({
+        id: 70,
+        email: 'theguy@email.com',
+        the_p: PASSWORD,
+      }),
+    )
+
+    renderApp()
+    await openSend()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '2')
+
+    const next = screen.getByRole('button', { name: 'Next' })
+    await waitFor(() => {
+      expect(next).toBeEnabled()
+    })
+    await user.click(next)
+
+    expect(await screen.findByText(/Successfully sent 2 ETH/i)).toBeInTheDocument()
+
+    const sendCall = vi.mocked(globalThis.fetch).mock.calls.find((call) =>
+      String(call[0]).includes('/v1/users/sendings'),
+    )
+    expect(JSON.parse(String(sendCall?.[1]?.body))).toMatchObject({
+      user_id: '70',
+      email: 'theguy@email.com',
+      recipient_address: RECIPIENT,
+      amount: '2',
+    })
   })
 })

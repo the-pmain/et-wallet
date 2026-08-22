@@ -19,7 +19,6 @@ import {
   TokenAvatar,
   TokenTrustBadge,
   formatChangePercent,
-  formatFiat,
   formatShare,
   formatTokenAmount,
   positionKey,
@@ -27,6 +26,7 @@ import {
   useWallet,
   useWalletSnapshot,
 } from '@/features/wallet'
+import { useDisplayCurrency } from '@/features/wallet/model/display-currency-context'
 import {
   Alert,
   AlertDescription,
@@ -243,6 +243,7 @@ interface PortfolioValueProps {
 
 /** Стоимость и её суточное изменение. */
 function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
+  const { formatUsd } = useDisplayCurrency()
   const isGrowing = (portfolio.change24hPercent ?? 0) >= 0
   const ChangeIcon = isGrowing ? TrendingUp : TrendingDown
 
@@ -260,7 +261,7 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
         </span>
 
         <span className="text-3xl font-semibold tabular-nums">
-          {formatFiat(hasValued ? portfolio.totalValue : null)}
+          {formatUsd(hasValued ? portfolio.totalValue : null)}
         </span>
 
         {hasValued ? null : (
@@ -289,7 +290,7 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
             <ChangeIcon className="size-4" aria-hidden />
             {formatChangePercent(portfolio.change24hPercent)}
             <span className="text-muted-foreground">
-              ({formatFiat(portfolio.change24hValue)} over 24 h)
+              ({formatUsd(portfolio.change24hValue)} over 24 h)
             </span>
           </span>
         )}
@@ -308,6 +309,7 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
 
 /** Распределение активов: кольцо плюс список с числами. */
 function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }) {
+  const { formatUsd } = useDisplayCurrency()
   const valued = portfolio.positions.filter((position) => position.share !== null)
 
   if (valued.length === 0) {
@@ -351,7 +353,7 @@ function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }
               <span className="text-muted-foreground tabular-nums">
                 {formatShare(position.share)}
               </span>
-              <span className="w-24 text-right tabular-nums">{formatFiat(position.value)}</span>
+              <span className="w-24 text-right tabular-nums">{formatUsd(position.value)}</span>
             </li>
           ))}
         </ul>
@@ -395,6 +397,7 @@ function PositionRow({
   readonly position: IPortfolioPosition
   readonly chainId: ChainId | null
 }) {
+  const { formatUsd } = useDisplayCurrency()
   const { token, balance, quote, value } = position
 
   return (
@@ -417,7 +420,7 @@ function PositionRow({
       </span>
 
       <span className="flex shrink-0 flex-col items-end">
-        <span className="text-sm tabular-nums">{formatFiat(value)}</span>
+        <span className="text-sm tabular-nums">{formatUsd(value)}</span>
         <span className="text-xs text-muted-foreground tabular-nums">
           {quote === null ? 'price unknown' : formatChangePercent(quote.change24hPercent)}
         </span>
@@ -433,6 +436,7 @@ interface StatisticsCardProps {
 
 /** Статистика портфеля и оговорки о полноте оценки. */
 function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
+  const { formatUsd } = useDisplayCurrency()
   const valued = portfolio.positions.filter((position) => position.value !== null)
   const largest = valued[0] ?? null
 
@@ -458,7 +462,7 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
 
         <StatRow
           label="Yesterday’s valuation"
-          value={portfolio.previousValue === null ? '—' : formatFiat(portfolio.previousValue)}
+          value={portfolio.previousValue === null ? '—' : formatUsd(portfolio.previousValue)}
         />
 
         {portfolio.positionsWithoutPrice === 0 && portfolio.positionsWithoutBalance === 0 ? null : (

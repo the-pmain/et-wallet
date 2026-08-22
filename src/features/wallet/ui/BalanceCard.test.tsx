@@ -16,6 +16,7 @@ import {
 } from '@/core'
 import { I18nProvider } from '@/app/providers/I18nProvider'
 
+import { DisplayCurrencyProvider } from '../model/display-currency-context'
 import { BalanceCard } from './BalanceCard'
 
 const CHAIN_ID = toChainId(1n)
@@ -82,16 +83,18 @@ function card(balance: IBalance | null, options: Options = {}) {
   return (
     <MemoryRouter>
       <I18nProvider>
-        <BalanceCard
-          balance={balance}
-          network={NETWORK}
-          isLoading={options.isLoading ?? false}
-          error={null}
-          onRefresh={() => undefined}
-          portfolio={options.portfolio ?? null}
-          arePricesEnabled={options.arePricesEnabled ?? false}
-          isPortfolioLoading={options.isPortfolioLoading ?? false}
-        />
+        <DisplayCurrencyProvider>
+          <BalanceCard
+            balance={balance}
+            network={NETWORK}
+            isLoading={options.isLoading ?? false}
+            error={null}
+            onRefresh={() => undefined}
+            portfolio={options.portfolio ?? null}
+            arePricesEnabled={options.arePricesEnabled ?? false}
+            isPortfolioLoading={options.isPortfolioLoading ?? false}
+          />
+        </DisplayCurrencyProvider>
       </I18nProvider>
     </MemoryRouter>
   )

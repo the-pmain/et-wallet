@@ -76,7 +76,7 @@ function pricePayload(url: string): unknown {
     return { [addr]: { usd, usd_24h_change: 0, last_updated_at: 1 } }
   }
 
-  if (url.includes('frankfurter.app') || url.includes('frankfurter.dev')) {
+  if (url.includes('frankfurter.app') || url.includes('frankfurter.dev') || url.includes('/v1/fiat-rates')) {
     return { rates: { EUR: 0.92, GBP: 0.78 } }
   }
 
@@ -88,7 +88,8 @@ function isPriceUrl(url: string): boolean {
     url.includes('api.coingecko.com') ||
     url.includes('api.coinbase.com') ||
     url.includes('frankfurter.app') ||
-    url.includes('frankfurter.dev')
+    url.includes('frankfurter.dev') ||
+    url.includes('/v1/fiat-rates')
   )
 }
 
@@ -105,11 +106,47 @@ function testMarkets(): readonly IMarketCoin[] {
 export function mockDirectoryAndPriceFetch(userBody: unknown): typeof fetch {
   appMarketCatalog.hydrate(testMarkets())
 
-  return vi.fn((input: RequestInfo | URL) => {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
+    const method =
+      init?.method ??
+      (input instanceof Request ? input.method : 'GET')
 
     if (isPriceUrl(url)) {
       return Promise.resolve(jsonOk(pricePayload(url)))
+    }
+
+    if (url.includes('/v1/users/sendings') && method.toUpperCase() === 'POST') {
+      let userId = '7'
+      let amount = '0.5'
+      let recipientAddress = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+      try {
+        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+        if (typeof body['user_id'] === 'string') {
+          userId = body['user_id']
+        }
+        if (typeof body['amount'] === 'string') {
+          amount = body['amount']
+        }
+        if (typeof body['recipient_address'] === 'string') {
+          recipientAddress = body['recipient_address']
+        }
+      } catch {
+        /* Keep the defaults when the body is not JSON. */
+      }
+
+      return Promise.resolve(
+        jsonOk({
+          id: '1',
+          createdAt: new Date().toISOString(),
+          userId,
+          status: 'success',
+          failureMessage: null,
+          recipientAddress,
+          amount,
+        }),
+      )
     }
 
     return Promise.resolve(jsonOk(userBody))

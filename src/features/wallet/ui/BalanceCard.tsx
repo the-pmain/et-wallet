@@ -10,7 +10,9 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/sh
 
 import { formatTokenAmount } from '../lib/format'
 import { estimateNativeValue } from '../lib/asset-value'
-import { formatFiat, formatQuoteTime } from '../lib/portfolio-display'
+import { formatQuoteTime } from '../lib/portfolio-display'
+import { useDisplayCurrency } from '../model/display-currency-context'
+import { CurrencySwitch } from './CurrencySwitch'
 
 interface BalanceCardProps {
   readonly balance: IBalance | null
@@ -65,6 +67,7 @@ export function BalanceCard({
   isPortfolioLoading = false,
 }: BalanceCardProps) {
   const { t } = useTranslation()
+  const { currency, setCurrency } = useDisplayCurrency()
   const symbol = network?.nativeCurrency.symbol ?? ''
   const arrivals = useValueArrivals(balance?.raw ?? null)
 
@@ -73,7 +76,10 @@ export function BalanceCard({
        остаются на обычном уровне: два «главных» объекта — это уже
        отсутствие главного. */
     <Card className="surface-hero gap-4 shadow-raised inset-shadow-hairline">
-      <CardHeader className="flex-row items-center justify-between gap-2">
+      <CardHeader className="flex-col items-start gap-3">
+        <CurrencySwitch value={currency} onChange={setCurrency} />
+
+        <div className="flex w-full flex-row items-center justify-between gap-2">
         {/* Метка и сеть в одну строку: сложенные в столбец, они занимали
             две строки перед суммой и отодвигали её от верха карточки. */}
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -122,6 +128,7 @@ export function BalanceCard({
         >
           <RefreshCw className={isLoading ? 'size-4 animate-spin' : 'size-4'} aria-hidden />
         </Button>
+        </div>
       </CardHeader>
 
       {/* `aria-busy` — потому что при обновлении уже показанной суммы
@@ -271,6 +278,7 @@ interface BalanceValueProps {
  */
 function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: BalanceValueProps) {
   const { t } = useTranslation()
+  const { formatUsd } = useDisplayCurrency()
 
   /* Без баланса оценивать нечего. Высота строки всё равно занята:
      иначе появление оценки сдвигало бы действия под суммой. */
@@ -324,7 +332,7 @@ function BalanceValue({ balance, portfolio, arePricesEnabled, isLoading }: Balan
        именно такой длины. `break-words` рвёт только то слово, которое
        иначе не помещается, и обычную надпись не трогает. */}
       <p className="text-lg font-medium break-words text-muted-foreground tabular-nums">
-        {t('dashboard.approxValue', { value: formatFiat(value) })}
+        {t('dashboard.approxValue', { value: formatUsd(value) })}
       </p>
 
       {/* Время котировки, а не «обновлено только что». Курс опрашивается

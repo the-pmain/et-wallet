@@ -203,6 +203,17 @@ export interface IUserResponse {
   readonly assets: IUserAssetsResponse
 }
 
+/** Запись перевода в `public.sendings`. */
+export interface ISendingResponse {
+  readonly id: string
+  readonly createdAt: string
+  readonly userId: string | null
+  readonly status: 'pending' | 'success' | 'failure' | null
+  readonly failureMessage: string | null
+  readonly recipientAddress: string | null
+  readonly amount: string | null
+}
+
 /** Ответ при отказе. Одинаков для всех маршрутов. */
 export interface IErrorResponse {
   readonly error: {

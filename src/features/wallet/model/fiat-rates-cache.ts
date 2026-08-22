@@ -52,7 +52,11 @@ export class FiatRatesCache {
         this.#notify()
       })
       .catch(() => {
-        /* Канонический показ остаётся в долларах. */
+        /* Повтор при следующем ensureLoaded: первый сбой не должен
+           закреплять курс 1:1 на всю сессию. */
+        if (generation === this.#generation) {
+          this.#load = null
+        }
       })
 
     return this.#load

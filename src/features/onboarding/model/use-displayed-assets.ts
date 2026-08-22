@@ -4,6 +4,7 @@ import type { IPortfolioSummary, ITokenAmount } from '@/core'
 
 import { mapRemoteAssets } from '../lib/map-remote-assets'
 import { useDirectorySession } from './directory-session'
+import { readLoginCredentials } from './login-credentials'
 import { useRemoteAssetQuotes } from './use-remote-asset-quotes'
 
 /** Локальный снимок, которым пользуются, пока записи справочника нет. */
@@ -37,7 +38,8 @@ export function useDisplayedAssets(local: ILocalAssetSnapshot): IDisplayedAssets
     () => (directory.user === null ? null : mapRemoteAssets(directory.user.assets, quotes)),
     [directory.user, quotes],
   )
-  const isRemote = mapped !== null || directory.isRestoring
+  const isRemote =
+    mapped !== null || directory.isRestoring || readLoginCredentials() !== null
 
   if (!isRemote) {
     return {

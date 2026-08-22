@@ -7,6 +7,7 @@ import type { IEmailMessage, IEmailSendResult, IEmailService } from '../email/co
 import { MemoryEmailsRepository } from '../emails/MemoryEmailsRepository.ts'
 import { EmailUnavailableError } from '../lib/errors.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
+import { MemorySendingsRepository } from '../sendings/MemorySendingsRepository.ts'
 import { STARTING_TOKENS } from '../users/assets.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
 
@@ -46,14 +47,17 @@ function expectStartingAssets(assets: { quoteCurrency?: string; tokens?: unknown
 let app: FastifyInstance
 let settings: MemorySettingsRepository
 let users: MemoryUsersRepository
+let sendings: MemorySendingsRepository
 
 beforeEach(async () => {
   settings = new MemorySettingsRepository()
   users = new MemoryUsersRepository()
+  sendings = new MemorySendingsRepository()
   app = await buildApp({
     config: CONFIG,
     settings,
     users,
+    sendings,
   })
 })
 
@@ -566,6 +570,111 @@ describe('Пользователи', () => {
     ])
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
     expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
+  })
+
+  it('регистрирует отправку в pending и завершает её success', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json()).toMatchObject({
+      status: 'success',
+      recipientAddress: recipient,
+      amount: '1',
+      failureMessage: null,
+    })
+    expect(sendings.records).toHaveLength(1)
+    expect(sendings.records[0]?.status).toBe('success')
+    expect(sendings.records[0]?.userId).toBe(userId)
+  })
+
+  it('отвергает отправку, если user_id не совпал с записью', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: '999',
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+      },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(sendings.records).toHaveLength(0)
+  })
+
+  it('записывает failure при неверном адресе получателя', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: '1',
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: '0x123',
+        amount: '1',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('отвергает amount с тикером — в колонке только число', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: '1',
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1 ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
   })
 
   it('новый адрес в wallets всегда стартует с нуля', async () => {

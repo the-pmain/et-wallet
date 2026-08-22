@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,6 +10,11 @@ import {
   mockDirectoryAndPriceFetch,
   type ITestAppServices,
 } from '@/test/doubles'
+import {
+  DISPLAY_CURRENCY,
+  formatDisplayFiat,
+} from '@/features/wallet/lib/display-currency'
+import { appFiatRates } from '@/features/wallet/model/fiat-rates-cache'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -254,6 +259,42 @@ describe('Панель: кабинет справочника', () => {
     expect(screen.getByText('No assets yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
     expect((await screen.findAllByText('Account 1')).length).toBeGreaterThan(0)
+  })
+
+  it('переводит фиатный баланс в евро по курсу источника', async () => {
+    const user = userEvent.setup()
+
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '12.5',
+      createdAt: '2026-08-19T12:00:00.000Z',
+    })
+    appFiatRates.reset()
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+
+    expect(await screen.findByText('$12.50')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(appFiatRates.getSnapshot().EUR).not.toBe(1)
+    })
+
+    const eurAmount = formatDisplayFiat(
+      12.5,
+      DISPLAY_CURRENCY.Eur,
+      appFiatRates.getSnapshot(),
+    )
+
+    await user.click(screen.getByRole('radio', { name: 'EUR' }))
+
+    expect(await screen.findByText(eurAmount)).toBeInTheDocument()
   })
 
   it('на главном экране показывает токены из users.assets', async () => {

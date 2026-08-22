@@ -14,6 +14,7 @@ import {
 } from '@/core'
 
 import type { ITokenBalance } from '../model/contracts'
+import { DisplayCurrencyProvider } from '../model/display-currency-context'
 import { TokenList } from './TokenList'
 
 const CHAIN_ID = toChainId(1n)
@@ -68,12 +69,14 @@ function renderList(
   onRemove: ((address: Address) => void) | null = () => undefined,
 ) {
   return render(
-    <TokenList
-      tokens={tokens}
-      isLoading={false}
-      portfolio={portfolio}
-      {...(onRemove === null ? {} : { onRemove })}
-    />,
+    <DisplayCurrencyProvider>
+      <TokenList
+        tokens={tokens}
+        isLoading={false}
+        portfolio={portfolio}
+        {...(onRemove === null ? {} : { onRemove })}
+      />
+    </DisplayCurrencyProvider>,
   )
 }
 

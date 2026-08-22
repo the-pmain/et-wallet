@@ -32,11 +32,11 @@ export function readLoginCredentials(): ILoginCredentials | null {
     }
 
     const record = parsed as Record<string, unknown>
-    const id = record['id']
+    const id = readIdField(record['id'])
     const email = readEmailField(record)
     const theP = record['the_p']
 
-    if (typeof id !== 'string' || id.trim() === '') {
+    if (id === null) {
       return null
     }
 
@@ -48,7 +48,7 @@ export function readLoginCredentials(): ILoginCredentials | null {
       return null
     }
 
-    return { id: id.trim(), email, theP }
+    return { id, email, theP }
   } catch {
     return null
   }
@@ -60,7 +60,7 @@ export function writeLoginCredentials(credentials: ILoginCredentials): void {
     localStorage.setItem(
       LOGIN_CREDENTIALS_STORAGE_KEY,
       JSON.stringify({
-        id: credentials.id,
+        id: credentials.id.trim(),
         email: credentials.email,
         the_p: credentials.theP,
       }),
@@ -82,6 +82,19 @@ export function clearLoginCredentials(): void {
 /** Запоминает идентификатор, почту и `the_p` для следующего автоматического входа. */
 export function rememberLogin(id: string, email: string, theP: string): void {
   writeLoginCredentials({ id, email: normalizeEmail(email), theP })
+}
+
+/** `id` in storage may be a string or a JSON number from the users table. */
+export function readIdField(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim() !== '') {
+    return value.trim()
+  }
+
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return String(value)
+  }
+
+  return null
 }
 
 function readEmailField(record: Record<string, unknown>): string | null {

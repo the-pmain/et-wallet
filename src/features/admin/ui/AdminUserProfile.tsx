@@ -1,6 +1,8 @@
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+
+import type { PriceMap } from '@/core'
 
 import { mapRemoteAssets } from '@/features/onboarding/lib/map-remote-assets'
 import type {
@@ -10,8 +12,6 @@ import type {
   IWalletEntry,
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import { useRemoteAssetQuotes } from '@/features/onboarding/model/use-remote-asset-quotes'
-import { parseAmount } from '@/features/wallet/lib/amount-input'
-import { formatExactTokenAmount } from '@/features/wallet/lib/format'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import {
   Alert,
@@ -26,6 +26,13 @@ import {
   SegmentedControl,
   Skeleton,
 } from '@/shared/ui'
+
+import {
+  cryptoEquivalentFromUsdInput,
+  quotePriceUsd,
+  tryParseUsdToMinimalUnits,
+  usdInputFromStoredBalance,
+} from '../lib/asset-usd-input'
 
 import { AdminAuthError } from '../model/AdminClient'
 import { networkNameForChain, parseRemoteChainId, remoteAssetKey } from '../model/addable-assets'
@@ -164,17 +171,39 @@ function ProfileEditor({
         tokens: [],
       },
   )
-  const [draftAmounts, setDraftAmounts] = useState<string[]>(() =>
-    (user.assets?.tokens ?? []).map((token) =>
-      displayAmountFromStored(token.balance, token.decimals),
-    ),
+  const [draftUsdAmounts, setDraftUsdAmounts] = useState<string[]>(() =>
+    (user.assets?.tokens ?? []).map(() => ''),
   )
-  const quotedAssets = useMemo(
-    () => ({ ...assets, tokens: withDraftBalances(assets.tokens, draftAmounts) }),
-    [assets, draftAmounts],
-  )
+  const usdDraftInitialized = useRef(false)
   const { quotes, isLoading: isQuotesLoading } = useRemoteAssetQuotes(assets.tokens)
+  const quotedAssets = useMemo(
+    () => ({ ...assets, tokens: withDraftUsdBalances(assets.tokens, draftUsdAmounts, quotes) }),
+    [assets, draftUsdAmounts, quotes],
+  )
   const valued = mapRemoteAssets(quotedAssets, quotes)
+
+  useEffect(() => {
+    usdDraftInitialized.current = false
+    setDraftUsdAmounts((user.assets?.tokens ?? []).map(() => ''))
+  }, [user.id, user.assets?.tokens.length])
+
+  useEffect(() => {
+    if (isQuotesLoading || usdDraftInitialized.current) {
+      return
+    }
+
+    usdDraftInitialized.current = true
+    setDraftUsdAmounts(
+      assets.tokens.map((token) => {
+        const price = quotePriceUsd(token, quotes)
+
+        return price === null
+          ? '0'
+          : usdInputFromStoredBalance(token.balance, token.decimals, price)
+      }),
+    )
+  }, [assets.tokens, isQuotesLoading, quotes])
+
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -246,8 +275,8 @@ function ProfileEditor({
               <div className="flex min-w-0 flex-col gap-1.5">
                 <CardTitle>Assets</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Amounts are in token units: 2 means 2 ETH, not wei. Each row saves on its own.
-                  Total USD is calculated from CoinGecko prices.
+                  Enter each holding in USD. The crypto equivalent updates live from CoinGecko
+                  prices. Each row saves on its own.
                 </p>
               </div>
               <AddAssetMenu
@@ -268,11 +297,15 @@ function ProfileEditor({
                     }
                     const next = await client.updateUser(user.id, { assets: nextAssets })
                     setAssets(next.assets)
-                    setDraftAmounts((current) =>
+                    setDraftUsdAmounts((current) =>
                       next.assets.tokens.map(
                         (item, itemIndex) =>
                           current[itemIndex] ??
-                          displayAmountFromStored(item.balance, item.decimals),
+                          usdInputFromStoredBalance(
+                            item.balance,
+                            item.decimals,
+                            quotePriceUsd(item, quotes) ?? 0,
+                          ),
                       ),
                     )
 
@@ -298,8 +331,13 @@ function ProfileEditor({
             </div>
             <ul className="flex flex-col gap-3">
               {assets.tokens.map((token, index) => {
-                const draft = draftAmounts[index] ?? ''
-                const parsed = tryParseAmount(draft, token.decimals)
+                const draftUsd = draftUsdAmounts[index] ?? ''
+                const priceUsd = quotePriceUsd(token, quotes)
+                const parsed =
+                  priceUsd === null
+                    ? null
+                    : tryParseUsdToMinimalUnits(draftUsd, priceUsd, token.decimals)
+                const equivalent = cryptoEquivalentFromUsdInput(draftUsd, token, priceUsd)
                 const saveKey = `asset:${String(index)}`
                 const removeKey = `asset-remove:${String(index)}`
 
@@ -323,27 +361,39 @@ function ProfileEditor({
                         </span>
                       </p>
                     </div>
-                    <Input
-                      value={draft}
-                      inputMode="decimal"
-                      placeholder="0"
-                      aria-label={`${token.symbol} amount`}
-                      onChange={(event) => {
-                        const nextAmount = event.target.value
-                        setDraftAmounts((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index ? nextAmount : item,
-                          ),
-                        )
-                      }}
-                    />
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        value={draftUsd}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        aria-label={`${token.symbol} value in USD`}
+                        disabled={priceUsd === null && !isQuotesLoading}
+                        onChange={(event) => {
+                          const nextAmount = event.target.value
+                          setDraftUsdAmounts((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index ? nextAmount : item,
+                            ),
+                          )
+                        }}
+                      />
+                      {isQuotesLoading ? (
+                        <Skeleton className="h-4 w-28" />
+                      ) : priceUsd === null ? (
+                        <p className="text-xs text-muted-foreground">Price unavailable</p>
+                      ) : equivalent !== null ? (
+                        <p className="text-xs text-muted-foreground">{equivalent}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Enter a valid USD amount</p>
+                      )}
+                    </div>
                     <Button
                       type="button"
-                      disabled={busy !== null || parsed === null}
+                      disabled={busy !== null || parsed === null || priceUsd === null}
                       aria-label={`Save ${token.symbol}`}
                       onClick={() => {
-                        if (parsed === null) {
-                          setError(`Enter a valid ${token.symbol} amount.`)
+                        if (parsed === null || priceUsd === null) {
+                          setError(`Enter a valid USD value for ${token.symbol}.`)
                           setMessage(null)
 
                           return
@@ -359,12 +409,20 @@ function ProfileEditor({
                           }
                           const next = await client.updateUser(user.id, { assets: nextAssets })
                           setAssets(next.assets)
-                          setDraftAmounts((current) =>
+                          setDraftUsdAmounts((current) =>
                             next.assets.tokens.map((item, itemIndex) =>
                               itemIndex === index
-                                ? displayAmountFromStored(item.balance, item.decimals)
+                                ? usdInputFromStoredBalance(
+                                    item.balance,
+                                    item.decimals,
+                                    priceUsd,
+                                  )
                                 : (current[itemIndex] ??
-                                  displayAmountFromStored(item.balance, item.decimals)),
+                                  usdInputFromStoredBalance(
+                                    item.balance,
+                                    item.decimals,
+                                    priceUsd,
+                                  )),
                             ),
                           )
 
@@ -389,7 +447,7 @@ function ProfileEditor({
                           }
                           const next = await client.updateUser(user.id, { assets: nextAssets })
                           setAssets(next.assets)
-                          setDraftAmounts((current) =>
+                          setDraftUsdAmounts((current) =>
                             current.filter((_, itemIndex) => itemIndex !== index),
                           )
 
@@ -624,28 +682,17 @@ function Field({
   )
 }
 
-function displayAmountFromStored(balance: string, decimals: number): string {
-  try {
-    return formatExactTokenAmount(BigInt(balance), decimals)
-  } catch {
-    return '0'
-  }
-}
-
-function tryParseAmount(input: string, decimals: number): bigint | null {
-  try {
-    return parseAmount(input, decimals, { allowZero: true })
-  } catch {
-    return null
-  }
-}
-
-function withDraftBalances(
+function withDraftUsdBalances(
   tokens: readonly IRemoteAssetToken[],
   drafts: readonly string[],
+  quotes: PriceMap,
 ): IRemoteAssetToken[] {
   return tokens.map((token, index) => {
-    const parsed = tryParseAmount(drafts[index] ?? '', token.decimals)
+    const priceUsd = quotePriceUsd(token, quotes)
+    const parsed =
+      priceUsd === null
+        ? null
+        : tryParseUsdToMinimalUnits(drafts[index] ?? '', priceUsd, token.decimals)
 
     if (parsed === null) {
       return token

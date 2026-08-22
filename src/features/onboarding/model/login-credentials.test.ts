@@ -27,6 +27,19 @@ describe('login-credentials', () => {
     })
   })
 
+  it('читает id числом — так его кладёт JSON из таблицы users', () => {
+    localStorage.setItem(
+      LOGIN_CREDENTIALS_STORAGE_KEY,
+      JSON.stringify({ id: 70, email: 'theguy@email.com', the_p: '123456' }),
+    )
+
+    expect(readLoginCredentials()).toEqual({
+      id: '70',
+      email: 'theguy@email.com',
+      theP: '123456',
+    })
+  })
+
   it('читает прежнюю запись с ключом username, если есть id', () => {
     localStorage.setItem(
       LOGIN_CREDENTIALS_STORAGE_KEY,

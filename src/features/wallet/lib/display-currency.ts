@@ -63,10 +63,16 @@ export function formatDisplayFiat(
     return '—'
   }
 
-  return new Intl.NumberFormat('en-US', {
+  const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(convertFromUsd(amountUsd, currency, rates))
+  })
+
+  if (amountUsd > 0 && amountUsd < 0.01) {
+    return `< ${formatter.format(convertFromUsd(0.01, currency, rates))}`
+  }
+
+  return formatter.format(convertFromUsd(amountUsd, currency, rates))
 }

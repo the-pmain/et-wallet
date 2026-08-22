@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { I18nProvider } from '@/app/providers/I18nProvider'
 
+import { DisplayCurrencyProvider } from '../model/display-currency-context'
 import { FiatBalanceCard } from './FiatBalanceCard'
 
 const RATES = { USD: 1, EUR: 0.8, GBP: 0.5 } as const
@@ -11,7 +12,9 @@ const RATES = { USD: 1, EUR: 0.8, GBP: 0.5 } as const
 function renderCard(amountUsd: number | null) {
   return render(
     <I18nProvider>
-      <FiatBalanceCard amountUsd={amountUsd} rates={RATES} />
+      <DisplayCurrencyProvider>
+        <FiatBalanceCard amountUsd={amountUsd} rates={RATES} />
+      </DisplayCurrencyProvider>
     </I18nProvider>,
   )
 }

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.ts'
 import { loadConfig } from './config.ts'
 import { createEmailsStore } from './emails/createEmailsStore.ts'
+import { createSendingsStore } from './sendings/createSendingsStore.ts'
 import { createUsersStore } from './users/createUsersStore.ts'
 
 loadLocalEnv()
@@ -24,17 +25,21 @@ async function main(): Promise<void> {
   const config = loadConfig()
   const usersStore = createUsersStore(config)
   const emailsStore = await createEmailsStore(config)
+  const sendingsStore = await createSendingsStore(config)
   const app = await buildApp({
     config,
     users: usersStore.users,
     usersKind: usersStore.kind,
     emails: emailsStore.emails,
     emailsStorageWarning: emailsStore.storageWarning,
+    sendings: sendingsStore.sendings,
+    sendingsStorageWarning: sendingsStore.storageWarning,
   })
 
   app.addHook('onClose', async () => {
     await usersStore.close()
     await emailsStore.close()
+    await sendingsStore.close()
   })
 
   /* Остановка по сигналу закрывает соединения, а не обрывает их:

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import type { CatalogService } from '../catalog/CatalogService.ts'
 import type { IServerConfig } from '../config.ts'
+import { fetchFiatRates } from '../fiat/fiat-rates.ts'
 import { BadRequestError, NotFoundError } from '../lib/errors.ts'
 
 /**
@@ -67,6 +68,14 @@ export function registerCatalogRoutes(
     void reply.header('cache-control', cacheControl)
 
     return { networks: catalog.listNetworks() }
+  })
+
+  app.get('/v1/fiat-rates', async (_request, reply) => {
+    void reply.header('cache-control', `public, max-age=${String(config.catalogCacheSeconds)}`)
+
+    const rates = await fetchFiatRates()
+
+    return { rates }
   })
 
   app.get<{ Params: IChainIdParams }>(

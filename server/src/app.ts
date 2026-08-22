@@ -3,6 +3,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { registerAdminRoutes } from './api/admin.routes.ts'
 import { registerCatalogRoutes } from './api/catalog.routes.ts'
 import { registerNotificationRoutes } from './api/notifications.routes.ts'
+import { registerSendingRoutes } from './api/sendings.routes.ts'
 import { registerSettingsRoutes } from './api/settings.routes.ts'
 import { registerUserRoutes } from './api/users.routes.ts'
 import { registerVersionRoutes } from './api/version.routes.ts'
@@ -19,6 +20,9 @@ import { registerSecurity } from './plugins/security.ts'
 import { registerUi, sendWalletIndex } from './plugins/ui.ts'
 import { MemorySettingsRepository } from './settings/MemorySettingsRepository.ts'
 import type { ISettingsRepository } from './settings/contracts.ts'
+import { MemorySendingsRepository } from './sendings/MemorySendingsRepository.ts'
+import { SendingsService } from './sendings/SendingsService.ts'
+import type { ISendingsRepository } from './sendings/contracts.ts'
 import { MemoryUsersRepository } from './users/MemoryUsersRepository.ts'
 import { USERS_STORE_KIND, type IUsersRepository, type UsersStoreKind } from './users/contracts.ts'
 
@@ -37,6 +41,8 @@ export interface IAppDependencies {
   readonly email?: IEmailService
   readonly emails?: IEmailsRepository
   readonly emailsStorageWarning?: string | null
+  readonly sendings?: ISendingsRepository
+  readonly sendingsStorageWarning?: string | null
 }
 
 /**
@@ -120,6 +126,8 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
       authEmail: config.cloudflareAuthEmail,
     })
   const emails = dependencies.emails ?? new MemoryEmailsRepository()
+  const sendings = dependencies.sendings ?? new MemorySendingsRepository()
+  const sendingsService = new SendingsService(sendings, users)
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
@@ -180,6 +188,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
+  registerSendingRoutes(app, sendingsService)
   registerAdminRoutes(
     app,
     users,

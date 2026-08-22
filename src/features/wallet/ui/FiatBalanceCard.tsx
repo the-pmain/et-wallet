@@ -1,14 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 import { useTranslation } from '@/shared/i18n'
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/shared/ui'
 
-import {
-  DISPLAY_CURRENCY,
-  formatDisplayFiat,
-  type DisplayCurrency,
-  type IFiatRates,
-} from '../lib/display-currency'
+import { formatDisplayFiat, type IFiatRates } from '../lib/display-currency'
+import { useDisplayCurrency } from '../model/display-currency-context'
 import { CurrencySwitch } from './CurrencySwitch'
 import { useFiatRates } from './useFiatRates'
 
@@ -41,9 +37,13 @@ export function FiatBalanceCard({
   action,
 }: FiatBalanceCardProps) {
   const { t } = useTranslation()
+  const { currency, setCurrency, formatUsd } = useDisplayCurrency()
   const fetchedRates = useFiatRates()
   const rates = ratesOverride ?? fetchedRates
-  const [currency, setCurrency] = useState<DisplayCurrency>(DISPLAY_CURRENCY.Usd)
+  const displayAmount =
+    ratesOverride === undefined
+      ? formatUsd(amountUsd)
+      : formatDisplayFiat(amountUsd, currency, rates)
 
   return (
     <Card className="surface-hero gap-4 shadow-raised inset-shadow-hairline">
@@ -68,7 +68,7 @@ export function FiatBalanceCard({
               <span className="sr-only">{t('dashboard.valueLoading')}</span>
             </>
           ) : (
-            formatDisplayFiat(amountUsd, currency, rates)
+            displayAmount
           )}
         </div>
 

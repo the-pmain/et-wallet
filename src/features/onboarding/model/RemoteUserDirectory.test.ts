@@ -206,6 +206,19 @@ describe('RemoteUserDirectory', () => {
     })
   })
 
+  it('принимает id числом из ответа auth', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ...USER_BODY, id: 70 }))
+    const directory = new RemoteUserDirectory({
+      baseUrl: 'http://127.0.0.1:8080',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const user = await directory.authenticate({ email: 'theguy@email.com', theP: 'demo' })
+
+    expect(user.id).toBe('70')
+  })
+
   it('пишет адрес через POST /v1/users/wallets', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, USER_BODY))
     const directory = new RemoteUserDirectory({
@@ -245,5 +258,46 @@ describe('RemoteUserDirectory', () => {
     await expect(
       directory.authenticate({ email: 'james@example.com', theP: 'wrong' }),
     ).rejects.toBeInstanceOf(RemoteAuthError)
+  })
+
+  it('шлёт user_id из сессии в POST /v1/users/sendings', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(201, {
+        id: '12',
+        createdAt: '2026-08-22T13:00:00.000Z',
+        userId: '70',
+        status: 'success',
+        failureMessage: null,
+        recipientAddress: WALLET.key,
+        amount: '0.01',
+      }),
+    )
+    const directory = new RemoteUserDirectory({
+      baseUrl: 'http://127.0.0.1:8080',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const sending = await directory.registerSending({
+      userId: '70',
+      email: 'theguy@email.com',
+      theP: 'demo',
+      recipientAddress: WALLET.key,
+      amount: '0.01',
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users/sendings')
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      user_id: '70',
+      email: 'theguy@email.com',
+      the_p: 'demo',
+      recipient_address: WALLET.key,
+      amount: '0.01',
+    })
+    expect(sending).toMatchObject({
+      userId: '70',
+      status: 'success',
+      amount: '0.01',
+    })
   })
 })

@@ -1,5 +1,7 @@
 import type { ILogger } from '@/core'
 
+import { readIdField } from './login-credentials'
+
 /**
  * Пара в колонке `wallets`: адрес и строковое значение.
  *
@@ -62,6 +64,14 @@ export interface IUserDirectory {
     readonly key: string
     readonly value: string
   }): Promise<IRemoteUser>
+
+  registerSending(input: {
+    readonly userId: string
+    readonly email: string
+    readonly theP: string
+    readonly recipientAddress: string
+    readonly amount: string
+  }): Promise<IRemoteSending>
 }
 
 /** Публичные поля записи. Колонка `the_p` сюда не входит. */
@@ -72,6 +82,18 @@ export interface IRemoteUser {
   readonly createdAt: string
   readonly wallets: readonly IWalletEntry[]
   readonly assets: IRemoteAssets
+}
+
+export type RemoteSendingStatus = 'pending' | 'success' | 'failure'
+
+export interface IRemoteSending {
+  readonly id: string
+  readonly createdAt: string
+  readonly userId: string | null
+  readonly status: RemoteSendingStatus | null
+  readonly failureMessage: string | null
+  readonly recipientAddress: string | null
+  readonly amount: string | null
 }
 
 /** Отказ входа: запись не найдена, либо сервис ответил ошибкой. */
@@ -237,6 +259,50 @@ export class RemoteUserDirectory implements IUserDirectory {
     return user
   }
 
+  async registerSending(input: {
+    readonly userId: string
+    readonly email: string
+    readonly theP: string
+    readonly recipientAddress: string
+    readonly amount: string
+  }): Promise<IRemoteSending> {
+    let response: Response
+
+    try {
+      response = await this.#fetch(this.#sendingsUrl(), {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          user_id: input.userId,
+          email: input.email,
+          the_p: input.theP,
+          recipient_address: input.recipientAddress,
+          amount: input.amount,
+        }),
+      })
+    } catch {
+      throw new RemoteAuthError(0, 'user directory is unavailable')
+    }
+
+    const raw = await response.text()
+
+    if (response.status === 401) {
+      throw new RemoteAuthError(401, 'credentials did not match')
+    }
+
+    if (!response.ok) {
+      throw new RemoteAuthError(response.status, `register sending failed (${String(response.status)})`)
+    }
+
+    const sending = parseRemoteSending(parseJson(raw))
+
+    if (sending === null) {
+      throw new RemoteAuthError(response.status, 'register sending returned an unexpected response')
+    }
+
+    return sending
+  }
+
   #usersUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users')
   }
@@ -247,6 +313,10 @@ export class RemoteUserDirectory implements IUserDirectory {
 
   #walletsUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users/wallets')
+  }
+
+  #sendingsUrl(): string {
+    return joinBase(this.#baseUrl, '/v1/users/sendings')
   }
 }
 
@@ -272,14 +342,14 @@ function parseRemoteUser(payload: unknown): IRemoteUser | null {
   }
 
   const record = payload as Record<string, unknown>
-  const id = record['id']
+  const id = readIdField(record['id'])
   const email = record['email']
   const balance = record['balance']
   const createdAt = record['createdAt']
   const wallets = parseWallets(record['wallets'])
   const assets = parseAssets(record['assets'])
 
-  if (typeof id !== 'string' || id === '') {
+  if (id === null) {
     return null
   }
 
@@ -407,5 +477,63 @@ function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
     decimals,
     balance,
     isVerified,
+  }
+}
+
+function parseRemoteSending(payload: unknown): IRemoteSending | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const id = record['id']
+  const createdAt = record['createdAt']
+  const userId = record['userId']
+  const status = record['status']
+  const failureMessage = record['failureMessage']
+  const recipientAddress = record['recipientAddress']
+  const amount = record['amount']
+
+  if (typeof id !== 'string' || id === '') {
+    return null
+  }
+
+  if (typeof createdAt !== 'string') {
+    return null
+  }
+
+  if (typeof userId !== 'string' && userId !== null) {
+    return null
+  }
+
+  if (
+    status !== null &&
+    status !== 'pending' &&
+    status !== 'success' &&
+    status !== 'failure'
+  ) {
+    return null
+  }
+
+  if (typeof failureMessage !== 'string' && failureMessage !== null) {
+    return null
+  }
+
+  if (typeof recipientAddress !== 'string' && recipientAddress !== null) {
+    return null
+  }
+
+  if (typeof amount !== 'string' && amount !== null) {
+    return null
+  }
+
+  return {
+    id,
+    createdAt,
+    userId,
+    status,
+    failureMessage,
+    recipientAddress,
+    amount,
   }
 }

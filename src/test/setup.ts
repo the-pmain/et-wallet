@@ -166,7 +166,7 @@ vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
     )
   }
 
-  if (url.includes('frankfurter.app') || url.includes('frankfurter.dev') || url.includes('/latest?from=USD')) {
+  if (url.includes('frankfurter.app') || url.includes('frankfurter.dev') || url.includes('/v1/fiat-rates') || url.includes('/latest?from=USD')) {
     return Promise.resolve(
       new Response(JSON.stringify({ rates: { EUR: 0.9, GBP: 0.8 } }), {
         status: 200,

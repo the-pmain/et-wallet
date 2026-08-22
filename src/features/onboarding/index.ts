@@ -7,6 +7,7 @@ export { isPasswordPairValid } from './lib/password-form'
 export {
   LOGIN_CREDENTIALS_STORAGE_KEY,
   clearLoginCredentials,
+  readIdField,
   readLoginCredentials,
   writeLoginCredentials,
   rememberLogin,
@@ -21,6 +22,8 @@ export {
   INITIAL_WALLET_VALUE,
   type IUserDirectory,
   type IRemoteUser,
+  type IRemoteSending,
+  type RemoteSendingStatus,
   type IWalletEntry,
   type IRemoteAssetToken,
   type IRemoteAssets,

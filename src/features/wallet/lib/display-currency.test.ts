@@ -22,6 +22,11 @@ describe('formatDisplayFiat', () => {
   it('не подменяет неизвестную сумму нулём', () => {
     expect(formatDisplayFiat(null, DISPLAY_CURRENCY.Usd, RATES)).toBe('—')
   })
+
+  it('прячет суммы меньше цента за порогом в выбранной валюте', () => {
+    expect(formatDisplayFiat(0.005, DISPLAY_CURRENCY.Usd, RATES)).toBe('< $0.01')
+    expect(formatDisplayFiat(0.005, DISPLAY_CURRENCY.Eur, RATES)).toBe('< €0.01')
+  })
 })
 
 describe('parseDisplayAmount', () => {

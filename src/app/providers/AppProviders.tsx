@@ -6,6 +6,7 @@ import { WalletProvider } from '@/features/wallet'
 import { createAppServices, type IAppServices } from '../composition/createAppServices'
 import { AppErrorBoundary } from './AppErrorBoundary'
 import { DappProvider } from './DappProvider'
+import { DisplayCurrencyProvider } from '@/features/wallet/model/display-currency-context'
 import { I18nProvider } from './I18nProvider'
 import { MarketDataBootstrap } from './MarketDataBootstrap'
 import { SecurityProvider } from './SecurityProvider'
@@ -55,8 +56,9 @@ export function AppProviders({ children, services }: AppProvidersProps) {
           ли кошелёк, он не зависит. */}
         <I18nProvider>
           <MarketDataBootstrap>
-            <DirectorySessionProvider>
-              <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
+            <DisplayCurrencyProvider>
+              <DirectorySessionProvider>
+                <OnboardingProvider service={value.onboarding} broadcast={value.broadcast}>
                 {/* Модуль безопасности вложен в онбординг и охватывает сессию
                 кошелька: автоблокировка следит за состоянием блокировки,
                 а её срабатывание обязано закрыть сессию. */}
@@ -72,7 +74,8 @@ export function AppProviders({ children, services }: AppProvidersProps) {
                   </WalletProvider>
                 </SecurityProvider>
               </OnboardingProvider>
-            </DirectorySessionProvider>
+              </DirectorySessionProvider>
+            </DisplayCurrencyProvider>
           </MarketDataBootstrap>
         </I18nProvider>
       </ThemeProvider>

@@ -16,17 +16,17 @@ import {
   TRANSACTION_TYPE,
   decodeTransfer,
   findRecipientRisks,
-  safeText,
+  isValidAddress,
+  toAddress,
   toWei,
   type Address,
-  type FeePriority,
   type IToken,
   type RecipientRisk,
   type TxHash,
 } from '@/core'
+import { readLoginCredentials, useDirectorySession } from '@/features/onboarding'
 import { ConfirmPassword, UntrustedText, useSecurity } from '@/features/security'
 import {
-  RECIPIENT_STATUS,
   AccountAvatar,
   addressLabel,
   formatTokenAmount,
@@ -34,12 +34,15 @@ import {
   NATIVE_ASSET_KEY,
   PreflightNotice,
   SimulationNotice,
+  useSendAssets,
   useWallet,
   useWalletSnapshot,
   type IPreparedTransfer,
   type IRecipientResolution,
   type ISimulationAsset,
 } from '@/features/wallet'
+import { SendAssetSelect } from '@/features/wallet/ui/SendAssetSelect'
+import { RECIPIENT_STATUS } from '@/features/wallet/model/contracts'
 import {
   Alert,
   AlertDescription,
@@ -52,7 +55,6 @@ import {
   CardTitle,
   Input,
   Label,
-  SegmentedControl,
 } from '@/shared/ui'
 
 /** Этапы отправки. */
@@ -72,15 +74,6 @@ type Step = (typeof STEP)[keyof typeof STEP]
  * имя и подробный след у оператора узла.
  */
 const RESOLVE_DEBOUNCE_MS = 350
-
-/**
- * Значение пункта «нативная валюта» в списке активов.
- *
- * У нативной валюты нет адреса контракта, а `<option>` обязан иметь
- * значение-строку. Пустая строка не годится: браузер считает её
- * отсутствием выбора.
- */
-const NATIVE_ASSET_VALUE = 'native'
 
 /** Совпадают ли активы. `null` с обеих сторон — нативная валюта. */
 function sameAsset(left: Address | null, right: Address | null): boolean {
@@ -131,19 +124,23 @@ const EMPTY_RECIPIENT: IResolvedRecipient = {
 export function SendPage() {
   const session = useWallet()
   const snapshot = useWalletSnapshot()
+  const directory = useDirectorySession()
+  const { assets, isLoading: isAssetsLoading, chainId: sendChainId, isRemote } = useSendAssets()
+  const login = readLoginCredentials()
+  const sendViaDirectory = isRemote || login !== null
   const fieldId = useId()
 
   const [step, setStep] = useState<Step>(STEP.Form)
   const [recipient, setRecipient] = useState('')
   const [resolved, setResolved] = useState<IResolvedRecipient>(EMPTY_RECIPIENT)
   const [amount, setAmount] = useState('')
+  const [success, setSuccess] = useState<string | null>(null)
 
   /* Что отправляется. `null` — нативная валюта сети; иначе адрес
      контракта токена. Хранится адрес, а не сам токен: список приходит
      из снимка и пересоздаётся при каждом обновлении баланса, и ссылка
      на прежний объект перестала бы совпадать. */
   const [assetAddress, setAssetAddress] = useState<Address | null>(null)
-  const [priority, setPriority] = useState<FeePriority>(FEE_PRIORITY.Medium)
   const [prepared, setPrepared] = useState<IPreparedTransfer | null>(null)
   const [risks, setRisks] = useState<readonly RecipientRisk[]>([])
   const [hash, setHash] = useState<TxHash | null>(null)
@@ -153,10 +150,8 @@ export function SendPage() {
   const network = snapshot.activeNetwork
   const account = snapshot.activeAccount
 
-  /* Отслеживаемые активы: первой идёт нативная валюта, дальше токены.
-     Список тот же, что на главном экране, — второй источник правды
-     о составе кошелька разошёлся бы с первым. */
-  const assets = snapshot.tokenBalances
+  /* Тот же список, что на главном и в Assets: для записи справочника
+     он приходит с сервера в `users.assets`. */
   const selected = assets.find((item) => sameAsset(item.token.address, assetAddress)) ?? null
   const token = selected === null || selected.token.address === null ? null : selected.token
 
@@ -166,7 +161,26 @@ export function SendPage() {
   /* Доступное количество берётся у выбранного актива. `null` означает
      «прочитать не удалось» и показывается прочерком: ноль на этом месте
      сказал бы, что средств нет. */
-  const available = selected === null ? (snapshot.balance?.raw ?? null) : selected.balance
+  const available =
+    selected === null
+      ? isAssetsLoading
+        ? null
+        : (snapshot.balance?.raw ?? null)
+      : selected.balance
+
+  /* Первая строка списка выбирается автоматически: пустой выбор
+     оставлял бы поле «Что отправить» без значения и скрывал бы баланс. */
+  useEffect(() => {
+    if (assets.length === 0) {
+      return
+    }
+
+    const stillListed = assets.some((item) => sameAsset(item.token.address, assetAddress))
+
+    if (!stillListed) {
+      setAssetAddress(assets[0]?.token.address ?? null)
+    }
+  }, [assetAddress, assets])
 
   /* Обозначения и число знаков по адресу контракта — для показа
      перемещений, найденных симуляцией. Собирается здесь, а не
@@ -203,6 +217,29 @@ export function SendPage() {
   const recipientAddress = isResolving ? null : resolved.result.address
   const recipientName = isResolving ? null : resolved.result.name
 
+  /* Кнопка «Далее» не должна ждать конца разбора, если адрес уже
+     выглядит как валидный hex: иначе форма кажется сломанной, хотя
+     введено верно. Имена ENS по-прежнему ждут асинхронного разбора. */
+  const effectiveRecipientAddress = useMemo((): Address | null => {
+    if (trimmedRecipient === '') {
+      return null
+    }
+
+    if (!isResolving && recipientAddress !== null) {
+      return recipientAddress
+    }
+
+    if (isValidAddress(trimmedRecipient)) {
+      try {
+        return toAddress(trimmedRecipient)
+      } catch {
+        return null
+      }
+    }
+
+    return null
+  }, [isResolving, recipientAddress, trimmedRecipient])
+
   /**
    * Разбирает введённого получателя с задержкой.
    *
@@ -238,15 +275,44 @@ export function SendPage() {
   async function prepare(event: FormEvent): Promise<void> {
     event.preventDefault()
 
-    if (account === null || network === null || recipientAddress === null) {
+    if (sendChainId === null || effectiveRecipientAddress === null) {
       return
     }
 
     setBusy(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const value = parseAmount(amount, decimals)
+
+      if (sendViaDirectory) {
+        if (login === null || login.id === '') {
+          setError('Sign in again to send.')
+          return
+        }
+
+        const amountValue = formatTokenAmount(value, decimals)
+        const sending = await directory.registerSending({
+          recipientAddress: effectiveRecipientAddress,
+          amount: amountValue,
+        })
+
+        if (sending.status === 'failure') {
+          setError(sending.failureMessage ?? 'The transfer could not be sent.')
+          return
+        }
+
+        setSuccess(
+          `Successfully sent ${sending.amount ?? amountValue} ${symbol} to ${trimmedRecipient}`,
+        )
+        return
+      }
+
+      if (account === null) {
+        setError('Unlock the wallet before sending.')
+        return
+      }
 
       /* Два разных намерения — два разных вызова. У перевода токена
          получатель и сумма уходят в данные вызова, и собирать их
@@ -255,19 +321,19 @@ export function SendPage() {
       const result =
         token === null
           ? await session.prepareTransfer({
-              chainId: network.chainId,
+              chainId: sendChainId,
               from: account.address,
-              to: recipientAddress,
+              to: effectiveRecipientAddress,
               /* `toWei` — единственный допустимый способ получить
                  брендированное значение: приведение типом обошло бы
                  проверку диапазона. */
               value: toWei(value),
             })
           : await session.prepareTokenTransfer({
-              chainId: network.chainId,
+              chainId: sendChainId,
               from: account.address,
               token: token.address as Address,
-              to: recipientAddress,
+              to: effectiveRecipientAddress,
               amount: value,
             })
 
@@ -277,9 +343,13 @@ export function SendPage() {
          Исключение — адрес, полученный из имени: его пользователь
          не набирал, и упрекать его в отсутствии контрольной суммы
          не за что. */
+      const riskRecipient = isValidAddress(trimmedRecipient)
+        ? trimmedRecipient
+        : (effectiveRecipientAddress ?? trimmedRecipient)
+
       const found = [
         ...findRecipientRisks(
-          resolved.result.status === RECIPIENT_STATUS.Address ? trimmedRecipient : recipientAddress,
+          riskRecipient,
           account.address,
           /* Адрес контракта отправляемого токена: перевод токена в его
              собственный контракт — заведомая потеря. У нативной валюты
@@ -292,7 +362,7 @@ export function SendPage() {
          здесь, один раз, а не в чистой функции выше. Отказ узла даёт
          `null` и не добавляет замечания: «проверить не удалось» нельзя
          показывать как «получатель обычный адрес». */
-      const isContract = await session.isContractRecipient(recipientAddress)
+      const isContract = await session.isContractRecipient(effectiveRecipientAddress)
 
       if (isContract === true) {
         /* Для токена «получатель — контракт» звучит иначе: перевод
@@ -302,7 +372,7 @@ export function SendPage() {
       }
 
       setRisks(found)
-      setPrepared(applyPriority(result, priority))
+      setPrepared(applyPriority(result, FEE_PRIORITY.Medium))
       setStep(STEP.Confirm)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
@@ -369,7 +439,18 @@ export function SendPage() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-3">
-          {account === null ? null : (
+          {account === null ? (
+            directory.user === null ? null : (
+              <div className="flex items-center gap-3 rounded-xl border p-3">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{directory.user.email}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    Directory user {directory.user.id}
+                  </span>
+                </div>
+              </div>
+            )
+          ) : (
             <div className="flex items-center gap-3 rounded-xl border p-3">
               <AccountAvatar address={account.address} />
 
@@ -423,6 +504,7 @@ export function SendPage() {
                 onChange={(event) => {
                   setRecipient(event.target.value)
                   setError(null)
+                  setSuccess(null)
                 }}
               />
 
@@ -435,44 +517,34 @@ export function SendPage() {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${fieldId}-asset`}>What to send</Label>
-              <select
+              <SendAssetSelect
                 id={`${fieldId}-asset`}
-                value={assetAddress ?? NATIVE_ASSET_VALUE}
-                /* Высота 44: список активов — обычный собственный
-                   элемент, а не кнопка, и общий `tap-target` его не
-                   касается. Прежние 36 пикселей были ниже предела
-                   прицеливания пальцем. */
-                className="focus-ring h-11 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs"
-                onChange={(event) => {
+                assets={assets}
+                value={assetAddress}
+                disabled={assets.length === 0}
+                isLoading={isAssetsLoading}
+                onChange={(address) => {
                   /* Сумма сбрасывается вместе с активом: число знаков
                      у токенов разное, и «10», набранное для актива
                      с восемнадцатью знаками, при шести означало бы
                      совсем другую величину. */
-                  setAssetAddress(
-                    event.target.value === NATIVE_ASSET_VALUE
-                      ? null
-                      : (event.target.value as Address),
-                  )
+                  setAssetAddress(address)
                   setAmount('')
                   setError(null)
+                  setSuccess(null)
                 }}
-              >
-                {assets.map((item) => (
-                  <option
-                    key={item.token.address ?? NATIVE_ASSET_VALUE}
-                    value={item.token.address ?? NATIVE_ASSET_VALUE}
-                  >
-                    {/* `<option>` вмещает только текст, не элементы:
-                        обезвреживание строкой, а не компонентом со span. */}
-                    {safeText(item.token.symbol)}
-                    {item.token.isVerified
-                      ? ' — verified'
-                      : item.token.isCustom
-                        ? ' — added by hand'
-                        : ''}
-                  </option>
-                ))}
-              </select>
+              />
+
+              {isAssetsLoading ? (
+                <p className="text-xs text-muted-foreground">Loading assets from your account…</p>
+              ) : null}
+
+              {!isAssetsLoading && assets.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No assets are available to send. Add tokens on the Assets screen or check your
+                  account on the server.
+                </p>
+              ) : null}
 
               {token === null ? null : (
                 /* Символ токена задаёт автор контракта, и выпустить токен
@@ -511,20 +583,18 @@ export function SendPage() {
                 onChange={(event) => {
                   setAmount(event.target.value)
                   setError(null)
+                  setSuccess(null)
                 }}
               />
             </div>
 
-            {/* Тот же переключатель, что и на отборе истории. Прежде
-                здесь стоял свой набор кнопок с собственными размерами:
-                одинаковые по смыслу органы управления, выглядящие
-                по-разному, читаются как разные по назначению. */}
-            <SegmentedControl
-              legend="Speed"
-              options={FEE_LEVELS}
-              value={priority}
-              onChange={setPriority}
-            />
+            {success === null ? null : (
+              <Alert>
+                <CheckCircle2 aria-hidden />
+                <AlertTitle>Success</AlertTitle>
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
 
             {error === null ? null : (
               <Alert variant="danger">
@@ -536,11 +606,17 @@ export function SendPage() {
               type="submit"
               size="lg"
               disabled={
-                isBusy || account === null || recipientAddress === null || amount.trim() === ''
+                isBusy ||
+                isAssetsLoading ||
+                sendChainId === null ||
+                effectiveRecipientAddress === null ||
+                amount.trim() === '' ||
+                assets.length === 0 ||
+                (!sendViaDirectory && account === null)
               }
             >
               <Send className="size-4" aria-hidden />
-              {isBusy ? 'Estimating the fee…' : 'Next'}
+              {isBusy ? (sendViaDirectory ? 'Sending…' : 'Estimating the fee…') : 'Next'}
             </Button>
           </form>
         </CardContent>
@@ -645,20 +721,11 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
   }
 }
 
-/** Уровни срочности в порядке возрастания. */
-const FEE_LEVELS: readonly { value: FeePriority; label: string }[] = [
-  { value: FEE_PRIORITY.Low, label: 'Normal' },
-  { value: FEE_PRIORITY.Medium, label: 'Fast' },
-  { value: FEE_PRIORITY.High, label: 'Urgent' },
-]
-
-/**
- * Применяет выбранный уровень комиссии к подготовленной транзакции.
- *
- * Пересчёт выполняется ОДИН РАЗ, до показа подтверждения. После этого
- * объект не меняется: экран показывает те же поля, что уходят в подпись.
- */
-function applyPriority(prepared: IPreparedTransfer, priority: FeePriority): IPreparedTransfer {
+/** Применяет стандартный уровень комиссии к подготовленной транзакции. */
+function applyPriority(
+  prepared: IPreparedTransfer,
+  priority: (typeof FEE_PRIORITY)[keyof typeof FEE_PRIORITY],
+): IPreparedTransfer {
   const fee = prepared.fees.find((item) => item.priority === priority)
 
   if (fee === undefined) {
