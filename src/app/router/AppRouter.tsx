@@ -7,7 +7,10 @@ import { ONBOARDING_STATE, useDirectorySession, useOnboardingState } from '@/fea
    отложенную загрузку остальных. */
 import { AdminPage } from '@/pages/AdminPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { EmailConversationPage } from '@/pages/EmailConversationPage'
+import { EmailConversationsPage } from '@/pages/EmailConversationsPage'
 import { EmailManagerPage } from '@/pages/EmailManagerPage'
+import { EmailNewConversationPage } from '@/pages/EmailNewConversationPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { UnlockWalletPage } from '@/pages/UnlockWalletPage'
 import { WelcomePage } from '@/pages/WelcomePage'
@@ -195,7 +198,11 @@ export function AppRouter() {
           </Route>
         </Route>
 
-        <Route path={ROUTE.EmailManager} element={<EmailManagerPage />} />
+        <Route path={ROUTE.EmailManager} element={<EmailManagerPage />}>
+          <Route index element={<EmailConversationsPage />} />
+          <Route path="new" element={<EmailNewConversationPage />} />
+          <Route path=":conversationId" element={<EmailConversationPage />} />
+        </Route>
 
         <Route path={ROUTE.Dashboard} element={<UnlockedOnly />}>
           {/* Одна граница ожидания на все разделы: она лежит внутри

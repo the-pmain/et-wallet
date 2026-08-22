@@ -4,7 +4,13 @@ import { emailManagerPinMatches, pinMatches } from '../admin/pin.ts'
 import { isEmailAddress } from '../email/address.ts'
 import type { IEmailMessage, IEmailService } from '../email/contracts.ts'
 import { htmlToPlainText, isBlankHtml, wrapPlainTextAsHtml } from '../email/plain-text.ts'
-import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
+import { EMAIL_DIRECTION, type IEmailRecord, type IEmailsRepository } from '../emails/contracts.ts'
+import {
+  BadRequestError,
+  NotFoundError,
+  ServiceUnavailableError,
+  UnauthorizedError,
+} from '../lib/errors.ts'
 import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
 import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
 import { readWalletsPayload } from '../users/wallets.ts'
@@ -66,6 +72,20 @@ const SEND_EMAIL_BODY = {
   },
 } as const
 
+const INBOUND_EMAIL_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['from', 'to', 'subject'],
+  properties: {
+    from: { type: 'string', minLength: 3, maxLength: 254 },
+    to: { type: 'string', minLength: 3, maxLength: 254 },
+    subject: { type: 'string', minLength: 1, maxLength: 200 },
+    html: { type: 'string', minLength: 1, maxLength: 32_000 },
+    text: { type: 'string', minLength: 1, maxLength: 32_000 },
+    externalId: { type: 'string', minLength: 1, maxLength: 200 },
+  },
+} as const
+
 interface IAuthBody {
   readonly pin: string
 }
@@ -86,6 +106,15 @@ interface ISendEmailBody {
   readonly text?: string
 }
 
+interface IInboundEmailBody {
+  readonly from: string
+  readonly to: string
+  readonly subject: string
+  readonly html?: string
+  readonly text?: string
+  readonly externalId?: string
+}
+
 interface IUserIdParams {
   readonly id: string
 }
@@ -94,6 +123,9 @@ export function registerAdminRoutes(
   app: FastifyInstance,
   users: IUsersRepository,
   email: IEmailService,
+  emails: IEmailsRepository,
+  emailWebhookSecret: string | null,
+  emailsStorageWarning: string | null = null,
 ): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
@@ -188,7 +220,35 @@ export function registerAdminRoutes(
 
     void reply.header('cache-control', 'no-store')
 
-    return { configured: email.isConfigured }
+    return {
+      configured: email.isConfigured,
+      storageWarning: emailsStorageWarning,
+    }
+  })
+
+  app.get('/v1/admin/email/messages', async (request, reply) => {
+    requireEmailManagerPin(request)
+
+    const records = await emails.list({ limit: 100 })
+
+    void reply.header('cache-control', 'no-store')
+
+    return { messages: records.map(toEmailMessageResponse) }
+  })
+
+  app.get('/v1/admin/email/recipients', async (request, reply) => {
+    requireEmailManagerPin(request)
+
+    const records = await users.list()
+    const recipients = [
+      ...new Set(
+        records.flatMap((user) => (user.email === null || user.email.trim() === '' ? [] : [user.email])),
+      ),
+    ].sort((left, right) => left.localeCompare(right))
+
+    void reply.header('cache-control', 'no-store')
+
+    return { recipients }
   })
 
   app.post<{ Body: ISendEmailBody }>(
@@ -205,6 +265,26 @@ export function registerAdminRoutes(
 
       const result = await email.send(message)
 
+      await emails.create({
+        direction: EMAIL_DIRECTION.Sent,
+        from: message.from,
+        to: message.to,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+        status:
+          result.delivered.length > 0
+            ? 'delivered'
+            : result.queued.length > 0
+              ? 'queued'
+              : 'accepted',
+        providerResult: {
+          delivered: result.delivered,
+          queued: result.queued,
+          permanentBounces: result.permanentBounces,
+        },
+      })
+
       void reply.header('cache-control', 'no-store')
 
       return {
@@ -212,6 +292,56 @@ export function registerAdminRoutes(
         queued: result.queued,
         permanentBounces: result.permanentBounces,
       }
+    },
+  )
+
+  app.post<{ Body: IInboundEmailBody }>(
+    '/v1/webhooks/email-inbound',
+    { schema: { body: INBOUND_EMAIL_BODY } },
+    async (request, reply) => {
+      if (emailWebhookSecret === null || emailWebhookSecret.trim() === '') {
+        throw new ServiceUnavailableError(
+          'Inbound email is not configured. Set EMAIL_WEBHOOK_SECRET.',
+        )
+      }
+
+      const header = request.headers['x-email-webhook-secret']
+      const presented = Array.isArray(header) ? header[0] : header
+
+      if (typeof presented !== 'string' || presented !== emailWebhookSecret) {
+        throw new UnauthorizedError('Неверные учётные данные.')
+      }
+
+      const inbound = readInboundEmail(request.body)
+
+      if (inbound === null) {
+        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+      }
+
+      if (inbound.externalId !== null) {
+        const existing = await emails.findByExternalId(inbound.externalId)
+
+        if (existing !== null) {
+          void reply.header('cache-control', 'no-store')
+
+          return { message: toEmailMessageResponse(existing), duplicate: true }
+        }
+      }
+
+      const record = await emails.create({
+        direction: EMAIL_DIRECTION.Received,
+        from: inbound.from,
+        to: inbound.to,
+        subject: inbound.subject,
+        html: inbound.html,
+        text: inbound.text,
+        status: 'received',
+        externalId: inbound.externalId,
+      })
+
+      void reply.status(201).header('cache-control', 'no-store')
+
+      return { message: toEmailMessageResponse(record), duplicate: false }
     },
   )
 }
@@ -314,6 +444,63 @@ function readSendEmail(body: ISendEmailBody): IEmailMessage | null {
   }
 
   return { to, from, subject, html, text }
+}
+
+function readInboundEmail(body: IInboundEmailBody): {
+  readonly from: string
+  readonly to: string
+  readonly subject: string
+  readonly html: string | null
+  readonly text: string | null
+  readonly externalId: string | null
+} | null {
+  const to = body.to.trim()
+  const from = body.from.trim()
+  const subject = body.subject.trim()
+
+  if (!isEmailAddress(to) || !isEmailAddress(from) || subject === '') {
+    return null
+  }
+
+  const htmlRaw = body.html?.trim() ?? ''
+  const textRaw = body.text?.trim() ?? ''
+  const html =
+    htmlRaw === '' || isBlankHtml(htmlRaw)
+      ? textRaw === ''
+        ? null
+        : wrapPlainTextAsHtml(textRaw)
+      : htmlRaw
+  const text =
+    textRaw === '' ? (html === null ? null : htmlToPlainText(html)) : textRaw
+
+  if ((text === null || text === '') && (html === null || isBlankHtml(html))) {
+    return null
+  }
+
+  const externalId = body.externalId?.trim() ?? ''
+
+  return {
+    from,
+    to,
+    subject,
+    html,
+    text,
+    externalId: externalId === '' ? null : externalId,
+  }
+}
+
+function toEmailMessageResponse(record: IEmailRecord) {
+  return {
+    id: record.id,
+    createdAt: record.createdAt.toISOString(),
+    direction: record.direction,
+    from: record.from,
+    to: record.to,
+    subject: record.subject,
+    html: record.html,
+    text: record.text,
+    status: record.status,
+  }
 }
 
 function toUserResponse(record: IUserRecord): IUserResponse {

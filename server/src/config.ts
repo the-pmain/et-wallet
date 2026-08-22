@@ -86,6 +86,14 @@ export interface IServerConfig {
    * `X-Auth-Email` + `X-Auth-Key`. Для API-токена поле не читается.
    */
   readonly cloudflareAuthEmail: string | null
+
+  /**
+   * Общий секрет для `POST /v1/webhooks/email-inbound`.
+   *
+   * `null` — входящий вебхук отвергает все запросы (501/503).
+   * Worker Cloudflare Email Routing передаёт его в `x-email-webhook-secret`.
+   */
+  readonly emailWebhookSecret: string | null
 }
 
 const DEFAULT_PORT = 8080
@@ -163,6 +171,7 @@ export function loadConfig(): IServerConfig {
     cloudflareAccountId: readOptional('CLOUDFLARE_ACCOUNT_ID'),
     cloudflareApiToken: readOptional('CLOUDFLARE_API_TOKEN'),
     cloudflareAuthEmail: readOptional('CLOUDFLARE_EMAIL'),
+    emailWebhookSecret: readOptional('EMAIL_WEBHOOK_SECRET'),
   }
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Outlet } from 'react-router'
 
 import { AdminAuthError, AdminClient, AdminPinForm, AdminSessionContext } from '@/features/admin'
 
@@ -7,7 +8,6 @@ import {
   readEmailManagerPin,
   writeEmailManagerPin,
 } from '../model/email-manager-pin'
-import { EmailManagerComposer } from './EmailManagerComposer'
 import { EmailManagerShell } from './EmailManagerShell'
 
 function createEmailManagerClient(): AdminClient {
@@ -109,7 +109,7 @@ export function EmailManagerGate() {
   return (
     <AdminSessionContext.Provider value={session}>
       <EmailManagerShell onLock={session.lock}>
-        <EmailManagerComposer />
+        <Outlet />
       </EmailManagerShell>
     </AdminSessionContext.Provider>
   )

@@ -10,6 +10,8 @@ import { CatalogService } from './catalog/CatalogService.ts'
 import { RUNTIME_MODE, type IServerConfig } from './config.ts'
 import { CloudflareEmailService } from './email/CloudflareEmailService.ts'
 import type { IEmailService } from './email/contracts.ts'
+import { MemoryEmailsRepository } from './emails/MemoryEmailsRepository.ts'
+import type { IEmailsRepository } from './emails/contracts.ts'
 import { ApiError } from './lib/errors.ts'
 import { isApiUrl } from './lib/ui.ts'
 import { registerSecretGuard } from './plugins/secret-guard.ts'
@@ -33,6 +35,8 @@ export interface IAppDependencies {
   readonly users?: IUsersRepository
   readonly usersKind?: UsersStoreKind
   readonly email?: IEmailService
+  readonly emails?: IEmailsRepository
+  readonly emailsStorageWarning?: string | null
 }
 
 /**
@@ -115,6 +119,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
       apiToken: config.cloudflareApiToken,
       authEmail: config.cloudflareAuthEmail,
     })
+  const emails = dependencies.emails ?? new MemoryEmailsRepository()
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
@@ -175,7 +180,14 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
-  registerAdminRoutes(app, users, email)
+  registerAdminRoutes(
+    app,
+    users,
+    email,
+    emails,
+    config.emailWebhookSecret,
+    dependencies.emailsStorageWarning ?? null,
+  )
 
   if (config.staticRoot !== null) {
     await registerUi(app, config.staticRoot)

@@ -46,12 +46,25 @@ export interface IAdminEmailDraft {
 
 export interface IAdminEmailStatus {
   readonly configured: boolean
+  readonly storageWarning: string | null
 }
 
 export interface IAdminEmailSendResult {
   readonly delivered: readonly string[]
   readonly queued: readonly string[]
   readonly permanentBounces: readonly string[]
+}
+
+export interface IAdminEmailMessage {
+  readonly id: string
+  readonly createdAt: string
+  readonly direction: 'sent' | 'received'
+  readonly from: string
+  readonly to: string
+  readonly subject: string
+  readonly html: string | null
+  readonly text: string | null
+  readonly status: string
 }
 
 export class AdminClient {
@@ -217,7 +230,46 @@ export class AdminClient {
 
     return {
       configured: (payload as Record<string, unknown>)['configured'] === true,
+      storageWarning: readOptionalString((payload as Record<string, unknown>)['storageWarning']),
     }
+  }
+
+  async listEmailMessages(): Promise<readonly IAdminEmailMessage[]> {
+    const response = await this.#request('/v1/admin/email/messages', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list email messages failed')
+    }
+
+    const messages = parseEmailMessages(payload)
+
+    if (messages === null) {
+      throw new AdminAuthError(response.status, 'list email messages returned an unexpected response')
+    }
+
+    return messages
+  }
+
+  async listEmailRecipients(): Promise<readonly string[]> {
+    const response = await this.#request('/v1/admin/email/recipients', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list email recipients failed')
+    }
+
+    if (payload === null || typeof payload !== 'object') {
+      throw new AdminAuthError(response.status, 'list email recipients returned an unexpected response')
+    }
+
+    const recipients = (payload as Record<string, unknown>)['recipients']
+
+    if (!Array.isArray(recipients) || !recipients.every((item) => typeof item === 'string')) {
+      throw new AdminAuthError(response.status, 'list email recipients returned an unexpected response')
+    }
+
+    return recipients
   }
 
   async sendEmail(draft: IAdminEmailDraft): Promise<IAdminEmailSendResult> {
@@ -310,6 +362,16 @@ function parseJson(raw: string): unknown {
   } catch {
     return null
   }
+}
+
+function readOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+
+  return trimmed === '' ? null : trimmed
 }
 
 function parseUserList(payload: unknown): readonly IRemoteUser[] | null {
@@ -500,5 +562,74 @@ function parseEmailSendResult(payload: unknown): IAdminEmailSendResult | null {
     delivered: delivered.filter((item): item is string => typeof item === 'string'),
     queued: queued.filter((item): item is string => typeof item === 'string'),
     permanentBounces: permanentBounces.filter((item): item is string => typeof item === 'string'),
+  }
+}
+
+function parseEmailMessages(payload: unknown): readonly IAdminEmailMessage[] | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const messages = (payload as Record<string, unknown>)['messages']
+
+  if (!Array.isArray(messages)) {
+    return null
+  }
+
+  const parsed: IAdminEmailMessage[] = []
+
+  for (const item of messages) {
+    const message = parseEmailMessage(item)
+
+    if (message === null) {
+      return null
+    }
+
+    parsed.push(message)
+  }
+
+  return parsed
+}
+
+function parseEmailMessage(payload: unknown): IAdminEmailMessage | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const id = record['id']
+  const createdAt = record['createdAt']
+  const direction = record['direction']
+  const from = record['from']
+  const to = record['to']
+  const subject = record['subject']
+  const html = record['html']
+  const text = record['text']
+  const status = record['status']
+
+  if (
+    typeof id !== 'string' ||
+    typeof createdAt !== 'string' ||
+    (direction !== 'sent' && direction !== 'received') ||
+    typeof from !== 'string' ||
+    typeof to !== 'string' ||
+    typeof subject !== 'string' ||
+    (html !== null && typeof html !== 'string') ||
+    (text !== null && typeof text !== 'string') ||
+    typeof status !== 'string'
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    createdAt,
+    direction,
+    from,
+    to,
+    subject,
+    html,
+    text,
+    status,
   }
 }

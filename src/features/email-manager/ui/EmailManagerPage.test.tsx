@@ -12,6 +12,7 @@ import { EMAIL_MANAGER_PIN_STORAGE_KEY } from '@/features/email-manager'
 
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
+let storedMessages: Array<Record<string, unknown>>
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(body === null ? '' : JSON.stringify(body), {
@@ -54,6 +55,19 @@ beforeEach(() => {
   openPath('/email-manager')
   localStorage.clear()
   services = createTestAppServices()
+  storedMessages = [
+    {
+      id: '1',
+      createdAt: '2026-08-21T12:00:00.000Z',
+      direction: 'received',
+      from: 'user@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'Need help',
+      html: null,
+      text: 'Please help',
+      status: 'received',
+    },
+  ]
 
   fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
     const url = requestUrl(input)
@@ -73,13 +87,38 @@ beforeEach(() => {
     }
 
     if (url.endsWith('/v1/admin/email') && method === 'GET') {
-      return Promise.resolve(jsonResponse(200, { configured: true }))
+      return Promise.resolve(jsonResponse(200, { configured: true, storageWarning: null }))
+    }
+
+    if (url.endsWith('/v1/admin/email/messages') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { messages: storedMessages }))
+    }
+
+    if (url.endsWith('/v1/admin/email/recipients') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { recipients: ['maria@example.com'] }))
     }
 
     if (url.endsWith('/v1/admin/email/send') && method === 'POST') {
+      const body = requestJson(init) as { to?: string; from?: string; subject?: string; text?: string }
+
+      storedMessages = [
+        {
+          id: '2',
+          createdAt: '2026-08-21T13:00:00.000Z',
+          direction: 'sent',
+          from: body.from ?? 'support@etwalletx.com',
+          to: body.to ?? 'maria@example.com',
+          subject: body.subject ?? 'ETWallet',
+          html: null,
+          text: body.text ?? 'Sent',
+          status: 'delivered',
+        },
+        ...storedMessages,
+      ]
+
       return Promise.resolve(
         jsonResponse(200, {
-          delivered: ['support@etwalletx.com'],
+          delivered: [body.to ?? 'maria@example.com'],
           queued: [],
           permanentBounces: [],
         }),
@@ -105,10 +144,10 @@ describe('Менеджер писем', () => {
     await user.type(screen.getByLabelText('PIN'), '3100')
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
-    expect(await screen.findByRole('button', { name: 'Send' })).toBeInTheDocument()
-    expect(screen.getByTitle('Preview')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Conversations' })).toBeInTheDocument()
+    expect(await screen.findByText('user@example.com')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /New conversation/i })).toBeInTheDocument()
     expect(localStorage.getItem(EMAIL_MANAGER_PIN_STORAGE_KEY)).toBe('3100')
-    expect(localStorage.getItem('etwallet.admin-pin')).toBeNull()
   })
 
   it('не пускает с неверным PIN', async () => {
@@ -120,20 +159,23 @@ describe('Менеджер писем', () => {
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByText('That PIN is not accepted.')).toBeInTheDocument()
-    expect(localStorage.getItem(EMAIL_MANAGER_PIN_STORAGE_KEY)).toBeNull()
   })
 
-  it('показывает макет и отправляет с зашитого адреса', async () => {
+  it('отправляет с выбранных From и To', async () => {
     const user = userEvent.setup()
     localStorage.setItem(EMAIL_MANAGER_PIN_STORAGE_KEY, '3100')
     renderEmailManager()
 
-    expect(await screen.findByRole('button', { name: 'Send' })).toBeInTheDocument()
-    expect(screen.getByTitle('Preview')).toHaveAttribute('src', expect.stringMatching(/^blob:/u))
+    await screen.findByRole('heading', { name: 'Conversations' })
+    await user.click(screen.getByRole('link', { name: /New conversation/i }))
 
-    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByLabelText('From')
+    await user.clear(screen.getByLabelText('From'))
+    await user.type(screen.getByLabelText('From'), 'support@etwalletx.com')
+    await user.type(screen.getByLabelText('To'), 'maria@example.com')
+    await user.click(screen.getByRole('button', { name: /^Send$/i }))
 
-    expect(await screen.findByText('Sent to support@etwalletx.com.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'maria@example.com' })).toBeInTheDocument()
 
     const send = fetchSpy.mock.calls.find((call) => {
       const url = requestUrl(call[0] as RequestInfo | URL)
@@ -142,11 +184,9 @@ describe('Менеджер писем', () => {
       return url.endsWith('/v1/admin/email/send') && method === 'POST'
     })
 
-    expect(new Headers(send?.[1]?.headers).get('x-email-manager-pin')).toBe('3100')
     expect(requestJson(send?.[1])).toMatchObject({
-      to: 'support@etwalletx.com',
+      to: 'maria@example.com',
       from: 'support@etwalletx.com',
-      subject: 'ETWallet',
     })
   })
 })

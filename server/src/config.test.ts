@@ -14,6 +14,7 @@ const KEYS = [
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_API_TOKEN',
   'CLOUDFLARE_EMAIL',
+  'EMAIL_WEBHOOK_SECRET',
 ] as const
 
 const snapshot = new Map<string, string | undefined>()
@@ -106,5 +107,15 @@ describe('loadConfig', () => {
     expect(config.cloudflareAccountId).toBe('account-id')
     expect(config.cloudflareApiToken).toBe('token')
     expect(config.cloudflareAuthEmail).toBe('owner@example.com')
+    expect(config.emailWebhookSecret).toBeNull()
+  })
+
+  it('читает секрет входящего вебхука', () => {
+    isolateEnv({
+      NODE_ENV: 'development',
+      EMAIL_WEBHOOK_SECRET: 'inbound-secret',
+    })
+
+    expect(loadConfig().emailWebhookSecret).toBe('inbound-secret')
   })
 })

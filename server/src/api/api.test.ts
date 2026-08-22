@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import type { IEmailMessage, IEmailSendResult, IEmailService } from '../email/contracts.ts'
+import { MemoryEmailsRepository } from '../emails/MemoryEmailsRepository.ts'
 import { EmailUnavailableError } from '../lib/errors.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
 import { STARTING_TOKENS } from '../users/assets.ts'
@@ -23,6 +24,7 @@ const CONFIG: IServerConfig = {
   cloudflareAccountId: null,
   cloudflareApiToken: null,
   cloudflareAuthEmail: null,
+  emailWebhookSecret: 'webhook-secret',
 }
 
 const SYNC_ID = 'a'.repeat(64)
@@ -933,15 +935,18 @@ describe('Менеджер писем', () => {
 
 describe('Отправка писем кабинета', () => {
   let mail: RecordingEmailService
+  let mailbox: MemoryEmailsRepository
   let mailApp: FastifyInstance
 
   beforeEach(async () => {
     mail = new RecordingEmailService()
+    mailbox = new MemoryEmailsRepository()
     mailApp = await buildApp({
       config: CONFIG,
       settings,
       users,
       email: mail,
+      emails: mailbox,
     })
   })
 
@@ -949,7 +954,7 @@ describe('Отправка писем кабинета', () => {
     await mailApp.close()
   })
 
-  it('отправляет письмо через службу', async () => {
+  it('отправляет письмо через службу и сохраняет в журнал', async () => {
     const response = await mailApp.inject({
       method: 'POST',
       url: '/v1/admin/email/send',
@@ -974,6 +979,59 @@ describe('Отправка писем кабинета', () => {
         text: 'Hello',
       },
     ])
+    expect(mailbox.records).toHaveLength(1)
+    expect(mailbox.records[0]).toMatchObject({
+      direction: 'sent',
+      to: 'recipient@example.com',
+      from: 'custom123@etwalletx.com',
+      status: 'delivered',
+    })
+  })
+
+  it('отдаёт журнал писем', async () => {
+    await mailbox.create({
+      direction: 'received',
+      from: 'user@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'Help',
+      text: 'Need help',
+      status: 'received',
+    })
+
+    const response = await mailApp.inject({
+      method: 'GET',
+      url: '/v1/admin/email/messages',
+      headers: { 'x-email-manager-pin': '3100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ messages: { subject: string; from: string }[] }>().messages[0]).toMatchObject({
+      subject: 'Help',
+      from: 'user@example.com',
+    })
+  })
+
+  it('принимает входящее письмо по вебхуку', async () => {
+    const response = await mailApp.inject({
+      method: 'POST',
+      url: '/v1/webhooks/email-inbound',
+      headers: { 'x-email-webhook-secret': 'webhook-secret' },
+      payload: {
+        from: 'user@example.com',
+        to: 'support@etwalletx.com',
+        subject: 'Inbound',
+        text: 'Hello support',
+        externalId: 'cf-1',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(mailbox.records[0]).toMatchObject({
+      direction: 'received',
+      from: 'user@example.com',
+      subject: 'Inbound',
+      externalId: 'cf-1',
+    })
   })
 
   it('пропускает длинный текст письма мимо охранника секретов', async () => {

@@ -24,6 +24,7 @@ function configWithStatic(staticRoot: string | null): IServerConfig {
     cloudflareAccountId: null,
     cloudflareApiToken: null,
     cloudflareAuthEmail: null,
+    emailWebhookSecret: null,
   }
 }
 

@@ -1,4 +1,7 @@
 export { EmailManagerGate } from './ui/EmailManagerGate'
+export { EmailConversationsList } from './ui/EmailConversationsList'
+export { EmailConversationView } from './ui/EmailConversationView'
+export { EmailNewConversation } from './ui/EmailNewConversation'
 export { EMAIL_HTML_TEMPLATE, MOCK_FROM } from './model/template'
 export {
   EMAIL_MANAGER_PIN_STORAGE_KEY,

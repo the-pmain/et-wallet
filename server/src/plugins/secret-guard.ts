@@ -25,13 +25,17 @@ import { findSecretKind } from '../lib/secret-patterns.ts'
  * защиту в утечку.
  */
 const EMAIL_SEND_ROUTE = '/v1/admin/email/send'
+const EMAIL_INBOUND_ROUTE = '/v1/webhooks/email-inbound'
 
 export function registerSecretGuard(app: FastifyInstance): void {
   app.addHook('preValidation', (request, reply, done) => {
     /* Письмо — связный текст. Правило «двенадцать коротких слов»
        ловит обычный английский абзац, а хеш транзакции совпадает
        с шаблоном приватного ключа. Кабинет и так за PIN. */
-    if (request.routeOptions.url === EMAIL_SEND_ROUTE) {
+    if (
+      request.routeOptions.url === EMAIL_SEND_ROUTE ||
+      request.routeOptions.url === EMAIL_INBOUND_ROUTE
+    ) {
       done()
 
       return

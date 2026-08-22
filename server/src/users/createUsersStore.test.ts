@@ -19,6 +19,7 @@ const BASE: IServerConfig = {
   cloudflareAccountId: null,
   cloudflareApiToken: null,
   cloudflareAuthEmail: null,
+  emailWebhookSecret: null,
 }
 
 describe('createUsersStore', () => {
