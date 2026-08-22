@@ -35,6 +35,10 @@ export class ResilientSendingsRepository implements ISendingsRepository {
     return this.#withFallback((repo) => repo.findById(id))
   }
 
+  list(options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]> {
+    return this.#withFallback((repo) => repo.list(options))
+  }
+
   listByUserId(
     userId: string,
     options?: { readonly limit?: number },

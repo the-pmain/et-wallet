@@ -54,6 +54,16 @@ export default defineConfig({
       '/v1': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
+        timeout: 0,
+        configure(proxy) {
+          proxy.on('proxyRes', (proxyRes, req) => {
+            const path = (req.url ?? '').split('?')[0]
+            if (path === '/v1/sendings') {
+              proxyRes.headers['cache-control'] = 'no-store, no-transform'
+              proxyRes.headers['x-accel-buffering'] = 'no'
+            }
+          })
+        },
       },
     },
   },

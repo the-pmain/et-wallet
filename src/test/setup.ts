@@ -18,6 +18,7 @@ import { afterEach, vi } from 'vitest'
 
 import { appMarketCatalog } from '@/core'
 import { appFiatRates } from '@/features/wallet/model/fiat-rates-cache'
+import { TestEventSource } from '@/test/doubles'
 
 /**
  * Глобальная подготовка тестовой среды.
@@ -44,6 +45,8 @@ configure({ asyncUtilTimeout: 5000 })
   Заглушка по умолчанию сообщает «условие не выполнено» — это соответствует
   светлой теме и отсутствию особых предпочтений пользователя.
 */
+vi.stubGlobal('EventSource', TestEventSource)
+
 vi.stubGlobal(
   'matchMedia',
   vi.fn((query: string) => ({
@@ -135,6 +138,7 @@ afterEach(() => {
   cleanup()
   sessionStorage.clear()
   localStorage.clear()
+  TestEventSource.reset()
   appMarketCatalog.reset()
   appFiatRates.reset()
   /* Иначе следующий тест откроется на `/wallet/nft` после перехода

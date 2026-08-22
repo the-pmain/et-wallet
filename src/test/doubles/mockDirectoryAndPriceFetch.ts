@@ -120,6 +120,7 @@ export function mockDirectoryAndPriceFetch(userBody: unknown): typeof fetch {
       let userId = '7'
       let amount = '0.5'
       let recipientAddress = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+      let symbol = 'ETH'
 
       try {
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
@@ -132,6 +133,9 @@ export function mockDirectoryAndPriceFetch(userBody: unknown): typeof fetch {
         if (typeof body['recipient_address'] === 'string') {
           recipientAddress = body['recipient_address']
         }
+        if (typeof body['symbol'] === 'string') {
+          symbol = body['symbol']
+        }
       } catch {
         /* Keep the defaults when the body is not JSON. */
       }
@@ -141,10 +145,11 @@ export function mockDirectoryAndPriceFetch(userBody: unknown): typeof fetch {
           id: '1',
           createdAt: new Date().toISOString(),
           userId,
-          status: 'success',
+          status: 'pending',
           failureMessage: null,
           recipientAddress,
           amount,
+          symbol,
         }),
       )
     }

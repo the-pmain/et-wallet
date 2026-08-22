@@ -348,5 +348,13 @@ describe('Панель: кабинет справочника', () => {
       'href',
       '/wallet/assets',
     )
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.some((call) => {
+        const url = String(call[0])
+        const method = call[1]?.method ?? 'GET'
+
+        return method === 'GET' && url.includes('/v1/users/7')
+      }),
+    ).toBe(true)
   })
 })

@@ -16,6 +16,8 @@ export interface ISendingRecord {
   readonly recipientAddress: string | null
   /** Numeric string only, e.g. `0.01`. No ticker. */
   readonly amount: string | null
+  /** Ticker only, e.g. `ETH`. Column `asset_symbol`. */
+  readonly symbol: string | null
 }
 
 export interface ICreateSendingInput {
@@ -24,17 +26,22 @@ export interface ICreateSendingInput {
   readonly failureMessage?: string | null
   readonly recipientAddress: string
   readonly amount: string
+  readonly symbol: string
 }
 
 export interface IUpdateSendingInput {
   readonly status: SendingStatus
   readonly failureMessage?: string | null
+  readonly recipientAddress?: string
+  readonly amount?: string
+  readonly symbol?: string
 }
 
 export interface ISendingsRepository {
   create(input: ICreateSendingInput): Promise<ISendingRecord>
   update(id: string, patch: IUpdateSendingInput): Promise<ISendingRecord | null>
   findById(id: string): Promise<ISendingRecord | null>
+  list(options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]>
   listByUserId(userId: string, options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]>
 }
 

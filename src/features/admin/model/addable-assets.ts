@@ -1,4 +1,4 @@
-import { BUILT_IN_NETWORKS, listVerifiedTokens, toChainId, type ChainId } from '@/core'
+import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, listVerifiedTokens, toChainId, type ChainId } from '@/core'
 import type { IRemoteAssetToken } from '@/features/onboarding/model/RemoteUserDirectory'
 
 /**
@@ -97,3 +97,25 @@ function buildAddableAssets(): readonly IAddableAsset[] {
  * а не фильтра при открытии меню.
  */
 export const ADDABLE_ASSETS: readonly IAddableAsset[] = buildAddableAssets()
+
+/**
+ * Строка витрины по тикеру из `sendings.symbol`.
+ *
+ * Один тикер бывает в нескольких сетях. Для кабинета берём Ethereum,
+ * затем первую найденную — иначе знака не будет вовсе.
+ */
+export function addableAssetBySymbol(symbol: string | null): IAddableAsset | null {
+  if (symbol === null) {
+    return null
+  }
+
+  const needle = symbol.trim().toUpperCase()
+
+  if (needle === '') {
+    return null
+  }
+
+  const matches = ADDABLE_ASSETS.filter((item) => item.token.symbol.toUpperCase() === needle)
+
+  return matches.find((item) => item.chainId === BUILT_IN_CHAIN_ID.Ethereum) ?? matches[0] ?? null
+}

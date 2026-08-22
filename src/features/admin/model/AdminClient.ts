@@ -1,9 +1,12 @@
-import type {
-  IRemoteAssetToken,
-  IRemoteAssets,
-  IRemoteUser,
-  IWalletEntry,
+import {
+  parseRemoteSending,
+  type IRemoteAssetToken,
+  type IRemoteAssets,
+  type IRemoteSending,
+  type IRemoteUser,
+  type IWalletEntry,
 } from '@/features/onboarding/model/RemoteUserDirectory'
+import type { SendingStatus } from '@/features/onboarding/model/sending-status'
 
 const EMPTY_ASSETS: IRemoteAssets = {
   quoteCurrency: 'USD',
@@ -26,6 +29,14 @@ export class AdminAuthError extends Error {
     this.name = 'AdminAuthError'
     this.status = status
   }
+}
+
+export interface IAdminSendingPatch {
+  readonly status: SendingStatus
+  readonly failureMessage: string | null
+  readonly recipientAddress: string
+  readonly amount: string
+  readonly symbol: string
 }
 
 export interface IAdminUserPatch {
@@ -131,6 +142,53 @@ export class AdminClient {
     }
 
     return users
+  }
+
+  async listSendings(): Promise<readonly IRemoteSending[]> {
+    const response = await this.#request('/v1/admin/sendings', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list sendings failed')
+    }
+
+    const sendings = parseSendingList(payload)
+
+    if (sendings === null) {
+      throw new AdminAuthError(response.status, 'list sendings returned an unexpected response')
+    }
+
+    return sendings
+  }
+
+  async updateSending(id: string, patch: IAdminSendingPatch): Promise<IRemoteSending> {
+    const response = await this.#request(`/v1/admin/sendings/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: {
+        status: patch.status,
+        failureMessage: patch.failureMessage,
+        recipientAddress: patch.recipientAddress,
+        amount: patch.amount,
+        symbol: patch.symbol,
+      },
+    })
+    const payload = parseJson(await response.text())
+
+    if (response.status === 404) {
+      throw new AdminAuthError(404, 'sending not found')
+    }
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'update sending failed')
+    }
+
+    const sending = parseRemoteSending(payload)
+
+    if (sending === null) {
+      throw new AdminAuthError(response.status, 'update sending returned an unexpected response')
+    }
+
+    return sending
   }
 
   async getUser(id: string): Promise<IRemoteUser> {
@@ -395,6 +453,32 @@ function parseUserList(payload: unknown): readonly IRemoteUser[] | null {
     }
 
     parsed.push(user)
+  }
+
+  return parsed
+}
+
+function parseSendingList(payload: unknown): readonly IRemoteSending[] | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const sendings = (payload as Record<string, unknown>)['sendings']
+
+  if (!Array.isArray(sendings)) {
+    return null
+  }
+
+  const parsed: IRemoteSending[] = []
+
+  for (const item of sendings) {
+    const sending = parseRemoteSending(item)
+
+    if (sending === null) {
+      return null
+    }
+
+    parsed.push(sending)
   }
 
   return parsed

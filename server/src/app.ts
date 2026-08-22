@@ -21,6 +21,7 @@ import { registerUi, sendWalletIndex } from './plugins/ui.ts'
 import { MemorySettingsRepository } from './settings/MemorySettingsRepository.ts'
 import type { ISettingsRepository } from './settings/contracts.ts'
 import { MemorySendingsRepository } from './sendings/MemorySendingsRepository.ts'
+import { SendingsHub } from './sendings/SendingsHub.ts'
 import { SendingsService } from './sendings/SendingsService.ts'
 import type { ISendingsRepository } from './sendings/contracts.ts'
 import { MemoryUsersRepository } from './users/MemoryUsersRepository.ts'
@@ -43,6 +44,7 @@ export interface IAppDependencies {
   readonly emailsStorageWarning?: string | null
   readonly sendings?: ISendingsRepository
   readonly sendingsStorageWarning?: string | null
+  readonly sendingsHub?: SendingsHub
 }
 
 /**
@@ -128,6 +130,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   const emails = dependencies.emails ?? new MemoryEmailsRepository()
   const sendings = dependencies.sendings ?? new MemorySendingsRepository()
   const sendingsService = new SendingsService(sendings, users)
+  const sendingsHub = dependencies.sendingsHub ?? new SendingsHub()
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
@@ -188,7 +191,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
-  registerSendingRoutes(app, sendingsService)
+  registerSendingRoutes(app, sendingsService, sendingsHub)
   registerAdminRoutes(
     app,
     users,

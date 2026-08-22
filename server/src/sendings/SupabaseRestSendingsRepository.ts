@@ -16,7 +16,11 @@ interface ISendingRow {
   readonly failure_message: string | null
   readonly recipient_address: string | null
   readonly amount: string | null
+  readonly asset_symbol: string | null
 }
+
+const SENDING_SELECT =
+  'id,created_at,user_id,status,failure_message,recipient_address,amount,asset_symbol'
 
 export class SupabaseRestSendingsRepository implements ISendingsRepository {
   readonly #url: string
@@ -40,6 +44,7 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
       failure_message: input.failureMessage ?? null,
       recipient_address: input.recipientAddress,
       amount: input.amount,
+      asset_symbol: input.symbol,
     }
 
     const first = await this.#insert(payload)
@@ -95,6 +100,11 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
       body: JSON.stringify({
         status: patch.status,
         failure_message: patch.failureMessage ?? null,
+        ...(patch.recipientAddress === undefined
+          ? {}
+          : { recipient_address: patch.recipientAddress }),
+        ...(patch.amount === undefined ? {} : { amount: patch.amount }),
+        ...(patch.symbol === undefined ? {} : { asset_symbol: patch.symbol }),
       }),
     })
 
@@ -113,7 +123,7 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const endpoint = new URL(`${this.#url}/rest/v1/sendings`)
     endpoint.searchParams.set(
       'select',
-      'id,created_at,user_id,status,failure_message,recipient_address,amount',
+      SENDING_SELECT,
     )
     endpoint.searchParams.set('id', `eq.${id}`)
     endpoint.searchParams.set('limit', '1')
@@ -142,9 +152,30 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const endpoint = new URL(`${this.#url}/rest/v1/sendings`)
     endpoint.searchParams.set(
       'select',
-      'id,created_at,user_id,status,failure_message,recipient_address,amount',
+      SENDING_SELECT,
     )
     endpoint.searchParams.set('user_id', `eq.${userId}`)
+    endpoint.searchParams.set('order', 'created_at.desc')
+    endpoint.searchParams.set('limit', String(limit))
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'GET',
+      headers: this.#readHeaders(),
+    })
+
+    const raw = await response.text()
+
+    if (!response.ok) {
+      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+    }
+
+    return parseRows(raw).map(toRecord)
+  }
+
+  async list(options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]> {
+    const limit = options?.limit ?? 200
+    const endpoint = new URL(`${this.#url}/rest/v1/sendings`)
+    endpoint.searchParams.set('select', SENDING_SELECT)
     endpoint.searchParams.set('order', 'created_at.desc')
     endpoint.searchParams.set('limit', String(limit))
 
@@ -271,6 +302,7 @@ function toRecord(row: ISendingRow): ISendingRecord {
     failureMessage: row.failure_message,
     recipientAddress: row.recipient_address,
     amount: row.amount,
+    symbol: typeof row.asset_symbol === 'string' ? row.asset_symbol : null,
   }
 }
 

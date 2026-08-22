@@ -8,6 +8,7 @@ import { LOGIN_CREDENTIALS_STORAGE_KEY, writeLoginCredentials } from '@/features
 import {
   createTestAppServices,
   mockDirectoryAndPriceFetch,
+  TestEventSource,
   type IFakeToken,
   type ITestAppServices,
 } from '@/test/doubles'
@@ -102,6 +103,23 @@ beforeEach(async () => {
 })
 
 describe('Отправка: форма', () => {
+  it('подключается к SSE sendings и закрывает поток при уходе', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await openSend()
+
+    const sources = TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings'))
+
+    expect(sources).toHaveLength(1)
+    expect(sources[0]?.url).toBe('/v1/sendings')
+    expect(sources[0]?.closed).toBe(false)
+
+    await user.click(screen.getByRole('link', { name: /^wallet$/i }))
+
+    expect(sources[0]?.closed).toBe(true)
+  })
+
   it('показывает отправителя и доступный баланс', async () => {
     renderApp()
     await openSend()
@@ -350,14 +368,13 @@ describe('Отправка: недостаток средств', () => {
 
     renderApp()
     await openSend()
-    await fillAndContinue(RECIPIENT, '1')
 
-    /* Проверка выполняется в ядре, а не в форме: в форме её забыли бы
-       при появлении второго пути отправки. */
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Send' })).toBeInTheDocument()
-    })
-    expect(screen.getByText(/funds/i)).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '1')
+
+    expect(screen.getByText(/^Available/)).toHaveClass('text-destructive')
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 })
 
@@ -443,13 +460,16 @@ describe('Отправка: токен ERC-20', () => {
   })
 
   it('не даёт отправить больше, чем есть токенов', async () => {
+    const user = userEvent.setup()
+
     renderApp()
     await openSend()
-    await fillTokenForm('1000')
+    await selectSendAsset(/Select USDC on Ethereum/)
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '1000')
 
-    /* Иначе контракт откатил бы вызов, газ списался, а перевода
-       не случилось бы. */
-    expect(await screen.findByText(/The token balance is lower/i)).toBeInTheDocument()
+    expect(screen.getByText(/^Available/)).toHaveClass('text-destructive')
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('смена актива очищает сумму', async () => {
@@ -675,6 +695,14 @@ describe('Отправка: запись справочника', () => {
     expect(screen.getByRole('option', { name: /Select USDC on Ethereum/ })).toBeInTheDocument()
     expect(screen.getByText(/Available/i)).toBeInTheDocument()
     expect(screen.getByText(/1\.2847 ETH/)).toBeInTheDocument()
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.some((call) => {
+        const url = String(call[0])
+        const method = call[1]?.method ?? 'GET'
+
+        return method === 'GET' && url.includes('/v1/users/7')
+      }),
+    ).toBe(true)
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
@@ -686,7 +714,10 @@ describe('Отправка: запись справочника', () => {
     })
     await user.click(next)
 
-    expect(await screen.findByText(/Successfully sent 0\.5 ETH/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+    expect(screen.getByText(/The transfer was recorded as pending/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Recipient address/)).toHaveValue('')
+    expect(screen.getByLabelText(/Amount/)).toHaveValue('')
 
     const sendCall = vi.mocked(globalThis.fetch).mock.calls.find((call) =>
       String(call[0]).includes('/v1/users/sendings'),
@@ -696,7 +727,263 @@ describe('Отправка: запись справочника', () => {
       email: 'theguy@email.com',
       recipient_address: RECIPIENT,
       amount: '0.5',
+      symbol: 'ETH',
     })
+  })
+
+  it('обновляет Available после GET /v1/users/:id', async () => {
+    const staleUser = {
+      id: '7',
+      email: 'theguy@email.com',
+      balance: '70',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+        ],
+      },
+    }
+    const freshUser = {
+      ...staleUser,
+      assets: {
+        ...staleUser.assets,
+        updatedAt: '2026-08-22T16:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native' as const,
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '832117000000000000',
+            isVerified: true,
+          },
+        ],
+      },
+    }
+    const directoryFetch = mockDirectoryAndPriceFetch(staleUser)
+
+    globalThis.fetch = vi.fn((input, init) => {
+      const url = String(input instanceof Request ? input.url : input)
+      const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
+
+      if (method === 'GET' && /\/v1\/users\/\d+/u.test(url)) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(freshUser)),
+          json: () => Promise.resolve(freshUser),
+        }) as Promise<Response>
+      }
+
+      return directoryFetch(input, init)
+    }) as typeof fetch
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'theguy@email.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+    await openSend()
+
+    expect(await screen.findByText(/0\.832117 ETH/)).toBeInTheDocument()
+    expect(screen.queryByText(/1\.2847 ETH/)).not.toBeInTheDocument()
+  })
+
+  it('показывает failureMessage в модалке, если SSE update совпал с текущей отправкой', async () => {
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'theguy@email.com',
+      balance: '70',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+        ],
+      },
+    })
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'theguy@email.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+    await openSend()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '0.5')
+
+    const next = screen.getByRole('button', { name: 'Next' })
+    await waitFor(() => {
+      expect(next).toBeEnabled()
+    })
+    await user.click(next)
+
+    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+
+    const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
+    expect(source).toBeDefined()
+
+    source?.emit(
+      'sendings',
+      JSON.stringify({
+        id: '1',
+        createdAt: '2026-08-22T14:59:14.037Z',
+        userId: '7',
+        status: 'failure',
+        failureMessage: 'Blocked by admin',
+        recipientAddress: RECIPIENT,
+        amount: '0.5',
+        symbol: 'ETH',
+        type_send: 'update',
+      }),
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Sending failed' })).toBeInTheDocument()
+    expect(screen.getByText('Blocked by admin')).toBeInTheDocument()
+  })
+
+  it('показывает success в модалке, если SSE update совпал с текущей отправкой', async () => {
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'theguy@email.com',
+      balance: '70',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+        ],
+      },
+    })
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'theguy@email.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+    await openSend()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '0.5')
+
+    const next = screen.getByRole('button', { name: 'Next' })
+    await waitFor(() => {
+      expect(next).toBeEnabled()
+    })
+    await user.click(next)
+
+    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+
+    const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
+    expect(source).toBeDefined()
+
+    source?.emit(
+      'sendings',
+      JSON.stringify({
+        id: '1',
+        createdAt: '2026-08-22T14:59:14.037Z',
+        userId: '7',
+        status: 'success',
+        failureMessage: null,
+        recipientAddress: RECIPIENT,
+        amount: '0.5',
+        symbol: 'ETH',
+        type_send: 'update',
+      }),
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Sending succeeded' })).toBeInTheDocument()
+    expect(screen.getByText('The transfer completed successfully.')).toBeInTheDocument()
+  })
+
+  it('красит Available и блокирует отправку, если сумма больше баланса', async () => {
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'theguy@email.com',
+      balance: '70',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      assets: {
+        quoteCurrency: 'USD',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        tokens: [
+          {
+            chainId: '1',
+            standard: 'native',
+            address: null,
+            symbol: 'ETH',
+            name: 'Ether',
+            decimals: 18,
+            balance: '1284700000000000000',
+            isVerified: true,
+          },
+        ],
+      },
+    })
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'theguy@email.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+    await openSend()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
+    await user.type(screen.getByLabelText(/Amount/), '2')
+
+    expect(screen.getByText(/^Available/)).toHaveClass('text-destructive')
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    })
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.some((call) =>
+        String(call[0]).includes('/v1/users/sendings'),
+      ),
+    ).toBe(false)
   })
 
   it('берёт user_id из etwallet.login-credentials.id, даже если это число', async () => {
@@ -737,7 +1024,7 @@ describe('Отправка: запись справочника', () => {
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/Recipient address/), RECIPIENT)
-    await user.type(screen.getByLabelText(/Amount/), '2')
+    await user.type(screen.getByLabelText(/Amount/), '0.5')
 
     const next = screen.getByRole('button', { name: 'Next' })
     await waitFor(() => {
@@ -745,7 +1032,7 @@ describe('Отправка: запись справочника', () => {
     })
     await user.click(next)
 
-    expect(await screen.findByText(/Successfully sent 2 ETH/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
 
     const sendCall = vi.mocked(globalThis.fetch).mock.calls.find((call) =>
       String(call[0]).includes('/v1/users/sendings'),
@@ -754,7 +1041,8 @@ describe('Отправка: запись справочника', () => {
       user_id: '70',
       email: 'theguy@email.com',
       recipient_address: RECIPIENT,
-      amount: '2',
+      amount: '0.5',
+      symbol: 'ETH',
     })
   })
 })

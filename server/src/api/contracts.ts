@@ -212,6 +212,25 @@ export interface ISendingResponse {
   readonly failureMessage: string | null
   readonly recipientAddress: string | null
   readonly amount: string | null
+  readonly symbol: string | null
+}
+
+/** Почему кадр ушёл в поток `sendings`. */
+export const SENDING_SSE_TYPE = {
+  Create: 'create',
+  Update: 'update',
+} as const
+
+export type SendingSseType = (typeof SENDING_SSE_TYPE)[keyof typeof SENDING_SSE_TYPE]
+
+/**
+ * Кадр потока `GET /v1/sendings`.
+ *
+ * Те же поля, что у ответа на создание, плюс `type_send` — чтобы
+ * клиент отличал появление строки от будущих смен статуса.
+ */
+export interface ISendingSseEvent extends ISendingResponse {
+  readonly type_send: SendingSseType
 }
 
 /** Ответ при отказе. Одинаков для всех маршрутов. */

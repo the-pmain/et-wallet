@@ -219,6 +219,47 @@ describe('RemoteUserDirectory', () => {
     expect(user.id).toBe('70')
   })
 
+  it('читает свежую запись через GET /v1/users/:id', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        ...USER_BODY,
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-22T16:00:00.000Z',
+          tokens: [
+            {
+              chainId: '1',
+              standard: 'native',
+              address: null,
+              symbol: 'ETH',
+              name: 'Ether',
+              decimals: 18,
+              balance: '832117000000000000',
+              isVerified: true,
+            },
+          ],
+        },
+      }),
+    )
+    const directory = new RemoteUserDirectory({
+      baseUrl: 'http://127.0.0.1:8080',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const user = await directory.getUser({
+      id: '7',
+      email: 'james@example.com',
+      theP: 'demo',
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:8080/v1/users/7?email=james%40example.com&the_p=demo',
+    )
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'GET' })
+    expect(user.assets.tokens[0]?.balance).toBe('832117000000000000')
+  })
+
   it('пишет адрес через POST /v1/users/wallets', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, USER_BODY))
     const directory = new RemoteUserDirectory({
@@ -270,6 +311,7 @@ describe('RemoteUserDirectory', () => {
         failureMessage: null,
         recipientAddress: WALLET.key,
         amount: '0.01',
+        symbol: 'ETH',
       }),
     )
     const directory = new RemoteUserDirectory({
@@ -284,6 +326,7 @@ describe('RemoteUserDirectory', () => {
       theP: 'demo',
       recipientAddress: WALLET.key,
       amount: '0.01',
+      symbol: 'ETH',
     })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users/sendings')
@@ -293,6 +336,7 @@ describe('RemoteUserDirectory', () => {
       the_p: 'demo',
       recipient_address: WALLET.key,
       amount: '0.01',
+      symbol: 'ETH',
     })
     expect(sending).toMatchObject({
       userId: '70',

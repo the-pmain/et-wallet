@@ -23,6 +23,7 @@ export class MemorySendingsRepository implements ISendingsRepository {
       failureMessage: input.failureMessage ?? null,
       recipientAddress: input.recipientAddress,
       amount: input.amount,
+      symbol: input.symbol,
     }
 
     this.#nextId += 1
@@ -47,7 +48,10 @@ export class MemorySendingsRepository implements ISendingsRepository {
     const next: ISendingRecord = {
       ...current,
       status: patch.status,
-      failureMessage: patch.failureMessage ?? null,
+      failureMessage: patch.failureMessage !== undefined ? patch.failureMessage : current.failureMessage,
+      recipientAddress: patch.recipientAddress ?? current.recipientAddress,
+      amount: patch.amount ?? current.amount,
+      symbol: patch.symbol ?? current.symbol,
     }
 
     this.#records[index] = next
@@ -57,6 +61,15 @@ export class MemorySendingsRepository implements ISendingsRepository {
 
   findById(id: string): Promise<ISendingRecord | null> {
     return Promise.resolve(this.#records.find((entry) => entry.id === id) ?? null)
+  }
+
+  list(options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]> {
+    const limit = options?.limit ?? 200
+    const sorted = [...this.#records].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    )
+
+    return Promise.resolve(sorted.slice(0, limit))
   }
 
   listByUserId(userId: string, options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]> {

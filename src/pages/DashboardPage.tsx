@@ -5,6 +5,7 @@ import {
   useDirectorySession,
   useDisplayedAssets,
   useOnboarding,
+  useRefreshRemoteAssets,
   type IRemoteUser,
 } from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
@@ -45,6 +46,7 @@ import {
  * успешного ввода пароля выглядит как потеря кошелька.
  */
 export function DashboardPage() {
+  useRefreshRemoteAssets()
   const session = useWallet()
   const onboarding = useOnboarding()
   const directory = useDirectorySession()

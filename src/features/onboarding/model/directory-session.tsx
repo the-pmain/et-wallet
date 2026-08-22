@@ -31,6 +31,7 @@ interface IDirectorySession {
   registerSending(input: {
     readonly recipientAddress: string
     readonly amount: string
+    readonly symbol: string
   }): Promise<IRemoteSending>
   refresh(): Promise<void>
   signOut(): void
@@ -75,26 +76,34 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
   const refresh = useCallback(async (): Promise<void> => {
     const stored = readLoginCredentials()
 
-    if (stored === null) {
+    if (stored === null || stored.id === '') {
       return
     }
 
     setRefreshing(true)
 
     try {
-      await signIn(stored.email, stored.theP)
-    } catch {
-      clearLoginCredentials()
-      setUser(null)
+      const next = await directory.getUser({
+        id: stored.id,
+        email: stored.email,
+        theP: stored.theP,
+      })
+      setUser(next)
+    } catch (caught: unknown) {
+      if (caught instanceof RemoteAuthError && caught.status === 401) {
+        clearLoginCredentials()
+        setUser(null)
+      }
     } finally {
       setRefreshing(false)
     }
-  }, [signIn])
+  }, [directory])
 
   const registerSending = useCallback(
     async (input: {
       readonly recipientAddress: string
       readonly amount: string
+      readonly symbol: string
     }): Promise<IRemoteSending> => {
       const stored = readLoginCredentials()
 
@@ -108,6 +117,7 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
         theP: stored.theP,
         recipientAddress: input.recipientAddress,
         amount: input.amount,
+        symbol: input.symbol,
       })
     },
     [directory],

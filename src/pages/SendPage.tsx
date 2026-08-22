@@ -4,6 +4,7 @@ import {
   ExternalLink,
   FileCode,
   Flame,
+  Loader2,
   ShieldAlert,
   Send,
 } from 'lucide-react'
@@ -24,7 +25,14 @@ import {
   type RecipientRisk,
   type TxHash,
 } from '@/core'
-import { readLoginCredentials, useDirectorySession } from '@/features/onboarding'
+import {
+  readLoginCredentials,
+  SENDING_SSE_TYPE,
+  SENDING_STATUS,
+  useDirectorySession,
+  useRefreshRemoteAssets,
+  useSendingsSse,
+} from '@/features/onboarding'
 import { ConfirmPassword, UntrustedText, useSecurity } from '@/features/security'
 import {
   AccountAvatar,
@@ -53,6 +61,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
   Input,
   Label,
 } from '@/shared/ui'
@@ -122,6 +131,7 @@ const EMPTY_RECIPIENT: IResolvedRecipient = {
  * из устройства экрана, а не из аккуратности того, кто его писал.
  */
 export function SendPage() {
+  useRefreshRemoteAssets()
   const session = useWallet()
   const snapshot = useWalletSnapshot()
   const directory = useDirectorySession()
@@ -129,6 +139,48 @@ export function SendPage() {
   const login = readLoginCredentials()
   const sendViaDirectory = isRemote || login !== null
   const fieldId = useId()
+  const sendingsUserId = directory.user?.id ?? login?.id ?? null
+  const [trackedSending, setTrackedSending] = useState<{
+    readonly id: string
+    readonly userId: string | null
+  } | null>(null)
+  const [sendingOutcome, setSendingOutcome] = useState<SendingModalOutcome>(null)
+  const [sendingPreview, setSendingPreview] = useState<{
+    readonly amount: string
+    readonly symbol: string
+    readonly recipient: string
+  } | null>(null)
+  const [isSendingModalOpen, setSendingModalOpen] = useState(false)
+
+  useSendingsSse(sendingsUserId, (event) => {
+    if (event.type_send !== SENDING_SSE_TYPE.Update) {
+      return
+    }
+
+    if (trackedSending === null) {
+      return
+    }
+
+    if (event.id !== trackedSending.id || event.userId !== trackedSending.userId) {
+      return
+    }
+
+    if (event.status === SENDING_STATUS.Success) {
+      setSendingOutcome({ status: SENDING_STATUS.Success })
+      setSendingModalOpen(true)
+      return
+    }
+
+    if (event.status !== SENDING_STATUS.Failure) {
+      return
+    }
+
+    setSendingOutcome({
+      status: SENDING_STATUS.Failure,
+      message: event.failureMessage ?? 'The transfer could not be sent.',
+    })
+    setSendingModalOpen(true)
+  })
 
   const [step, setStep] = useState<Step>(STEP.Form)
   const [recipient, setRecipient] = useState('')
@@ -167,6 +219,8 @@ export function SendPage() {
         ? null
         : (snapshot.balance?.raw ?? null)
       : selected.balance
+
+  const exceedsAvailable = isAmountOverAvailable(amount, available, decimals)
 
   /* Первая строка списка выбирается автоматически: пустой выбор
      оставлял бы поле «Что отправить» без значения и скрывал бы баланс. */
@@ -286,6 +340,11 @@ export function SendPage() {
     try {
       const value = parseAmount(amount, decimals)
 
+      if (available !== null && value > available) {
+        setError('The amount is more than you have available.')
+        return
+      }
+
       if (sendViaDirectory) {
         if (login === null || login.id === '') {
           setError('Sign in again to send.')
@@ -293,19 +352,34 @@ export function SendPage() {
         }
 
         const amountValue = formatTokenAmount(value, decimals)
+        setSendingOutcome(null)
+        setSendingPreview({
+          amount,
+          symbol,
+          recipient: effectiveRecipientAddress,
+        })
+        setSendingModalOpen(true)
         const sending = await directory.registerSending({
           recipientAddress: effectiveRecipientAddress,
           amount: amountValue,
+          symbol,
         })
+        setTrackedSending({ id: sending.id, userId: sending.userId })
+        setRecipient('')
+        setAmount('')
+        setResolved(EMPTY_RECIPIENT)
 
-        if (sending.status === 'failure') {
-          setError(sending.failureMessage ?? 'The transfer could not be sent.')
-          return
+        if (sending.status === SENDING_STATUS.Success) {
+          setSendingOutcome({ status: SENDING_STATUS.Success })
         }
 
-        setSuccess(
-          `Successfully sent ${sending.amount ?? amountValue} ${symbol} to ${trimmedRecipient}`,
-        )
+        if (sending.status === SENDING_STATUS.Failure) {
+          setSendingOutcome({
+            status: SENDING_STATUS.Failure,
+            message: sending.failureMessage ?? 'The transfer could not be sent.',
+          })
+        }
+
         return
       }
 
@@ -375,6 +449,7 @@ export function SendPage() {
       setPrepared(applyPriority(result, FEE_PRIORITY.Medium))
       setStep(STEP.Confirm)
     } catch (caught) {
+      setSendingModalOpen(false)
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
       setBusy(false)
@@ -560,9 +635,21 @@ export function SendPage() {
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <Label htmlFor={`${fieldId}-amount`}>Amount, {symbol}</Label>
 
-                <span className="text-xs text-muted-foreground">
+                <span
+                  className={
+                    exceedsAvailable
+                      ? 'text-xs font-medium text-destructive'
+                      : 'text-xs text-muted-foreground'
+                  }
+                >
                   Available{' '}
-                  <span className="font-medium text-foreground tabular-nums">
+                  <span
+                    className={
+                      exceedsAvailable
+                        ? 'font-medium tabular-nums'
+                        : 'font-medium text-foreground tabular-nums'
+                    }
+                  >
                     {available === null
                       ? '—'
                       : `${formatTokenAmount(available, decimals)} ${symbol}`}
@@ -580,6 +667,7 @@ export function SendPage() {
                 inputMode="decimal"
                 autoComplete="off"
                 className="h-12 text-lg tabular-nums md:text-lg"
+                aria-invalid={exceedsAvailable}
                 onChange={(event) => {
                   setAmount(event.target.value)
                   setError(null)
@@ -611,6 +699,7 @@ export function SendPage() {
                 sendChainId === null ||
                 effectiveRecipientAddress === null ||
                 amount.trim() === '' ||
+                exceedsAvailable ||
                 assets.length === 0 ||
                 (!sendViaDirectory && account === null)
               }
@@ -621,7 +710,107 @@ export function SendPage() {
           </form>
         </CardContent>
       </Card>
+
+      <SendingProcessDialog
+        isOpen={isSendingModalOpen}
+        amount={sendingPreview?.amount ?? amount}
+        symbol={sendingPreview?.symbol ?? symbol}
+        recipient={sendingPreview?.recipient ?? trimmedRecipient}
+        outcome={sendingOutcome}
+        onClose={() => {
+          setSendingModalOpen(false)
+        }}
+      />
     </div>
+  )
+}
+
+function isAmountOverAvailable(
+  input: string,
+  available: bigint | null,
+  decimals: number,
+): boolean {
+  if (available === null || input.trim() === '') {
+    return false
+  }
+
+  try {
+    return parseAmount(input, decimals, { allowZero: true }) > available
+  } catch {
+    return false
+  }
+}
+
+type SendingModalOutcome =
+  | { readonly status: typeof SENDING_STATUS.Success }
+  | { readonly status: typeof SENDING_STATUS.Failure; readonly message: string }
+  | null
+
+function SendingProcessDialog({
+  isOpen,
+  amount,
+  symbol,
+  recipient,
+  outcome,
+  onClose,
+}: {
+  readonly isOpen: boolean
+  readonly amount: string
+  readonly symbol: string
+  readonly recipient: string
+  readonly outcome: SendingModalOutcome
+  readonly onClose: () => void
+}) {
+  const failed = outcome?.status === SENDING_STATUS.Failure
+  const succeeded = outcome?.status === SENDING_STATUS.Success
+
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        failed ? 'Sending failed' : succeeded ? 'Sending succeeded' : 'Sending is in process'
+      }
+      description={
+        failed
+          ? 'The transfer was marked as failed.'
+          : succeeded
+            ? 'The transfer completed successfully.'
+            : 'The transfer was recorded as pending. It stays in process until it completes.'
+      }
+    >
+      <div className="flex flex-col items-center gap-4 py-2 text-center">
+        <span
+          className={
+            failed
+              ? 'flex size-14 items-center justify-center rounded-full bg-destructive/15 text-destructive'
+              : succeeded
+                ? 'flex size-14 items-center justify-center rounded-full bg-risk-low/15 text-risk-low'
+                : 'flex size-14 items-center justify-center rounded-full bg-muted'
+          }
+          aria-hidden
+        >
+          {failed ? (
+            <ShieldAlert className="size-7" />
+          ) : succeeded ? (
+            <CheckCircle2 className="size-7" />
+          ) : (
+            <Loader2 className="size-7 animate-spin text-foreground" />
+          )}
+        </span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="text-sm font-medium">
+            Sending {amount} {symbol}
+          </p>
+          <p className="text-xs break-all text-muted-foreground">To {recipient}</p>
+        </div>
+        {failed ? (
+          <Alert variant="danger" className="w-full text-left">
+            <AlertDescription>{outcome.message}</AlertDescription>
+          </Alert>
+        ) : null}
+      </div>
+    </Dialog>
   )
 }
 

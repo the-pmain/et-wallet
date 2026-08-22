@@ -1,10 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 import { appMarketCatalog, parseMarketList } from '@/core'
 import { EMPTY_REMOTE_ASSETS } from '@/features/onboarding/model/RemoteUserDirectory'
-import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { createTestAppServices, TestEventSource, type ITestAppServices } from '@/test/doubles'
 import { openPath } from '@/test/open-path'
 
 import { AppProviders } from '@/app/providers'
@@ -146,6 +146,28 @@ beforeEach(() => {
 
     if (url.endsWith('/v1/admin/users') && method === 'GET') {
       return Promise.resolve(jsonResponse(200, { users: [USER, MARIA] }))
+    }
+
+    if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { sendings: [] }))
+    }
+
+    if (url.includes('/v1/admin/sendings/') && method === 'PATCH') {
+      const body = requestJson(init) as Record<string, unknown>
+      const id = url.split('/').pop() ?? '0'
+
+      return Promise.resolve(
+        jsonResponse(200, {
+          id,
+          createdAt: '2026-08-22T14:59:14.037Z',
+          userId: '74',
+          status: body['status'] ?? 'pending',
+          failureMessage: body['failureMessage'] ?? null,
+          recipientAddress: body['recipientAddress'] ?? '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+          amount: body['amount'] ?? '4',
+          symbol: body['symbol'] ?? 'ETH',
+        }),
+      )
     }
 
     if (url.endsWith('/v1/admin/users/7') && method === 'GET') {
@@ -342,5 +364,202 @@ describe('Кабинет администратора', () => {
 
     expect(screen.getByText('james@example.com')).toBeInTheDocument()
     expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
+  })
+
+  it('открывает вкладку Sendings, поток SSE и добавляет кадр create', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Sendings' }))
+
+    expect(await screen.findByRole('heading', { name: 'Sendings' })).toBeInTheDocument()
+    expect(screen.getByText('No sendings yet')).toBeInTheDocument()
+    expect(
+      fetchSpy.mock.calls.some((call) => requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/sendings')),
+    ).toBe(true)
+
+    const sources = TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings'))
+    expect(sources).toHaveLength(1)
+    expect(sources[0]?.url).toBe('/v1/sendings')
+    expect(sources[0]?.closed).toBe(false)
+
+    sources[0]?.emit(
+      'sendings',
+      JSON.stringify({
+        id: '61',
+        createdAt: '2026-08-22T14:44:10.949Z',
+        userId: '74',
+        status: 'pending',
+        failureMessage: null,
+        recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+        amount: '2',
+        symbol: 'ETH',
+        type_send: 'create',
+      }),
+    )
+
+    expect(await screen.findByText('ETH')).toBeInTheDocument()
+    expect(screen.getByText('Ether · Ethereum')).toBeInTheDocument()
+    expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
+    expect(screen.getByText(/id 61 · user 74/)).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
+    expect(screen.getByText('1 record in the directory.')).toBeInTheDocument()
+    expect(document.querySelector('time[datetime="2026-08-22T14:44:10.949Z"]')).not.toBeNull()
+  })
+
+  it('окрашивает статусы pending, success и failure', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Sendings' }))
+    await screen.findByRole('heading', { name: 'Sendings' })
+
+    const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
+    expect(source).toBeDefined()
+
+    const frames = [
+      { id: '1', status: 'pending' },
+      { id: '2', status: 'success' },
+      { id: '3', status: 'failure' },
+    ] as const
+
+    for (const frame of frames) {
+      source?.emit(
+        'sendings',
+        JSON.stringify({
+          id: frame.id,
+          createdAt: '2026-08-22T14:44:10.949Z',
+          userId: '74',
+          status: frame.status,
+          failureMessage: frame.status === 'failure' ? 'rejected' : null,
+          recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+          amount: '1',
+          symbol: 'ETH',
+          type_send: 'create',
+        }),
+      )
+    }
+
+    const pending = await screen.findByText('pending')
+    const success = screen.getByText('success')
+    const failure = screen.getByText('failure')
+
+    expect(pending.className).toMatch(/risk-medium|warning/u)
+    expect(success.className).toMatch(/risk-low/u)
+    expect(failure.className).toMatch(/destructive/u)
+    expect(screen.getByText(/rejected/)).toBeInTheDocument()
+  })
+
+  it('рисует записи из GET /v1/admin/sendings', async () => {
+    const previous = fetchSpy.getMockImplementation()
+    fetchSpy.mockImplementation((input, init) => {
+      const url = requestUrl(input)
+      const method = init?.method ?? 'GET'
+
+      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            sendings: [
+              {
+                id: '62',
+                createdAt: '2026-08-22T14:59:14.037Z',
+                userId: '74',
+                status: 'pending',
+                failureMessage: null,
+                recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+                amount: '4',
+                symbol: 'USDC',
+              },
+            ],
+          }),
+        )
+      }
+
+      return previous?.(input, init) ?? Promise.resolve(jsonResponse(404, {}))
+    })
+
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Sendings' }))
+
+    expect(await screen.findByText('USDC')).toBeInTheDocument()
+    expect(screen.getByText(/USD Coin · Ethereum/)).toBeInTheDocument()
+    expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
+    expect(screen.getByText('4')).toBeInTheDocument()
+    expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
+  })
+
+  it('сохраняет правку sending через PATCH и шлёт status с failureMessage', async () => {
+    const previous = fetchSpy.getMockImplementation()
+    fetchSpy.mockImplementation((input, init) => {
+      const url = requestUrl(input)
+      const method = init?.method ?? 'GET'
+
+      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            sendings: [
+              {
+                id: '62',
+                createdAt: '2026-08-22T14:59:14.037Z',
+                userId: '74',
+                status: 'pending',
+                failureMessage: null,
+                recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+                amount: '4',
+                symbol: 'ETH',
+              },
+            ],
+          }),
+        )
+      }
+
+      return previous?.(input, init) ?? Promise.resolve(jsonResponse(404, {}))
+    })
+
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Sendings' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
+    const symbolField = screen.getByLabelText('symbol')
+    expect(symbolField).toHaveValue('ETH')
+    expect(symbolField).toHaveDisplayValue('ETH')
+    expect(screen.getByRole('option', { name: 'USDC' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'USDT' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'DAI' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'WBTC' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'WETH' })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('status'), 'failure')
+    await user.type(screen.getByLabelText('failureMessage'), 'Blocked by admin')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      const patch = fetchSpy.mock.calls.find((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const method = call[1]?.method ?? 'GET'
+
+        return url.endsWith('/v1/admin/sendings/62') && method === 'PATCH'
+      })
+
+      expect(patch).toBeDefined()
+      expect(requestJson(patch?.[1])).toMatchObject({
+        status: 'failure',
+        failureMessage: 'Blocked by admin',
+        recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+        amount: '4',
+        symbol: 'ETH',
+      })
+    })
   })
 })

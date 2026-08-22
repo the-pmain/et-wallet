@@ -33,6 +33,7 @@ import {
   SettingsPage,
   TrustPage,
   AdminUsersPage,
+  AdminSendingsPage,
   AdminUserPage,
 } from './lazy-pages'
 import { ROUTE } from './routes'
@@ -194,6 +195,7 @@ export function AppRouter() {
             }
           >
             <Route index element={<AdminUsersPage />} />
+            <Route path="sendings" element={<AdminSendingsPage />} />
             <Route path="users/:userId" element={<AdminUserPage />} />
           </Route>
         </Route>

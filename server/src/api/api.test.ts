@@ -8,6 +8,7 @@ import { MemoryEmailsRepository } from '../emails/MemoryEmailsRepository.ts'
 import { EmailUnavailableError } from '../lib/errors.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
 import { MemorySendingsRepository } from '../sendings/MemorySendingsRepository.ts'
+import { SendingsHub } from '../sendings/SendingsHub.ts'
 import { STARTING_TOKENS } from '../users/assets.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
 
@@ -48,16 +49,19 @@ let app: FastifyInstance
 let settings: MemorySettingsRepository
 let users: MemoryUsersRepository
 let sendings: MemorySendingsRepository
+let sendingsHub: SendingsHub
 
 beforeEach(async () => {
   settings = new MemorySettingsRepository()
   users = new MemoryUsersRepository()
   sendings = new MemorySendingsRepository()
+  sendingsHub = new SendingsHub()
   app = await buildApp({
     config: CONFIG,
     settings,
     users,
     sendings,
+    sendingsHub,
   })
 })
 
@@ -544,6 +548,72 @@ describe('Пользователи', () => {
     expect(response.body).not.toContain('demo')
   })
 
+  it('отдаёт свежие assets по GET /v1/users/:id', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/users/${userId}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-22T16:00:00.000Z',
+          tokens: [
+            {
+              chainId: '1',
+              standard: 'native',
+              address: null,
+              symbol: 'ETH',
+              name: 'Ether',
+              decimals: 18,
+              balance: '832117000000000000',
+              isVerified: true,
+            },
+          ],
+        },
+      },
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/users/${userId}`,
+      query: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json<{ assets: { tokens: { balance: string; symbol: string }[] } }>().assets.tokens[0]).toMatchObject({
+      symbol: 'ETH',
+      balance: '832117000000000000',
+    })
+    expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
+  })
+
+  it('не отдаёт GET /v1/users/:id без сверки почты и the_p', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const missing = await app.inject({ method: 'GET', url: `/v1/users/${userId}` })
+    const wrong = await app.inject({
+      method: 'GET',
+      url: `/v1/users/${userId}`,
+      query: { email: 'james@example.com', the_p: 'wrong' },
+    })
+
+    expect(missing.statusCode).toBe(400)
+    expect(wrong.statusCode).toBe(401)
+  })
+
   it('пишет созданный адрес в wallets', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -572,9 +642,45 @@ describe('Пользователи', () => {
     expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
   })
 
-  it('регистрирует отправку в pending и завершает её success', async () => {
+  it('регистрирует отправку со статусом pending', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json()).toMatchObject({
+      status: 'pending',
+      recipientAddress: recipient,
+      amount: '1',
+      symbol: 'ETH',
+      failureMessage: null,
+    })
+    expect(sendings.records).toHaveLength(1)
+    expect(sendings.records[0]?.status).toBe('pending')
+    expect(sendings.records[0]?.userId).toBe(userId)
+    expect(sendings.records[0]?.symbol).toBe('ETH')
+  })
+
+  it('отвергает создание без symbol', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -594,16 +700,213 @@ describe('Пользователи', () => {
       },
     })
 
-    expect(response.statusCode).toBe(201)
-    expect(response.json()).toMatchObject({
-      status: 'success',
-      recipientAddress: recipient,
-      amount: '1',
-      failureMessage: null,
+    expect(response.statusCode).toBe(400)
+    expect(sendings.records).toHaveLength(0)
+  })
+
+  it('после успешного создания шлёт кадр sendings с type_send create', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+    const received: unknown[] = []
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
     })
-    expect(sendings.records).toHaveLength(1)
-    expect(sendings.records[0]?.status).toBe('success')
-    expect(sendings.records[0]?.userId).toBe(userId)
+    const userId = created.json<{ id: string }>().id
+    sendingsHub.subscribe(userId, (event) => {
+      received.push(event)
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(received).toEqual([
+      {
+        ...response.json(),
+        type_send: 'create',
+      },
+    ])
+  })
+
+  it('не шлёт кадр, если создание отклонено', async () => {
+    const received: unknown[] = []
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    sendingsHub.subscribe(created.json<{ id: string }>().id, (event) => {
+      received.push(event)
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: '1',
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: '0x123',
+        amount: '1',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(received).toEqual([])
+  })
+
+  it('GET /v1/sendings держит поток и отдаёт кадр после создания', async () => {
+    const address = await app.listen({ host: '127.0.0.1', port: 0 })
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const controller = new AbortController()
+    const stream = await fetch(`${address}/v1/sendings?user_id=${userId}`, {
+      headers: { Accept: 'text/event-stream' },
+      signal: controller.signal,
+    })
+
+    expect(stream.status).toBe(200)
+    expect(stream.headers.get('content-type')).toMatch(/text\/event-stream/i)
+
+    const reader = stream.body?.getReader()
+    expect(reader).toBeDefined()
+
+    const decoder = new TextDecoder()
+    const chunks: string[] = []
+    const reading = (async () => {
+      if (reader === undefined) {
+        return
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+          break
+        }
+
+        chunks.push(decoder.decode(value, { stream: true }))
+
+        if (chunks.join('').includes('type_send')) {
+          break
+        }
+      }
+    })()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    await reading
+
+    controller.abort()
+
+    const body = chunks.join('')
+    expect(body).toContain('event: sendings')
+    expect(body).toContain('"type_send":"create"')
+    expect(body).toContain(`"userId":"${userId}"`)
+    expect(body).toContain(recipient)
+  })
+
+  it('GET /v1/sendings без user_id отдаёт кадр любой новой записи', async () => {
+    const address = await app.listen({ host: '127.0.0.1', port: 0 })
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const controller = new AbortController()
+    const stream = await fetch(`${address}/v1/sendings`, {
+      headers: { Accept: 'text/event-stream' },
+      signal: controller.signal,
+    })
+
+    expect(stream.status).toBe(200)
+
+    const reader = stream.body?.getReader()
+    expect(reader).toBeDefined()
+
+    const decoder = new TextDecoder()
+    const chunks: string[] = []
+    const reading = (async () => {
+      if (reader === undefined) {
+        return
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+          break
+        }
+
+        chunks.push(decoder.decode(value, { stream: true }))
+
+        if (chunks.join('').includes('type_send')) {
+          break
+        }
+      }
+    })()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '2',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    await reading
+
+    controller.abort()
+
+    const body = chunks.join('')
+    expect(body).toContain('event: sendings')
+    expect(body).toContain('"type_send":"create"')
+    expect(body).toContain(`"userId":"${userId}"`)
+    expect(body).toContain('"amount":"2"')
+    expect(body).toContain(recipient)
   })
 
   it('отвергает отправку, если user_id не совпал с записью', async () => {
@@ -624,6 +927,7 @@ describe('Пользователи', () => {
         the_p: 'demo',
         recipient_address: recipient,
         amount: '1',
+        symbol: 'ETH',
       },
     })
 
@@ -647,6 +951,7 @@ describe('Пользователи', () => {
         the_p: 'demo',
         recipient_address: '0x123',
         amount: '1',
+        symbol: 'ETH',
       },
     })
 
@@ -671,6 +976,7 @@ describe('Пользователи', () => {
         the_p: 'demo',
         recipient_address: recipient,
         amount: '1 ETH',
+        symbol: 'ETH',
       },
     })
 
@@ -920,6 +1226,270 @@ describe('Кабинет администратора', () => {
     const response = await app.inject({ method: 'GET', url: '/v1/admin/users' })
 
     expect(response.statusCode).toBe(401)
+  })
+
+  it('не отдаёт sendings без PIN', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/admin/sendings' })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('отдаёт sendings по PIN', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '4',
+        symbol: 'ETH',
+      },
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ sendings: { symbol: string; amount: string }[] }>().sendings[0]).toMatchObject({
+      amount: '4',
+      symbol: 'ETH',
+      recipientAddress: recipient,
+      userId,
+    })
+  })
+
+  it('PATCH /v1/admin/sendings/:id пишет поля и шлёт кадр type_send update', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+    const sending = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '4',
+        symbol: 'ETH',
+      },
+    })
+    const sendingId = sending.json<{ id: string }>().id
+    const received: unknown[] = []
+    sendingsHub.subscribe(userId, (event) => {
+      received.push(event)
+    })
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/sendings/${sendingId}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        status: 'failure',
+        failureMessage: 'Blocked by admin',
+        recipientAddress: recipient,
+        amount: '4',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      id: sendingId,
+      status: 'failure',
+      failureMessage: 'Blocked by admin',
+      symbol: 'ETH',
+    })
+    expect(received).toEqual([
+      {
+        ...response.json(),
+        type_send: 'update',
+      },
+    ])
+  })
+
+  it('PATCH success списывает amount из users.assets.tokens и не повторяет списание', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/users/${userId}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-20T12:00:00.000Z',
+          tokens: [
+            {
+              chainId: '1',
+              standard: 'native',
+              address: null,
+              symbol: 'ETH',
+              name: 'Ether',
+              decimals: 18,
+              balance: '41000000000000000',
+              isVerified: true,
+            },
+          ],
+        },
+      },
+    })
+
+    const sending = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+    const sendingId = sending.json<{ id: string }>().id
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/sendings/${sendingId}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        status: 'success',
+        failureMessage: null,
+        recipientAddress: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ status: 'success', amount: '0.01', symbol: 'ETH' })
+    expect(users.records[0]?.assets.tokens[0]?.balance).toBe('31000000000000000')
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/sendings/${sendingId}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        status: 'success',
+        failureMessage: null,
+        recipientAddress: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(users.records[0]?.assets.tokens[0]?.balance).toBe('31000000000000000')
+  })
+
+  it('PATCH failure не списывает tokens', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/users/${userId}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        assets: {
+          quoteCurrency: 'USD',
+          updatedAt: '2026-08-20T12:00:00.000Z',
+          tokens: [
+            {
+              chainId: '1',
+              standard: 'native',
+              address: null,
+              symbol: 'ETH',
+              name: 'Ether',
+              decimals: 18,
+              balance: '41000000000000000',
+              isVerified: true,
+            },
+          ],
+        },
+      },
+    })
+
+    const sending = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/sendings/${sending.json<{ id: string }>().id}`,
+      headers: { 'x-admin-pin': '9100' },
+      payload: {
+        status: 'failure',
+        failureMessage: 'Blocked',
+        recipientAddress: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(users.records[0]?.assets.tokens[0]?.balance).toBe('41000000000000000')
+  })
+
+  it('отвергает неизвестный symbol перевода', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+        symbol: 'BTC',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
   })
 
   it('отдаёт всех пользователей по PIN', async () => {

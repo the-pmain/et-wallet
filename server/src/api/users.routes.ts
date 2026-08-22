@@ -26,6 +26,7 @@ import type { IUserResponse, IWalletEntryResponse } from './contracts.ts'
  * и отбрасывает `priceUsd` / `valueUsd`. Без поля — стартовая витрина
  * из одного ETH.
  * `POST /v1/users/auth` — сверка `email` и `the_p`.
+ * `GET /v1/users/:id` — свежая запись, та же сверка `email` и `the_p`.
  * `POST /v1/users/wallets` — ещё один `{ key, value }` в уже существующий список.
  * Запрос не по схеме — 400, вход не выдаётся.
  */
@@ -92,6 +93,25 @@ const AUTH_USER_BODY = {
   },
 } as const
 
+const GET_USER_PARAMS = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id'],
+  properties: {
+    id: { type: 'string', minLength: 1, maxLength: 20, pattern: '^\\d+$' },
+  },
+} as const
+
+const GET_USER_QUERY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['email', 'the_p'],
+  properties: {
+    email: { type: 'string', minLength: 1, maxLength: 254 },
+    the_p: { type: 'string', minLength: 1, maxLength: 256 },
+  },
+} as const
+
 const ADD_WALLET_BODY = {
   type: 'object',
   additionalProperties: false,
@@ -117,6 +137,15 @@ interface IAuthUserBody {
   readonly the_p: string
 }
 
+interface IGetUserParams {
+  readonly id: string
+}
+
+interface IGetUserQuery {
+  readonly email: string
+  readonly the_p: string
+}
+
 interface IAddWalletBody {
   readonly email: string
   readonly the_p: string
@@ -125,6 +154,28 @@ interface IAddWalletBody {
 }
 
 export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository): void {
+  app.get<{ Params: IGetUserParams; Querystring: IGetUserQuery }>(
+    '/v1/users/:id',
+    { schema: { params: GET_USER_PARAMS, querystring: GET_USER_QUERY } },
+    async (request, reply) => {
+      const credentials = readCredentials(request.query)
+
+      if (credentials === null) {
+        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+      }
+
+      const record = await users.findByCredentials(credentials)
+
+      if (record === null || record.id !== request.params.id.trim()) {
+        throw new UnauthorizedError('Неверные учётные данные.')
+      }
+
+      void reply.header('cache-control', 'no-store')
+
+      return toUserResponse(record)
+    },
+  )
+
   app.post<{ Body: IAuthUserBody }>(
     '/v1/users/auth',
     { schema: { body: AUTH_USER_BODY } },

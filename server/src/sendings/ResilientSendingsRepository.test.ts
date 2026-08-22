@@ -22,6 +22,7 @@ describe('ResilientSendingsRepository', () => {
       status: SENDING_STATUS.Pending,
       recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
       amount: '2',
+      symbol: 'ETH',
     })
 
     expect(onFallback).toHaveBeenCalledOnce()
@@ -45,6 +46,7 @@ describe('ResilientSendingsRepository', () => {
       status: SENDING_STATUS.Pending,
       recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
       amount: '2',
+      symbol: 'ETH',
     })
 
     expect(onFallback).toHaveBeenCalledOnce()

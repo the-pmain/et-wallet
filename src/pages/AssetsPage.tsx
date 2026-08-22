@@ -2,7 +2,7 @@ import { Plus, RefreshCw, X } from 'lucide-react'
 import { useState } from 'react'
 
 import type { Address } from '@/core'
-import { useDirectorySession, useDisplayedAssets } from '@/features/onboarding'
+import { useDirectorySession, useDisplayedAssets, useRefreshRemoteAssets } from '@/features/onboarding'
 import { ImportTokenForm, TokenList, useWallet, useWalletSnapshot } from '@/features/wallet'
 import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
 
@@ -23,6 +23,7 @@ import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
  * НЕПРОЧИТАННЫЙ БАЛАНС НЕ ПОКАЗЫВАЕТСЯ НУЛЁМ — см. `TokenList`.
  */
 export function AssetsPage() {
+  useRefreshRemoteAssets()
   const session = useWallet()
   const snapshot = useWalletSnapshot()
   const directory = useDirectorySession()

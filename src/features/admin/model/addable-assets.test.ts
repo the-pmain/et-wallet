@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, listVerifiedTokens, toAddress } from '@/core'
 import { findTokenLogo } from '@/features/wallet/lib/token-logo'
 
-import { ADDABLE_ASSETS, networkNameForChain, remoteAssetKey } from './addable-assets'
+import { ADDABLE_ASSETS, addableAssetBySymbol, networkNameForChain, remoteAssetKey } from './addable-assets'
 
 describe('addable-assets', () => {
   it('держит нативную валюту и проверенные контракты каждой встроенной сети', () => {
@@ -63,5 +63,15 @@ describe('addable-assets', () => {
   it('подписывает известную сеть именем, неизвестную — номером', () => {
     expect(networkNameForChain('1')).toBe('Ethereum')
     expect(networkNameForChain('999999')).toBe('Chain 999999')
+  })
+
+  it('находит актив по тикеру sendings, предпочитая Ethereum', () => {
+    const eth = addableAssetBySymbol('eth')
+
+    expect(eth?.token.symbol).toBe('ETH')
+    expect(eth?.token.name).toBe('Ether')
+    expect(eth?.chainName).toBe('Ethereum')
+    expect(addableAssetBySymbol('USDC')?.token.symbol).toBe('USDC')
+    expect(addableAssetBySymbol(null)).toBeNull()
   })
 })

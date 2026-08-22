@@ -42,6 +42,76 @@ describe('AdminClient', () => {
     expect(users[0]?.email).toBe('james@example.com')
   })
 
+  it('читает список sendings', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        sendings: [
+          {
+            id: '62',
+            createdAt: '2026-08-22T14:59:14.037Z',
+            userId: '74',
+            status: 'pending',
+            failureMessage: null,
+            recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+            amount: '4',
+            symbol: 'ETH',
+          },
+        ],
+      }),
+    )
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '9100',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const sendings = await client.listSendings()
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/v1/admin/sendings')
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ 'x-admin-pin': '9100' })
+    expect(sendings[0]).toMatchObject({
+      id: '62',
+      amount: '4',
+      symbol: 'ETH',
+    })
+  })
+
+  it('пишет правку sending', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        id: '62',
+        createdAt: '2026-08-22T14:59:14.037Z',
+        userId: '74',
+        status: 'failure',
+        failureMessage: 'Blocked by admin',
+        recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+        amount: '4',
+        symbol: 'ETH',
+      }),
+    )
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '9100',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const updated = await client.updateSending('62', {
+      status: 'failure',
+      failureMessage: 'Blocked by admin',
+      recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+      amount: '4',
+      symbol: 'ETH',
+    })
+
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PATCH')
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/v1/admin/sendings/62')
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      status: 'failure',
+      failureMessage: 'Blocked by admin',
+    })
+    expect(updated.status).toBe('failure')
+  })
+
   it('отвергает неверный PIN', async () => {
     const client = new AdminClient({
       baseUrl: '',

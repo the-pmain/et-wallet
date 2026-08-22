@@ -16,6 +16,7 @@ const CREATED_ROW = {
   failure_message: null,
   recipient_address: '0xBB010AAb37E5b891DD2246de894E86C323EaB66E',
   amount: '0.01',
+  asset_symbol: 'ETH',
 }
 
 const FK_ERROR = {
@@ -49,6 +50,7 @@ describe('SupabaseRestSendingsRepository', () => {
       status: SENDING_STATUS.Pending,
       recipientAddress: CREATED_ROW.recipient_address,
       amount: CREATED_ROW.amount,
+      symbol: 'ETH',
     })
 
     expect(fetchMock).toHaveBeenCalledOnce()
@@ -58,12 +60,14 @@ describe('SupabaseRestSendingsRepository', () => {
       failure_message: null,
       recipient_address: CREATED_ROW.recipient_address,
       amount: '0.01',
+      asset_symbol: 'ETH',
     })
     expect(record).toMatchObject({
       id: '72',
       userId: '72',
       status: 'pending',
       amount: '0.01',
+      symbol: 'ETH',
     })
   })
 
@@ -86,6 +90,7 @@ describe('SupabaseRestSendingsRepository', () => {
       status: SENDING_STATUS.Pending,
       recipientAddress: CREATED_ROW.recipient_address,
       amount: CREATED_ROW.amount,
+      symbol: 'ETH',
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -95,6 +100,7 @@ describe('SupabaseRestSendingsRepository', () => {
       failure_message: null,
       recipient_address: CREATED_ROW.recipient_address,
       amount: '0.01',
+      asset_symbol: 'ETH',
     })
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
       id: 72,
@@ -152,6 +158,7 @@ describe('SupabaseRestSendingsRepository', () => {
       status: SENDING_STATUS.Pending,
       recipientAddress: CREATED_ROW.recipient_address,
       amount: CREATED_ROW.amount,
+      symbol: 'ETH',
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(5)
@@ -181,6 +188,7 @@ describe('SupabaseRestSendingsRepository', () => {
         status: SENDING_STATUS.Pending,
         recipientAddress: CREATED_ROW.recipient_address,
         amount: CREATED_ROW.amount,
+        symbol: 'ETH',
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableError)
     expect(fetchMock).toHaveBeenCalledOnce()

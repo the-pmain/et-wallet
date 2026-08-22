@@ -58,6 +58,12 @@ export interface IUserDirectory {
     readonly assets: IRemoteAssets
   }): Promise<IRemoteUser>
 
+  getUser(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<IRemoteUser>
+
   addWallet(input: {
     readonly email: string
     readonly theP: string
@@ -71,6 +77,7 @@ export interface IUserDirectory {
     readonly theP: string
     readonly recipientAddress: string
     readonly amount: string
+    readonly symbol: string
   }): Promise<IRemoteSending>
 }
 
@@ -94,6 +101,7 @@ export interface IRemoteSending {
   readonly failureMessage: string | null
   readonly recipientAddress: string | null
   readonly amount: string | null
+  readonly symbol: string | null
 }
 
 /** Отказ входа: запись не найдена, либо сервис ответил ошибкой. */
@@ -213,6 +221,47 @@ export class RemoteUserDirectory implements IUserDirectory {
   }
 
   /**
+   * Свежая запись `GET /v1/users/:id`.
+   *
+   * Та же сверка `email` и `the_p`, что у входа: чужой id
+   * с чужими данными не читается.
+   */
+  async getUser(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<IRemoteUser> {
+    let response: Response
+
+    try {
+      response = await this.#fetch(this.#userUrl(input.id, input.email, input.theP), {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      })
+    } catch {
+      throw new RemoteAuthError(0, 'user directory is unavailable')
+    }
+
+    const raw = await response.text()
+
+    if (response.status === 401) {
+      throw new RemoteAuthError(401, 'credentials did not match')
+    }
+
+    if (!response.ok) {
+      throw new RemoteAuthError(response.status, `get user failed (${String(response.status)})`)
+    }
+
+    const user = parseRemoteUser(parseJson(raw))
+
+    if (user === null) {
+      throw new RemoteAuthError(response.status, 'get user returned an unexpected response')
+    }
+
+    return user
+  }
+
+  /**
    * Пишет адрес в `wallets` записи, найденной по почте и `the_p`.
    *
    * Ключ — адрес `0x…`. Значение — подпись аккаунта, не секрет.
@@ -265,6 +314,7 @@ export class RemoteUserDirectory implements IUserDirectory {
     readonly theP: string
     readonly recipientAddress: string
     readonly amount: string
+    readonly symbol: string
   }): Promise<IRemoteSending> {
     let response: Response
 
@@ -278,6 +328,7 @@ export class RemoteUserDirectory implements IUserDirectory {
           the_p: input.theP,
           recipient_address: input.recipientAddress,
           amount: input.amount,
+          symbol: input.symbol,
         }),
       })
     } catch {
@@ -305,6 +356,12 @@ export class RemoteUserDirectory implements IUserDirectory {
 
   #usersUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users')
+  }
+
+  #userUrl(id: string, email: string, theP: string): string {
+    const query = new URLSearchParams({ email, the_p: theP })
+
+    return `${this.#usersUrl()}/${encodeURIComponent(id)}?${query.toString()}`
   }
 
   #authUrl(): string {
@@ -480,7 +537,7 @@ function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
   }
 }
 
-function parseRemoteSending(payload: unknown): IRemoteSending | null {
+export function parseRemoteSending(payload: unknown): IRemoteSending | null {
   if (payload === null || typeof payload !== 'object') {
     return null
   }
@@ -493,6 +550,7 @@ function parseRemoteSending(payload: unknown): IRemoteSending | null {
   const failureMessage = record['failureMessage']
   const recipientAddress = record['recipientAddress']
   const amount = record['amount']
+  const symbol = record['symbol']
 
   if (typeof id !== 'string' || id === '') {
     return null
@@ -527,6 +585,10 @@ function parseRemoteSending(payload: unknown): IRemoteSending | null {
     return null
   }
 
+  if (typeof symbol !== 'string' && symbol !== null && symbol !== undefined) {
+    return null
+  }
+
   return {
     id,
     createdAt,
@@ -535,5 +597,6 @@ function parseRemoteSending(payload: unknown): IRemoteSending | null {
     failureMessage,
     recipientAddress,
     amount,
+    symbol: typeof symbol === 'string' ? symbol : null,
   }
 }
