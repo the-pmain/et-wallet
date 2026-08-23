@@ -1,14 +1,18 @@
-import { RefreshCw, Trash2 } from 'lucide-react'
+import { ChevronDown, RefreshCw, Trash2 } from 'lucide-react'
+import { useId, useState } from 'react'
 
 import { safeText, type Address, type ChainId, type IPortfolioSummary } from '@/core'
 import { UntrustedText } from '@/features/security'
+import { cn } from '@/shared/lib/utils'
 import { Button, Skeleton } from '@/shared/ui'
 
 import { estimateValue, findQuote } from '../lib/asset-value'
 import { formatTokenAmount, shortenAddress } from '../lib/format'
+import { networkNameForChainId } from '../lib/network-name'
 import { useDisplayCurrency } from '../model/display-currency-context'
 import type { ITokenBalance } from '../model/contracts'
 import { TokenAvatar } from './TokenAvatar'
+import { TokenDetails } from './TokenDetails'
 import { TokenTrustBadge } from './TokenTrustBadge'
 
 /** Сколько строк-заполнителей, пока список ещё пуст. */
@@ -45,6 +49,11 @@ interface TokenListProps {
  * а выпустить токен с обозначением известного проекта может кто угодно.
  * Пометка не мешает пользоваться, но не даёт спутать подделку
  * с нативной валютой сети, чья конфигурация проверена.
+ *
+ * СТРОКА РАСКРЫВАЕТСЯ НА МЕСТЕ. Сведения живут в той же позиции списка,
+ * а не во всплывающем меню: меню закрыло бы соседние балансы, а второе
+ * `listitem` внутри строки сломало бы счётчик позиций. Удаление —
+ * соседняя кнопка, не потомок раскрывающей: вложенные кнопки запрещены.
  */
 export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: TokenListProps) {
   /* `aria-busy` по той же причине, что и на карточке баланса: пока
@@ -55,9 +64,44 @@ export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: Tok
       {isLoading && tokens.length === 0 ? <TokenListSkeleton /> : null}
 
       {tokens.map((entry) => (
-        <li
+        <TokenRow
           key={`${entry.token.chainId.toString()}:${entry.token.address ?? 'native'}`}
-          className="flex items-center gap-3 px-4 py-3.5 sm:px-6"
+          entry={entry}
+          isLoading={isLoading}
+          portfolio={portfolio}
+          {...(onRemove === undefined ? {} : { onRemove })}
+        />
+      ))}
+    </ul>
+  )
+}
+
+interface TokenRowProps {
+  readonly entry: ITokenBalance
+  readonly isLoading: boolean
+  readonly portfolio: IPortfolioSummary | null
+  readonly onRemove?: (address: Address) => void
+}
+
+function TokenRow({ entry, isLoading, portfolio, onRemove }: TokenRowProps) {
+  const [expanded, setExpanded] = useState(false)
+  const detailsId = useId()
+  const networkName = networkNameForChainId(entry.token.chainId)
+  const symbol = safeText(entry.token.symbol)
+  const canRemove = onRemove !== undefined && entry.token.address !== null
+
+  return (
+    <li className="flex flex-col">
+      <div className="relative">
+        <button
+          type="button"
+          className="focus-ring flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/60 sm:px-6"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={`${symbol} on ${networkName} — asset details`}
+          onClick={() => {
+            setExpanded((current) => !current)
+          }}
         >
           <TokenAvatar
             address={entry.token.address}
@@ -79,10 +123,7 @@ export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: Tok
             </span>
           </span>
 
-          {/* Группа сжимается, а кнопка внутри — нет. `shrink-0` здесь
-                не давал сжаться всей колонке, и ограничитель на самом
-                числе не действовал: ширину диктовало содержимое. */}
-          <span className="flex min-w-0 items-center gap-1">
+          <span className="flex min-w-0 items-center gap-2">
             <span className="flex min-w-0 flex-col items-end gap-0.5">
               {/* Количество — то, ради чего список открывают, и потому
                   весит больше имени. Табличные цифры плюс выравнивание
@@ -127,36 +168,41 @@ export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: Tok
               />
             </span>
 
-            {/* МЕСТО ПОД КНОПКУ ЗАНЯТО ДАЖЕ ТАМ, ГДЕ КНОПКИ НЕТ.
-                У нативной валюты удаления быть не может, и без распорки
-                её количество съезжало вправо на ширину кнопки — числа
-                соседних строк переставали стоять в столбец. Ради этого
-                столбца и существуют табличные цифры, и распорка
-                шириной в кнопку — самый дешёвый способ его сохранить. */}
-            <span className="flex size-8 shrink-0 items-center justify-center">
-              {entry.token.address === null || onRemove === undefined ? null : (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  /* Видимый размер меньше обычного намеренно:
-                     разрушающее действие не должно спорить за внимание
-                     с количеством. Область нажатия при этом остаётся
-                     полной — её задаёт `tap-target` в базовом наборе
-                     классов кнопки. */
-                  className="size-8 text-muted-foreground hover:text-destructive"
-                  aria-label={`Remove token ${safeText(entry.token.symbol)}`}
-                  onClick={() => {
-                    onRemove(entry.token.address as Address)
-                  }}
-                >
-                  <Trash2 className="size-4" aria-hidden />
-                </Button>
+            {/* Распорка только когда удаление реально есть. Пустой
+                квадрат справа от шеврона перехватывал нажатие и
+                строка казалась мёртвой — на витрине справочника
+                удаления нет вовсе. */}
+            {canRemove ? <span className="size-8 shrink-0" aria-hidden /> : null}
+
+            <ChevronDown
+              className={cn(
+                'size-4 shrink-0 text-muted-foreground transition-transform',
+                expanded && 'rotate-180',
               )}
-            </span>
+              aria-hidden
+            />
           </span>
-        </li>
-      ))}
-    </ul>
+        </button>
+
+        {canRemove ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-1/2 right-10 size-8 -translate-y-1/2 text-muted-foreground hover:text-destructive sm:right-12"
+            aria-label={`Remove token ${symbol}`}
+            onClick={() => {
+              onRemove(entry.token.address as Address)
+            }}
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </Button>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <TokenDetails detailsId={detailsId} token={entry.token} portfolio={portfolio} />
+      ) : null}
+    </li>
   )
 }
 

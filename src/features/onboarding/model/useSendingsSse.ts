@@ -15,6 +15,7 @@ import { parseSendingSseEvent, type ISendingSseEvent } from './sending-sse'
 export function useSendingsSse(
   userId: string | null,
   onEvent?: (event: ISendingSseEvent) => void,
+  enabled = true,
 ): void {
   const onEventRef = useRef(onEvent)
 
@@ -23,7 +24,7 @@ export function useSendingsSse(
   }, [onEvent])
 
   useEffect(() => {
-    if (typeof EventSource === 'undefined') {
+    if (!enabled || typeof EventSource === 'undefined') {
       return
     }
 
@@ -50,7 +51,7 @@ export function useSendingsSse(
       source.removeEventListener('sendings', handle as EventListener)
       source.close()
     }
-  }, [userId])
+  }, [enabled, userId])
 }
 
 export function sendingsSseUrl(baseUrl: string, userId: string | null): string {

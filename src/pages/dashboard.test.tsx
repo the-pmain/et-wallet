@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type Wei } from '@/core'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
 import { writeLoginCredentials } from '@/features/onboarding'
+import { shortenAddress } from '@/features/wallet'
 import {
   createTestAppServices,
   mockDirectoryAndPriceFetch,
@@ -59,6 +60,7 @@ describe('Панель: баланс', () => {
 
     expect((await screen.findAllByText('1.5')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('ETH').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Mirror' })).not.toBeInTheDocument()
   })
 
   it('называет, что показан баланс нативной валюты, и ведёт в портфель', async () => {
@@ -140,6 +142,19 @@ describe('Панель: операции', () => {
       '/wallet/assets',
     )
     expect(screen.getByRole('heading', { name: 'Cryptocurrency Prices' })).toBeInTheDocument()
+  })
+
+  it('по нажатию актива на главной показывает сведения', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await findDashboard()
+    await screen.findByText('Ether')
+
+    await user.click(screen.getByRole('button', { name: 'ETH on Ethereum — asset details' }))
+
+    expect(screen.getByText('Native currency')).toBeInTheDocument()
+    expect(screen.getByText('No contract — native currency of the network')).toBeInTheDocument()
   })
 })
 
@@ -229,18 +244,24 @@ describe('Панель: кабинет справочника', () => {
   })
 
   it('после создания и после входа показывает фиат, а не эфир', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            id: '7',
-            email: 'james@example.com',
-            balance: '12.5',
-            createdAt: '2026-08-19T12:00:00.000Z',
-          }),
-        ),
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input)
+      const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+      const body =
+        method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)
+          ? { sendings: [] }
+          : {
+              id: '7',
+              email: 'james@example.com',
+              balance: '12.5',
+              createdAt: '2026-08-19T12:00:00.000Z',
+            }
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
     }) as typeof fetch
 
     writeLoginCredentials({
@@ -354,6 +375,56 @@ describe('Панель: кабинет справочника', () => {
         const method = call[1]?.method ?? 'GET'
 
         return method === 'GET' && url.includes('/v1/users/7')
+      }),
+    ).toBe(true)
+  })
+
+  it('на главной после входа показывает sendings из GET /v1/users/:id/sendings', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    globalThis.fetch = mockDirectoryAndPriceFetch(
+      {
+        id: '7',
+        email: 'james@example.com',
+        balance: '12.5',
+        createdAt: '2026-08-19T12:00:00.000Z',
+      },
+      {
+        sendings: [
+          {
+            id: '61',
+            createdAt: '2026-08-22T14:44:10.949Z',
+            userId: '7',
+            status: 'success',
+            failureMessage: null,
+            recipientAddress: recipient,
+            amount: '2',
+            symbol: 'USDT',
+          },
+        ],
+      },
+    )
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+
+    expect(await screen.findByText('$12.50')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Recent activity' })).toBeInTheDocument()
+    expect(await screen.findByText(shortenAddress(recipient))).toBeInTheDocument()
+    expect(screen.getByText('success')).toBeInTheDocument()
+    expect(screen.queryByText('No operations yet')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.some((call) => {
+        const url = String(call[0])
+        const method = call[1]?.method ?? 'GET'
+
+        return method === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)
       }),
     ).toBe(true)
   })

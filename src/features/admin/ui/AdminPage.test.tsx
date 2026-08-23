@@ -532,16 +532,20 @@ describe('Кабинет администратора', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit' }))
 
     expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
-    const symbolField = screen.getByLabelText('symbol')
-    expect(symbolField).toHaveValue('ETH')
-    expect(symbolField).toHaveDisplayValue('ETH')
+    expect(screen.getByLabelText('symbol')).toHaveTextContent('ETH')
+    await user.click(screen.getByLabelText('symbol'))
+    expect(screen.getByRole('option', { name: 'ETH' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('option', { name: 'USDC' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'USDT' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'DAI' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'WBTC' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'WETH' })).toBeInTheDocument()
-    await user.selectOptions(screen.getByLabelText('status'), 'failure')
-    await user.type(screen.getByLabelText('failureMessage'), 'Blocked by admin')
+    await user.click(screen.getByLabelText('status'))
+    await user.click(screen.getByRole('option', { name: 'failure' }))
+    await user.click(screen.getByLabelText('failureMessage'))
+    expect(screen.getByRole('option', { name: 'Insufficient balance' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Custom…' })).toBeInTheDocument()
+    await user.click(screen.getByRole('option', { name: 'Blocked by admin' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
@@ -559,6 +563,64 @@ describe('Кабинет администратора', () => {
         recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
         amount: '4',
         symbol: 'ETH',
+      })
+    })
+  })
+
+  it('даёт написать свою причину отказа через Custom', async () => {
+    const previous = fetchSpy.getMockImplementation()
+    fetchSpy.mockImplementation((input, init) => {
+      const url = requestUrl(input)
+      const method = init?.method ?? 'GET'
+
+      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            sendings: [
+              {
+                id: '62',
+                createdAt: '2026-08-22T14:59:14.037Z',
+                userId: '74',
+                status: 'pending',
+                failureMessage: null,
+                recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+                amount: '4',
+                symbol: 'ETH',
+              },
+            ],
+          }),
+        )
+      }
+
+      return previous?.(input, init) ?? Promise.resolve(jsonResponse(404, {}))
+    })
+
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Sendings' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await screen.findByRole('heading', { name: 'Edit sending' })
+
+    await user.click(screen.getByLabelText('status'))
+    await user.click(screen.getByRole('option', { name: 'failure' }))
+    await user.click(screen.getByLabelText('failureMessage'))
+    await user.click(screen.getByRole('option', { name: 'Custom…' }))
+    await user.type(screen.getByLabelText('Custom failure message'), 'Node timed out')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      const patch = fetchSpy.mock.calls.find((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const method = call[1]?.method ?? 'GET'
+
+        return url.endsWith('/v1/admin/sendings/62') && method === 'PATCH'
+      })
+
+      expect(requestJson(patch?.[1])).toMatchObject({
+        status: 'failure',
+        failureMessage: 'Node timed out',
       })
     })
   })

@@ -143,6 +143,16 @@ export class MarketCatalog {
     return this.quotesForAssets([ref]).get(priceRefKey(ref))
   }
 
+  /**
+   * Монета каталога для актива. Нужна графику: курс уже есть в сводке,
+   * а ряд за семь дней живёт только здесь.
+   *
+   * `null` — в снимке этой монеты нет. График тогда не выдумывает ряд.
+   */
+  coinForAsset(ref: IMarketAssetRef): IMarketCoin | null {
+    return this.#coinForAsset(ref) ?? null
+  }
+
   quotesForAssets(refs: readonly IMarketAssetRef[]): PriceMap {
     const quotes = new Map<string, IPriceQuote>()
 
@@ -202,6 +212,7 @@ export class MarketCatalog {
         change7dPercent: null,
         volume24hUsd: null,
         marketCapUsd: null,
+        sparkline7d: null,
       },
     ]
   }
@@ -233,27 +244,30 @@ export class MarketCatalog {
   }
 
   #quoteForAsset(ref: IMarketAssetRef): IPriceQuote | undefined {
+    const coin = this.#coinForAsset(ref)
+
+    return coin === undefined ? undefined : this.#toQuote(coin)
+  }
+
+  #coinForAsset(ref: IMarketAssetRef): IMarketCoin | undefined {
     if (ref.address === null) {
       const platform = findCoinGeckoPlatform(ref.chainId)
-      const coin = platform === null ? undefined : this.#byId.get(platform.nativeCoinId)
 
-      return coin === undefined ? undefined : this.#toQuote(coin)
+      return platform === null ? undefined : this.#byId.get(platform.nativeCoinId)
     }
 
     const knownId = knownMarketCoinId(ref.chainId, ref.address)
     const byId = knownId === null ? undefined : this.#byId.get(knownId)
 
     if (byId !== undefined) {
-      return this.#toQuote(byId)
+      return byId
     }
 
     if (ref.symbol === undefined || ref.symbol.trim() === '') {
       return undefined
     }
 
-    const bySymbol = this.#bySymbol.get(ref.symbol.toUpperCase())
-
-    return bySymbol === undefined ? undefined : this.#toQuote(bySymbol)
+    return this.#bySymbol.get(ref.symbol.toUpperCase())
   }
 
   #toQuote(coin: IMarketCoin): IPriceQuote | undefined {

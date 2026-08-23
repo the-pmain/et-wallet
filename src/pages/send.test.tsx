@@ -714,8 +714,10 @@ describe('Отправка: запись справочника', () => {
     })
     await user.click(next)
 
-    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Status' })).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
     expect(screen.getByText(/The transfer was recorded as pending/i)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByLabelText(/Recipient address/)).toHaveValue('')
     expect(screen.getByLabelText(/Amount/)).toHaveValue('')
 
@@ -804,7 +806,7 @@ describe('Отправка: запись справочника', () => {
     expect(screen.queryByText(/1\.2847 ETH/)).not.toBeInTheDocument()
   })
 
-  it('показывает failureMessage в модалке, если SSE update совпал с текущей отправкой', async () => {
+  it('показывает failureMessage в панели статуса, если SSE update совпал с текущей отправкой', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'theguy@email.com',
@@ -847,7 +849,8 @@ describe('Отправка: запись справочника', () => {
     })
     await user.click(next)
 
-    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Status' })).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
 
     const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
     expect(source).toBeDefined()
@@ -867,11 +870,13 @@ describe('Отправка: запись справочника', () => {
       }),
     )
 
-    expect(await screen.findByRole('heading', { name: 'Sending failed' })).toBeInTheDocument()
+    expect(await screen.findByText('failure')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Status' })).toBeInTheDocument()
     expect(screen.getByText('Blocked by admin')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('показывает success в модалке, если SSE update совпал с текущей отправкой', async () => {
+  it('показывает success в панели статуса, если SSE update совпал с текущей отправкой', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'theguy@email.com',
@@ -914,7 +919,8 @@ describe('Отправка: запись справочника', () => {
     })
     await user.click(next)
 
-    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Status' })).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
 
     const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
     expect(source).toBeDefined()
@@ -934,8 +940,10 @@ describe('Отправка: запись справочника', () => {
       }),
     )
 
-    expect(await screen.findByRole('heading', { name: 'Sending succeeded' })).toBeInTheDocument()
+    expect(await screen.findByText('success')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Status' })).toBeInTheDocument()
     expect(screen.getByText('The transfer completed successfully.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('красит Available и блокирует отправку, если сумма больше баланса', async () => {
@@ -1032,7 +1040,9 @@ describe('Отправка: запись справочника', () => {
     })
     await user.click(next)
 
-    expect(await screen.findByRole('heading', { name: 'Sending is in process' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Status' })).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     const sendCall = vi.mocked(globalThis.fetch).mock.calls.find((call) =>
       String(call[0]).includes('/v1/users/sendings'),

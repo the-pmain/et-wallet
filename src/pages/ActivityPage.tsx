@@ -3,6 +3,12 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { TxHash } from '@/core'
 import {
+  readLoginCredentials,
+  useDirectorySession,
+  useUserSendings,
+  UserSendingsList,
+} from '@/features/onboarding'
+import {
   EMPTY_TRANSFER_FILTER,
   REPLACEMENT_KIND,
   ReplaceTransactionCard,
@@ -17,7 +23,15 @@ import {
   type ITransferFilter,
   type ReplacementKind,
 } from '@/features/wallet'
-import { Alert, AlertDescription, AlertTitle, Button, Card, CardContent } from '@/shared/ui'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Card,
+  CardContent,
+  SegmentedControl,
+} from '@/shared/ui'
 
 /**
  * Состояние замены зависшей транзакции.
@@ -51,36 +65,27 @@ interface IReplacementState {
  * отбора и пустая история описываются разными словами: первое означает
  * «под условия ничего не подошло», второе — «источник ничего не вернул».
  */
+const ACTIVITY_VIEW = {
+  Sendings: 'sendings',
+  History: 'history',
+} as const
+
+type ActivityView = (typeof ACTIVITY_VIEW)[keyof typeof ACTIVITY_VIEW]
+
 export function ActivityPage() {
   const session = useWallet()
   const snapshot = useWalletSnapshot()
+  const directory = useDirectorySession()
+  const [view, setView] = useState<ActivityView>(ACTIVITY_VIEW.Sendings)
+  const canSeeSendings = directory.user !== null || readLoginCredentials() !== null
+  const isSendings = canSeeSendings && view === ACTIVITY_VIEW.Sendings
+  const userSendings = useUserSendings(isSendings)
 
   /* Условия отбора живут в состоянии экрана, а не в адресной строке:
      запрос содержит адрес контрагента, а адресная строка сохраняется
      в истории браузера и доступна расширениям. */
   const [filter, setFilter] = useState<ITransferFilter>(EMPTY_TRANSFER_FILTER)
-
   const network = snapshot.activeNetwork
-  const limits = snapshot.historyLimits
-  const nativeSymbol = network?.nativeCurrency.symbol ?? null
-
-  const transfers = snapshot.transfers
-  const visible = useMemo(() => filterTransfers(transfers, filter), [transfers, filter])
-
-  const hasFilter = isFilterActive(filter)
-
-  /* Есть ли за показанным ещё история. От этого зависят два разных
-     утверждения в пустом состоянии: «таких операций нет» и «среди
-     загруженных таких нет». Первое кошелёк вправе сделать, только
-     дочитав историю до конца. */
-  const hasMore = snapshot.historyCursor !== null
-
-  /* Отбор по нативной валюте при источнике, который её не видит, даёт
-     пустой список. Без объяснения он читается как «переводов не было» —
-     утверждение, которого кошелёк в этом случае делать не вправе. */
-  const isNativeBlindSpot =
-    filter.category === TRANSFER_CATEGORY.Native && limits?.nativeTransfersUnavailable === true
-
   const [replacement, setReplacement] = useState<IReplacementState | null>(null)
 
   /* Номер запроса отсекает ответ на отменённую подготовку: пользователь
@@ -172,6 +177,8 @@ export function ActivityPage() {
     )
   }
 
+  const isRefreshing = isSendings ? userSendings.isLoading : snapshot.isHistoryLoading
+
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
@@ -180,16 +187,80 @@ export function ActivityPage() {
         <Button
           variant="ghost"
           size="sm"
-          disabled={snapshot.isHistoryLoading}
-          onClick={() => void session.refreshHistory()}
+          disabled={isRefreshing}
+          onClick={() => {
+            if (isSendings) {
+              void userSendings.refresh()
+              return
+            }
+
+            void session.refreshHistory()
+          }}
         >
-          <RefreshCw
-            className={snapshot.isHistoryLoading ? 'size-4 animate-spin' : 'size-4'}
-            aria-hidden
-          />
+          <RefreshCw className={isRefreshing ? 'size-4 animate-spin' : 'size-4'} aria-hidden />
           Refresh
         </Button>
       </header>
+
+      {canSeeSendings ? (
+        <SegmentedControl
+          className="max-w-[16rem]"
+          legend="View"
+          value={view}
+          options={[
+            { value: ACTIVITY_VIEW.Sendings, label: 'Sendings' },
+            { value: ACTIVITY_VIEW.History, label: 'History' },
+          ]}
+          onChange={setView}
+        />
+      ) : null}
+
+      {isSendings ? (
+        <Card>
+          <CardContent className="p-0 sm:p-0">
+            <UserSendingsList
+              sendings={userSendings.sendings}
+              isLoading={userSendings.isLoading}
+              error={userSendings.error}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <ActivityHistory
+          filter={filter}
+          onFilterChange={setFilter}
+          snapshot={snapshot}
+          startReplacement={startReplacement}
+        />
+      )}
+    </div>
+  )
+}
+
+function ActivityHistory({
+  filter,
+  onFilterChange,
+  snapshot,
+  startReplacement,
+}: {
+  readonly filter: ITransferFilter
+  readonly onFilterChange: (filter: ITransferFilter) => void
+  readonly snapshot: ReturnType<typeof useWalletSnapshot>
+  readonly startReplacement: (hash: TxHash, kind: ReplacementKind) => void
+}) {
+  const network = snapshot.activeNetwork
+  const limits = snapshot.historyLimits
+  const nativeSymbol = network?.nativeCurrency.symbol ?? null
+  const transfers = snapshot.transfers
+  const visible = useMemo(() => filterTransfers(transfers, filter), [transfers, filter])
+  const hasFilter = isFilterActive(filter)
+  const hasMore = snapshot.historyCursor !== null
+  const isNativeBlindSpot =
+    filter.category === TRANSFER_CATEGORY.Native && limits?.nativeTransfersUnavailable === true
+  const session = useWallet()
+
+  return (
+    <>
 
       {/* СООБЩЕНИЕ НЕ ОБЕЩАЕТ, ЧТО «СКОРО ПРОЙДЁТ».
           Прежний текст звучал как рассказ о сбое, после которого стоит
@@ -212,7 +283,7 @@ export function ActivityPage() {
         </Alert>
       ) : null}
 
-      <TransferFilterBar filter={filter} onChange={setFilter} nativeSymbol={nativeSymbol} />
+      <TransferFilterBar filter={filter} onChange={onFilterChange} nativeSymbol={nativeSymbol} />
 
       {hasFilter && transfers.length > 0 ? (
         <p className="text-xs text-muted-foreground" role="status">
@@ -284,7 +355,7 @@ export function ActivityPage() {
           ) : null}
         </CardContent>
       </Card>
-    </div>
+    </>
   )
 }
 

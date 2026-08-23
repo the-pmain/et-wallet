@@ -9,11 +9,13 @@ import { sendingsSseUrl, useSendingsSse } from './useSendingsSse'
 function Probe({
   userId,
   onEvent,
+  enabled,
 }: {
   readonly userId: string | null
   readonly onEvent?: (event: { readonly id: string }) => void
+  readonly enabled?: boolean
 }) {
-  useSendingsSse(userId, onEvent)
+  useSendingsSse(userId, onEvent, enabled)
   return null
 }
 
@@ -54,6 +56,12 @@ describe('useSendingsSse', () => {
     render(<Probe userId={null} />)
 
     expect(TestEventSource.instances[0]?.url).toBe('/v1/sendings')
+  })
+
+  it('не открывает поток, пока подписка выключена', () => {
+    render(<Probe userId={null} enabled={false} />)
+
+    expect(TestEventSource.instances).toHaveLength(0)
   })
 
   it('передаёт кадр sendings с type_send create', () => {

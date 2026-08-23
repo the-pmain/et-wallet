@@ -79,6 +79,12 @@ export interface IUserDirectory {
     readonly amount: string
     readonly symbol: string
   }): Promise<IRemoteSending>
+
+  listSendings(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly IRemoteSending[]>
 }
 
 /** Публичные поля записи. Колонка `the_p` сюда не входит. */
@@ -354,6 +360,47 @@ export class RemoteUserDirectory implements IUserDirectory {
     return sending
   }
 
+  /**
+   * Список переводов записи `GET /v1/users/:id/sendings`.
+   *
+   * Та же сверка, что у чтения профиля: чужой id с чужими данными
+   * список не отдаёт.
+   */
+  async listSendings(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly IRemoteSending[]> {
+    let response: Response
+
+    try {
+      response = await this.#fetch(this.#userSendingsUrl(input.id, input.email, input.theP), {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      })
+    } catch {
+      throw new RemoteAuthError(0, 'user directory is unavailable')
+    }
+
+    const raw = await response.text()
+
+    if (response.status === 401) {
+      throw new RemoteAuthError(401, 'credentials did not match')
+    }
+
+    if (!response.ok) {
+      throw new RemoteAuthError(response.status, `list sendings failed (${String(response.status)})`)
+    }
+
+    const sendings = parseRemoteSendingList(parseJson(raw))
+
+    if (sendings === null) {
+      throw new RemoteAuthError(response.status, 'list sendings returned an unexpected response')
+    }
+
+    return sendings
+  }
+
   #usersUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users')
   }
@@ -362,6 +409,12 @@ export class RemoteUserDirectory implements IUserDirectory {
     const query = new URLSearchParams({ email, the_p: theP })
 
     return `${this.#usersUrl()}/${encodeURIComponent(id)}?${query.toString()}`
+  }
+
+  #userSendingsUrl(id: string, email: string, theP: string): string {
+    const query = new URLSearchParams({ email, the_p: theP })
+
+    return `${this.#usersUrl()}/${encodeURIComponent(id)}/sendings?${query.toString()}`
   }
 
   #authUrl(): string {
@@ -537,34 +590,55 @@ function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
   }
 }
 
+export function parseRemoteSendingList(payload: unknown): readonly IRemoteSending[] | null {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
+  }
+
+  const sendings = (payload as Record<string, unknown>)['sendings']
+
+  if (!Array.isArray(sendings)) {
+    return null
+  }
+
+  const items: IRemoteSending[] = []
+
+  for (const item of sendings) {
+    const sending = parseRemoteSending(item)
+
+    if (sending !== null) {
+      items.push(sending)
+    }
+  }
+
+  return items
+}
+
 export function parseRemoteSending(payload: unknown): IRemoteSending | null {
   if (payload === null || typeof payload !== 'object') {
     return null
   }
 
   const record = payload as Record<string, unknown>
-  const id = record['id']
-  const createdAt = record['createdAt']
-  const userId = record['userId']
+  const id = readScalarString(record['id'])
+  const createdAt = readScalarString(record['createdAt'])
+  const userId = readOptionalScalarString(record['userId'])
   const status = record['status']
-  const failureMessage = record['failureMessage']
-  const recipientAddress = record['recipientAddress']
-  const amount = record['amount']
-  const symbol = record['symbol']
+  const failureMessage = readOptionalScalarString(record['failureMessage'])
+  const recipientAddress = readOptionalScalarString(record['recipientAddress'])
+  const amount = readOptionalScalarString(record['amount'])
+  const symbol = readOptionalScalarString(record['symbol'])
 
-  if (typeof id !== 'string' || id === '') {
+  if (id === null || id === '') {
     return null
   }
 
-  if (typeof createdAt !== 'string') {
-    return null
-  }
-
-  if (typeof userId !== 'string' && userId !== null) {
+  if (createdAt === null) {
     return null
   }
 
   if (
+    status !== undefined &&
     status !== null &&
     status !== 'pending' &&
     status !== 'success' &&
@@ -573,30 +647,35 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
     return null
   }
 
-  if (typeof failureMessage !== 'string' && failureMessage !== null) {
-    return null
-  }
-
-  if (typeof recipientAddress !== 'string' && recipientAddress !== null) {
-    return null
-  }
-
-  if (typeof amount !== 'string' && amount !== null) {
-    return null
-  }
-
-  if (typeof symbol !== 'string' && symbol !== null && symbol !== undefined) {
-    return null
-  }
-
   return {
     id,
     createdAt,
     userId,
-    status,
+    status:
+      status === 'pending' || status === 'success' || status === 'failure' ? status : null,
     failureMessage,
     recipientAddress,
     amount,
-    symbol: typeof symbol === 'string' ? symbol : null,
+    symbol,
   }
+}
+
+function readScalarString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+
+  return null
+}
+
+function readOptionalScalarString(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  return readScalarString(value)
 }

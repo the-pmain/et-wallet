@@ -17,6 +17,18 @@ export {
 } from './FiatRatesClient'
 export { parseMarketList, type IMarketCoin } from './markets'
 export {
+  CHART_RANGE,
+  coinbaseProductForCoinId,
+  fetchCoinbaseCandlePoints,
+  mergeLivePrice,
+  parseCoinbaseCandles,
+  pointsFromSparkline,
+  slicePointsForRange,
+  type ChartRange,
+  type IFetchCandleOptions,
+  type IPricePoint,
+} from './price-series'
+export {
   findCoinGeckoPlatform,
   listCoinGeckoPlatforms,
   type ICoinGeckoPlatform,

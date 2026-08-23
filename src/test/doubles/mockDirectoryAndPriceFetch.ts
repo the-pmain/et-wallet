@@ -52,10 +52,25 @@ function marketEntry(
     price_change_percentage_7d_in_currency: 0,
     total_volume: 1,
     market_cap: 2,
+    sparkline_in_7d: {
+      price: Array.from({ length: 24 }, (_, index) => price * (0.985 + index * 0.00125)),
+    },
   }
 }
 
 function pricePayload(url: string): unknown {
+  if (url.includes('api.exchange.coinbase.com')) {
+    const now = 1_785_000_000
+    return Array.from({ length: 12 }, (_, index) => [
+      now - (11 - index) * 300,
+      ETH_USD * 0.99,
+      ETH_USD * 1.01,
+      ETH_USD,
+      ETH_USD * (0.995 + index * 0.001),
+      1,
+    ])
+  }
+
   if (url.includes('api.coinbase.com')) {
     return { data: { amount: String(ETH_USD) } }
   }
@@ -87,6 +102,7 @@ function isPriceUrl(url: string): boolean {
   return (
     url.includes('api.coingecko.com') ||
     url.includes('api.coinbase.com') ||
+    url.includes('api.exchange.coinbase.com') ||
     url.includes('frankfurter.app') ||
     url.includes('frankfurter.dev') ||
     url.includes('/v1/fiat-rates')
@@ -103,7 +119,10 @@ function testMarkets(): readonly IMarketCoin[] {
  * Каталог рынка заполняется сразу: тесты не ждут сеть и не поднимают
  * второй запрос к CoinGecko.
  */
-export function mockDirectoryAndPriceFetch(userBody: unknown): typeof fetch {
+export function mockDirectoryAndPriceFetch(
+  userBody: unknown,
+  extras: { readonly sendings?: readonly unknown[] } = {},
+): typeof fetch {
   appMarketCatalog.hydrate(testMarkets())
 
   return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -114,6 +133,10 @@ export function mockDirectoryAndPriceFetch(userBody: unknown): typeof fetch {
 
     if (isPriceUrl(url)) {
       return Promise.resolve(jsonOk(pricePayload(url)))
+    }
+
+    if (method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)) {
+      return Promise.resolve(jsonOk({ sendings: extras.sendings ?? [] }))
     }
 
     if (url.includes('/v1/users/sendings') && method.toUpperCase() === 'POST') {

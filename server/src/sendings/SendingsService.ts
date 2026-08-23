@@ -62,6 +62,34 @@ export class SendingsService {
     return await this.#sendings.list(options)
   }
 
+  async listForUser(input: {
+    readonly userId: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly ISendingRecord[]> {
+    const user = await this.#users.findByCredentials({
+      email: input.email,
+      theP: input.theP,
+    })
+
+    if (user === null || user.id !== input.userId.trim()) {
+      throw new SendingsAuthError('Invalid credentials.')
+    }
+
+    const owned = await this.#sendings.listByUserId(user.id)
+
+    if (owned.length > 0) {
+      return owned
+    }
+
+    /* Если фильтр `user_id` на таблице пуст, а запись всё же есть
+       (другой тип колонки, старый ряд), не показываем владельцу пустой
+       список при живых переводах в общей выдаче. */
+    const listed = await this.#sendings.list({ limit: 200 })
+
+    return listed.filter((record) => record.userId !== null && record.userId === user.id)
+  }
+
   async update(id: string, patch: IUpdateSendingFields): Promise<ISendingRecord | null> {
     const failureMessage = validateSending({
       recipientAddress: patch.recipientAddress,

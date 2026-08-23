@@ -4,7 +4,6 @@ import {
   ExternalLink,
   FileCode,
   Flame,
-  Loader2,
   ShieldAlert,
   Send,
 } from 'lucide-react'
@@ -61,7 +60,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Dialog,
   Input,
   Label,
 } from '@/shared/ui'
@@ -144,13 +142,12 @@ export function SendPage() {
     readonly id: string
     readonly userId: string | null
   } | null>(null)
-  const [sendingOutcome, setSendingOutcome] = useState<SendingModalOutcome>(null)
+  const [sendingOutcome, setSendingOutcome] = useState<SendingOutcome>(null)
   const [sendingPreview, setSendingPreview] = useState<{
     readonly amount: string
     readonly symbol: string
     readonly recipient: string
   } | null>(null)
-  const [isSendingModalOpen, setSendingModalOpen] = useState(false)
 
   useSendingsSse(sendingsUserId, (event) => {
     if (event.type_send !== SENDING_SSE_TYPE.Update) {
@@ -167,7 +164,6 @@ export function SendPage() {
 
     if (event.status === SENDING_STATUS.Success) {
       setSendingOutcome({ status: SENDING_STATUS.Success })
-      setSendingModalOpen(true)
       return
     }
 
@@ -179,7 +175,6 @@ export function SendPage() {
       status: SENDING_STATUS.Failure,
       message: event.failureMessage ?? 'The transfer could not be sent.',
     })
-    setSendingModalOpen(true)
   })
 
   const [step, setStep] = useState<Step>(STEP.Form)
@@ -358,7 +353,6 @@ export function SendPage() {
           symbol,
           recipient: effectiveRecipientAddress,
         })
-        setSendingModalOpen(true)
         const sending = await directory.registerSending({
           recipientAddress: effectiveRecipientAddress,
           amount: amountValue,
@@ -449,7 +443,7 @@ export function SendPage() {
       setPrepared(applyPriority(result, FEE_PRIORITY.Medium))
       setStep(STEP.Confirm)
     } catch (caught) {
-      setSendingModalOpen(false)
+      setSendingPreview(null)
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
       setBusy(false)
@@ -711,16 +705,19 @@ export function SendPage() {
         </CardContent>
       </Card>
 
-      <SendingProcessDialog
-        isOpen={isSendingModalOpen}
-        amount={sendingPreview?.amount ?? amount}
-        symbol={sendingPreview?.symbol ?? symbol}
-        recipient={sendingPreview?.recipient ?? trimmedRecipient}
-        outcome={sendingOutcome}
-        onClose={() => {
-          setSendingModalOpen(false)
-        }}
-      />
+      {sendingPreview === null ? null : (
+        <SendingStatusPanel
+          amount={sendingPreview.amount}
+          symbol={sendingPreview.symbol}
+          recipient={sendingPreview.recipient}
+          outcome={sendingOutcome}
+          onDismiss={() => {
+            setSendingPreview(null)
+            setSendingOutcome(null)
+            setTrackedSending(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -741,76 +738,82 @@ function isAmountOverAvailable(
   }
 }
 
-type SendingModalOutcome =
+type SendingOutcome =
   | { readonly status: typeof SENDING_STATUS.Success }
   | { readonly status: typeof SENDING_STATUS.Failure; readonly message: string }
   | null
 
-function SendingProcessDialog({
-  isOpen,
+/**
+ * Статус перевода под формой, не в модальном окне.
+ *
+ * Кабинет ждёт решение сервера. Крутящийся индикатор ничего не говорит
+ * о записи — говорит слово статуса. Панель остаётся на странице, форму
+ * не перекрывает.
+ */
+function SendingStatusPanel({
   amount,
   symbol,
   recipient,
   outcome,
-  onClose,
+  onDismiss,
 }: {
-  readonly isOpen: boolean
   readonly amount: string
   readonly symbol: string
   readonly recipient: string
-  readonly outcome: SendingModalOutcome
-  readonly onClose: () => void
+  readonly outcome: SendingOutcome
+  readonly onDismiss: () => void
 }) {
   const failed = outcome?.status === SENDING_STATUS.Failure
   const succeeded = outcome?.status === SENDING_STATUS.Success
+  const status = failed
+    ? SENDING_STATUS.Failure
+    : succeeded
+      ? SENDING_STATUS.Success
+      : SENDING_STATUS.Pending
 
   return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title={
-        failed ? 'Sending failed' : succeeded ? 'Sending succeeded' : 'Sending is in process'
-      }
-      description={
-        failed
-          ? 'The transfer was marked as failed.'
-          : succeeded
-            ? 'The transfer completed successfully.'
-            : 'The transfer was recorded as pending. It stays in process until it completes.'
-      }
-    >
-      <div className="flex flex-col items-center gap-4 py-2 text-center">
-        <span
-          className={
-            failed
-              ? 'flex size-14 items-center justify-center rounded-full bg-destructive/15 text-destructive'
-              : succeeded
-                ? 'flex size-14 items-center justify-center rounded-full bg-risk-low/15 text-risk-low'
-                : 'flex size-14 items-center justify-center rounded-full bg-muted'
+    <Card aria-live="polite">
+      <CardHeader className="flex-row items-center justify-between gap-3">
+        <CardTitle className="text-base font-medium text-muted-foreground">Status</CardTitle>
+        <Badge
+          variant={
+            status === SENDING_STATUS.Failure
+              ? 'danger'
+              : status === SENDING_STATUS.Success
+                ? 'default'
+                : 'warning'
           }
-          aria-hidden
+          className={
+            status === SENDING_STATUS.Success
+              ? 'border-transparent bg-risk-low/15 text-risk-low capitalize'
+              : 'capitalize'
+          }
         >
-          {failed ? (
-            <ShieldAlert className="size-7" />
-          ) : succeeded ? (
-            <CheckCircle2 className="size-7" />
-          ) : (
-            <Loader2 className="size-7 animate-spin text-foreground" />
-          )}
-        </span>
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm font-medium">
-            Sending {amount} {symbol}
-          </p>
-          <p className="text-xs break-all text-muted-foreground">To {recipient}</p>
-        </div>
+          {status}
+        </Badge>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm font-medium">
+          Sending {amount} {symbol}
+        </p>
+        <p className="text-xs break-all text-muted-foreground">To {recipient}</p>
+        <p className="text-sm text-muted-foreground">
+          {failed
+            ? 'The transfer was marked as failed.'
+            : succeeded
+              ? 'The transfer completed successfully.'
+              : 'The transfer was recorded as pending.'}
+        </p>
         {failed ? (
-          <Alert variant="danger" className="w-full text-left">
+          <Alert variant="danger">
             <AlertDescription>{outcome.message}</AlertDescription>
           </Alert>
         ) : null}
-      </div>
-    </Dialog>
+        <Button type="button" variant="ghost" className="self-start" onClick={onDismiss}>
+          Dismiss
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 

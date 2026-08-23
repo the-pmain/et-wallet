@@ -297,11 +297,11 @@ function toRecord(row: ISendingRow): ISendingRecord {
   return {
     id: String(row.id),
     createdAt: new Date(row.created_at),
-    userId: row.user_id === null ? null : String(row.user_id),
+    userId: row.user_id === null || row.user_id === undefined ? null : String(row.user_id),
     status: normalizeSendingStatus(row.status),
-    failureMessage: row.failure_message,
-    recipientAddress: row.recipient_address,
-    amount: row.amount,
+    failureMessage: row.failure_message ?? null,
+    recipientAddress: row.recipient_address ?? null,
+    amount: row.amount === null || row.amount === undefined ? null : String(row.amount),
     symbol: typeof row.asset_symbol === 'string' ? row.asset_symbol : null,
   }
 }

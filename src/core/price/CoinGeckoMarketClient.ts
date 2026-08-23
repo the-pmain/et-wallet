@@ -22,9 +22,10 @@ export interface ICoinGeckoMarketClientOptions {
  * за согласием. Этот — каталог рынка, и его можно показать на главном
  * экране без того согласия.
  *
- * ГРАФИК ЗА СЕМЬ ДНЕЙ НЕ ЗАПРАШИВАЕТСЯ. Параметр `sparkline=false`
- * отключает ряд точек, который на экране всё равно нельзя нарисовать:
- * колонка графика сознательно отсутствует.
+ * РЯД ЗА СЕМЬ ДНЕЙ ИДЁТ В ТОМ ЖЕ ЗАПРОСЕ. `sparkline=true` не открывает
+ * второго обращения: точки лежат в `sparkline_in_7d` ответа `/coins/markets`.
+ * Отдельный `market_chart` на каждый раскрытый актив съел бы лимит
+ * раньше, чем пользователь успел бы сравнить два токена.
  */
 export class CoinGeckoMarketClient {
   readonly #baseUrl: string
@@ -48,7 +49,7 @@ export class CoinGeckoMarketClient {
     url.searchParams.set('order', 'market_cap_desc')
     url.searchParams.set('per_page', String(this.#perPage))
     url.searchParams.set('page', '1')
-    url.searchParams.set('sparkline', 'false')
+    url.searchParams.set('sparkline', 'true')
     url.searchParams.set('price_change_percentage', '1h,24h,7d')
 
     const payload = await this.#request(url, signal)

@@ -22,6 +22,16 @@ export interface IMarketCoin {
   readonly change7dPercent: number | null
   readonly volume24hUsd: number | null
   readonly marketCapUsd: number | null
+
+  /**
+   * Ряд цен за семь дней из того же `/coins/markets`.
+   *
+   * Отдельный `market_chart` не запрашивается: бесплатный лимит
+   * CoinGecko кончается на нескольких обращениях, а этот ряд уже
+   * приходит вместе с таблицей. `null` — источника не было или точек
+   * слишком мало, чтобы провести линию.
+   */
+  readonly sparkline7d: readonly number[] | null
 }
 
 /**
@@ -78,7 +88,34 @@ function readMarketCoin(entry: unknown, index: number): IMarketCoin | null {
     change7dPercent: readNumber(record['price_change_percentage_7d_in_currency']),
     volume24hUsd: readNumber(record['total_volume']),
     marketCapUsd: readNumber(record['market_cap']),
+    sparkline7d: readSparkline(record['sparkline_in_7d']),
   }
+}
+
+/**
+ * Ряд из `sparkline_in_7d.price`. Меньше двух точек — не ряд:
+ * одну точку график не нарисует, и врать пустой линией нельзя.
+ */
+function readSparkline(value: unknown): readonly number[] | null {
+  if (typeof value !== 'object' || value === null) {
+    return null
+  }
+
+  const prices = (value as Record<string, unknown>)['price']
+
+  if (!Array.isArray(prices)) {
+    return null
+  }
+
+  const points: number[] = []
+
+  for (const price of prices) {
+    if (typeof price === 'number' && Number.isFinite(price) && price > 0) {
+      points.push(price)
+    }
+  }
+
+  return points.length >= 2 ? points : null
 }
 
 /** Положительный ранг из ответа, иначе порядковый номер в выдаче. */

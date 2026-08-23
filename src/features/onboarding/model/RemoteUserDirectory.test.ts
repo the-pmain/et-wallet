@@ -260,6 +260,97 @@ describe('RemoteUserDirectory', () => {
     expect(user.assets.tokens[0]?.balance).toBe('832117000000000000')
   })
 
+  it('читает sendings через GET /v1/users/:id/sendings', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        sendings: [
+          {
+            id: '12',
+            createdAt: '2026-08-22T13:00:00.000Z',
+            userId: '7',
+            status: 'pending',
+            failureMessage: null,
+            recipientAddress: WALLET.key,
+            amount: '0.01',
+            symbol: 'ETH',
+          },
+        ],
+      }),
+    )
+    const directory = new RemoteUserDirectory({
+      baseUrl: 'http://127.0.0.1:8080',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const sendings = await directory.listSendings({
+      id: '7',
+      email: 'james@example.com',
+      theP: 'demo',
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:8080/v1/users/7/sendings?email=james%40example.com&the_p=demo',
+    )
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'GET' })
+    expect(sendings).toEqual([
+      {
+        id: '12',
+        createdAt: '2026-08-22T13:00:00.000Z',
+        userId: '7',
+        status: 'pending',
+        failureMessage: null,
+        recipientAddress: WALLET.key,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    ])
+  })
+
+  it('принимает числовые id и amount и пропускает битые строки списка', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        sendings: [
+          {
+            id: 12,
+            createdAt: '2026-08-22T13:00:00.000Z',
+            userId: 7,
+            status: 'pending',
+            failureMessage: null,
+            recipientAddress: WALLET.key,
+            amount: 4,
+            symbol: 'USDT',
+          },
+          { id: '', createdAt: 'bad' },
+        ],
+      }),
+    )
+    const directory = new RemoteUserDirectory({
+      baseUrl: 'http://127.0.0.1:8080',
+      logger: new NullLogger(),
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const sendings = await directory.listSendings({
+      id: '7',
+      email: 'james@example.com',
+      theP: 'demo',
+    })
+
+    expect(sendings).toEqual([
+      {
+        id: '12',
+        createdAt: '2026-08-22T13:00:00.000Z',
+        userId: '7',
+        status: 'pending',
+        failureMessage: null,
+        recipientAddress: WALLET.key,
+        amount: '4',
+        symbol: 'USDT',
+      },
+    ])
+  })
+
   it('пишет адрес через POST /v1/users/wallets', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, USER_BODY))
     const directory = new RemoteUserDirectory({

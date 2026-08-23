@@ -67,6 +67,25 @@ const UPDATE_SENDING_BODY = {
   },
 } as const
 
+const LIST_USER_SENDINGS_PARAMS = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id'],
+  properties: {
+    id: { type: 'string', minLength: 1, maxLength: 20, pattern: '^\\d+$' },
+  },
+} as const
+
+const LIST_USER_SENDINGS_QUERY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['email', 'the_p'],
+  properties: {
+    email: { type: 'string', minLength: 1, maxLength: 254 },
+    the_p: { type: 'string', minLength: 1, maxLength: 256 },
+  },
+} as const
+
 const SENDINGS_SSE_QUERY = {
   type: 'object',
   additionalProperties: false,
@@ -96,6 +115,15 @@ interface IUpdateSendingBody {
 
 interface ISendingIdParams {
   readonly id: string
+}
+
+interface IListUserSendingsParams {
+  readonly id: string
+}
+
+interface IListUserSendingsQuery {
+  readonly email: string
+  readonly the_p: string
 }
 
 interface ISendingsSseQuery {
@@ -141,6 +169,38 @@ export function registerSendingRoutes(
       request.raw.once('close', cleanup)
       request.raw.once('end', cleanup)
       request.raw.once('error', cleanup)
+    },
+  )
+
+  app.get<{ Params: IListUserSendingsParams; Querystring: IListUserSendingsQuery }>(
+    '/v1/users/:id/sendings',
+    { schema: { params: LIST_USER_SENDINGS_PARAMS, querystring: LIST_USER_SENDINGS_QUERY } },
+    async (request, reply) => {
+      const credentials = readCredentials(request.query)
+
+      if (credentials === null) {
+        throw new BadRequestError('invalid_request', 'Request does not match the schema.')
+      }
+
+      let records: readonly ISendingRecord[]
+
+      try {
+        records = await sendingsService.listForUser({
+          userId: request.params.id.trim(),
+          email: credentials.email,
+          theP: credentials.theP,
+        })
+      } catch (error) {
+        if (error instanceof SendingsAuthError) {
+          throw new UnauthorizedError(error.message)
+        }
+
+        throw error
+      }
+
+      void reply.header('cache-control', 'no-store')
+
+      return { sendings: records.map(toSendingResponse) }
     },
   )
 

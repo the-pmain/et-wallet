@@ -31,6 +31,7 @@ describe('parseMarketList', () => {
       change7dPercent: 13.4,
       volume24hUsd: 66_443_997_085,
       marketCapUsd: 1_444_080_308_589,
+      sparkline7d: null,
     })
     expect(coin).not.toHaveProperty('image')
   })
@@ -60,6 +61,23 @@ describe('parseMarketList', () => {
     ])
 
     expect(coins.map((coin) => coin.rank)).toEqual([1, 2])
+  })
+
+  it('забирает ряд за семь дней и отбрасывает короткий', () => {
+    const [withLine, withoutLine] = parseMarketList([
+      {
+        ...BITCOIN,
+        sparkline_in_7d: { price: [1, 2, 3] },
+      },
+      {
+        ...BITCOIN,
+        id: 'tiny',
+        sparkline_in_7d: { price: [1] },
+      },
+    ])
+
+    expect(withLine?.sparkline7d).toEqual([1, 2, 3])
+    expect(withoutLine?.sparkline7d).toBeNull()
   })
 
   it('отказывается от ответа, который не список', () => {

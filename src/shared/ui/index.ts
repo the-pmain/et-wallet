@@ -17,6 +17,7 @@ export {
 } from './segmented-control'
 export { Input } from './input'
 export { Label } from './label'
+export { Select, type ISelectOption, type SelectProps } from './select'
 export { Separator, type SeparatorProps } from './separator'
 export { Skeleton } from './skeleton'
 export { Textarea } from './textarea'

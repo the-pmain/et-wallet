@@ -55,6 +55,9 @@ export {
   type ILocalAssetSnapshot,
 } from './model/use-displayed-assets'
 export { useRefreshRemoteAssets } from './model/use-refresh-remote-assets'
+export { useUserSendings, type IUserSendings } from './model/use-user-sendings'
+export { SendingsCard } from './ui/SendingsCard'
+export { UserSendingsList } from './ui/UserSendingsList'
 export { PasswordFields } from './ui/PasswordFields'
 export { SeedPhraseConfirmation } from './ui/SeedPhraseConfirmation'
 export { SeedPhraseDisplay } from './ui/SeedPhraseDisplay'

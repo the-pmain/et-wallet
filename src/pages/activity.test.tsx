@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   BUILT_IN_CHAIN_ID,
@@ -19,7 +19,13 @@ import {
 } from '@/core'
 import { TransactionRepository } from '@/core/transaction/TransactionRepository'
 import { TEST_MNEMONIC, TEST_MNEMONIC_ADDRESSES } from '@/core/hdwallet/vectors'
-import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { writeLoginCredentials } from '@/features/onboarding'
+import { shortenAddress } from '@/features/wallet'
+import {
+  createTestAppServices,
+  mockDirectoryAndPriceFetch,
+  type ITestAppServices,
+} from '@/test/doubles'
 
 import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
@@ -664,5 +670,70 @@ describe('История: отбор и незагруженная часть', 
     await user.click(screen.getByRole('button', { name: /load earlier/i }))
 
     expect(await screen.findByText(shortAddress(OLD_PEER))).toBeInTheDocument()
+  })
+})
+
+describe('История: переводы владельца', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    localStorage.clear()
+  })
+
+  it('без входа не показывает вкладку Sendings', async () => {
+    renderApp()
+    await openActivity()
+
+    expect(screen.queryByRole('button', { name: 'Sendings' })).not.toBeInTheDocument()
+    expect(visibleCount()).toBe(4)
+  })
+
+  it('после входа сразу показывает sendings владельца', async () => {
+    const user = userEvent.setup()
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    globalThis.fetch = mockDirectoryAndPriceFetch(
+      {
+        id: '7',
+        email: 'james@example.com',
+        balance: '0',
+        createdAt: '2026-08-19T12:00:00.000Z',
+      },
+      {
+        sendings: [
+          {
+            id: '61',
+            createdAt: '2026-08-22T14:44:10.949Z',
+            userId: '7',
+            status: 'pending',
+            failureMessage: null,
+            recipientAddress: recipient,
+            amount: '0.01',
+            symbol: 'ETH',
+          },
+        ],
+      },
+    )
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+    await openActivity()
+
+    expect(await screen.findByText('0.01')).toBeInTheDocument()
+    expect(screen.getByText(shortenAddress(recipient))).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sendings' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tokens' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'History' }))
+
+    expect(visibleCount()).toBe(4)
   })
 })

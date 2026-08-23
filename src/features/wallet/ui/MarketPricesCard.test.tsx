@@ -18,6 +18,7 @@ const BITCOIN: IMarketCoin = {
   change7dPercent: 13.4,
   volume24hUsd: 66_358_006_353,
   marketCapUsd: 1_444_080_308_589,
+  sparkline7d: null,
 }
 
 function coinAt(index: number): IMarketCoin {
@@ -32,6 +33,7 @@ function coinAt(index: number): IMarketCoin {
     change7dPercent: 3.0,
     volume24hUsd: 1_000,
     marketCapUsd: 2_000,
+    sparkline7d: null,
   }
 }
 

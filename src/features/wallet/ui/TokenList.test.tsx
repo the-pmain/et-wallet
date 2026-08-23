@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   TOKEN_STANDARD,
+  appMarketCatalog,
   buildPortfolio,
   priceRefKey,
   toAddress,
@@ -193,5 +195,145 @@ describe('TokenList: оценка в долларах', () => {
 
     expect(amount.className).toContain('font-semibold')
     expect(value.className).toContain('text-xs')
+  })
+})
+
+describe('TokenList: сведения об активе', () => {
+  it('раскрывает нативную валюту без адреса контракта', async () => {
+    const user = userEvent.setup()
+
+    renderList(
+      portfolioWith([
+        [ETH, 3000],
+        [USDC, 1],
+      ]),
+    )
+
+    expect(screen.queryByText('Native currency')).not.toBeInTheDocument()
+
+    const ethRow = screen.getByRole('button', { name: 'ETH on Ethereum — asset details' })
+
+    expect(ethRow).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(ethRow)
+
+    expect(ethRow).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Native currency')).toBeInTheDocument()
+    expect(screen.getByText('No contract — native currency of the network')).toBeInTheDocument()
+    expect(screen.getByText('Ethereum')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open in Ethereum explorer' })).toHaveAttribute(
+      'href',
+      'https://etherscan.io',
+    )
+    expect(screen.queryByText(USDC.address as string)).not.toBeInTheDocument()
+  })
+
+  it('раскрывает контракт ERC-20 с полным адресом и курсом', async () => {
+    const user = userEvent.setup()
+
+    renderList(
+      buildPortfolio(
+        [
+          { token: ETH, balance: 2n * ETHER },
+          { token: USDC, balance: 50n * 10n ** 6n },
+        ],
+        new Map([
+          [
+            priceRefKey({ chainId: ETH.chainId, address: ETH.address }),
+            { price: 3000, change24hPercent: null, updatedAt: NOW },
+          ],
+          [
+            priceRefKey({ chainId: USDC.chainId, address: USDC.address }),
+            { price: 1, change24hPercent: -0.42, updatedAt: NOW },
+          ],
+        ]),
+      ),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'USDC on Ethereum — asset details' }))
+
+    expect(screen.getByText('ERC-20')).toBeInTheDocument()
+    expect(screen.getByText(USDC.address as string)).toBeInTheDocument()
+    expect(screen.getByText('-0.42 %')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open in Ethereum explorer' })).toHaveAttribute(
+      'href',
+      `https://etherscan.io/token/${USDC.address as string}`,
+    )
+    expect(screen.getByRole('button', { name: 'Copy USDC contract address' })).toBeInTheDocument()
+  })
+
+  it('повторное нажатие закрывает панель', async () => {
+    const user = userEvent.setup()
+
+    renderList(null)
+
+    const ethRow = screen.getByRole('button', { name: 'ETH on Ethereum — asset details' })
+
+    await user.click(ethRow)
+    expect(screen.getByText('Native currency')).toBeInTheDocument()
+
+    await user.click(ethRow)
+    expect(ethRow).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Native currency')).not.toBeInTheDocument()
+  })
+
+  it('удаление не раскрывает строку', async () => {
+    const user = userEvent.setup()
+    const onRemove = vi.fn()
+
+    renderList(null, BALANCES, onRemove)
+
+    await user.click(screen.getByRole('button', { name: 'Remove token USDC' }))
+
+    expect(onRemove).toHaveBeenCalledWith(USDC.address)
+    expect(screen.queryByText('ERC-20')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'USDC on Ethereum — asset details' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+  })
+
+  it('рисует график курса из каталожного ряда', async () => {
+    const user = userEvent.setup()
+
+    appMarketCatalog.hydrate([
+      {
+        id: 'ethereum',
+        symbol: 'ETH',
+        name: 'Ethereum',
+        rank: 2,
+        priceUsd: 3000,
+        change1hPercent: 0,
+        change24hPercent: 1.2,
+        change7dPercent: 3,
+        volume24hUsd: 1,
+        marketCapUsd: 2,
+        sparkline7d: [2900, 2950, 3000, 2980, 3020],
+      },
+    ])
+
+    renderList(portfolioWith([[ETH, 3000]]))
+
+    await user.click(screen.getByRole('button', { name: 'ETH on Ethereum — asset details' }))
+
+    expect(screen.getByRole('img', { name: /ETH price, last 24 hours/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '24H' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: '7D' }))
+
+    expect(screen.getByRole('img', { name: /ETH price, last 7 days/i })).toBeInTheDocument()
+  })
+
+  it('держит раскрытыми несколько строк сразу', async () => {
+    const user = userEvent.setup()
+
+    renderList(null)
+
+    await user.click(screen.getByRole('button', { name: 'ETH on Ethereum — asset details' }))
+    await user.click(screen.getByRole('button', { name: 'USDC on Ethereum — asset details' }))
+
+    expect(screen.getByText('Native currency')).toBeInTheDocument()
+    expect(screen.getByText('ERC-20')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
   })
 })

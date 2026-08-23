@@ -170,6 +170,15 @@ vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
     )
   }
 
+  if (url.includes('api.exchange.coinbase.com')) {
+    return Promise.resolve(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+  }
+
   if (url.includes('frankfurter.app') || url.includes('frankfurter.dev') || url.includes('/v1/fiat-rates') || url.includes('/latest?from=USD')) {
     return Promise.resolve(
       new Response(JSON.stringify({ rates: { EUR: 0.9, GBP: 0.8 } }), {

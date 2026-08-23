@@ -187,4 +187,27 @@ describe('Активы записи справочника', () => {
       }),
     ).toBe(true)
   })
+
+  it('по нажатию строки показывает сведения об активе', async () => {
+    const user = userEvent.setup()
+
+    renderApp()
+    await user.click(screen.getByRole('link', { name: 'Assets' }))
+    await screen.findByRole('heading', { name: 'Assets' })
+
+    await user.click(screen.getByRole('button', { name: 'USDC on Ethereum — asset details' }))
+
+    expect(screen.getByText('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')).toBeInTheDocument()
+    expect(screen.getByText('ERC-20')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open in Ethereum explorer' })).toHaveAttribute(
+      'href',
+      'https://etherscan.io/token/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    )
+    expect(screen.getByRole('img', { name: /USDC price, last 24 hours/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ETH on Ethereum — asset details' }))
+
+    expect(screen.getByText('Native currency')).toBeInTheDocument()
+    expect(screen.getByText('No contract — native currency of the network')).toBeInTheDocument()
+  })
 })

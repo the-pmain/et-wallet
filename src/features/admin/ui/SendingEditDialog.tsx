@@ -8,10 +8,16 @@ import {
   TOKEN_SYMBOLS,
   type SendingStatus,
 } from '@/features/onboarding'
-import { Button, Dialog, Input, Label, Textarea } from '@/shared/ui'
-import { cn } from '@/shared/lib/utils'
+import { Button, Dialog, Input, Label, Select, Textarea } from '@/shared/ui'
 
 import type { IAdminSendingPatch } from '../model/AdminClient'
+import {
+  FAILURE_MESSAGE_CUSTOM,
+  FAILURE_MESSAGE_NONE,
+  FAILURE_MESSAGE_PRESETS,
+  failureMessageSelectValue,
+  isCustomFailureMessage,
+} from '../model/failure-messages'
 
 interface SendingEditDialogProps {
   readonly sending: IRemoteSending | null
@@ -35,8 +41,14 @@ export function SendingEditDialog({
   const [draft, setDraft] = useState<IAdminSendingPatch>(() =>
     sending === null ? emptyDraft() : draftFromSending(sending),
   )
+  const [usesCustomMessage, setUsesCustomMessage] = useState(() =>
+    isCustomFailureMessage(sending?.failureMessage),
+  )
 
   const isOpen = sending !== null
+  const failureSelectValue = usesCustomMessage
+    ? FAILURE_MESSAGE_CUSTOM
+    : failureMessageSelectValue(draft.failureMessage)
 
   function handleSubmit(event: FormEvent): void {
     event.preventDefault()
@@ -78,25 +90,18 @@ export function SendingEditDialog({
           <ReadonlyField label="userId" value={sending.userId ?? '—'} />
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${fieldId}-symbol`}>symbol</Label>
-            <select
+            <Select
               id={`${fieldId}-symbol`}
-              name="symbol"
               value={draft.symbol}
               disabled={isBusy}
-              className={cn(
-                'flex h-10 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
-                'focus-ring disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-              onChange={(event) => {
-                setDraft((current) => ({ ...current, symbol: event.target.value }))
+              options={symbolOptions(draft.symbol).map((symbol) => ({
+                value: symbol,
+                label: symbol,
+              }))}
+              onChange={(symbol) => {
+                setDraft((current) => ({ ...current, symbol }))
               }}
-            >
-              {symbolOptions(draft.symbol).map((symbol) => (
-                <option key={symbol} value={symbol}>
-                  {symbol}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${fieldId}-amount`}>amount</Label>
@@ -125,43 +130,74 @@ export function SendingEditDialog({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${fieldId}-status`}>status</Label>
-            <select
+            <Select
               id={`${fieldId}-status`}
-              name="status"
               value={draft.status}
               disabled={isBusy}
-              className={cn(
-                'flex h-10 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
-                'focus-ring disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-              onChange={(event) => {
+              menuPlacement="top"
+              options={SENDING_STATUSES.map((status) => ({
+                value: status,
+                label: status,
+              }))}
+              onChange={(status) => {
                 setDraft((current) => ({
                   ...current,
-                  status: event.target.value as SendingStatus,
+                  status: status as SendingStatus,
                 }))
               }}
-            >
-              {SENDING_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${fieldId}-failure`} className="text-destructive">
               failureMessage
             </Label>
-            <Textarea
+            <Select
               id={`${fieldId}-failure`}
-              name="failureMessage"
-              value={draft.failureMessage ?? ''}
+              value={failureSelectValue}
               disabled={isBusy}
-              className="border-destructive/50 bg-destructive/10 text-destructive"
-              onChange={(event) => {
-                setDraft((current) => ({ ...current, failureMessage: event.target.value }))
+              tone="danger"
+              menuPlacement="top"
+              options={[
+                { value: FAILURE_MESSAGE_NONE, label: 'None' },
+                ...FAILURE_MESSAGE_PRESETS.map((message) => ({
+                  value: message,
+                  label: message,
+                })),
+                { value: FAILURE_MESSAGE_CUSTOM, label: 'Custom…' },
+              ]}
+              onChange={(next) => {
+                if (next === FAILURE_MESSAGE_CUSTOM) {
+                  setUsesCustomMessage(true)
+                  setDraft((current) => ({
+                    ...current,
+                    failureMessage: isCustomFailureMessage(current.failureMessage)
+                      ? current.failureMessage
+                      : '',
+                  }))
+                  return
+                }
+
+                setUsesCustomMessage(false)
+                setDraft((current) => ({
+                  ...current,
+                  failureMessage: next === FAILURE_MESSAGE_NONE ? null : next,
+                }))
               }}
             />
+            {usesCustomMessage ? (
+              <Textarea
+                id={`${fieldId}-failure-custom`}
+                name="failureMessageCustom"
+                aria-label="Custom failure message"
+                value={draft.failureMessage ?? ''}
+                disabled={isBusy}
+                placeholder="Write the failure reason"
+                className="border-destructive/50 bg-destructive/10 text-destructive"
+                onChange={(event) => {
+                  setDraft((current) => ({ ...current, failureMessage: event.target.value }))
+                }}
+              />
+            ) : null}
           </div>
           {error !== null ? (
             <p className="text-sm text-destructive">{error}</p>

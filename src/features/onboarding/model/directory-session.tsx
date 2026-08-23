@@ -33,6 +33,7 @@ interface IDirectorySession {
     readonly amount: string
     readonly symbol: string
   }): Promise<IRemoteSending>
+  listSendings(): Promise<readonly IRemoteSending[]>
   refresh(): Promise<void>
   signOut(): void
 }
@@ -123,6 +124,20 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
     [directory],
   )
 
+  const listSendings = useCallback(async (): Promise<readonly IRemoteSending[]> => {
+    const stored = readLoginCredentials()
+
+    if (stored === null || stored.id === '') {
+      throw new RemoteAuthError(401, 'Sign in again to see sendings.')
+    }
+
+    return directory.listSendings({
+      id: stored.id,
+      email: stored.email,
+      theP: stored.theP,
+    })
+  }, [directory])
+
   const signOut = useCallback(() => {
     clearLoginCredentials()
     setUser(null)
@@ -158,8 +173,18 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
   }, [signIn])
 
   const value = useMemo(
-    () => ({ user, isRefreshing, isRestoring, enter, signIn, registerSending, refresh, signOut }),
-    [user, isRefreshing, isRestoring, enter, signIn, registerSending, refresh, signOut],
+    () => ({
+      user,
+      isRefreshing,
+      isRestoring,
+      enter,
+      signIn,
+      registerSending,
+      listSendings,
+      refresh,
+      signOut,
+    }),
+    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, refresh, signOut],
   )
 
   return <DirectorySessionContext value={value}>{children}</DirectorySessionContext>

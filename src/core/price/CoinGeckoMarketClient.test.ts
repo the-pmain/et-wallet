@@ -29,7 +29,7 @@ beforeEach(() => {
 })
 
 describe('CoinGeckoMarketClient', () => {
-  it('запрашивает рынок без графика за семь дней', async () => {
+  it('запрашивает рынок вместе с рядом за семь дней', async () => {
     responder = () => ({
       status: 200,
       body: [
@@ -50,7 +50,7 @@ describe('CoinGeckoMarketClient', () => {
     expect(url.searchParams.get('vs_currency')).toBe('usd')
     expect(url.searchParams.get('order')).toBe('market_cap_desc')
     expect(url.searchParams.get('per_page')).toBe('50')
-    expect(url.searchParams.get('sparkline')).toBe('false')
+    expect(url.searchParams.get('sparkline')).toBe('true')
     expect(url.searchParams.get('price_change_percentage')).toBe('1h,24h,7d')
     expect(coins).toHaveLength(1)
     expect(coins[0]?.name).toBe('Bitcoin')

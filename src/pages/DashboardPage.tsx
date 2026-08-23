@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 
 import {
@@ -6,6 +7,8 @@ import {
   useDisplayedAssets,
   useOnboarding,
   useRefreshRemoteAssets,
+  useUserSendings,
+  SendingsCard,
   type IRemoteUser,
 } from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
@@ -18,6 +21,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  SegmentedControl,
 } from '@/shared/ui'
 import {
   AssetsCard,
@@ -112,9 +116,9 @@ export function DashboardPage() {
 
       <AssetsCard />
 
-      <MarketPricesCard />
-
       <RecentActivity />
+
+      <MarketPricesCard />
     </div>
   )
 }
@@ -140,6 +144,13 @@ function remotePortfolioUsd(
   return parseDisplayAmount(user.balance)
 }
 
+const HOME_VIEW = {
+  Wallet: 'wallet',
+  Mirror: 'mirror',
+} as const
+
+type HomeView = (typeof HOME_VIEW)[keyof typeof HOME_VIEW]
+
 function RemoteAccountHome({
   user,
   isRefreshing,
@@ -148,6 +159,8 @@ function RemoteAccountHome({
   readonly isRefreshing: boolean
 }) {
   const snapshot = useWalletSnapshot()
+  const [view, setView] = useState<HomeView>(HOME_VIEW.Wallet)
+  const userSendings = useUserSendings(true)
   const displayed = useDisplayedAssets({
     tokens: [],
     portfolio: null,
@@ -161,6 +174,17 @@ function RemoteAccountHome({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
+      <SegmentedControl
+        className="max-w-[16rem]"
+        legend="View"
+        value={view}
+        options={[
+          { value: HOME_VIEW.Wallet, label: 'Wallet' },
+          { value: HOME_VIEW.Mirror, label: 'Mirror' },
+        ]}
+        onChange={setView}
+      />
+
       <FiatBalanceCard
         amountUsd={amountUsd}
         isRefreshing={isRefreshing || displayed.isLoading}
@@ -169,9 +193,13 @@ function RemoteAccountHome({
 
       <AssetsCard />
 
-      <MarketPricesCard />
+      <SendingsCard
+        sendings={userSendings.sendings.slice(0, RECENT_LIMIT)}
+        isLoading={userSendings.isLoading}
+        error={userSendings.error}
+      />
 
-      <RecentActivity />
+      <MarketPricesCard />
     </div>
   )
 }

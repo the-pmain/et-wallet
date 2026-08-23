@@ -679,6 +679,85 @@ describe('Пользователи', () => {
     expect(sendings.records[0]?.symbol).toBe('ETH')
   })
 
+  it('отдаёт sendings владельца по GET /v1/users/:id/sendings', async () => {
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const other = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'other@example.com', the_p: 'demo' },
+    })
+    const otherId = other.json<{ id: string }>().id
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: userId,
+        email: 'james@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '1',
+        symbol: 'ETH',
+      },
+    })
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users/sendings',
+      payload: {
+        user_id: otherId,
+        email: 'other@example.com',
+        the_p: 'demo',
+        recipient_address: recipient,
+        amount: '9',
+        symbol: 'USDT',
+      },
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/users/${userId}/sendings`,
+      query: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json<{ sendings: { userId: string; amount: string; symbol: string }[] }>().sendings).toEqual([
+      expect.objectContaining({
+        userId,
+        amount: '1',
+        symbol: 'ETH',
+      }),
+    ])
+  })
+
+  it('не отдаёт GET /v1/users/:id/sendings без сверки почты и the_p', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const userId = created.json<{ id: string }>().id
+
+    const missing = await app.inject({ method: 'GET', url: `/v1/users/${userId}/sendings` })
+    const wrong = await app.inject({
+      method: 'GET',
+      url: `/v1/users/${userId}/sendings`,
+      query: { email: 'james@example.com', the_p: 'wrong' },
+    })
+
+    expect(missing.statusCode).toBe(400)
+    expect(wrong.statusCode).toBe(401)
+  })
+
   it('отвергает создание без symbol', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({

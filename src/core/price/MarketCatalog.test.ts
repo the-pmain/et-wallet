@@ -21,6 +21,7 @@ function ethereumCoin(price = ETH_USD) {
     change7dPercent: 4.2,
     volume24hUsd: 1,
     marketCapUsd: 2,
+    sparkline7d: null,
   }
 }
 
@@ -61,6 +62,7 @@ describe('MarketCatalog', () => {
           change7dPercent: 0,
           volume24hUsd: 1,
           marketCapUsd: 2,
+          sparkline7d: null,
         },
       ],
     })
@@ -69,6 +71,7 @@ describe('MarketCatalog', () => {
 
     expect(catalog.quoteForRef({ chainId: CHAIN, address: USDC })?.price).toBe(1)
     expect(catalog.quoteForRef({ chainId: OP, address: OP_USDC })?.price).toBe(1)
+    expect(catalog.coinForAsset({ chainId: CHAIN, address: null })?.id).toBe('ethereum')
   })
 
   it('при отказе CoinGecko подставляет курс эфира с запасного источника', async () => {
