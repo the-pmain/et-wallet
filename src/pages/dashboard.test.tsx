@@ -244,6 +244,9 @@ describe('Панель: кабинет справочника', () => {
   })
 
   it('после создания и после входа показывает фиат, а не эфир', async () => {
+    /* Тонкий fetch: без каталога рынка. Общая заглушка гидратирует
+       монеты, и на панели появляется ETH — как раз то, чего здесь
+       быть не должно. */
     globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input instanceof Request ? input.url : input)
       const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
@@ -262,7 +265,7 @@ describe('Панель: кабинет справочника', () => {
         status: 200,
         text: () => Promise.resolve(JSON.stringify(body)),
       })
-    }) as typeof fetch
+    }) as unknown as typeof fetch
 
     writeLoginCredentials({
       id: '7',
