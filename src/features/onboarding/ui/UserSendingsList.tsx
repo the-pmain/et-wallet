@@ -3,6 +3,7 @@ import { Send } from 'lucide-react'
 import { addableAssetBySymbol } from '@/features/admin/model/addable-assets'
 import { SendingStatusBadge } from '@/features/admin/ui/SendingStatusBadge'
 import { shortenAddress } from '@/features/wallet'
+import { AmountWithUnit } from '@/features/wallet/ui/AmountWithUnit'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import { Alert, AlertDescription, EmptyState, Skeleton } from '@/shared/ui'
 
@@ -62,12 +63,10 @@ function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
   const name = asset?.token.name ?? sending.symbol ?? 'Unknown asset'
   const recipient = sending.recipientAddress
   const recipientLabel = recipient === null || recipient === '' ? '—' : shortenAddress(recipient)
+  const failureMessage = sending.failureMessage?.trim() ?? ''
 
   return (
-    <li
-      className="flex h-16 items-center gap-3 px-4 sm:px-6"
-      title={sending.failureMessage ?? undefined}
-    >
+    <li className="flex items-start gap-3 px-4 py-3 sm:px-6">
       <TokenAvatar
         address={asset?.token.address ?? null}
         symbol={symbol}
@@ -87,10 +86,17 @@ function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
           </span>
           <SendingTimestamp value={sending.createdAt} />
         </span>
+        {failureMessage === '' ? null : (
+          <span className="text-xs break-words text-destructive">{failureMessage}</span>
+        )}
       </span>
 
       <span className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="text-sm font-medium tabular-nums">{sending.amount ?? '—'}</span>
+        <AmountWithUnit
+          amount={sending.amount === null || sending.amount === '' ? '—' : sending.amount}
+          unit={symbol === '—' ? '' : symbol}
+          className="text-sm font-semibold"
+        />
         <SendingStatusBadge status={sending.status} />
       </span>
     </li>

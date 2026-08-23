@@ -712,6 +712,16 @@ describe('История: переводы владельца', () => {
             amount: '0.01',
             symbol: 'ETH',
           },
+          {
+            id: '62',
+            createdAt: '2026-08-22T15:00:00.000Z',
+            userId: '7',
+            status: 'failure',
+            failureMessage: 'Blocked by admin',
+            recipientAddress: recipient,
+            amount: '1',
+            symbol: 'USDT',
+          },
         ],
       },
     )
@@ -725,9 +735,12 @@ describe('История: переводы владельца', () => {
     renderApp()
     await openActivity()
 
-    expect(await screen.findByText('0.01')).toBeInTheDocument()
-    expect(screen.getByText(shortenAddress(recipient))).toBeInTheDocument()
+    expect(await screen.findByText('0.01 ETH')).toBeInTheDocument()
+    expect(screen.getByText('1 USDT')).toBeInTheDocument()
+    expect(screen.getByText('Blocked by admin')).toBeInTheDocument()
+    expect(screen.getAllByText(shortenAddress(recipient)).length).toBeGreaterThan(0)
     expect(screen.getByText('pending')).toBeInTheDocument()
+    expect(screen.getByText('failure')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Tokens' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()

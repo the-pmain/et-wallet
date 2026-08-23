@@ -366,8 +366,8 @@ describe('Панель: кабинет справочника', () => {
     expect(await screen.findByText('$6,719.11')).toBeInTheDocument()
     expect(screen.getByText('Ether')).toBeInTheDocument()
     expect(screen.getAllByText('USD Coin').length).toBeGreaterThan(0)
-    expect(screen.getByText('1.2847')).toBeInTheDocument()
-    expect(screen.getByText('2500')).toBeInTheDocument()
+    expect(screen.getByText('1.2847 ETH')).toBeInTheDocument()
+    expect(screen.getByText('2500 USDC')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /all assets/i })).toHaveAttribute(
       'href',
       '/wallet/assets',
@@ -404,6 +404,16 @@ describe('Панель: кабинет справочника', () => {
             amount: '2',
             symbol: 'USDT',
           },
+          {
+            id: '62',
+            createdAt: '2026-08-22T15:00:00.000Z',
+            userId: '7',
+            status: 'failure',
+            failureMessage: 'Blocked by admin',
+            recipientAddress: recipient,
+            amount: '1',
+            symbol: 'USDT',
+          },
         ],
       },
     )
@@ -418,8 +428,12 @@ describe('Панель: кабинет справочника', () => {
 
     expect(await screen.findByText('$12.50')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent activity' })).toBeInTheDocument()
-    expect(await screen.findByText(shortenAddress(recipient))).toBeInTheDocument()
+    expect(await screen.findByText('2 USDT')).toBeInTheDocument()
+    expect(screen.getByText('1 USDT')).toBeInTheDocument()
+    expect(screen.getByText('Blocked by admin')).toBeInTheDocument()
+    expect(screen.getAllByText(shortenAddress(recipient)).length).toBeGreaterThan(0)
     expect(screen.getByText('success')).toBeInTheDocument()
+    expect(screen.getByText('failure')).toBeInTheDocument()
     expect(screen.queryByText('No operations yet')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
     expect(

@@ -6,6 +6,7 @@ import {
   type IRemoteSending,
   type ISendingSseEvent,
 } from '@/features/onboarding'
+import { AmountWithUnit } from '@/features/wallet/ui/AmountWithUnit'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import { Alert, AlertDescription, Button, EmptyState, Input, Skeleton } from '@/shared/ui'
 
@@ -208,14 +209,16 @@ function SendingRow({
           <span className="break-all font-mono text-xs text-foreground">
             {sending.recipientAddress ?? '—'}
           </span>
-          <span className="text-2xl font-semibold tabular-nums tracking-tight">
-            {sending.amount ?? '—'}
-          </span>
+          <AmountWithUnit
+            amount={sending.amount === null || sending.amount === '' ? '—' : sending.amount}
+            unit={symbol === '—' ? '' : symbol}
+            className="text-2xl font-semibold tracking-tight"
+          />
+          {sending.failureMessage !== null && sending.failureMessage !== '' ? (
+            <span className="text-sm break-words text-destructive">{sending.failureMessage}</span>
+          ) : null}
           <span className="text-xs text-muted-foreground">
             id {sending.id} · user {sending.userId ?? '—'}
-            {sending.failureMessage !== null && sending.failureMessage !== ''
-              ? ` · ${sending.failureMessage}`
-              : null}
           </span>
         </span>
       </span>

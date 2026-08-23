@@ -175,8 +175,8 @@ describe('TokenList: оценка в долларах', () => {
     ])
 
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
-    expect(screen.getByText('1')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('1 ETH')).toBeInTheDocument()
+    expect(screen.getByText('2 ETH')).toBeInTheDocument()
   })
 
   it('без обработчика удаления не показывает кнопку', () => {
@@ -190,7 +190,7 @@ describe('TokenList: оценка в долларах', () => {
        подписывается. Оценка не должна её вытеснять. */
     renderList(portfolioWith([[ETH, 3000]]))
 
-    const amount = screen.getByText('2')
+    const amount = screen.getByText('2 ETH')
     const value = screen.getByText('≈ $6,000.00')
 
     expect(amount.className).toContain('font-semibold')

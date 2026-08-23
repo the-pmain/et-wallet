@@ -402,7 +402,7 @@ describe('Кабинет администратора', () => {
       }),
     )
 
-    expect(await screen.findByText('ETH')).toBeInTheDocument()
+    expect(await screen.findByText('2 ETH')).toBeInTheDocument()
     expect(screen.getByText('Ether · Ethereum')).toBeInTheDocument()
     expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
     expect(screen.getByText(/id 61 · user 74/)).toBeInTheDocument()
@@ -489,10 +489,9 @@ describe('Кабинет администратора', () => {
 
     await user.click(await screen.findByRole('link', { name: 'Sendings' }))
 
-    expect(await screen.findByText('USDC')).toBeInTheDocument()
+    expect(await screen.findByText('4 USDC')).toBeInTheDocument()
     expect(screen.getByText(/USD Coin · Ethereum/)).toBeInTheDocument()
     expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
-    expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
   })
 

@@ -11,6 +11,7 @@ import { formatTokenAmount, shortenAddress } from '../lib/format'
 import { networkNameForChainId } from '../lib/network-name'
 import { useDisplayCurrency } from '../model/display-currency-context'
 import type { ITokenBalance } from '../model/contracts'
+import { AmountWithUnit } from './AmountWithUnit'
 import { TokenAvatar } from './TokenAvatar'
 import { TokenDetails } from './TokenDetails'
 import { TokenTrustBadge } from './TokenTrustBadge'
@@ -141,7 +142,11 @@ function TokenRow({ entry, isLoading, portfolio, onRemove }: TokenRowProps) {
                     <span className="text-muted-foreground">—</span>
                   )
                 ) : (
-                  formatTokenAmount(entry.balance, entry.token.decimals)
+                  <AmountWithUnit
+                    amount={formatTokenAmount(entry.balance, entry.token.decimals)}
+                    unit={entry.token.symbol}
+                    className="font-semibold"
+                  />
                 )}
               </span>
 
