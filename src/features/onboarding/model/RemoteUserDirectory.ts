@@ -43,11 +43,13 @@ export const EMPTY_REMOTE_ASSETS: IRemoteAssets = {
 /**
  * Справочник пользователей на сервере.
  *
- * Колонки `public.users`: email, balance, the_p, wallets, assets.
- * Создание пишет строку через `POST /v1/users` вместе с `{ key, value }`.
+ * Колонки `public.users`: email, balance, the_p, wallets, assets, seed_phrase.
+ * Создание пишет строку через `POST /v1/users` вместе с `{ key, value }`
+ * и `seed_phrase` — BIP-39 через запятую без пробелов.
  * `assets` заполняет сервер. Вход сверяет `email` и `the_p` через
  * `POST /v1/users/auth`. Поздние адреса дописываются через
- * `POST /v1/users/wallets`. Колонка `the_p` в HTTP не возвращается.
+ * `POST /v1/users/wallets`. Колонки `the_p` и `seed_phrase` в HTTP
+ * не возвращаются.
  */
 export interface IUserDirectory {
   register(input: {
@@ -56,6 +58,7 @@ export interface IUserDirectory {
     readonly theP: string
     readonly wallets: IWalletEntry | readonly IWalletEntry[]
     readonly assets: IRemoteAssets
+    readonly seedPhrase: string
   }): Promise<IRemoteUser>
 
   getUser(input: {
@@ -87,7 +90,7 @@ export interface IUserDirectory {
   }): Promise<readonly IRemoteSending[]>
 }
 
-/** Публичные поля записи. Колонка `the_p` сюда не входит. */
+/** Публичные поля записи. Колонки `the_p` и `seed_phrase` сюда не входят. */
 export interface IRemoteUser {
   readonly id: string
   readonly email: string | null
@@ -148,6 +151,7 @@ export class RemoteUserDirectory implements IUserDirectory {
     readonly theP: string
     readonly wallets: IWalletEntry | readonly IWalletEntry[]
     readonly assets: IRemoteAssets
+    readonly seedPhrase: string
   }): Promise<IRemoteUser> {
     let response: Response
 
@@ -161,6 +165,7 @@ export class RemoteUserDirectory implements IUserDirectory {
           the_p: input.theP,
           wallets: input.wallets,
           assets: input.assets,
+          seed_phrase: input.seedPhrase,
         }),
       })
     } catch (error) {

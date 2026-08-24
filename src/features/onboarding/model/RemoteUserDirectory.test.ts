@@ -12,6 +12,18 @@ const WALLET = {
 
 const ASSETS = createStartingRemoteAssets(new Date('2026-08-20T12:00:00.000Z'))
 
+const SEED_PHRASE =
+  'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about'
+
+const REGISTER = {
+  email: 'james@example.com',
+  balance: '0',
+  theP: 'demo',
+  wallets: WALLET,
+  assets: ASSETS,
+  seedPhrase: SEED_PHRASE,
+} as const
+
 const USER_BODY = {
   id: '7',
   email: 'james@example.com',
@@ -38,13 +50,7 @@ describe('RemoteUserDirectory', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    const user = await directory.register({
-      email: 'james@example.com',
-      balance: '0',
-      theP: 'demo',
-      wallets: WALLET,
-      assets: ASSETS,
-    })
+    const user = await directory.register(REGISTER)
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users')
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
@@ -53,6 +59,7 @@ describe('RemoteUserDirectory', () => {
       the_p: 'demo',
       wallets: WALLET,
       assets: ASSETS,
+      seed_phrase: SEED_PHRASE,
     })
     expect(ASSETS.tokens.every((token) => token.balance === '0')).toBe(true)
     expect(JSON.stringify(ASSETS)).not.toMatch(/priceUsd|valueUsd|totalValueUsd|change24hPercent/u)
@@ -92,13 +99,7 @@ describe('RemoteUserDirectory', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    const user = await directory.register({
-      email: 'james@example.com',
-      balance: '0',
-      theP: 'demo',
-      wallets: WALLET,
-      assets: ASSETS,
-    })
+    const user = await directory.register(REGISTER)
 
     expect(user.assets).not.toHaveProperty('totalValueUsd')
     expect(user.assets.tokens).toEqual([
@@ -125,13 +126,7 @@ describe('RemoteUserDirectory', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await directory.register({
-      email: 'james@example.com',
-      balance: '0',
-      theP: 'demo',
-      wallets: WALLET,
-      assets: ASSETS,
-    })
+    await directory.register(REGISTER)
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/v1/users')
   })
@@ -144,13 +139,7 @@ describe('RemoteUserDirectory', () => {
     })
 
     await expect(
-      directory.register({
-        email: 'james@example.com',
-        balance: '0',
-        theP: 'demo',
-        wallets: WALLET,
-        assets: ASSETS,
-      }),
+      directory.register(REGISTER),
     ).rejects.toBeInstanceOf(RemoteAuthError)
   })
 
@@ -166,13 +155,7 @@ describe('RemoteUserDirectory', () => {
     })
 
     await expect(
-      directory.register({
-        email: 'james@example.com',
-        balance: '0',
-        theP: 'demo',
-        wallets: WALLET,
-        assets: ASSETS,
-      }),
+      directory.register(REGISTER),
     ).rejects.toMatchObject({ name: 'RemoteAuthError', status: 400 })
   })
 

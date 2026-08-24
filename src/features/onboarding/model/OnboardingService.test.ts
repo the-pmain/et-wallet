@@ -11,6 +11,7 @@ import { EMPTY_REMOTE_ASSETS } from './RemoteUserDirectory'
 const PASSWORD = 'Korova-7-Luna!'
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+const TEST_SEED_PHRASE = TEST_MNEMONIC.split(' ').join(',')
 const FIRST_ADDRESS = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
 const FIRST_WALLET: IWalletEntry = { key: FIRST_ADDRESS, value: INITIAL_WALLET_VALUE }
 
@@ -58,6 +59,7 @@ describe('OnboardingService: запись пользователя на серв
           quoteCurrency: 'USD',
           tokens: STARTING_REMOTE_TOKENS,
         }),
+        seedPhrase: expect.stringMatching(/^[a-z]+(?:,[a-z]+){11}$/u),
       }),
     )
     expect(STARTING_REMOTE_TOKENS).toHaveLength(1)
@@ -91,6 +93,7 @@ describe('OnboardingService: запись пользователя на серв
         quoteCurrency: 'USD',
         tokens: STARTING_REMOTE_TOKENS,
       }),
+      seedPhrase: TEST_SEED_PHRASE,
     })
   })
 

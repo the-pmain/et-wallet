@@ -22,6 +22,7 @@ interface IUserRow {
   readonly the_p?: string | null
   readonly wallets?: unknown
   readonly assets?: unknown
+  readonly seed_phrase?: string | null
 }
 
 /**
@@ -61,6 +62,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
         the_p: input.theP,
         wallets: input.wallets ?? emptyWallets(),
         assets: sanitizeAssets(input.assets ?? emptyAssets()),
+        seed_phrase: input.seedPhrase ?? null,
       }),
     })
 
@@ -323,6 +325,7 @@ function toRecord(row: IUserRow, fallbackTheP: string | null): IUserRecord {
     theP: row.the_p ?? fallbackTheP,
     wallets: parseWallets(row.wallets),
     assets: parseAssets(row.assets),
+    seedPhrase: typeof row.seed_phrase === 'string' ? row.seed_phrase : null,
   }
 }
 

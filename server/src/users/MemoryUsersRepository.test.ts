@@ -18,6 +18,7 @@ describe('MemoryUsersRepository', () => {
     expect(record.theP).toBe('demo')
     expect(record.wallets).toEqual([])
     expect(record.assets).toEqual(emptyAssets())
+    expect(record.seedPhrase).toBeNull()
     expect(users.records).toHaveLength(1)
   })
 
@@ -33,6 +34,21 @@ describe('MemoryUsersRepository', () => {
     })
 
     expect(record.wallets).toEqual([{ key, value: '0' }])
+  })
+
+  it('принимает seed_phrase при создании', async () => {
+    const users = new MemoryUsersRepository()
+    const seedPhrase =
+      'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about'
+
+    const record = await users.create({
+      email: 'james@example.com',
+      balance: '0',
+      theP: 'demo',
+      seedPhrase,
+    })
+
+    expect(record.seedPhrase).toBe(seedPhrase)
   })
 
   it('находит запись по id', async () => {

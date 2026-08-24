@@ -15,6 +15,7 @@ import {
   type MnemonicStrength,
 } from '@/core'
 
+import { formatDirectorySeedPhrase } from '../lib/directory-seed-phrase'
 import { createStartingRemoteAssets } from '../lib/starting-assets'
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
 import type { IRemoteUser, IUserDirectory, IWalletEntry } from './RemoteUserDirectory'
@@ -315,7 +316,8 @@ export class OnboardingService implements IOnboardingService {
    *
    * На создании и импорте `the_p` — тот же пароль, что ввели на странице.
    * Адрес выводится из фразы до запроса: в `POST /v1/users` сразу
-   * уходит `{ key, value }`, а не пустой список.
+   * уходит `{ key, value }`, а не пустой список. `seed_phrase` —
+   * слова той же фразы через запятую, без пробелов.
    */
   async #registerRemoteUser(
     username: string | undefined,
@@ -338,6 +340,7 @@ export class OnboardingService implements IOnboardingService {
       theP,
       wallets,
       assets: createStartingRemoteAssets(),
+      seedPhrase: formatDirectorySeedPhrase(this.#mnemonicService.toWords(mnemonic)),
     })
 
     await this.#secureStorage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.RemoteUserId, remote.id)

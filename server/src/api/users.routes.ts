@@ -8,6 +8,7 @@ import {
   withZeroTokenBalances,
 } from '../users/assets.ts'
 import type { IUserRecord, IUsersRepository } from '../users/contracts.ts'
+import { readSeedPhrase } from '../users/seed-phrase.ts'
 import {
   INITIAL_WALLET_VALUE,
   isWalletKey,
@@ -21,10 +22,12 @@ import type { IUserResponse, IWalletEntryResponse } from './contracts.ts'
  * Пользователи в таблице `public.users`.
  *
  * Колонки входа: `email` и `the_p`. Поле `username` схема не принимает.
- * `POST /v1/users` — новая строка. Тело может содержать `assets`;
- * сервер оставляет только остатки, обнуляет `balance` у каждого токена
- * и отбрасывает `priceUsd` / `valueUsd`. Без поля — стартовая витрина
- * из одного ETH.
+ * `POST /v1/users` — новая строка. Тело обязано содержать `seed_phrase`:
+ * BIP-39 через запятую без пробелов. Неверная фраза — 400, строка
+ * не создаётся. `seed_phrase` в ответ не входит.
+ * Тело может содержать `assets`; сервер оставляет только остатки,
+ * обнуляет `balance` у каждого токена и отбрасывает `priceUsd` /
+ * `valueUsd`. Без поля — стартовая витрина из одного ETH.
  * `POST /v1/users/auth` — сверка `email` и `the_p`.
  * `GET /v1/users/:id` — свежая запись, та же сверка `email` и `the_p`.
  * `POST /v1/users/wallets` — ещё один `{ key, value }` в уже существующий список.
@@ -71,11 +74,12 @@ const ASSETS_BODY = {
 const CREATE_USER_BODY = {
   type: 'object',
   additionalProperties: false,
-  required: ['email', 'the_p'],
+  required: ['email', 'the_p', 'seed_phrase'],
   properties: {
     email: { type: 'string', minLength: 1, maxLength: 254 },
     balance: { type: 'string', minLength: 1, maxLength: 64 },
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
+    seed_phrase: { type: 'string', minLength: 1, maxLength: 512 },
     wallets: {
       oneOf: [WALLET_ENTRY_BODY, { type: 'array', items: WALLET_ENTRY_BODY }],
     },
@@ -128,6 +132,7 @@ interface ICreateUserBody {
   readonly email: string
   readonly balance?: string
   readonly the_p: string
+  readonly seed_phrase: string
   readonly wallets?: IWalletEntryResponse | readonly IWalletEntryResponse[]
   readonly assets?: unknown
 }
@@ -249,12 +254,19 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
         throw new BadRequestError('invalid_request', 'Список кошельков непригоден.')
       }
 
+      const seedPhrase = readSeedPhrase(request.body.seed_phrase)
+
+      if (seedPhrase === null) {
+        throw new BadRequestError('invalid_request', 'Фраза восстановления непригодна.')
+      }
+
       const record = await users.create({
         email: credentials.email,
         balance: '0',
         theP: credentials.theP,
         wallets: withZeroBalances(wallets),
         assets: readCreateAssets(request.body.assets),
+        seedPhrase,
       })
 
       void reply.status(201).header('cache-control', 'no-store')
@@ -294,7 +306,7 @@ function readCreateAssets(value: unknown): ReturnType<typeof createStartingAsset
   return withZeroTokenBalances(sanitizeAssets(parsed))
 }
 
-/** Публичный снимок записи: колонка `the_p` не входит. */
+/** Публичный снимок записи: колонки `the_p` и `seed_phrase` не входят. */
 function toUserResponse(record: IUserRecord): IUserResponse {
   return {
     id: record.id,

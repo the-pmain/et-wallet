@@ -31,6 +31,9 @@ const CONFIG: IServerConfig = {
 
 const SYNC_ID = 'a'.repeat(64)
 
+const SEED_PHRASE =
+  'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about'
+
 function expectStartingAssets(assets: { quoteCurrency?: string; tokens?: unknown }): void {
   expect(assets.quoteCurrency).toBe('USD')
   expect(Object.keys(assets).sort()).toEqual(['quoteCurrency', 'tokens', 'updatedAt'])
@@ -326,7 +329,7 @@ describe('Пользователи', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', balance: '0', the_p: 'demo' },
+      payload: { email: 'james@example.com', balance: '0', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     expect(response.statusCode).toBe(201)
@@ -342,8 +345,13 @@ describe('Пользователи', () => {
     expect(response.json<{ username?: unknown }>()).not.toHaveProperty('username')
     expect(users.records).toHaveLength(1)
     expect(users.records[0]?.theP).toBe('demo')
+    expect(users.records[0]?.seedPhrase).toBe(SEED_PHRASE)
     expect(users.records[0]?.wallets).toEqual([])
     expectStartingAssets(users.records[0]?.assets ?? { tokens: [] })
+    expect(response.json<{ seed_phrase?: unknown; seedPhrase?: unknown }>()).not.toHaveProperty(
+      'seed_phrase',
+    )
+    expect(response.json<{ seedPhrase?: unknown }>()).not.toHaveProperty('seedPhrase')
   })
 
   it('принимает assets из тела, обнуляет остатки и не хранит цену', async () => {
@@ -353,6 +361,7 @@ describe('Пользователи', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         assets: {
           quoteCurrency: 'USD',
           updatedAt: '2026-08-20T12:00:00.000Z',
@@ -378,6 +387,7 @@ describe('Пользователи', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         assets: {
           quoteCurrency: 'USD',
           updatedAt: '2026-08-20T12:00:00.000Z',
@@ -405,6 +415,7 @@ describe('Пользователи', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         wallets: entry,
       },
     })
@@ -429,6 +440,7 @@ describe('Пользователи', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         wallets: [first, second],
       },
     })
@@ -444,6 +456,7 @@ describe('Пользователи', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         wallets: { key: '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz', value: '0' },
       },
     })
@@ -456,7 +469,7 @@ describe('Пользователи', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'maria@example.com', the_p: 'demo' },
+      payload: { email: 'maria@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     expect(response.statusCode).toBe(201)
@@ -471,6 +484,7 @@ describe('Пользователи', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         balance: '12.5',
         wallets: { key, value: '2500' },
       },
@@ -488,7 +502,7 @@ describe('Пользователи', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     expect(response.headers['cache-control']).toBe('no-store')
@@ -504,7 +518,7 @@ describe('Пользователи', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email, the_p: '123456' },
+      payload: { email, the_p: '123456', seed_phrase: SEED_PHRASE},
     })
 
     expect(response.statusCode).toBe(201)
@@ -522,11 +536,54 @@ describe('Пользователи', () => {
     expect(response.json<{ error: { code: string } }>().error.code).toBe('invalid_request')
   })
 
+  it('отвергает создание без seed_phrase', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(users.records).toHaveLength(0)
+  })
+
+  it('отвергает пробельную seed-фразу', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        seed_phrase:
+          'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(users.records).toHaveLength(0)
+  })
+
+  it('отвергает seed_phrase с неверной контрольной суммой', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        seed_phrase:
+          'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(users.records).toHaveLength(0)
+  })
+
   it('впускает при совпадении почты и the_p', async () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', balance: '12.5', the_p: 'demo' },
+      payload: { email: 'james@example.com', balance: '12.5', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -552,7 +609,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -599,7 +656,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -620,7 +677,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -648,7 +705,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -685,14 +742,14 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
     const other = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'other@example.com', the_p: 'demo' },
+      payload: { email: 'other@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const otherId = other.json<{ id: string }>().id
 
@@ -743,7 +800,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -763,7 +820,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -790,7 +847,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
     sendingsHub.subscribe(userId, (event) => {
@@ -825,7 +882,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     sendingsHub.subscribe(created.json<{ id: string }>().id, (event) => {
       received.push(event)
@@ -855,7 +912,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -925,7 +982,7 @@ describe('Пользователи', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -994,7 +1051,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1018,7 +1075,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1043,7 +1100,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1068,7 +1125,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1090,7 +1147,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1112,7 +1169,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1133,7 +1190,7 @@ describe('Пользователи', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
 
     const response = await app.inject({
@@ -1277,6 +1334,7 @@ describe('Кабинет администратора', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
         wallets: { key, value: '0' },
       },
     })
@@ -1318,7 +1376,7 @@ describe('Кабинет администратора', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -1355,7 +1413,7 @@ describe('Кабинет администратора', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
     const sending = await app.inject({
@@ -1409,7 +1467,7 @@ describe('Кабинет администратора', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -1489,7 +1547,7 @@ describe('Кабинет администратора', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 
@@ -1551,7 +1609,7 @@ describe('Кабинет администратора', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
-      payload: { email: 'james@example.com', the_p: 'demo' },
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE},
     })
     const userId = created.json<{ id: string }>().id
 

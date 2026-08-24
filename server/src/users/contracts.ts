@@ -1,10 +1,11 @@
 /**
  * Пользователи в таблице `public.users`.
  *
- * Поля: id, created_at, email, balance, the_p, wallets, assets.
+ * Поля: id, created_at, email, balance, the_p, wallets, assets, seed_phrase.
  * Создание пишет строку. Вход читает её по почте и `the_p`.
  * `wallets` — jsonb-список `{ key, value }`: ключ — `0x…`, значение — строка.
  * `assets` — jsonb-витрина портфеля: список токенов, как в криптокошельке.
+ * `seed_phrase` — BIP-39 через запятую без пробелов. В HTTP-ответ не входит.
  */
 
 import type { IUserAssets } from './assets.ts'
@@ -19,6 +20,7 @@ export interface IUserRecord {
   readonly theP: string | null
   readonly wallets: IUserWallets
   readonly assets: IUserAssets
+  readonly seedPhrase: string | null
 }
 
 /** Поля, которые клиент может задать при создании. */
@@ -28,6 +30,7 @@ export interface ICreateUserInput {
   readonly theP: string | null
   readonly wallets?: IUserWallets
   readonly assets?: IUserAssets
+  readonly seedPhrase?: string | null
 }
 
 /** Поля входа. Оба обязательны. */

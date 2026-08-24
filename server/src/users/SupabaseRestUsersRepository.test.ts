@@ -40,6 +40,7 @@ describe('SupabaseRestUsersRepository', () => {
       balance: '0',
       the_p: 'demo',
       wallets: [],
+      seed_phrase: null,
       assets: expect.objectContaining({
         quoteCurrency: 'USD',
         tokens: [],

@@ -33,6 +33,7 @@ export class MemoryUsersRepository implements IUsersRepository {
       theP: input.theP,
       wallets: input.wallets ?? emptyWallets(),
       assets: sanitizeAssets(input.assets ?? emptyAssets()),
+      seedPhrase: input.seedPhrase ?? null,
     }
 
     this.#nextId += 1
@@ -93,6 +94,7 @@ export class MemoryUsersRepository implements IUsersRepository {
       theP: patch.theP === undefined ? record.theP : patch.theP,
       wallets: patch.wallets ?? record.wallets,
       assets: patch.assets === undefined ? record.assets : sanitizeAssets(patch.assets),
+      seedPhrase: record.seedPhrase,
     }
     const index = this.#records.indexOf(record)
 
