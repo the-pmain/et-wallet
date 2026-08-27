@@ -1,51 +1,69 @@
 import type { IServerConfig } from '../config.ts'
-import { ServiceUnavailableError } from '../lib/errors.ts'
+import { emailDomain } from '../email/address.ts'
 
+import { CloudflareEmailsRepository } from './CloudflareEmailsRepository.ts'
 import { EMAILS_STORE_KIND, type IEmailsStore } from './contracts.ts'
+import { ensureCloudflareInbox, resolveCloudflareZoneId } from './ensureCloudflareInbox.ts'
 import { MemoryEmailsRepository } from './MemoryEmailsRepository.ts'
-import {
-  isMissingEmailsTableError,
-  SupabaseRestEmailsRepository,
-} from './SupabaseRestEmailsRepository.ts'
 
-const MISSING_TABLE_WARNING =
-  'Supabase table public.emails is missing. In Supabase → SQL Editor, run server/supabase/allow-email-inserts.sql, then restart the server. Using in-memory email storage until then.'
+const MISSING_ZONE_WARNING =
+  'Cloudflare Email Sending is configured, but the MAIL_FROM domain has no zone. Using in-memory mail until the zone is available.'
 
 /**
- * Собирает журнал писем.
+ * Ящик менеджера писем.
  *
- * Те же `SUPABASE_URL` / `SUPABASE_ANON_KEY`, что и у пользователей.
- * Без них — память процесса. Если таблица `public.emails` ещё не
- * создана, тоже память, с предупреждением в журнале и в API.
+ * Источник — Cloudflare (activity log + KV). Supabase для писем не используется.
  */
-export async function createEmailsStore(config: IServerConfig): Promise<IEmailsStore> {
-  if (config.supabaseUrl === null || config.supabaseAnonKey === null) {
+export async function createEmailsStore(
+  config: IServerConfig,
+  options: { readonly ensureInbox?: boolean } = {},
+): Promise<IEmailsStore> {
+  const accountId = config.cloudflareAccountId
+  const apiToken = config.cloudflareApiToken
+  const domain = emailDomain(config.mailFrom ?? '') ?? 'etwalletx.com'
+
+  if (accountId === null || apiToken === null) {
     return memoryStore(null)
   }
 
-  const repository = new SupabaseRestEmailsRepository({
-    supabaseUrl: config.supabaseUrl,
-    anonKey: config.supabaseAnonKey,
+  const zoneId = await resolveCloudflareZoneId({
+    accountId,
+    apiToken,
+    authEmail: config.cloudflareAuthEmail,
+    domain,
   })
 
-  try {
-    await repository.list({ limit: 1 })
-  } catch (error) {
-    if (
-      error instanceof ServiceUnavailableError &&
-      isMissingEmailsTableError(error.message)
-    ) {
-      console.warn(MISSING_TABLE_WARNING)
-      return memoryStore(MISSING_TABLE_WARNING)
-    }
+  if (zoneId === null) {
+    console.warn(MISSING_ZONE_WARNING)
 
-    throw error
+    return memoryStore(MISSING_ZONE_WARNING)
+  }
+
+  let kvNamespaceId: string | null = null
+  let storageWarning: string | null = null
+
+  if (options.ensureInbox !== false) {
+    const inbox = await ensureCloudflareInbox({
+      accountId,
+      apiToken,
+      authEmail: config.cloudflareAuthEmail,
+      zoneId,
+    })
+
+    kvNamespaceId = inbox.kvNamespaceId
+    storageWarning = inbox.warning
   }
 
   return {
-    emails: repository,
-    kind: EMAILS_STORE_KIND.Supabase,
-    storageWarning: null,
+    emails: new CloudflareEmailsRepository({
+      accountId,
+      apiToken,
+      authEmail: config.cloudflareAuthEmail,
+      zoneId,
+      kvNamespaceId,
+    }),
+    kind: EMAILS_STORE_KIND.Cloudflare,
+    storageWarning,
     close: () => Promise.resolve(),
   }
 }

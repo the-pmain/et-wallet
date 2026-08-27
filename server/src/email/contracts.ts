@@ -16,6 +16,7 @@ export interface IEmailMessage {
 
 /** Итог доставки, который Cloudflare вернул без служебных полей. */
 export interface IEmailSendResult {
+  readonly messageId: string | null
   readonly delivered: readonly string[]
   readonly queued: readonly string[]
   readonly permanentBounces: readonly string[]

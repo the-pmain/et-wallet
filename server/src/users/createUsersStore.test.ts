@@ -19,6 +19,11 @@ const BASE: IServerConfig = {
   cloudflareAccountId: null,
   cloudflareApiToken: null,
   cloudflareAuthEmail: null,
+  mailFrom: null,
+  r2AccessKeyId: null,
+  r2SecretAccessKey: null,
+  r2Endpoint: null,
+  r2Bucket: null,
   emailWebhookSecret: null,
 }
 

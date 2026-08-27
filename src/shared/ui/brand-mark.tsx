@@ -2,6 +2,11 @@ import { cn } from '@/shared/lib/utils'
 
 interface BrandMarkProps {
   readonly className?: string
+  /**
+   * Подпись знака. Пустая строка — знак декоративный: рядом уже стоит
+   * видимое имя, и повтор «ETWallet» в программе чтения был бы шумом.
+   */
+  readonly alt?: string
 }
 
 /**
@@ -32,13 +37,13 @@ const INTRINSIC_SIZE = 128
  * привыкший к конкретному знаку, замечает подмену. Поэтому он одинаков
  * на всех экранах и не подменяется произвольными значками.
  */
-export function BrandMark({ className }: BrandMarkProps) {
+export function BrandMark({ className, alt = 'ETWallet' }: BrandMarkProps) {
   return (
     <img
       src="/icons/icon-128.png"
       width={INTRINSIC_SIZE}
       height={INTRINSIC_SIZE}
-      alt="ETWallet"
+      alt={alt}
       /* Знак виден сразу при открытии приложения, поэтому откладывать
          его загрузку нечем: отложенная загрузка здесь только добавила бы
          мигание на первом экране. */

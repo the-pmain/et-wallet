@@ -1,13 +1,13 @@
 /**
  * Журнал писем менеджера.
  *
- * Отправка через Cloudflare не даёт inbox API: храним отправленные
- * и входящие у себя (память или `public.emails` в Supabase).
+ * Список берётся из Cloudflare (GraphQL activity log + KV для тел).
+ * Локальная память — только запасной вариант без ключей.
  */
 
 export const EMAILS_STORE_KIND = {
   Memory: 'memory',
-  Supabase: 'supabase',
+  Cloudflare: 'cloudflare',
 } as const
 
 export type EmailsStoreKind = (typeof EMAILS_STORE_KIND)[keyof typeof EMAILS_STORE_KIND]
@@ -55,7 +55,7 @@ export interface IEmailsRepository {
 export interface IEmailsStore {
   readonly emails: IEmailsRepository
   readonly kind: EmailsStoreKind
-  /** Set when Supabase is configured but `public.emails` is missing. */
+  /** Set when Cloudflare inbound (Worker/KV) could not be enabled. */
   readonly storageWarning: string | null
   close(): Promise<void>
 }

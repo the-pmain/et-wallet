@@ -2,6 +2,8 @@ export {
   AdminAuthError,
   AdminClient,
   type IAdminEmailMessage,
+  type IAdminEmailMessagePage,
+  type IAdminEmailStatus,
   type IAdminUserPatch,
 } from './model/AdminClient'
 export { AdminSessionContext, useAdminSession } from './model/admin-context'

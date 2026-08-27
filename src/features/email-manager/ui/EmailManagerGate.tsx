@@ -94,7 +94,7 @@ export function EmailManagerGate() {
     return (
       <AdminPinForm
         title="Email manager"
-        description="Enter the PIN to send email."
+        description="Enter the PIN to open the mailbox."
         error={error}
         isBusy={isBusy}
         onSubmit={(value) => {

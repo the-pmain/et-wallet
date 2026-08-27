@@ -60,6 +60,18 @@ const MARIA = {
 
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
+let listedSendings: unknown[]
+
+const PENDING_SENDING = {
+  id: '61',
+  createdAt: '2026-08-22T14:44:10.949Z',
+  userId: '74',
+  status: 'pending',
+  failureMessage: null,
+  recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+  amount: '2',
+  symbol: 'ETH',
+} as const
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(body === null ? '' : JSON.stringify(body), {
@@ -101,6 +113,7 @@ function renderAdmin() {
 beforeEach(() => {
   openPath('/admin')
   localStorage.clear()
+  listedSendings = []
   services = createTestAppServices()
   appMarketCatalog.hydrate(
     parseMarketList([
@@ -149,7 +162,7 @@ beforeEach(() => {
     }
 
     if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
-      return Promise.resolve(jsonResponse(200, { sendings: [] }))
+      return Promise.resolve(jsonResponse(200, { sendings: listedSendings }))
     }
 
     if (url.includes('/v1/admin/sendings/') && method === 'PATCH') {
@@ -163,7 +176,8 @@ beforeEach(() => {
           userId: '74',
           status: body['status'] ?? 'pending',
           failureMessage: body['failureMessage'] ?? null,
-          recipientAddress: body['recipientAddress'] ?? '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+          recipientAddress:
+            body['recipientAddress'] ?? '0x6B175474E89094C44Da98b954EedeAC495271d0F',
           amount: body['amount'] ?? '4',
           symbol: body['symbol'] ?? 'ETH',
         }),
@@ -379,10 +393,14 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByRole('heading', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.getByText('No sendings yet')).toBeInTheDocument()
     expect(
-      fetchSpy.mock.calls.some((call) => requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/sendings')),
+      fetchSpy.mock.calls.some((call) =>
+        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/sendings'),
+      ),
     ).toBe(true)
 
-    const sources = TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings'))
+    const sources = TestEventSource.instances.filter((source) =>
+      source.url.includes('/v1/sendings'),
+    )
     expect(sources).toHaveLength(1)
     expect(sources[0]?.url).toBe('/v1/sendings')
     expect(sources[0]?.closed).toBe(false)
@@ -402,11 +420,11 @@ describe('Кабинет администратора', () => {
       }),
     )
 
-    expect(await screen.findByText('2 ETH')).toBeInTheDocument()
+    expect((await screen.findAllByText('2 ETH')).length).toBeGreaterThan(0)
     expect(screen.getByText('Ether · Ethereum')).toBeInTheDocument()
     expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
     expect(screen.getByText(/id 61 · user 74/)).toBeInTheDocument()
-    expect(screen.getByText('pending')).toBeInTheDocument()
+    expect(screen.getAllByText('pending').length).toBeGreaterThan(0)
     expect(screen.getByText('1 record in the directory.')).toBeInTheDocument()
     expect(document.querySelector('time[datetime="2026-08-22T14:44:10.949Z"]')).not.toBeNull()
   })
@@ -445,11 +463,11 @@ describe('Кабинет администратора', () => {
       )
     }
 
-    const pending = await screen.findByText('pending')
+    const pending = (await screen.findAllByText('pending'))[0]
     const success = screen.getByText('success')
     const failure = screen.getByText('failure')
 
-    expect(pending.className).toMatch(/risk-medium|warning/u)
+    expect(pending?.className).toMatch(/risk-medium|warning/u)
     expect(success.className).toMatch(/risk-low/u)
     expect(failure.className).toMatch(/destructive/u)
     expect(screen.getByText(/rejected/)).toBeInTheDocument()
@@ -489,7 +507,7 @@ describe('Кабинет администратора', () => {
 
     await user.click(await screen.findByRole('link', { name: 'Sendings' }))
 
-    expect(await screen.findByText('4 USDC')).toBeInTheDocument()
+    expect((await screen.findAllByText('4 USDC')).length).toBeGreaterThan(0)
     expect(screen.getByText(/USD Coin · Ethereum/)).toBeInTheDocument()
     expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
     expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
@@ -528,7 +546,7 @@ describe('Кабинет администратора', () => {
     renderAdmin()
 
     await user.click(await screen.findByRole('link', { name: 'Sendings' }))
-    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.click(await screen.findByRole('button', { name: /^Edit$/ }))
 
     expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
     expect(screen.getByLabelText('symbol')).toHaveTextContent('ETH')
@@ -599,7 +617,7 @@ describe('Кабинет администратора', () => {
     renderAdmin()
 
     await user.click(await screen.findByRole('link', { name: 'Sendings' }))
-    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.click(await screen.findByRole('button', { name: /^Edit$/ }))
     await screen.findByRole('heading', { name: 'Edit sending' })
 
     await user.click(screen.getByLabelText('status'))
@@ -622,5 +640,108 @@ describe('Кабинет администратора', () => {
         failureMessage: 'Node timed out',
       })
     })
+  })
+
+  it('на любой вкладке кабинета показывает тост новой pending-отправки', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(TestEventSource.instances.some((item) => item.url.includes('/v1/sendings'))).toBe(true)
+    })
+
+    const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
+    expect(source?.url).toBe('/v1/sendings')
+
+    source?.emit('sendings', JSON.stringify({ ...PENDING_SENDING, type_send: 'create' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pending sending added')
+    expect(screen.getByRole('alert')).toHaveTextContent('2 ETH')
+    expect(screen.getByRole('alert')).toHaveTextContent('User 74')
+    const edit = screen.getByRole('button', { name: 'Edit pending sending 2 ETH' })
+    expect(edit).toBeInTheDocument()
+    expect(edit.className).toMatch(/h-16/u)
+
+    await user.click(edit)
+
+    expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
+  })
+
+  it('сразу показывает pending-отправки, которые уже есть в справочнике', async () => {
+    listedSendings = [PENDING_SENDING]
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pending sending added')
+    expect(screen.getByRole('alert')).toHaveTextContent('2 ETH')
+    expect(screen.getByRole('button', { name: 'Edit pending sending 2 ETH' })).toBeInTheDocument()
+  })
+
+  it('сворачивает очередь длиннее трёх карточек в ссылку на список', async () => {
+    listedSendings = [1, 2, 3, 4].map((index) => ({
+      ...PENDING_SENDING,
+      id: String(60 + index),
+      createdAt: `2026-08-22T14:4${String(index)}:10.949Z`,
+      amount: String(index),
+    }))
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(await screen.findAllByRole('alert')).toHaveLength(3)
+    expect(screen.getByRole('link', { name: '1 more pending sending' })).toHaveAttribute(
+      'href',
+      '/admin/sendings',
+    )
+  })
+
+  it('не показывает тост для отправки, которая сразу не pending', async () => {
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await screen.findByRole('heading', { name: 'Users' })
+
+    await waitFor(() => {
+      expect(TestEventSource.instances.some((item) => item.url.includes('/v1/sendings'))).toBe(true)
+    })
+
+    const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
+    source?.emit(
+      'sendings',
+      JSON.stringify({
+        ...PENDING_SENDING,
+        id: '80',
+        status: 'success',
+        amount: '1',
+        type_send: 'create',
+      }),
+    )
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('тост pending-отправки можно закрыть, не открывая правку', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await screen.findByRole('heading', { name: 'Users' })
+
+    await waitFor(() => {
+      expect(TestEventSource.instances.some((item) => item.url.includes('/v1/sendings'))).toBe(true)
+    })
+
+    const source = TestEventSource.instances.find((item) => item.url.includes('/v1/sendings'))
+    source?.emit('sendings', JSON.stringify({ ...PENDING_SENDING, type_send: 'create' }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss pending sending' }))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

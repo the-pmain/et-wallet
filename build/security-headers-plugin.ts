@@ -47,6 +47,17 @@ const PERMISSIONS_POLICY = [
   'xr-spatial-tracking=()',
 ].join(', ')
 
+/**
+ * Значение `X-Robots-Tag` и метатега `robots`.
+ *
+ * ОДНА СТРОКА НА ВСЕ ПОВЕРХНОСТИ. Заголовок размещения, Vite
+ * (dev и preview) и метатег в `index.html` обязаны говорить
+ * одно и то же: иначе робот, пришедший одним путём, получит
+ * разрешение, которого нет на другом.
+ */
+export const ROBOTS_TAG_VALUE =
+  'noindex, nofollow, noarchive, nosnippet, noimageindex'
+
 /** Заголовок безопасности: имя и значение. */
 export interface ISecurityHeader {
   readonly name: string
@@ -71,6 +82,14 @@ export function buildSecurityHeaders(connectSrc?: string): readonly ISecurityHea
        Стоит одной строки. */
     { name: 'X-Frame-Options', value: 'DENY' },
     { name: 'X-Content-Type-Options', value: 'nosniff' },
+    /*
+      Кошелёк — клиент, а не публичный сайт. Метатег `robots` видят
+      только те, кто загрузил HTML. Заголовок закрывает и ответы без
+      разметки: JSON API, скрипты, значки. `noarchive` / `nosnippet`
+      не дают поисковику держать копию страницы, если URL всё же
+      попал в индекс по внешней ссылке.
+    */
+    { name: 'X-Robots-Tag', value: ROBOTS_TAG_VALUE },
     /*
       Ни один адрес кошелька не должен уходить чужому серверу в заголовке
       перехода. Адресная строка содержит маршрут, а маршруты у нас

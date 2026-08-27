@@ -53,4 +53,56 @@ describe('ResilientSendingsRepository', () => {
     expect(record.userId).toBe('70')
     expect(record.amount).toBe('2')
   })
+
+  it('falls back when every users.id is already a sending id', async () => {
+    const onFallback = vi.fn()
+    const primary = new MemorySendingsRepository()
+    vi.spyOn(primary, 'create').mockRejectedValueOnce(
+      new ServiceUnavailableError(
+        'sendings_id_fkey requires sendings.id to be an unused users.id, and none are left.',
+      ),
+    )
+
+    const repository = new ResilientSendingsRepository(primary, onFallback)
+    const record = await repository.create({
+      userId: '70',
+      status: SENDING_STATUS.Pending,
+      recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+      amount: '2',
+      symbol: 'ETH',
+    })
+
+    expect(onFallback).toHaveBeenCalledOnce()
+    expect(record.userId).toBe('70')
+    expect(record.amount).toBe('2')
+  })
+
+  it('keeps existing Supabase rows after write fallback', async () => {
+    const primary = new MemorySendingsRepository()
+    await primary.create({
+      userId: '70',
+      status: SENDING_STATUS.Pending,
+      recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+      amount: '1',
+      symbol: 'ETH',
+    })
+    vi.spyOn(primary, 'create').mockRejectedValueOnce(
+      new ServiceUnavailableError(
+        'sendings_id_fkey requires sendings.id to be an unused users.id, and none are left.',
+      ),
+    )
+
+    const repository = new ResilientSendingsRepository(primary, vi.fn())
+    await repository.create({
+      userId: '70',
+      status: SENDING_STATUS.Pending,
+      recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+      amount: '2',
+      symbol: 'ETH',
+    })
+
+    const listed = await repository.listByUserId('70')
+
+    expect(listed.map((row) => row.amount)).toEqual(['2', '1'])
+  })
 })

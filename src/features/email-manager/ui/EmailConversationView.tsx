@@ -2,48 +2,81 @@ import { ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
-import { AdminAuthError, type IAdminEmailMessage, useAdminSession } from '@/features/admin'
+import { AdminAuthError, type IAdminEmailMessage, type IAdminEmailStatus, useAdminSession } from '@/features/admin'
 import { Alert, AlertDescription, Button, Skeleton } from '@/shared/ui'
 
 import { findConversationById, groupMessagesIntoConversations } from '../model/conversations'
+import { MAILBOX_PAGE_SIZE, peerFromConversationId } from '../model/mailbox'
 import { MOCK_FROM } from '../model/template'
 import { ConversationAvatar } from './ConversationAvatar'
 import { EmailComposer, type IEmailComposerSendPayload } from './EmailComposer'
 import { EmailConfiguredAlert } from './EmailConfiguredAlert'
 import { EmailMessageBubble } from './EmailMessageBubble'
 import { EmailStorageAlert } from './EmailStorageAlert'
+import { MailboxPager } from './MailboxPager'
 
 /** Thread view for one counterparty, with template/custom compose. */
 export function EmailConversationView() {
   const { conversationId } = useParams()
   const navigate = useNavigate()
   const { client, lock } = useAdminSession()
+  const peer = peerFromConversationId(conversationId)
 
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [storageWarning, setStorageWarning] = useState<string | null>(null)
   const [messages, setMessages] = useState<readonly IAdminEmailMessage[] | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
+  const [pageIndex, setPageIndex] = useState(0)
   const [from, setFrom] = useState(MOCK_FROM)
+  const [sendingDomain, setSendingDomain] = useState<string | null>(null)
+  const [fromAddresses, setFromAddresses] = useState<readonly string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pageBusy, setPageBusy] = useState(false)
 
-  const reloadMessages = useCallback(async () => {
-    const listed = await client.listEmailMessages()
-    setMessages(listed)
-  }, [client])
+  const loadPage = useCallback(
+    async (cursor: string | null) => {
+      const [status, page] = await Promise.all([
+        client.getEmailStatus(),
+        client.listEmailMessages({ limit: MAILBOX_PAGE_SIZE, cursor, peer }),
+      ])
+
+      return { status, page }
+    },
+    [client, peer],
+  )
+
+  const applyPage = useCallback((status: IAdminEmailStatus, messagesPage: {
+    readonly messages: readonly IAdminEmailMessage[]
+    readonly nextCursor: string | null
+  }) => {
+      setConfigured(status.configured)
+      setStorageWarning(status.storageWarning)
+      setMessages(messagesPage.messages)
+      setNextCursor(messagesPage.nextCursor)
+      setSendingDomain(status.sendingDomain)
+      setFromAddresses(status.fromAddresses)
+      if (status.defaultFrom !== null) {
+        setFrom(status.defaultFrom)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     let cancelled = false
 
-    void Promise.all([client.getEmailStatus(), client.listEmailMessages()])
-      .then(([status, listed]) => {
+    void loadPage(null)
+      .then(({ status, page }) => {
         if (cancelled) {
           return
         }
 
-        setConfigured(status.configured)
-        setStorageWarning(status.storageWarning)
-        setMessages(listed)
+        applyPage(status, page)
+        setCursorStack([null])
+        setPageIndex(0)
       })
       .catch((caught: unknown) => {
         if (cancelled) {
@@ -68,7 +101,34 @@ export function EmailConversationView() {
     return () => {
       cancelled = true
     }
-  }, [client, lock])
+  }, [applyPage, loadPage, lock])
+
+  const goTo = async (cursor: string | null, nextIndex: number, stack: Array<string | null>) => {
+    setPageBusy(true)
+    setError(null)
+
+    try {
+      const { status, page } = await loadPage(cursor)
+
+      applyPage(status, page)
+      setCursorStack(stack)
+      setPageIndex(nextIndex)
+    } catch (caught: unknown) {
+      if (caught instanceof AdminAuthError && caught.status === 401) {
+        lock()
+
+        return
+      }
+
+      setError(
+        caught instanceof AdminAuthError
+          ? caught.message
+          : 'The conversation could not be loaded.',
+      )
+    } finally {
+      setPageBusy(false)
+    }
+  }
 
   const conversation = useMemo(() => {
     if (messages === null || conversationId === undefined) {
@@ -96,7 +156,11 @@ export function EmailConversationView() {
             : 'Cloudflare accepted the message.',
       )
 
-      await reloadMessages()
+      const { status, page } = await loadPage(null)
+
+      applyPage(status, page)
+      setCursorStack([null])
+      setPageIndex(0)
     } catch (caught: unknown) {
       if (caught instanceof AdminAuthError && caught.status === 401) {
         lock()
@@ -152,7 +216,7 @@ export function EmailConversationView() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {String(conversation.messages.length)}{' '}
-            {conversation.messages.length === 1 ? 'message' : 'messages'} ·{' '}
+            {conversation.messages.length === 1 ? 'message' : 'messages'} on this page ·{' '}
             {conversation.sentCount} sent · {conversation.receivedCount} received
           </p>
         </div>
@@ -187,9 +251,28 @@ export function EmailConversationView() {
         )}
       </section>
 
+      <MailboxPager
+        page={pageIndex + 1}
+        hasPrevious={pageIndex > 0}
+        hasNext={nextCursor !== null}
+        busy={pageBusy || busy}
+        onPrevious={() => {
+          void goTo(cursorStack[pageIndex - 1] ?? null, pageIndex - 1, cursorStack)
+        }}
+        onNext={() => {
+          if (nextCursor === null) {
+            return
+          }
+
+          void goTo(nextCursor, pageIndex + 1, [...cursorStack.slice(0, pageIndex + 1), nextCursor])
+        }}
+      />
+
       <EmailComposer
         from={from}
         to={conversation.counterparty}
+        fromAddresses={fromAddresses}
+        sendingDomain={sendingDomain}
         toReadOnly
         busy={busy}
         sendLabel="Send message"

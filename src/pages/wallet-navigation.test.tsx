@@ -102,6 +102,7 @@ describe('Навигация кошелька', () => {
        на каждом экране давало бы мерцание при переходе. */
     expect(screen.getByText('Account 1')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'ET Wallet' }).length).toBeGreaterThan(0)
   })
 })
 

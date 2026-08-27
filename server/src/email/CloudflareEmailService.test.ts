@@ -33,6 +33,7 @@ describe('CloudflareEmailService', () => {
         success: true,
         errors: [],
         result: {
+          message_id: 'msg-1',
           delivered: ['recipient@example.com'],
           queued: [],
           permanent_bounces: [],
@@ -67,6 +68,7 @@ describe('CloudflareEmailService', () => {
 
     expect(JSON.parse(body)).toEqual(MESSAGE)
     expect(result.delivered).toEqual(['recipient@example.com'])
+    expect(result.messageId).toBe('msg-1')
   })
 
   it('отправляет глобальный ключ как X-Auth-Email и X-Auth-Key', async () => {
@@ -146,6 +148,24 @@ describe('CloudflareEmailService', () => {
       name: 'EmailSendError',
       statusCode: 400,
       message: 'email.sending.error.invalid_request_schema',
+    })
+  })
+
+  it('объясняет, если Email Sending выключен на зоне', async () => {
+    const service = new CloudflareEmailService({
+      accountId: 'account-id',
+      apiToken: 'token',
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse(403, {
+          success: false,
+          errors: [{ code: 10203, message: 'email.sending.error.email.sending_disabled' }],
+        }),
+      ) as unknown as typeof fetch,
+    })
+
+    await expect(service.send(MESSAGE)).rejects.toMatchObject({
+      name: 'EmailUnavailableError',
+      message: expect.stringContaining('Email Sending is disabled'),
     })
   })
 

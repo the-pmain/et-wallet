@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from '@/shared/ui'
 
-/** Shown when Supabase is configured but `public.emails` was not created yet. */
+/** Shown when Cloudflare inbound mailbox setup is incomplete. */
 export function EmailStorageAlert({ message }: { readonly message: string }) {
   return (
     <Alert variant="warning">

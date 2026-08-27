@@ -2,18 +2,24 @@ import { ChevronDown, Lock } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
+import { ROUTE } from '@/app/router/routes'
 import {
   ONBOARDING_STATE,
   readLoginCredentials,
   useDirectorySession,
   useOnboarding,
   useOnboardingState,
+  type IRemoteUser,
 } from '@/features/onboarding'
+import {
+  displayNameFromEmail,
+  formatMemberSince,
+} from '@/features/onboarding/lib/directory-identity'
 import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Button, Skeleton, Toaster } from '@/shared/ui'
+import { BrandMark, Button, Skeleton, Toaster } from '@/shared/ui'
 
 import { AmbientBackground } from './AmbientBackground'
 import { NAVIGATION } from './navigation'
@@ -118,21 +124,21 @@ export function AppShell() {
 
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="flex w-full min-w-0 items-center gap-3 px-4 py-3 lg:pl-64">
+          {/* На узком экране панели слева нет: знак и имя живут в шапке. */}
+          <BrandLockup className="shrink-0 lg:hidden" />
           {snapshot.activeAccount === null ? (
             directoryUser === null ? (
               directory.isRestoring ? (
-                <div className="flex min-w-0 flex-col gap-1.5" aria-hidden>
-                  <Skeleton className="h-4 w-36" />
-                  <Skeleton className="h-3 w-24" />
+                <div className="flex min-w-0 items-center gap-2.5" aria-hidden>
+                  <Skeleton className="size-9 shrink-0 rounded-full" />
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-36" />
+                  </div>
                 </div>
               ) : null
             ) : (
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-semibold">
-                  {directoryUser.email ?? 'Account'}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">{directoryUser.id}</span>
-              </div>
+              <DirectoryIdentity user={directoryUser} />
             )
           ) : (
             /* ПЕРЕКЛЮЧАТЕЛЬ ВЫГЛЯДИТ НАЖИМАЕМЫМ. Прежде здесь стояли
@@ -238,7 +244,12 @@ export function AppShell() {
         aria-label="Wallet sections"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 backdrop-blur-md lg:inset-y-0 lg:right-auto lg:left-0 lg:w-60 lg:border-t-0 lg:border-r lg:bg-background/80"
       >
-        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:mx-0 lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:p-3 lg:pt-20">
+        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:mx-0 lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:p-3 lg:pt-4">
+          {/*
+            Знак стоит в самой панели, а не над ней: шапка создаёт свой
+            слой, и закреплённый поверх неё знак оказывался под пунктами.
+          */}
+          <BrandLockup className="mb-3 hidden shrink-0 px-1 py-1 lg:flex" />
           {NAVIGATION.map((item) => (
             <NavLink
               key={item.to}
@@ -275,6 +286,52 @@ export function AppShell() {
         </div>
       </nav>
     </div>
+  )
+}
+
+/**
+ * Знак и имя продукта. Один блок: знак без подписи, имя читается само.
+ */
+function BrandLockup({ className }: { readonly className?: string }) {
+  return (
+    <Link
+      to={ROUTE.Dashboard}
+      className={cn('focus-ring flex items-center gap-2.5 rounded-lg', className)}
+    >
+      <BrandMark alt="" className="size-9 lg:size-10" />
+      <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap text-foreground lg:text-base">
+        ET Wallet
+      </span>
+    </Link>
+  )
+}
+
+/**
+ * Шапка кабинета: отпечаток, имя и почта.
+ *
+ * ТОТ ЖЕ УЗОР, ЧТО У АДРЕСА. Для входа по почте ключей на устройстве нет,
+ * поэтому картинка считается из адреса почты. Номер записи в шапку
+ * не выводится: это служебный ключ, а не то, чем человек представляется.
+ */
+function DirectoryIdentity({ user }: { readonly user: IRemoteUser }) {
+  const name = displayNameFromEmail(user.email)
+  const since = formatMemberSince(user.createdAt)
+  const details = [user.email, since].filter((part): part is string => part !== null && part !== '')
+  const seed = user.email === null || user.email === '' ? user.id : user.email
+
+  return (
+    <Link
+      to={ROUTE.Settings}
+      className="focus-ring -ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent"
+    >
+      <AccountAvatar address={seed} label={name} />
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold">{name}</span>
+        {details.length > 0 ? (
+          <span className="truncate text-xs text-muted-foreground">{details.join(' · ')}</span>
+        ) : null}
+      </div>
+    </Link>
   )
 }
 

@@ -1,11 +1,7 @@
 import { Pencil, Send } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-import {
-  useSendingsSse,
-  type IRemoteSending,
-  type ISendingSseEvent,
-} from '@/features/onboarding'
+import { type IRemoteSending, type ISendingSseEvent } from '@/features/onboarding'
 import { AmountWithUnit } from '@/features/wallet/ui/AmountWithUnit'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import { Alert, AlertDescription, Button, EmptyState, Input, Skeleton } from '@/shared/ui'
@@ -13,6 +9,7 @@ import { Alert, AlertDescription, Button, EmptyState, Input, Skeleton } from '@/
 import { AdminAuthError, type IAdminSendingPatch } from '../model/AdminClient'
 import { addableAssetBySymbol } from '../model/addable-assets'
 import { useAdminSession } from '../model/admin-context'
+import { useAdminSendingsLive } from '../model/admin-sendings-live'
 import { sendingMatchesAdminQuery } from '../model/sending-query'
 import { SendingEditDialog } from './SendingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
@@ -20,8 +17,8 @@ import { SendingStatusBadge } from './SendingStatusBadge'
 /**
  * Список переводов кабинета.
  *
- * При входе читает `GET /v1/admin/sendings`, затем держит
- * `GET /v1/sendings`: кадр `type_send: create` дописывает строку.
+ * При входе читает `GET /v1/admin/sendings`, затем слушает поток
+ * оболочки: кадр `type_send: create` дописывает строку.
  */
 export function AdminSendingsList() {
   const { client, lock } = useAdminSession()
@@ -61,7 +58,7 @@ export function AdminSendingsList() {
     }
   }, [client, lock])
 
-  useSendingsSse(null, (event) => {
+  useAdminSendingsLive((event) => {
     setSendings((current) => upsertSending(current ?? [], event))
   })
 
@@ -206,7 +203,7 @@ function SendingRow({
               {name} · {network}
             </span>
           </span>
-          <span className="break-all font-mono text-xs text-foreground">
+          <span className="font-mono text-xs break-all text-foreground">
             {sending.recipientAddress ?? '—'}
           </span>
           <AmountWithUnit
@@ -254,7 +251,7 @@ function SendingTimestamp({ value }: { readonly value: string }) {
 
   return (
     <time dateTime={value} className="flex flex-col items-end leading-tight">
-      <span className="text-base font-semibold tabular-nums tracking-tight">{clock}</span>
+      <span className="text-base font-semibold tracking-tight tabular-nums">{clock}</span>
       <span className="text-sm font-medium text-foreground/80">{day}</span>
     </time>
   )

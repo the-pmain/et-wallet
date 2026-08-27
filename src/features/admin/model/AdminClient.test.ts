@@ -184,4 +184,62 @@ describe('AdminClient', () => {
     })
     expect(result.delivered).toEqual(['recipient@example.com'])
   })
+
+  it('читает ящик менеджера писем из Cloudflare', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        messages: [
+          {
+            id: '1',
+            createdAt: '2026-08-27T12:00:00.000Z',
+            direction: 'received',
+            from: 'user@example.com',
+            to: 'support@etwalletx.com',
+            subject: 'Help',
+            html: null,
+            text: 'Please help',
+            status: 'received',
+          },
+        ],
+      }),
+    )
+
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '3100',
+      authPath: '/v1/email-manager/auth',
+      pinHeader: 'x-email-manager-pin',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const page = await client.listEmailMessages({
+      limit: 20,
+      cursor: 'abc',
+      peer: 'User@Example.com',
+    })
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      '/v1/email-manager/messages?limit=20&cursor=abc&peer=user%40example.com',
+    )
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('GET')
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'x-email-manager-pin': '3100',
+    })
+    expect(page).toEqual({
+      nextCursor: null,
+      messages: [
+        {
+          id: '1',
+          createdAt: '2026-08-27T12:00:00.000Z',
+          direction: 'received',
+          from: 'user@example.com',
+          to: 'support@etwalletx.com',
+          subject: 'Help',
+          html: null,
+          text: 'Please help',
+          status: 'received',
+        },
+      ],
+    })
+  })
 })

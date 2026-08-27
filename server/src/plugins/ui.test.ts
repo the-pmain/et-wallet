@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
-import { htmlForTransport, isApiUrl, pageContentSecurityPolicy } from '../lib/ui.ts'
+import { htmlForTransport, isApiUrl, isStaticAssetUrl, pageContentSecurityPolicy } from '../lib/ui.ts'
 
 function configWithStatic(staticRoot: string | null): IServerConfig {
   return {
@@ -24,6 +24,11 @@ function configWithStatic(staticRoot: string | null): IServerConfig {
     cloudflareAccountId: null,
     cloudflareApiToken: null,
     cloudflareAuthEmail: null,
+    mailFrom: null,
+    r2AccessKeyId: null,
+    r2SecretAccessKey: null,
+    r2Endpoint: null,
+    r2Bucket: null,
     emailWebhookSecret: null,
   }
 }
@@ -37,6 +42,7 @@ function writeWalletDist(): string {
     join(root, 'index.html'),
     '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; upgrade-insecure-requests"></head><body>wallet</body></html>',
   )
+  writeFileSync(join(root, 'robots.txt'), 'User-agent: *\nDisallow: /\n')
   writeFileSync(join(assets, 'app.js'), 'console.log(1)')
 
   return root
@@ -48,6 +54,16 @@ describe('isApiUrl', () => {
     expect(isApiUrl('/v1/users?x=1')).toBe(true)
     expect(isApiUrl('/')).toBe(false)
     expect(isApiUrl('/assets/app.js')).toBe(false)
+  })
+})
+
+describe('isStaticAssetUrl', () => {
+  it('отличает файл сборки от маршрута приложения', () => {
+    expect(isStaticAssetUrl('/assets/index-abc.js')).toBe(true)
+    expect(isStaticAssetUrl('/assets/index-abc.css')).toBe(true)
+    expect(isStaticAssetUrl('/robots.txt')).toBe(true)
+    expect(isStaticAssetUrl('/wallet')).toBe(false)
+    expect(isStaticAssetUrl('/admin/sendings')).toBe(false)
   })
 })
 
@@ -117,5 +133,46 @@ describe('Раздача интерфейса', () => {
     expect(response.statusCode).toBe(200)
     expect(response.body).toContain('console.log')
     expect(response.headers['cache-control']).toContain('immutable')
+    expect(String(response.headers['content-type'])).not.toContain('text/html')
+  })
+
+  it('отдаёт файл, появившийся после старта', async () => {
+    /* Сборка меняет имена с отпечатком, пока процесс уже слушает.
+       Снимок каталога при старте оставлял бы новые файлы без маршрута,
+       и вместо байт уходила бы HTML-страница. */
+    const root = writeWalletDist()
+    app = await buildApp({ config: configWithStatic(root) })
+    writeFileSync(join(root, 'assets', 'late.js'), 'window.__late = 1')
+
+    const response = await app.inject({ method: 'GET', url: '/assets/late.js' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('window.__late')
+    expect(String(response.headers['content-type'])).not.toContain('text/html')
+  })
+
+  it('на отсутствующий файл сборки отвечает отказом, а не HTML', async () => {
+    app = await buildApp({ config: configWithStatic(writeWalletDist()) })
+    const response = await app.inject({ method: 'GET', url: '/assets/missing-hash.js' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.body).not.toContain('wallet')
+  })
+
+  it('раздаёт robots.txt с запретом обхода', async () => {
+    app = await buildApp({ config: configWithStatic(writeWalletDist()) })
+    const response = await app.inject({ method: 'GET', url: '/robots.txt' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toMatch(/^User-agent:\s*\*/m)
+    expect(response.body).toMatch(/^Disallow: \/$/m)
+    expect(response.headers['x-robots-tag']).toContain('noindex')
+  })
+
+  it('запрещает индексирование HTML кошелька', async () => {
+    app = await buildApp({ config: configWithStatic(writeWalletDist()) })
+    const response = await app.inject({ method: 'GET', url: '/' })
+
+    expect(response.headers['x-robots-tag']).toContain('noindex')
   })
 })

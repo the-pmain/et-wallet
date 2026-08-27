@@ -14,7 +14,7 @@ import type { IEmailService } from './email/contracts.ts'
 import { MemoryEmailsRepository } from './emails/MemoryEmailsRepository.ts'
 import type { IEmailsRepository } from './emails/contracts.ts'
 import { ApiError } from './lib/errors.ts'
-import { isApiUrl } from './lib/ui.ts'
+import { isApiUrl, isStaticAssetUrl } from './lib/ui.ts'
 import { registerSecretGuard } from './plugins/secret-guard.ts'
 import { registerSecurity } from './plugins/security.ts'
 import { registerUi, sendWalletIndex } from './plugins/ui.ts'
@@ -199,6 +199,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
     emails,
     config.emailWebhookSecret,
     dependencies.emailsStorageWarning ?? null,
+    config.mailFrom,
   )
 
   if (config.staticRoot !== null) {
@@ -206,7 +207,12 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   }
 
   app.setNotFoundHandler((request, reply) => {
-    if (config.staticRoot !== null && request.method === 'GET' && !isApiUrl(request.url)) {
+    if (
+      config.staticRoot !== null &&
+      request.method === 'GET' &&
+      !isApiUrl(request.url) &&
+      !isStaticAssetUrl(request.url)
+    ) {
       void sendWalletIndex(config.staticRoot, request, reply)
 
       return

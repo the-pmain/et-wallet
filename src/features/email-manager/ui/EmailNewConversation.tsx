@@ -20,6 +20,8 @@ export function EmailNewConversation() {
   const [storageWarning, setStorageWarning] = useState<string | null>(null)
   const [recipients, setRecipients] = useState<readonly string[]>([])
   const [from, setFrom] = useState(MOCK_FROM)
+  const [sendingDomain, setSendingDomain] = useState<string | null>(null)
+  const [fromAddresses, setFromAddresses] = useState<readonly string[]>([])
   const [to, setTo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -37,6 +39,11 @@ export function EmailNewConversation() {
         setConfigured(status.configured)
         setStorageWarning(status.storageWarning)
         setRecipients(listedRecipients)
+        setSendingDomain(status.sendingDomain)
+        setFromAddresses(status.fromAddresses)
+        if (status.defaultFrom !== null) {
+          setFrom(status.defaultFrom)
+        }
       })
       .catch((caught: unknown) => {
         if (cancelled) {
@@ -123,6 +130,8 @@ export function EmailNewConversation() {
       <EmailComposer
         from={from}
         to={to}
+        fromAddresses={fromAddresses}
+        sendingDomain={sendingDomain}
         recipients={recipients}
         busy={busy}
         onFromChange={setFrom}

@@ -14,6 +14,11 @@ const KEYS = [
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_API_TOKEN',
   'CLOUDFLARE_EMAIL',
+  'MAIL_FROM',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+  'R2_ENDPOINT',
+  'R2_BUCKET',
   'EMAIL_WEBHOOK_SECRET',
 ] as const
 
@@ -100,6 +105,11 @@ describe('loadConfig', () => {
       CLOUDFLARE_ACCOUNT_ID: 'account-id',
       CLOUDFLARE_API_TOKEN: 'token',
       CLOUDFLARE_EMAIL: 'owner@example.com',
+      MAIL_FROM: 'support@etwalletx.com',
+      R2_ACCESS_KEY_ID: 'r2-key',
+      R2_SECRET_ACCESS_KEY: 'r2-secret',
+      R2_ENDPOINT: 'https://example.r2.cloudflarestorage.com',
+      R2_BUCKET: 'etwallet-emails',
     })
 
     const config = loadConfig()
@@ -107,6 +117,11 @@ describe('loadConfig', () => {
     expect(config.cloudflareAccountId).toBe('account-id')
     expect(config.cloudflareApiToken).toBe('token')
     expect(config.cloudflareAuthEmail).toBe('owner@example.com')
+    expect(config.mailFrom).toBe('support@etwalletx.com')
+    expect(config.r2AccessKeyId).toBe('r2-key')
+    expect(config.r2SecretAccessKey).toBe('r2-secret')
+    expect(config.r2Endpoint).toBe('https://example.r2.cloudflarestorage.com')
+    expect(config.r2Bucket).toBe('etwallet-emails')
     expect(config.emailWebhookSecret).toBeNull()
   })
 

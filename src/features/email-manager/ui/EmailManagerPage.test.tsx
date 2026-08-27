@@ -43,6 +43,15 @@ function requestJson(init?: RequestInit): unknown {
   return JSON.parse(raw) as unknown
 }
 
+function mailboxListCalls(): readonly unknown[] {
+  return fetchSpy.mock.calls.filter((call) => {
+    const parsed = new URL(requestUrl(call[0] as RequestInfo | URL), 'http://local.test')
+    const method = call[1]?.method ?? 'GET'
+
+    return parsed.pathname.endsWith('/v1/email-manager/messages') && method === 'GET'
+  })
+}
+
 function renderEmailManager() {
   return render(
     <AppProviders services={services}>
@@ -87,11 +96,52 @@ beforeEach(() => {
     }
 
     if (url.endsWith('/v1/admin/email') && method === 'GET') {
-      return Promise.resolve(jsonResponse(200, { configured: true, storageWarning: null }))
+      return Promise.resolve(
+        jsonResponse(200, {
+          configured: true,
+          storageWarning: null,
+          defaultFrom: 'support@etwalletx.com',
+          sendingDomain: 'etwalletx.com',
+          fromAddresses: [
+            'support@etwalletx.com',
+            'hello@etwalletx.com',
+            'info@etwalletx.com',
+            'contact@etwalletx.com',
+            'team@etwalletx.com',
+            'mail@etwalletx.com',
+            'enquiries@etwalletx.com',
+          ],
+        }),
+      )
     }
 
-    if (url.endsWith('/v1/admin/email/messages') && method === 'GET') {
-      return Promise.resolve(jsonResponse(200, { messages: storedMessages }))
+    if (new URL(url, 'http://local.test').pathname.endsWith('/v1/email-manager/messages') && method === 'GET') {
+      const parsed = new URL(url, 'http://local.test')
+      const peer = parsed.searchParams.get('peer')
+      const cursor = parsed.searchParams.get('cursor')
+      let rows = storedMessages
+
+      if (peer !== null) {
+        const needle = peer.toLowerCase()
+        rows = rows.filter((message) => {
+          const from = String(message['from'] ?? '').toLowerCase()
+          const to = String(message['to'] ?? '').toLowerCase()
+
+          return from === needle || to === needle
+        })
+      }
+
+      if (peer === null && rows.length > 1 && cursor === null) {
+        return Promise.resolve(
+          jsonResponse(200, { messages: rows.slice(0, 1), nextCursor: 'c1' }),
+        )
+      }
+
+      if (cursor === 'c1') {
+        rows = rows.slice(1)
+      }
+
+      return Promise.resolve(jsonResponse(200, { messages: rows, nextCursor: null }))
     }
 
     if (url.endsWith('/v1/admin/email/recipients') && method === 'GET') {
@@ -148,6 +198,7 @@ describe('Менеджер писем', () => {
     expect(await screen.findByText('user@example.com')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /New conversation/i })).toBeInTheDocument()
     expect(localStorage.getItem(EMAIL_MANAGER_PIN_STORAGE_KEY)).toBe('3100')
+    expect(mailboxListCalls().length).toBeGreaterThan(0)
   })
 
   it('не пускает с неверным PIN', async () => {
@@ -170,8 +221,8 @@ describe('Менеджер писем', () => {
     await user.click(screen.getByRole('link', { name: /New conversation/i }))
 
     await screen.findByLabelText('From')
-    await user.clear(screen.getByLabelText('From'))
-    await user.type(screen.getByLabelText('From'), 'support@etwalletx.com')
+    await user.click(screen.getByLabelText('From'))
+    await user.click(screen.getByRole('option', { name: 'hello@etwalletx.com' }))
     await user.type(screen.getByLabelText('To'), 'maria@example.com')
     await user.click(screen.getByRole('button', { name: /^Send$/i }))
 
@@ -186,7 +237,89 @@ describe('Менеджер писем', () => {
 
     expect(requestJson(send?.[1])).toMatchObject({
       to: 'maria@example.com',
-      from: 'support@etwalletx.com',
+      from: 'hello@etwalletx.com',
     })
+  })
+
+  it('открывает переписку всеми письмами из GET /v1/email-manager/messages', async () => {
+    storedMessages = [
+      {
+        id: '1',
+        createdAt: '2026-08-21T12:00:00.000Z',
+        direction: 'received',
+        from: 'user@example.com',
+        to: 'support@etwalletx.com',
+        subject: 'Need help',
+        html: null,
+        text: 'Please help',
+        status: 'received',
+      },
+      {
+        id: '2',
+        createdAt: '2026-08-21T13:00:00.000Z',
+        direction: 'sent',
+        from: 'support@etwalletx.com',
+        to: 'user@example.com',
+        subject: 'Re: Need help',
+        html: null,
+        text: 'On the way',
+        status: 'delivered',
+      },
+    ]
+
+    const user = userEvent.setup()
+    localStorage.setItem(EMAIL_MANAGER_PIN_STORAGE_KEY, '3100')
+    renderEmailManager()
+
+    await screen.findByRole('heading', { name: 'Conversations' })
+    expect(mailboxListCalls().length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('link', { name: /user@example.com/i }))
+
+    expect(await screen.findByRole('heading', { name: 'user@example.com' })).toBeInTheDocument()
+    expect(screen.getByText('Need help')).toBeInTheDocument()
+    expect(screen.getByText('Please help')).toBeInTheDocument()
+    expect(screen.getByText('Re: Need help')).toBeInTheDocument()
+    expect(screen.getByText('On the way')).toBeInTheDocument()
+    expect(mailboxListCalls().length).toBeGreaterThan(1)
+  })
+
+  it('листает разговоры через GET /v1/email-manager/messages', async () => {
+    storedMessages = [
+      {
+        id: '1',
+        createdAt: '2026-08-21T12:00:00.000Z',
+        direction: 'received',
+        from: 'user@example.com',
+        to: 'support@etwalletx.com',
+        subject: 'Need help',
+        html: null,
+        text: 'Please help',
+        status: 'received',
+      },
+      {
+        id: '3',
+        createdAt: '2026-08-21T11:00:00.000Z',
+        direction: 'received',
+        from: 'maria@example.com',
+        to: 'support@etwalletx.com',
+        subject: 'Hello',
+        html: null,
+        text: 'Hi',
+        status: 'received',
+      },
+    ]
+
+    const user = userEvent.setup()
+    localStorage.setItem(EMAIL_MANAGER_PIN_STORAGE_KEY, '3100')
+    renderEmailManager()
+
+    expect(await screen.findByText('user@example.com')).toBeInTheDocument()
+    expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByText('maria@example.com')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
   })
 })

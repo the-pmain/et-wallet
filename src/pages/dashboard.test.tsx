@@ -277,6 +277,8 @@ describe('Панель: кабинет справочника', () => {
 
     expect(await screen.findByText('$12.50')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mirror' })).not.toBeInTheDocument()
     expect(screen.queryByText('1.5')).not.toBeInTheDocument()
     expect(screen.queryByText('ETH')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Assets' })).toBeInTheDocument()

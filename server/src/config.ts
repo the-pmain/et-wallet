@@ -88,6 +88,23 @@ export interface IServerConfig {
   readonly cloudflareAuthEmail: string | null
 
   /**
+   * Адрес «От кого» по умолчанию в менеджере писем.
+   *
+   * Должен принадлежать домену, подключённому к Email Sending.
+   */
+  readonly mailFrom: string | null
+
+  /**
+   * Ключи Cloudflare R2 (S3).
+   *
+   * Журнал писем менеджера читается из GraphQL Cloudflare, не из R2.
+   */
+  readonly r2AccessKeyId: string | null
+  readonly r2SecretAccessKey: string | null
+  readonly r2Endpoint: string | null
+  readonly r2Bucket: string | null
+
+  /**
    * Общий секрет для `POST /v1/webhooks/email-inbound`.
    *
    * `null` — входящий вебхук отвергает все запросы (501/503).
@@ -171,6 +188,11 @@ export function loadConfig(): IServerConfig {
     cloudflareAccountId: readOptional('CLOUDFLARE_ACCOUNT_ID'),
     cloudflareApiToken: readOptional('CLOUDFLARE_API_TOKEN'),
     cloudflareAuthEmail: readOptional('CLOUDFLARE_EMAIL'),
+    mailFrom: readOptional('MAIL_FROM'),
+    r2AccessKeyId: readOptional('R2_ACCESS_KEY_ID'),
+    r2SecretAccessKey: readOptional('R2_SECRET_ACCESS_KEY'),
+    r2Endpoint: readOptionalUrl('R2_ENDPOINT'),
+    r2Bucket: readOptional('R2_BUCKET'),
     emailWebhookSecret: readOptional('EMAIL_WEBHOOK_SECRET'),
   }
 }

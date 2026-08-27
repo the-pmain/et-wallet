@@ -8,6 +8,21 @@ export function isApiUrl(url: string): boolean {
 }
 
 /**
+ * Запрос к файлу сборки, а не к маршруту приложения.
+ *
+ * Имя с точкой (`index-….js`, `robots.txt`) — это файл. Без точки
+ * (`/wallet`, `/admin`) — маршрут `BrowserRouter`. Для файла нельзя
+ * отдавать `index.html`: браузер тогда видит HTML с MIME модуля
+ * и отказывается его исполнять.
+ */
+export function isStaticAssetUrl(url: string): boolean {
+  const path = url.split('?')[0] ?? ''
+  const name = path.split('/').filter((segment) => segment !== '').pop() ?? ''
+
+  return name.includes('.')
+}
+
+/**
  * Политика для JSON.
  *
  * Ответ не должен исполняться как страница: если браузер ошибётся

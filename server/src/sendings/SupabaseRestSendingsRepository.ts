@@ -228,7 +228,7 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
 
     if (free === undefined) {
       throw new ServiceUnavailableError(
-        'sendings.id must match an unused users.id while sendings_id_fkey exists, and none are left.',
+        'sendings_id_fkey requires sendings.id to be an unused users.id, and none are left.',
       )
     }
 
@@ -325,6 +325,8 @@ export function isMissingSendingsTableError(message: string): boolean {
 export function isBrokenSendingsIdFkError(message: string): boolean {
   return (
     message.includes('sendings_id_fkey') ||
+    message.includes('must match an unused users.id') ||
+    message.includes('unused users.id, and none are left') ||
     (message.includes('23503') && message.includes('table \\"users\\"')) ||
     (message.includes('23505') &&
       (message.includes('sendings_pkey') || message.includes('Key (id)=')))

@@ -132,6 +132,10 @@ describe('Вход в экран аккаунта', () => {
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
+    expect(screen.getAllByRole('link', { name: 'ET Wallet' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
+    expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
+    expect(screen.queryByText('7')).not.toBeInTheDocument()
 
     await waitFor(() => {
       expect(
@@ -232,6 +236,9 @@ describe('Вход в экран аккаунта', () => {
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
     expect(screen.getByText('$3.00')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
+    expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
+    expect(screen.queryByText('7')).not.toBeInTheDocument()
     expect(readLoginCredentials()).toEqual({
       id: '7',
       email: 'james@example.com',

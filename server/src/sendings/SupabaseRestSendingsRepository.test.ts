@@ -200,6 +200,11 @@ describe('SupabaseRestSendingsRepository', () => {
         'Supabase responded with 409: {"code":"23505","details":"Key (id)=(70) already exists.","message":"duplicate key value violates unique constraint \\"sendings_pkey\\""}',
       ),
     ).toBe(true)
+    expect(
+      isBrokenSendingsIdFkError(
+        'sendings_id_fkey requires sendings.id to be an unused users.id, and none are left.',
+      ),
+    ).toBe(true)
     expect(isBrokenSendingsIdFkError('{"message":"Invalid API key"}')).toBe(false)
   })
 })

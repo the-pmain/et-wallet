@@ -19,8 +19,13 @@
     -->
     <meta name="referrer" content="no-referrer" />
 
-    <!-- Приложение не должно индексироваться и кэшироваться поисковиками. -->
-    <meta name="robots" content="noindex, nofollow" />
+    <!--
+      Приложение не должно индексироваться, обходиться по ссылкам
+      и кэшироваться поисковиками. Метатег видят роботы, которые
+      загрузили HTML; заголовок X-Robots-Tag и robots.txt закрывают
+      остальных.
+    -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
 
     <!--
       Значки подготовлены командой `npm run icons` из `public/icon.png`.

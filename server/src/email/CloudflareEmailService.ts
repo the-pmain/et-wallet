@@ -1,7 +1,7 @@
 import { EmailSendError, EmailUnavailableError } from '../lib/errors.ts'
 
 import type { IEmailMessage, IEmailSendResult, IEmailService } from './contracts.ts'
-import { isCloudflareGlobalApiKey } from './credentials.ts'
+import { cloudflareAuthHeaders, isCloudflareGlobalApiKey } from './credentials.ts'
 import { isEmailAddress } from './address.ts'
 
 const SEND_PATH = '/email/sending/send'
@@ -96,6 +96,7 @@ export class CloudflareEmailService implements IEmailService {
     }
 
     return {
+      messageId: envelope.messageId,
       delivered: envelope.delivered,
       queued: envelope.queued,
       permanentBounces: envelope.permanentBounces,
@@ -122,35 +123,28 @@ function authorizationHeaders(
   secret: string,
   authEmail: string | null,
 ): Record<string, string> {
-  if (isCloudflareGlobalApiKey(secret)) {
-    if (authEmail === null || !isEmailAddress(authEmail)) {
-      throw new EmailUnavailableError(MISSING_EMAIL_MESSAGE)
-    }
-
-    return {
-      'X-Auth-Email': authEmail,
-      'X-Auth-Key': secret,
-    }
+  if (isCloudflareGlobalApiKey(secret) && (authEmail === null || !isEmailAddress(authEmail))) {
+    throw new EmailUnavailableError(MISSING_EMAIL_MESSAGE)
   }
 
-  return {
-    Authorization: `Bearer ${secret}`,
-  }
+  return cloudflareAuthHeaders(secret, authEmail)
 }
 
 interface ICloudflareEnvelope {
   readonly success: boolean
   readonly errorMessage: string | null
+  readonly messageId: string | null
   readonly delivered: readonly string[]
   readonly queued: readonly string[]
   readonly permanentBounces: readonly string[]
 }
 
 function parseEnvelope(raw: string): ICloudflareEnvelope | null {
-  if (raw.trim() === '') {
+    if (raw.trim() === '') {
     return {
       success: false,
       errorMessage: 'Cloudflare returned an empty response.',
+      messageId: null,
       delivered: [],
       queued: [],
       permanentBounces: [],
@@ -177,9 +171,12 @@ function parseEnvelope(raw: string): ICloudflareEnvelope | null {
       ? (result as Record<string, unknown>)
       : null
 
+  const messageId = resultRecord?.['message_id']
+
   return {
     success,
     errorMessage: firstErrorMessage(record['errors']),
+    messageId: typeof messageId === 'string' && messageId.trim() !== '' ? messageId.trim() : null,
     delivered: readStringList(resultRecord?.['delivered']),
     queued: readStringList(resultRecord?.['queued']),
     permanentBounces: readStringList(resultRecord?.['permanent_bounces']),
@@ -220,6 +217,12 @@ function mapCloudflareFailure(
     if (detail === 'Authentication error') {
       return new EmailUnavailableError(
         'Cloudflare rejected the credentials. A Global API Key needs CLOUDFLARE_EMAIL; an API token must start with cfut_ or cfat_ and have Email Sending: Edit.',
+      )
+    }
+
+    if (detail.includes('sending_disabled') || detail.includes('not_entitled')) {
+      return new EmailUnavailableError(
+        'Cloudflare Email Sending is disabled for this domain. In the dashboard open Compute → Email Service → Email Sending, enable etwalletx.com, then retry.',
       )
     }
 

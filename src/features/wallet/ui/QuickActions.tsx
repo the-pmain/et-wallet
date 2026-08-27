@@ -55,7 +55,7 @@ export function QuickActions({ account }: QuickActionsProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-stretch gap-1.5">
+      <div className="flex w-fit items-stretch justify-start gap-1.5">
         <ActionTile
           to="/wallet/send"
           icon={Send}

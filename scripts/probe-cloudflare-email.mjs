@@ -58,6 +58,21 @@ if (!accountId || !token) {
 
 const probes = [
   {
+    name: 'Verify token',
+    path: '/user/tokens/verify',
+    note: 'Confirms the API token is valid',
+  },
+  {
+    name: 'List zones',
+    path: `/zones?account.id=${accountId}`,
+    note: 'Domains on this account — needed for Email Sending subdomains',
+  },
+  {
+    name: 'R2 buckets',
+    path: `/accounts/${accountId}/r2/buckets`,
+    note: 'Object storage for the mailbox archive',
+  },
+  {
     name: 'Email Routing destination addresses',
     path: `/accounts/${accountId}/email/routing/addresses`,
     note: 'Verified forward targets — not message bodies',
@@ -70,11 +85,6 @@ const probes = [
   {
     name: 'Email Sending — list messages (does not exist)',
     path: `/accounts/${accountId}/email/sending/messages`,
-    note: 'Expected 404/405 — Cloudflare has no inbox API',
-  },
-  {
-    name: 'Email Sending — list history (does not exist)',
-    path: `/accounts/${accountId}/email/sending/history`,
     note: 'Expected 404/405 — Cloudflare has no inbox API',
   },
 ]
@@ -90,10 +100,33 @@ for (const probe of probes) {
       status,
       note: probe.note,
       success: json?.success ?? null,
-      resultCount: Array.isArray(json?.result) ? json.result.length : null,
+      resultCount: Array.isArray(json?.result) ? json.result.length : json?.result?.buckets?.length ?? null,
       errors: json?.errors ?? null,
-      sample: Array.isArray(json?.result) ? json.result.slice(0, 5) : json?.result ?? null,
+      sample: Array.isArray(json?.result)
+        ? json.result.slice(0, 5)
+        : json?.result?.buckets
+          ? json.result.buckets.slice(0, 5)
+          : json?.result ?? null,
     })
+
+    if (probe.name === 'List zones' && Array.isArray(json?.result)) {
+      for (const zone of json.result.slice(0, 10)) {
+        const zoneId = zone?.id
+        const zoneName = zone?.name
+        if (!zoneId) continue
+        const sub = await cfFetch(token, `/zones/${zoneId}/email/sending/subdomains`, email)
+        results.push({
+          name: `Email Sending subdomains (${zoneName})`,
+          path: `/zones/${zoneId}/email/sending/subdomains`,
+          status: sub.status,
+          note: 'From addresses must be on an enabled sending subdomain',
+          success: sub.json?.success ?? null,
+          resultCount: Array.isArray(sub.json?.result) ? sub.json.result.length : null,
+          errors: sub.json?.errors ?? null,
+          sample: Array.isArray(sub.json?.result) ? sub.json.result.slice(0, 5) : sub.json?.result ?? null,
+        })
+      }
+    }
   } catch (error) {
     results.push({
       name: probe.name,
@@ -103,44 +136,65 @@ for (const probe of probes) {
   }
 }
 
-// Local app store (Supabase or memory on running server)
-let localMessages = null
-const supabaseUrl = env.SUPABASE_URL?.replace(/\/$/u, '')
-const supabaseKey = env.SUPABASE_ANON_KEY
-if (supabaseUrl && supabaseKey) {
-  try {
-    const endpoint = new URL(`${supabaseUrl}/rest/v1/emails`)
-    endpoint.searchParams.set('select', 'id,created_at,direction,from_addr,to_addr,subject,status')
-    endpoint.searchParams.set('order', 'created_at.desc')
-    endpoint.searchParams.set('limit', '50')
-    const response = await fetch(endpoint, {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        Accept: 'application/json',
-      },
-    })
-    const text = await response.text()
-    localMessages = {
-      source: 'Supabase public.emails',
-      status: response.status,
-      rows: response.ok ? JSON.parse(text) : text.slice(0, 300),
-    }
-  } catch (error) {
-    localMessages = {
-      source: 'Supabase public.emails',
-      error: error instanceof Error ? error.message : String(error),
+const mailboxQuery = `
+query Mailbox($zoneTag: string!, $start: Time!, $end: Time!) {
+  viewer {
+    zones(filter: { zoneTag: $zoneTag }) {
+      emailSendingAdaptive(
+        filter: { datetime_geq: $start, datetime_leq: $end }
+        limit: 20
+        orderBy: [datetime_DESC]
+      ) { datetime from to subject status eventType messageId }
+      emailRoutingAdaptive(
+        filter: { datetime_geq: $start, datetime_leq: $end }
+        limit: 20
+        orderBy: [datetime_DESC]
+      ) { datetime from to subject status action messageId }
     }
   }
+}`
+
+const end = new Date()
+const start = new Date(end.getTime() - 31 * 24 * 60 * 60 * 1000)
+const mailbox = []
+const zonesProbe = results.find((item) => item.name === 'List zones')
+const zones = Array.isArray(zonesProbe?.sample) ? zonesProbe.sample : []
+
+for (const zone of zones.slice(0, 5)) {
+  if (!zone?.id) continue
+  const headers = { Accept: 'application/json', 'Content-Type': 'application/json' }
+  if (token.startsWith('cfk_')) {
+    headers['X-Auth-Email'] = email
+    headers['X-Auth-Key'] = token
+  } else {
+    headers.Authorization = `Bearer ${token}`
+  }
+  const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      query: mailboxQuery,
+      variables: { zoneTag: zone.id, start: start.toISOString(), end: end.toISOString() },
+    }),
+  })
+  const json = await response.json()
+  mailbox.push({
+    zone: zone.name,
+    zoneId: zone.id,
+    status: response.status,
+    errors: json?.errors ?? null,
+    sending: json?.data?.viewer?.zones?.[0]?.emailSendingAdaptive ?? null,
+    routing: json?.data?.viewer?.zones?.[0]?.emailRoutingAdaptive ?? null,
+  })
 }
 
 console.log(
   JSON.stringify(
     {
       summary:
-        'Cloudflare Email Sending has no API to list sent/received mail. Only routing config and your own DB (Supabase) hold history.',
+        'Send via Cloudflare Email Sending REST. GET /v1/admin/email/messages lists Cloudflare GraphQL activity logs (emailSendingAdaptive + emailRoutingAdaptive), not Supabase public.emails.',
       cloudflare: results,
-      localStore: localMessages,
+      mailbox,
     },
     null,
     2,

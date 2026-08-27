@@ -7,6 +7,13 @@ import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { API_CONTENT_SECURITY_POLICY, isApiUrl } from '../lib/ui.ts'
 
 /**
+ * Совпадает с `ROBOTS_TAG_VALUE` в `build/security-headers-plugin.ts`
+ * и с метатегом в `index.html`. JSON API тоже не должен попадать
+ * в индекс: ответ без HTML метатега не несёт.
+ */
+const ROBOTS_TAG_VALUE = 'noindex, nofollow, noarchive, nosnippet, noimageindex'
+
+/**
  * Защитная обвязка.
  *
  * ЗАГОЛОВКИ. JSON (`/v1`) не должен исполняться как страница:
@@ -34,6 +41,8 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
   })
 
   app.addHook('onSend', async (request, reply) => {
+    void reply.header('x-robots-tag', ROBOTS_TAG_VALUE)
+
     if (isApiUrl(request.url)) {
       void reply.header('content-security-policy', API_CONTENT_SECURITY_POLICY)
       void reply.header('cross-origin-resource-policy', 'cross-origin')

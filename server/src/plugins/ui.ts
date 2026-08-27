@@ -17,7 +17,11 @@ export async function registerUi(app: FastifyInstance, staticRoot: string): Prom
   await app.register(fastifyStatic, {
     root: staticRoot,
     prefix: '/',
-    wildcard: false,
+    /* `true`: файлы ищутся в момент запроса. `false` снимал снимок
+       каталога при старте, и после `npm run build` новые имена с
+       отпечатком уходили в HTML-заглушку с MIME `text/html` —
+       браузер отказывался исполнять модуль. */
+    wildcard: true,
     index: false,
     decorateReply: true,
     allowedPath: (pathName) => {
@@ -38,6 +42,17 @@ export async function registerUi(app: FastifyInstance, staticRoot: string): Prom
 
   app.get('/', async (request, reply) => {
     await sendWalletIndex(staticRoot, request, reply)
+  })
+
+  app.get('/robots.txt', async (_request, reply) => {
+    /* Явный маршрут, а не статика: неизвестный GET отдаёт index.html,
+       и робот получил бы HTML вместо запрета обхода. */
+    const body = await readFile(join(staticRoot, 'robots.txt'), 'utf8')
+
+    void reply
+      .type('text/plain; charset=utf-8')
+      .header('cache-control', 'no-cache')
+      .send(body)
   })
 }
 

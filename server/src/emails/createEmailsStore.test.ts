@@ -18,6 +18,11 @@ const BASE_CONFIG: IServerConfig = {
   cloudflareAccountId: null,
   cloudflareApiToken: null,
   cloudflareAuthEmail: null,
+  mailFrom: null,
+  r2AccessKeyId: null,
+  r2SecretAccessKey: null,
+  r2Endpoint: null,
+  r2Bucket: null,
   emailWebhookSecret: null,
 }
 
@@ -26,7 +31,7 @@ describe('createEmailsStore', () => {
     vi.unstubAllGlobals()
   })
 
-  it('использует память без Supabase', async () => {
+  it('использует память без ключей Cloudflare', async () => {
     const store = await createEmailsStore({
       ...BASE_CONFIG,
       supabaseUrl: null,
@@ -37,35 +42,39 @@ describe('createEmailsStore', () => {
     expect(store.storageWarning).toBeNull()
   })
 
-  it('использует Supabase, если таблица emails доступна', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('[]', { status: 200 })),
-    )
+  it('не использует Supabase для писем, если есть Cloudflare', async () => {
+    const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const url = String(input)
 
-    const store = await createEmailsStore(BASE_CONFIG)
-
-    expect(store.kind).toBe(EMAILS_STORE_KIND.Supabase)
-    expect(store.storageWarning).toBeNull()
-  })
-
-  it('переходит в память, если public.emails отсутствует', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
+      if (url.includes('/zones?')) {
+        return new Response(
           JSON.stringify({
-            code: 'PGRST205',
-            message: "Could not find the table 'public.emails' in the schema cache",
+            success: true,
+            result: [{ id: 'zone-etwalletx', name: 'etwalletx.com' }],
           }),
-          { status: 404 },
-        ),
-      ),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      }
+
+      return new Response('[]', { status: 200 })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = await createEmailsStore(
+      {
+        ...BASE_CONFIG,
+        cloudflareAccountId: 'account-id',
+        cloudflareApiToken: 'token',
+        mailFrom: 'support@etwalletx.com',
+      },
+      { ensureInbox: false },
     )
 
-    const store = await createEmailsStore(BASE_CONFIG)
-
-    expect(store.kind).toBe(EMAILS_STORE_KIND.Memory)
-    expect(store.storageWarning).toContain('public.emails')
+    expect(store.kind).toBe(EMAILS_STORE_KIND.Cloudflare)
+    expect(store.storageWarning).toBeNull()
+    expect(
+      fetchMock.mock.calls.every((call) => !String(call[0]).includes('/rest/v1/emails')),
+    ).toBe(true)
   })
 })

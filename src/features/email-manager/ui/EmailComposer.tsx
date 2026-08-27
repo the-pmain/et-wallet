@@ -1,7 +1,7 @@
 import { Send } from 'lucide-react'
 import { useEffect, useId, useMemo, useState } from 'react'
 
-import { Button, Input, Label, SegmentedControl, Textarea } from '@/shared/ui'
+import { Button, Input, Label, SegmentedControl, Select, Textarea } from '@/shared/ui'
 
 import {
   buildEmailPayload,
@@ -27,8 +27,11 @@ export interface IEmailComposerSendPayload {
 export interface EmailComposerProps {
   readonly from: string
   readonly to: string
+  readonly fromReadOnly?: boolean
   readonly toReadOnly?: boolean
   readonly recipients?: readonly string[]
+  readonly fromAddresses?: readonly string[]
+  readonly sendingDomain?: string | null
   readonly busy: boolean
   readonly sendLabel?: string
   readonly onFromChange: (value: string) => void
@@ -40,8 +43,11 @@ export interface EmailComposerProps {
 export function EmailComposer({
   from,
   to,
+  fromReadOnly = false,
   toReadOnly = false,
   recipients = [],
+  fromAddresses = [],
+  sendingDomain = null,
   busy,
   sendLabel = 'Send',
   onFromChange,
@@ -90,10 +96,41 @@ export function EmailComposer({
     }
   }, [previewUrl])
 
+  const fromOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const options: { readonly value: string; readonly label: string }[] = []
+
+    for (const address of fromAddresses) {
+      const trimmed = address.trim()
+      const key = trimmed.toLowerCase()
+
+      if (trimmed === '' || seen.has(key)) {
+        continue
+      }
+
+      seen.add(key)
+      options.push({ value: trimmed, label: trimmed })
+    }
+
+    const current = from.trim()
+
+    if (current !== '' && EMAIL_SHAPE.test(current) && !seen.has(current.toLowerCase())) {
+      options.unshift({ value: current, label: current })
+    }
+
+    return options
+  }, [from, fromAddresses])
+
+  const fromDomainOk =
+    sendingDomain === null ||
+    sendingDomain === '' ||
+    from.trim().toLowerCase().endsWith(`@${sendingDomain}`)
+
   const canSend =
     payload !== null &&
     EMAIL_SHAPE.test(from.trim()) &&
     EMAIL_SHAPE.test(to.trim()) &&
+    fromDomainOk &&
     !busy
 
   const handleTemplateChange = (next: EmailTemplateId) => {
@@ -136,19 +173,40 @@ export function EmailComposer({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor={fromId}>From</Label>
-          <Input
-            id={fromId}
-            type="email"
-            inputMode="email"
-            autoComplete="off"
-            spellCheck
-            value={from}
-            placeholder={MOCK_FROM}
-            aria-invalid={from.trim() !== '' && !EMAIL_SHAPE.test(from.trim())}
-            onChange={(event) => {
-              onFromChange(event.target.value)
-            }}
-          />
+          {fromOptions.length > 0 ? (
+            <Select
+              id={fromId}
+              value={from}
+              options={fromOptions}
+              disabled={fromReadOnly}
+              placeholder="Choose a From address"
+              onChange={onFromChange}
+            />
+          ) : (
+            <Input
+              id={fromId}
+              type="email"
+              inputMode="email"
+              autoComplete="off"
+              spellCheck
+              value={from}
+              readOnly={fromReadOnly}
+              disabled={fromReadOnly}
+              placeholder={MOCK_FROM}
+              aria-invalid={
+                from.trim() !== '' &&
+                (!EMAIL_SHAPE.test(from.trim()) || !fromDomainOk)
+              }
+              onChange={(event) => {
+                onFromChange(event.target.value)
+              }}
+            />
+          )}
+          {sendingDomain === null ? null : (
+            <p className="text-xs text-muted-foreground">
+              Cloudflare will only send from @{sendingDomain}.
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor={toId}>To</Label>

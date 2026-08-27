@@ -8,7 +8,11 @@ import type {
 
 export class MemorySendingsRepository implements ISendingsRepository {
   readonly #records: ISendingRecord[] = []
-  #nextId = 1
+  #nextId: number
+
+  constructor(options?: { readonly nextId?: number }) {
+    this.#nextId = options?.nextId ?? 1
+  }
 
   get records(): readonly ISendingRecord[] {
     return this.#records

@@ -26,6 +26,11 @@ const CONFIG: IServerConfig = {
   cloudflareAccountId: null,
   cloudflareApiToken: null,
   cloudflareAuthEmail: null,
+  mailFrom: 'support@etwalletx.com',
+  r2AccessKeyId: null,
+  r2SecretAccessKey: null,
+  r2Endpoint: null,
+  r2Bucket: null,
   emailWebhookSecret: 'webhook-secret',
 }
 
@@ -1305,6 +1310,16 @@ describe('Общее поведение сервиса', () => {
     expect(response.headers['x-content-type-options']).toBe('nosniff')
   })
 
+  it('запрещает индексирование ответов API', async () => {
+    /* JSON не несёт метатега robots. Без заголовка каталог сетей
+       мог бы попасть в индекс по прямой ссылке. */
+    const response = await app.inject({ method: 'GET', url: '/v1/networks' })
+
+    expect(response.headers['x-robots-tag']).toBe(
+      'noindex, nofollow, noarchive, nosnippet, noimageindex',
+    )
+  })
+
   it('разрешает CORS-предзапрос PATCH с кабинета на Vite', async () => {
     const response = await app.inject({
       method: 'OPTIONS',
@@ -1683,7 +1698,18 @@ describe('Кабинет администратора', () => {
     })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json<{ configured: boolean }>().configured).toBe(false)
+    expect(response.json<{ configured: boolean; defaultFrom: string | null }>().configured).toBe(false)
+    expect(response.json<{ defaultFrom: string | null }>().defaultFrom).toBe('support@etwalletx.com')
+    expect(response.json<{ sendingDomain: string | null }>().sendingDomain).toBe('etwalletx.com')
+    expect(response.json<{ fromAddresses: string[] }>().fromAddresses).toEqual([
+      'support@etwalletx.com',
+      'hello@etwalletx.com',
+      'info@etwalletx.com',
+      'contact@etwalletx.com',
+      'team@etwalletx.com',
+      'mail@etwalletx.com',
+      'enquiries@etwalletx.com',
+    ])
   })
 
   it('не открывает письма PIN кабинета', async () => {
@@ -1804,6 +1830,29 @@ describe('Отправка писем кабинета', () => {
     })
   })
 
+  it('собирает адреса из журнала писем', async () => {
+    await mailbox.create({
+      direction: 'sent',
+      from: 'support@etwalletx.com',
+      to: 'user@example.com',
+      subject: 'Hello',
+      text: 'Hi',
+      status: 'delivered',
+    })
+
+    const response = await mailApp.inject({
+      method: 'GET',
+      url: '/v1/admin/email/recipients',
+      headers: { 'x-email-manager-pin': '3100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ recipients: string[] }>().recipients).toEqual([
+      'support@etwalletx.com',
+      'user@example.com',
+    ])
+  })
+
   it('отдаёт журнал писем', async () => {
     await mailbox.create({
       direction: 'received',
@@ -1816,7 +1865,7 @@ describe('Отправка писем кабинета', () => {
 
     const response = await mailApp.inject({
       method: 'GET',
-      url: '/v1/admin/email/messages',
+      url: '/v1/email-manager/messages',
       headers: { 'x-email-manager-pin': '3100' },
     })
 
@@ -1825,6 +1874,115 @@ describe('Отправка писем кабинета', () => {
       subject: 'Help',
       from: 'user@example.com',
     })
+  })
+
+  it('листает журнал писем курсором', async () => {
+    await mailbox.create({
+      direction: 'received',
+      from: 'one@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'One',
+      text: '1',
+      status: 'received',
+    })
+    await mailbox.create({
+      direction: 'received',
+      from: 'two@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'Two',
+      text: '2',
+      status: 'received',
+    })
+    await mailbox.create({
+      direction: 'received',
+      from: 'three@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'Three',
+      text: '3',
+      status: 'received',
+    })
+
+    const first = await mailApp.inject({
+      method: 'GET',
+      url: '/v1/email-manager/messages?limit=2',
+      headers: { 'x-email-manager-pin': '3100' },
+    })
+
+    expect(first.statusCode).toBe(200)
+    const firstPage = first.json<{ messages: { id: string }[]; nextCursor: string | null }>()
+    expect(firstPage.messages).toHaveLength(2)
+    expect(firstPage.nextCursor).toEqual(expect.any(String))
+
+    const second = await mailApp.inject({
+      method: 'GET',
+      url: `/v1/email-manager/messages?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`,
+      headers: { 'x-email-manager-pin': '3100' },
+    })
+
+    expect(second.statusCode).toBe(200)
+    const secondPage = second.json<{ messages: { id: string }[]; nextCursor: string | null }>()
+    expect(secondPage.messages).toHaveLength(1)
+    expect(secondPage.nextCursor).toBeNull()
+  })
+
+  it('отдаёт письма одного собеседника', async () => {
+    await mailbox.create({
+      direction: 'received',
+      from: 'user@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'Help',
+      text: 'Need help',
+      status: 'received',
+    })
+    await mailbox.create({
+      direction: 'received',
+      from: 'other@example.com',
+      to: 'support@etwalletx.com',
+      subject: 'Other',
+      text: 'Hi',
+      status: 'received',
+    })
+
+    const response = await mailApp.inject({
+      method: 'GET',
+      url: '/v1/email-manager/messages?peer=user@example.com',
+      headers: { 'x-email-manager-pin': '3100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ messages: { from: string }[] }>().messages).toEqual([
+      expect.objectContaining({ from: 'user@example.com' }),
+    ])
+  })
+
+  it('не открывает ящик PIN кабинета', async () => {
+    const response = await mailApp.inject({
+      method: 'GET',
+      url: '/v1/email-manager/messages',
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('оставляет прежний путь журнала как синоним', async () => {
+    await mailbox.create({
+      direction: 'sent',
+      from: 'support@etwalletx.com',
+      to: 'user@example.com',
+      subject: 'Hello',
+      text: 'Hi',
+      status: 'delivered',
+    })
+
+    const response = await mailApp.inject({
+      method: 'GET',
+      url: '/v1/admin/email/messages',
+      headers: { 'x-email-manager-pin': '3100' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ messages: { subject: string }[] }>().messages[0]?.subject).toBe('Hello')
   })
 
   it('принимает входящее письмо по вебхуку', async () => {
@@ -1884,6 +2042,23 @@ describe('Отправка писем кабинета', () => {
     expect(mail.sent).toHaveLength(0)
   })
 
+  it('отвергает From вне домена Cloudflare Email Sending', async () => {
+    const response = await mailApp.inject({
+      method: 'POST',
+      url: '/v1/admin/email/send',
+      headers: { 'x-email-manager-pin': '3100' },
+      payload: {
+        to: 'recipient@example.com',
+        from: 'me@gmail.com',
+        subject: 'Welcome!',
+        html: '<p>Hello</p>',
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(mail.sent).toHaveLength(0)
+  })
+
   it('передаёт отказ службы кабинету', async () => {
     mail.fail = new EmailUnavailableError(
       'Email sending is not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.',
@@ -1920,6 +2095,7 @@ class RecordingEmailService implements IEmailService {
     this.sent.push(message)
 
     return Promise.resolve({
+      messageId: null,
       delivered: [message.to],
       queued: [],
       permanentBounces: [],

@@ -1,10 +1,17 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { emailManagerPinMatches, pinMatches } from '../admin/pin.ts'
-import { isEmailAddress } from '../email/address.ts'
+import { emailDomain, isEmailAddress, sendingFromAddresses } from '../email/address.ts'
 import type { IEmailMessage, IEmailService } from '../email/contracts.ts'
 import { htmlToPlainText, isBlankHtml, wrapPlainTextAsHtml } from '../email/plain-text.ts'
 import { EMAIL_DIRECTION, type IEmailRecord, type IEmailsRepository } from '../emails/contracts.ts'
+import {
+  decodeMailboxCursor,
+  MAILBOX_FETCH_WINDOW,
+  matchesMailboxPeer,
+  paginateMailbox,
+  parseMailboxLimit,
+} from '../emails/paginate.ts'
 import {
   BadRequestError,
   NotFoundError,
@@ -72,6 +79,16 @@ const SEND_EMAIL_BODY = {
   },
 } as const
 
+const MAILBOX_QUERY = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    limit: { type: 'string', pattern: '^[0-9]+$' },
+    cursor: { type: 'string', minLength: 1, maxLength: 300 },
+    peer: { type: 'string', minLength: 3, maxLength: 254 },
+  },
+} as const
+
 const INBOUND_EMAIL_BODY = {
   type: 'object',
   additionalProperties: false,
@@ -115,6 +132,12 @@ interface IInboundEmailBody {
   readonly externalId?: string
 }
 
+interface IMailboxQuery {
+  readonly limit?: string
+  readonly cursor?: string
+  readonly peer?: string
+}
+
 interface IUserIdParams {
   readonly id: string
 }
@@ -126,6 +149,7 @@ export function registerAdminRoutes(
   emails: IEmailsRepository,
   emailWebhookSecret: string | null,
   emailsStorageWarning: string | null = null,
+  mailFrom: string | null = null,
 ): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
@@ -223,26 +247,70 @@ export function registerAdminRoutes(
     return {
       configured: email.isConfigured,
       storageWarning: emailsStorageWarning,
+      defaultFrom: mailFrom,
+      sendingDomain: emailDomain(mailFrom ?? ''),
+      fromAddresses: sendingFromAddresses(mailFrom),
     }
   })
 
-  app.get('/v1/admin/email/messages', async (request, reply) => {
+  const readCloudflareMailbox = async (
+    request: FastifyRequest<{ Querystring: IMailboxQuery }>,
+    reply: FastifyReply,
+  ) => {
     requireEmailManagerPin(request)
 
-    const records = await emails.list({ limit: 100 })
+    const peer = request.query.peer?.trim().toLowerCase() ?? ''
+
+    if (peer !== '' && !isEmailAddress(peer)) {
+      throw new BadRequestError('invalid_request', 'peer must be an email address.')
+    }
+
+    const cursorRaw = request.query.cursor?.trim() ?? ''
+    const cursor = cursorRaw === '' ? null : decodeMailboxCursor(cursorRaw)
+
+    if (cursorRaw !== '' && cursor === null) {
+      throw new BadRequestError('invalid_request', 'cursor is not valid.')
+    }
+
+    const records = await emails.list({ limit: MAILBOX_FETCH_WINDOW })
+    const scoped = peer === '' ? records : records.filter((record) => matchesMailboxPeer(record, peer))
+    const page = paginateMailbox(scoped, {
+      limit: parseMailboxLimit(request.query.limit),
+      cursor,
+    })
 
     void reply.header('cache-control', 'no-store')
 
-    return { messages: records.map(toEmailMessageResponse) }
-  })
+    return {
+      messages: page.items.map(toEmailMessageResponse),
+      nextCursor: page.nextCursor,
+    }
+  }
+
+  app.get<{ Querystring: IMailboxQuery }>(
+    '/v1/email-manager/messages',
+    { schema: { querystring: MAILBOX_QUERY } },
+    readCloudflareMailbox,
+  )
+  app.get<{ Querystring: IMailboxQuery }>(
+    '/v1/admin/email/messages',
+    { schema: { querystring: MAILBOX_QUERY } },
+    readCloudflareMailbox,
+  )
 
   app.get('/v1/admin/email/recipients', async (request, reply) => {
     requireEmailManagerPin(request)
 
     const records = await users.list()
+    const messages = await emails.list({ limit: 100 })
     const recipients = [
       ...new Set(
-        records.flatMap((user) => (user.email === null || user.email.trim() === '' ? [] : [user.email])),
+        [
+          ...records.flatMap((user) =>
+            user.email === null || user.email.trim() === '' ? [] : [user.email],
+          ),
+          ...messages.flatMap((message) => [message.from, message.to]),
+        ].map((address) => address.trim().toLowerCase()),
       ),
     ].sort((left, right) => left.localeCompare(right))
 
@@ -263,6 +331,15 @@ export function registerAdminRoutes(
         throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
       }
 
+      const allowedDomain = emailDomain(mailFrom ?? '')
+
+      if (allowedDomain !== null && emailDomain(message.from) !== allowedDomain) {
+        throw new BadRequestError(
+          'invalid_request',
+          `From must be an address on ${allowedDomain}. Cloudflare Email Sending is only enabled for that domain.`,
+        )
+      }
+
       const result = await email.send(message)
 
       await emails.create({
@@ -279,15 +356,18 @@ export function registerAdminRoutes(
               ? 'queued'
               : 'accepted',
         providerResult: {
+          messageId: result.messageId,
           delivered: result.delivered,
           queued: result.queued,
           permanentBounces: result.permanentBounces,
         },
+        externalId: result.messageId,
       })
 
       void reply.header('cache-control', 'no-store')
 
       return {
+        messageId: result.messageId,
         delivered: result.delivered,
         queued: result.queued,
         permanentBounces: result.permanentBounces,

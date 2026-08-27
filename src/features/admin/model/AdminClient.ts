@@ -58,6 +58,9 @@ export interface IAdminEmailDraft {
 export interface IAdminEmailStatus {
   readonly configured: boolean
   readonly storageWarning: string | null
+  readonly defaultFrom: string | null
+  readonly sendingDomain: string | null
+  readonly fromAddresses: readonly string[]
 }
 
 export interface IAdminEmailSendResult {
@@ -76,6 +79,11 @@ export interface IAdminEmailMessage {
   readonly html: string | null
   readonly text: string | null
   readonly status: string
+}
+
+export interface IAdminEmailMessagePage {
+  readonly messages: readonly IAdminEmailMessage[]
+  readonly nextCursor: string | null
 }
 
 export class AdminClient {
@@ -289,24 +297,32 @@ export class AdminClient {
     return {
       configured: (payload as Record<string, unknown>)['configured'] === true,
       storageWarning: readOptionalString((payload as Record<string, unknown>)['storageWarning']),
+      defaultFrom: readOptionalString((payload as Record<string, unknown>)['defaultFrom']),
+      sendingDomain: readOptionalString((payload as Record<string, unknown>)['sendingDomain']),
+      fromAddresses: readStringList((payload as Record<string, unknown>)['fromAddresses']),
     }
   }
 
-  async listEmailMessages(): Promise<readonly IAdminEmailMessage[]> {
-    const response = await this.#request('/v1/admin/email/messages', { method: 'GET' })
+  /** Cloudflare mailbox used by Email manager list and conversation screens. */
+  async listEmailMessages(options: {
+    readonly limit?: number
+    readonly cursor?: string | null
+    readonly peer?: string | null
+  } = {}): Promise<IAdminEmailMessagePage> {
+    const response = await this.#request(mailboxMessagesPath(options), { method: 'GET' })
     const payload = parseJson(await response.text())
 
     if (!response.ok) {
       throw this.#failure(response.status, 'list email messages failed')
     }
 
-    const messages = parseEmailMessages(payload)
+    const page = parseEmailMessagePage(payload)
 
-    if (messages === null) {
+    if (page === null) {
       throw new AdminAuthError(response.status, 'list email messages returned an unexpected response')
     }
 
-    return messages
+    return page
   }
 
   async listEmailRecipients(): Promise<readonly string[]> {
@@ -410,6 +426,26 @@ function joinBase(baseUrl: string, path: string): string {
   return `${baseUrl}${path}`
 }
 
+function mailboxMessagesPath(options: {
+  readonly limit?: number
+  readonly cursor?: string | null
+  readonly peer?: string | null
+}): string {
+  const params = new URLSearchParams()
+
+  params.set('limit', String(options.limit ?? 20))
+
+  if (options.cursor !== null && options.cursor !== undefined && options.cursor.trim() !== '') {
+    params.set('cursor', options.cursor)
+  }
+
+  if (options.peer !== null && options.peer !== undefined && options.peer.trim() !== '') {
+    params.set('peer', options.peer.trim().toLowerCase())
+  }
+
+  return `/v1/email-manager/messages?${params.toString()}`
+}
+
 function parseJson(raw: string): unknown {
   if (raw.trim() === '') {
     return null
@@ -430,6 +466,14 @@ function readOptionalString(value: unknown): string | null {
   const trimmed = value.trim()
 
   return trimmed === '' ? null : trimmed
+}
+
+function readStringList(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '')
 }
 
 function parseUserList(payload: unknown): readonly IRemoteUser[] | null {
@@ -647,6 +691,21 @@ function parseEmailSendResult(payload: unknown): IAdminEmailSendResult | null {
     queued: queued.filter((item): item is string => typeof item === 'string'),
     permanentBounces: permanentBounces.filter((item): item is string => typeof item === 'string'),
   }
+}
+
+function parseEmailMessagePage(payload: unknown): IAdminEmailMessagePage | null {
+  const messages = parseEmailMessages(payload)
+
+  if (messages === null) {
+    return null
+  }
+
+  const nextCursor =
+    payload !== null && typeof payload === 'object'
+      ? readOptionalString((payload as Record<string, unknown>)['nextCursor'])
+      : null
+
+  return { messages, nextCursor }
 }
 
 function parseEmailMessages(payload: unknown): readonly IAdminEmailMessage[] | null {

@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 import { cspPlugin } from './build/csp-plugin'
-import { securityHeadersPlugin } from './build/security-headers-plugin'
+import { ROBOTS_TAG_VALUE, securityHeadersPlugin } from './build/security-headers-plugin'
 import packageJson from './package.json' with { type: 'json' }
 
 /** Порт dev-сервера. Фиксирован, чтобы адрес приложения был предсказуем. */
@@ -49,6 +49,9 @@ export default defineConfig({
   server: {
     port: DEV_SERVER_PORT,
     strictPort: true,
+    headers: {
+      'X-Robots-Tag': ROBOTS_TAG_VALUE,
+    },
     proxy: {
       /* Wallet create/import and POST /v1/users/auth in dev. */
       '/v1': {
@@ -74,6 +77,9 @@ export default defineConfig({
        приложение по адресу, которого никто не ждёт. Без назначения
        остаётся поведение Vite по умолчанию. */
     ...(PREVIEW_PORT === null ? {} : { port: PREVIEW_PORT, strictPort: true }),
+    headers: {
+      'X-Robots-Tag': ROBOTS_TAG_VALUE,
+    },
   },
 
   build: {

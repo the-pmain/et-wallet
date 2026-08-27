@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { isCloudflareGlobalApiKey } from './credentials.ts'
+import { cloudflareAuthHeaders, isCloudflareGlobalApiKey } from './credentials.ts'
 
 describe('isCloudflareGlobalApiKey', () => {
+  it('ставит Bearer для API-токена', () => {
+    expect(cloudflareAuthHeaders('cfat_abcdefghijklmnopqrstuvwxyz0123456789ABCD', null)).toEqual({
+      Authorization: 'Bearer cfat_abcdefghijklmnopqrstuvwxyz0123456789ABCD',
+    })
+  })
+
   it('узнаёт префикс cfk_', () => {
     expect(isCloudflareGlobalApiKey('cfk_abcdefghijklmnopqrstuvwxyz0123456789ABCD')).toBe(true)
   })

@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { buildContentSecurityPolicy } from './csp-plugin'
 import {
+  ROBOTS_TAG_VALUE,
   buildNetlifyHeaders,
   buildNginxSnippet,
   buildSecurityHeaders,
@@ -81,6 +85,21 @@ describe('Заголовки размещения', () => {
 
   it('запрещают угадывание типа содержимого', () => {
     expect(header('X-Content-Type-Options')).toBe('nosniff')
+  })
+
+  it('запрещают индексирование поисковиками', () => {
+    /* Метатег видят только роботы, загрузившие HTML. Заголовок
+       закрывает JSON, скрипты и значки — всё, что отдаёт размещение. */
+    expect(header('X-Robots-Tag')).toBe(ROBOTS_TAG_VALUE)
+  })
+
+  it('метатег и robots.txt говорят то же, что заголовок', () => {
+    const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    const robots = readFileSync(join(process.cwd(), 'public/robots.txt'), 'utf8')
+
+    expect(html).toContain(`content="${ROBOTS_TAG_VALUE}"`)
+    expect(robots).toMatch(/^User-agent:\s*\*/mu)
+    expect(robots).toMatch(/^Disallow: \/$/mu)
   })
 })
 

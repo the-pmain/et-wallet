@@ -3,6 +3,8 @@ import { cn } from '@/shared/lib/utils'
 interface AccountAvatarProps {
   readonly address: string
   readonly className?: string
+  /** Подпись для программы чтения. По умолчанию — отпечаток адреса. */
+  readonly label?: string
 }
 
 /** Сколько ячеек по стороне. Нечётное число даёт центральную ось симметрии. */
@@ -31,7 +33,11 @@ const HALF = Math.ceil(GRID / 2)
  * двадцати строк арифметики расширяет поверхность атаки на приложение,
  * работающее рядом с ключами.
  */
-export function AccountAvatar({ address, className }: AccountAvatarProps) {
+export function AccountAvatar({
+  address,
+  className,
+  label = 'Address fingerprint',
+}: AccountAvatarProps) {
   const seed = hashAddress(address)
   const hue = seed % 360
   const cells = buildCells(seed)
@@ -41,7 +47,7 @@ export function AccountAvatar({ address, className }: AccountAvatarProps) {
       viewBox={`0 0 ${String(GRID)} ${String(GRID)}`}
       className={cn('size-9 shrink-0 rounded-full', className)}
       role="img"
-      aria-label="Address fingerprint"
+      aria-label={label}
     >
       <rect width={GRID} height={GRID} fill={`oklch(0.3 0.09 ${String(hue)})`} />
 

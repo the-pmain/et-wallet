@@ -4,6 +4,10 @@ import { ServiceUnavailableError } from '../lib/errors.ts'
 import { SENDINGS_STORE_KIND, type ISendingsStore } from './contracts.ts'
 import { MemorySendingsRepository } from './MemorySendingsRepository.ts'
 import {
+  BROKEN_SENDINGS_FK_WARNING,
+  ResilientSendingsRepository,
+} from './ResilientSendingsRepository.ts'
+import {
   isMissingSendingsTableError,
   SupabaseRestSendingsRepository,
 } from './SupabaseRestSendingsRepository.ts'
@@ -39,10 +43,16 @@ export async function createSendingsStore(config: IServerConfig): Promise<ISendi
     )
   }
 
+  let storageWarning: string | null = null
+
   return {
-    sendings: primary,
+    sendings: new ResilientSendingsRepository(primary, () => {
+      storageWarning = BROKEN_SENDINGS_FK_WARNING
+    }),
     kind: SENDINGS_STORE_KIND.Supabase,
-    storageWarning: null,
+    get storageWarning() {
+      return storageWarning
+    },
     close: () => Promise.resolve(),
   }
 }

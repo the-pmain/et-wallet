@@ -1,5 +1,5 @@
 import { ChevronRight, Plus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import { AdminAuthError, type IAdminEmailMessage, useAdminSession } from '@/features/admin'
@@ -9,9 +9,11 @@ import {
   conversationMatchesQuery,
   groupMessagesIntoConversations,
 } from '../model/conversations'
+import { MAILBOX_PAGE_SIZE } from '../model/mailbox'
 import { ConversationAvatar } from './ConversationAvatar'
 import { EmailConfiguredAlert } from './EmailConfiguredAlert'
 import { EmailStorageAlert } from './EmailStorageAlert'
+import { MailboxPager } from './MailboxPager'
 
 /**
  * Conversation list styled like the admin users directory.
@@ -21,21 +23,40 @@ export function EmailConversationsList() {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [storageWarning, setStorageWarning] = useState<string | null>(null)
   const [messages, setMessages] = useState<readonly IAdminEmailMessage[] | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
+  const [pageIndex, setPageIndex] = useState(0)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const loadPage = useCallback(
+    async (cursor: string | null) => {
+      const [status, page] = await Promise.all([
+        client.getEmailStatus(),
+        client.listEmailMessages({ limit: MAILBOX_PAGE_SIZE, cursor }),
+      ])
+
+      return { status, page }
+    },
+    [client],
+  )
 
   useEffect(() => {
     let cancelled = false
 
-    void Promise.all([client.getEmailStatus(), client.listEmailMessages()])
-      .then(([status, listed]) => {
+    void loadPage(null)
+      .then(({ status, page }) => {
         if (cancelled) {
           return
         }
 
         setConfigured(status.configured)
         setStorageWarning(status.storageWarning)
-        setMessages(listed)
+        setMessages(page.messages)
+        setNextCursor(page.nextCursor)
+        setCursorStack([null])
+        setPageIndex(0)
       })
       .catch((caught: unknown) => {
         if (cancelled) {
@@ -60,7 +81,35 @@ export function EmailConversationsList() {
     return () => {
       cancelled = true
     }
-  }, [client, lock])
+  }, [loadPage, lock])
+
+  const goTo = async (cursor: string | null, nextIndex: number, stack: Array<string | null>) => {
+    setBusy(true)
+    setError(null)
+
+    try {
+      const { page } = await loadPage(cursor)
+
+      setMessages(page.messages)
+      setNextCursor(page.nextCursor)
+      setCursorStack(stack)
+      setPageIndex(nextIndex)
+    } catch (caught: unknown) {
+      if (caught instanceof AdminAuthError && caught.status === 401) {
+        lock()
+
+        return
+      }
+
+      setError(
+        caught instanceof AdminAuthError
+          ? caught.message
+          : 'The conversation list could not be loaded.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const conversations = useMemo(() => {
     if (messages === null) {
@@ -80,7 +129,7 @@ export function EmailConversationsList() {
     return conversations.filter((entry) => conversationMatchesQuery(entry, needle))
   }, [conversations, query])
 
-  if (error !== null) {
+  if (error !== null && messages === null) {
     return (
       <Alert variant="danger">
         <AlertDescription>{error}</AlertDescription>
@@ -105,7 +154,7 @@ export function EmailConversationsList() {
           <h1 className="text-2xl font-semibold tracking-tight">Conversations</h1>
           <p className="text-sm text-muted-foreground">
             {String(conversations.length)}{' '}
-            {conversations.length === 1 ? 'conversation' : 'conversations'} in the mailbox.
+            {conversations.length === 1 ? 'conversation' : 'conversations'} on this page.
           </p>
         </div>
         <Button asChild type="button">
@@ -118,6 +167,12 @@ export function EmailConversationsList() {
 
       {configured === false ? <EmailConfiguredAlert /> : null}
       {storageWarning !== null ? <EmailStorageAlert message={storageWarning} /> : null}
+
+      {error !== null ? (
+        <Alert variant="danger">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <Input
         type="search"
@@ -161,6 +216,23 @@ export function EmailConversationsList() {
           ))}
         </ul>
       )}
+
+      <MailboxPager
+        page={pageIndex + 1}
+        hasPrevious={pageIndex > 0}
+        hasNext={nextCursor !== null}
+        busy={busy}
+        onPrevious={() => {
+          void goTo(cursorStack[pageIndex - 1] ?? null, pageIndex - 1, cursorStack)
+        }}
+        onNext={() => {
+          if (nextCursor === null) {
+            return
+          }
+
+          void goTo(nextCursor, pageIndex + 1, [...cursorStack.slice(0, pageIndex + 1), nextCursor])
+        }}
+      />
     </div>
   )
 }
