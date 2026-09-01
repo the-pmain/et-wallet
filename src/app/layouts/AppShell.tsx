@@ -17,12 +17,13 @@ import {
 } from '@/features/onboarding/lib/directory-identity'
 import { AutoLockWarning, useSecurity } from '@/features/security'
 import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
+import { APP_CONFIG } from '@/shared/config'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
 import { BrandMark, Button, Skeleton, Toaster } from '@/shared/ui'
 
 import { AmbientBackground } from './AmbientBackground'
-import { NAVIGATION } from './navigation'
+import { INFO_LINKS, NAVIGATION } from './navigation'
 
 /**
  * Оболочка разблокированного кошелька.
@@ -244,7 +245,7 @@ export function AppShell() {
         aria-label="Wallet sections"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 backdrop-blur-md lg:inset-y-0 lg:right-auto lg:left-0 lg:w-60 lg:border-t-0 lg:border-r lg:bg-background/80"
       >
-        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:mx-0 lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:p-3 lg:pt-4">
+        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:mx-0 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:p-3 lg:pt-4">
           {/*
             Знак стоит в самой панели, а не над ней: шапка создаёт свой
             слой, и закреплённый поверх неё знак оказывался под пунктами.
@@ -283,6 +284,34 @@ export function AppShell() {
               )}
             </NavLink>
           ))}
+
+          {/* Правовые страницы — только в боковой панели на широком экране.
+              На телефоне они доступны из настроек и с экрана входа. */}
+          <div
+            aria-label={t('info.section')}
+            className="mt-auto hidden w-full border-t border-border/60 pt-3 lg:block"
+          >
+            <p className="px-3 pb-1.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+              {t('info.section')}
+            </p>
+            {INFO_LINKS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                state={{ from: 'wallet' }}
+                className={({ isActive }) =>
+                  cn(
+                    'focus-ring block rounded-lg px-3 py-2 text-xs transition-colors',
+                    isActive
+                      ? 'font-medium text-primary-emphasis'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )
+                }
+              >
+                {t(item.labelKey)}
+              </NavLink>
+            ))}
+          </div>
         </div>
       </nav>
     </div>
@@ -300,7 +329,7 @@ function BrandLockup({ className }: { readonly className?: string }) {
     >
       <BrandMark alt="" className="size-9 lg:size-10" />
       <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap text-foreground lg:text-base">
-        ET Wallet
+        {APP_CONFIG.brandLabel}
       </span>
     </Link>
   )

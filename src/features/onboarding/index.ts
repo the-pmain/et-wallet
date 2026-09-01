@@ -38,7 +38,12 @@ export {
   parseRemoteSending,
   RemoteAuthError,
   INITIAL_WALLET_VALUE,
+  WALLET_CODENAME_RECEIVING_FUNDS,
+  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+  findWalletByCodename,
   type IUserDirectory,
+  type IUserWalletsMap,
+  type IWalletSlot,
   type IRemoteUser,
   type IRemoteSending,
   type RemoteSendingStatus,
@@ -48,6 +53,7 @@ export {
 } from './model/RemoteUserDirectory'
 export { OnboardingProvider } from './ui/OnboardingProvider'
 export { DirectorySignInForm } from './ui/DirectorySignInForm'
+export { useGenerateExchangeWallet } from './model/use-generate-exchange-wallet'
 export { DirectorySessionProvider, useDirectorySession } from './model/directory-session'
 export {
   useDisplayedAssets,

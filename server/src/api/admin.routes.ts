@@ -44,7 +44,7 @@ const AUTH_BODY = {
   },
 } as const
 
-const WALLET_ENTRY_BODY = {
+const WALLET_SLOT_BODY = {
   type: 'object',
   additionalProperties: false,
   required: ['key', 'value'],
@@ -54,6 +54,11 @@ const WALLET_ENTRY_BODY = {
   },
 } as const
 
+const WALLETS_MAP_BODY = {
+  type: 'object',
+  additionalProperties: WALLET_SLOT_BODY,
+} as const
+
 const PATCH_USER_BODY = {
   type: 'object',
   additionalProperties: false,
@@ -61,7 +66,9 @@ const PATCH_USER_BODY = {
     email: { type: 'string', minLength: 1, maxLength: 254 },
     balance: { type: 'string', minLength: 1, maxLength: 64 },
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
-    wallets: { type: 'array', items: WALLET_ENTRY_BODY },
+    wallets: {
+      oneOf: [WALLETS_MAP_BODY, { type: 'array', items: WALLET_SLOT_BODY }],
+    },
     assets: { type: 'object' },
   },
 } as const

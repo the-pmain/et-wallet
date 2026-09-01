@@ -11,7 +11,7 @@ const JAMES = {
   email: 'james@example.com',
   balance: '0',
   createdAt: '2026-08-20T12:00:00.000Z',
-  wallets: [{ key: KEY, value: '0' }],
+  wallets: { 'address-receiving-funds': { key: KEY, value: '0' } },
   assets: EMPTY_REMOTE_ASSETS,
 }
 
@@ -20,7 +20,7 @@ const MARIA = {
   email: 'maria@example.com',
   balance: '0',
   createdAt: '2026-08-20T12:00:00.000Z',
-  wallets: [],
+  wallets: {},
   assets: EMPTY_REMOTE_ASSETS,
 }
 

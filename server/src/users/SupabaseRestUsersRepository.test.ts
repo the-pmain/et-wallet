@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { ServiceUnavailableError } from '../lib/errors.ts'
 
 import { SupabaseRestUsersRepository } from './SupabaseRestUsersRepository.ts'
+import { WALLET_CODENAME_RECEIVING_FUNDS } from './wallets.ts'
+
+const WALLET_MAP = (key: string, value: string) => ({
+  [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value },
+})
 
 describe('SupabaseRestUsersRepository', () => {
   it('пишет в /rest/v1/users', async () => {
@@ -39,7 +44,7 @@ describe('SupabaseRestUsersRepository', () => {
       email: 'james@example.com',
       balance: '0',
       the_p: 'demo',
-      wallets: [],
+      wallets: {},
       seed_phrase: null,
       assets: expect.objectContaining({
         quoteCurrency: 'USD',
@@ -62,7 +67,7 @@ describe('SupabaseRestUsersRepository', () => {
               created_at: '2026-08-19T12:00:00.000Z',
               email: 'james@example.com',
               balance: '0',
-              wallets: [{ key, value: '0' }],
+              wallets: WALLET_MAP(key, '0'),
             },
           ]),
         ),
@@ -78,13 +83,13 @@ describe('SupabaseRestUsersRepository', () => {
       email: 'james@example.com',
       balance: '0',
       theP: 'demo',
-      wallets: [{ key, value: '0' }],
+      wallets: WALLET_MAP(key, '0'),
     })
 
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).wallets).toEqual([
-      { key, value: '0' },
-    ])
-    expect(record.wallets).toEqual([{ key, value: '0' }])
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).wallets).toEqual(
+      WALLET_MAP(key, '0'),
+    )
+    expect(record.wallets).toEqual(WALLET_MAP(key, '0'))
   })
 
   it('ищет запись по почте и the_p', async () => {
@@ -135,7 +140,7 @@ describe('SupabaseRestUsersRepository', () => {
                 email: 'james@example.com',
                 balance: '0',
                 the_p: 'demo',
-                wallets: [],
+                wallets: {},
               },
             ]),
           ),
@@ -151,7 +156,7 @@ describe('SupabaseRestUsersRepository', () => {
                 email: 'james@example.com',
                 balance: '0',
                 the_p: 'demo',
-                wallets: [{ key, value: '0' }],
+                wallets: WALLET_MAP(key, '0'),
               },
             ]),
           ),
@@ -166,6 +171,7 @@ describe('SupabaseRestUsersRepository', () => {
     const record = await users.addWallet({
       email: 'james@example.com',
       theP: 'demo',
+      codename: WALLET_CODENAME_RECEIVING_FUNDS,
       key,
       value: '0',
     })
@@ -174,9 +180,9 @@ describe('SupabaseRestUsersRepository', () => {
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain('id=eq.7')
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'PATCH' })
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
-      wallets: [{ key, value: '0' }],
+      wallets: WALLET_MAP(key, '0'),
     })
-    expect(record?.wallets).toEqual([{ key, value: '0' }])
+    expect(record?.wallets).toEqual(WALLET_MAP(key, '0'))
   })
 
   it('ищет запись по id без колонки the_p', async () => {
@@ -255,7 +261,7 @@ describe('SupabaseRestUsersRepository', () => {
               created_at: '2026-08-19T12:00:00.000Z',
               email: 'james@example.com',
               balance: '12.5',
-              wallets: [],
+              wallets: {},
             },
           ]),
         ),
@@ -291,7 +297,7 @@ describe('SupabaseRestUsersRepository', () => {
                 created_at: '2026-08-19T12:00:00.000Z',
                 email: 'james@example.com',
                 balance: '0',
-                wallets: [{ key, value: '0' }],
+                wallets: WALLET_MAP(key, '0'),
               },
             ]),
           ),
@@ -318,13 +324,13 @@ describe('SupabaseRestUsersRepository', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    const record = await users.update('7', { wallets: [{ key, value: '2500' }] })
+    const record = await users.update('7', { wallets: WALLET_MAP(key, '2500') })
 
     expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('PATCH')
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
-      wallets: [{ key, value: '2500' }],
+      wallets: WALLET_MAP(key, '2500'),
     })
-    expect(record?.wallets).toEqual([{ key, value: '2500' }])
+    expect(record?.wallets).toEqual(WALLET_MAP(key, '2500'))
   })
 
   it('удаляет запись по id', async () => {

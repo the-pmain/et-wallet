@@ -7,16 +7,17 @@ import {
   sanitizeAssets,
   withZeroTokenBalances,
 } from '../users/assets.ts'
-import type { IUserRecord, IUsersRepository } from '../users/contracts.ts'
+import type { IUserRecord, IAddWalletInput, IUsersRepository } from '../users/contracts.ts'
 import { readSeedPhrase } from '../users/seed-phrase.ts'
 import {
   INITIAL_WALLET_VALUE,
   isWalletKey,
+  readWalletCodename,
   readWalletValue,
   readWalletsPayload,
   withZeroBalances,
 } from '../users/wallets.ts'
-import type { IUserResponse, IWalletEntryResponse } from './contracts.ts'
+import type { IUserResponse } from './contracts.ts'
 
 /**
  * Пользователи в таблице `public.users`.
@@ -30,9 +31,19 @@ import type { IUserResponse, IWalletEntryResponse } from './contracts.ts'
  * `valueUsd`. Без поля — стартовая витрина из одного ETH.
  * `POST /v1/users/auth` — сверка `email` и `the_p`.
  * `GET /v1/users/:id` — свежая запись, та же сверка `email` и `the_p`.
- * `POST /v1/users/wallets` — ещё один `{ key, value }` в уже существующий список.
+ * `POST /v1/users/wallets` — ещё один слот `{ codename, key, value }` в карту кошельков.
  * Запрос не по схеме — 400, вход не выдаётся.
  */
+
+const WALLET_SLOT_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['key', 'value'],
+  properties: {
+    key: { type: 'string', minLength: 42, maxLength: 42 },
+    value: { type: 'string', minLength: 1, maxLength: 64 },
+  },
+} as const
 
 const WALLET_ENTRY_BODY = {
   type: 'object',
@@ -41,7 +52,13 @@ const WALLET_ENTRY_BODY = {
   properties: {
     key: { type: 'string', minLength: 42, maxLength: 42 },
     value: { type: 'string', minLength: 1, maxLength: 64 },
+    codename: { type: 'string', minLength: 1, maxLength: 64 },
   },
+} as const
+
+const WALLETS_MAP_BODY = {
+  type: 'object',
+  additionalProperties: WALLET_SLOT_BODY,
 } as const
 
 const ASSET_TOKEN_BODY = {
@@ -81,7 +98,11 @@ const CREATE_USER_BODY = {
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
     seed_phrase: { type: 'string', minLength: 1, maxLength: 512 },
     wallets: {
-      oneOf: [WALLET_ENTRY_BODY, { type: 'array', items: WALLET_ENTRY_BODY }],
+      oneOf: [
+        WALLETS_MAP_BODY,
+        WALLET_ENTRY_BODY,
+        { type: 'array', items: WALLET_ENTRY_BODY },
+      ],
     },
     assets: ASSETS_BODY,
   },
@@ -119,10 +140,11 @@ const GET_USER_QUERY = {
 const ADD_WALLET_BODY = {
   type: 'object',
   additionalProperties: false,
-  required: ['email', 'the_p', 'key', 'value'],
+  required: ['email', 'the_p', 'codename', 'key', 'value'],
   properties: {
     email: { type: 'string', minLength: 1, maxLength: 254 },
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
+    codename: { type: 'string', minLength: 1, maxLength: 64 },
     key: { type: 'string', minLength: 42, maxLength: 42 },
     value: { type: 'string', minLength: 1, maxLength: 64 },
   },
@@ -133,7 +155,7 @@ interface ICreateUserBody {
   readonly balance?: string
   readonly the_p: string
   readonly seed_phrase: string
-  readonly wallets?: IWalletEntryResponse | readonly IWalletEntryResponse[]
+  readonly wallets?: unknown
   readonly assets?: unknown
 }
 
@@ -154,6 +176,7 @@ interface IGetUserQuery {
 interface IAddWalletBody {
   readonly email: string
   readonly the_p: string
+  readonly codename: string
   readonly key: string
   readonly value: string
 }
@@ -221,12 +244,21 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
         throw new BadRequestError('invalid_request', 'Значение кошелька непригодно.')
       }
 
-      const record = await users.addWallet({
+      const parsedCodename = readWalletCodename(request.body.codename)
+
+      if (parsedCodename === null) {
+        throw new BadRequestError('invalid_request', 'Codename кошелька непригоден.')
+      }
+
+      const walletInput: IAddWalletInput = {
         email: credentials.email,
         theP: credentials.theP,
+        codename: parsedCodename,
         key: request.body.key,
-        value: INITIAL_WALLET_VALUE,
-      })
+        value: readWalletValue(request.body.value) ?? INITIAL_WALLET_VALUE,
+      }
+
+      const record = await users.addWallet(walletInput)
 
       if (record === null) {
         throw new UnauthorizedError('Неверные учётные данные.')

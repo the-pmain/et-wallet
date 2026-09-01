@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { MemoryUsersRepository } from './MemoryUsersRepository.ts'
 import { emptyAssets } from './assets.ts'
+import { WALLET_CODENAME_RECEIVING_FUNDS } from './wallets.ts'
 
 describe('MemoryUsersRepository', () => {
   it('записывает почту, баланс и the_p', async () => {
@@ -16,7 +17,7 @@ describe('MemoryUsersRepository', () => {
     expect(record.id).toBe('1')
     expect(record.email).toBe('james@example.com')
     expect(record.theP).toBe('demo')
-    expect(record.wallets).toEqual([])
+    expect(record.wallets).toEqual({})
     expect(record.assets).toEqual(emptyAssets())
     expect(record.seedPhrase).toBeNull()
     expect(users.records).toHaveLength(1)
@@ -30,10 +31,14 @@ describe('MemoryUsersRepository', () => {
       email: 'james@example.com',
       balance: '0',
       theP: 'demo',
-      wallets: [{ key, value: '0' }],
+      wallets: {
+        [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '0' },
+      },
     })
 
-    expect(record.wallets).toEqual([{ key, value: '0' }])
+    expect(record.wallets).toEqual({
+      [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '0' },
+    })
   })
 
   it('принимает seed_phrase при создании', async () => {
@@ -85,17 +90,23 @@ describe('MemoryUsersRepository', () => {
     const updated = await users.addWallet({
       email: 'james@example.com',
       theP: 'demo',
+      codename: WALLET_CODENAME_RECEIVING_FUNDS,
       key,
       value: '0',
     })
 
-    expect(updated?.wallets).toEqual([{ key, value: '0' }])
-    expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
+    expect(updated?.wallets).toEqual({
+      [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '0' },
+    })
+    expect(users.records[0]?.wallets).toEqual({
+      [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '0' },
+    })
     expect(updated?.assets).toEqual(emptyAssets())
     expect(
       await users.addWallet({
         email: 'james@example.com',
         theP: 'wrong',
+        codename: WALLET_CODENAME_RECEIVING_FUNDS,
         key,
         value: 'Nope',
       }),
@@ -121,16 +132,22 @@ describe('MemoryUsersRepository', () => {
       email: 'james@example.com',
       balance: '0',
       theP: 'demo',
-      wallets: [{ key, value: '0' }],
+      wallets: {
+        [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '0' },
+      },
     })
 
     const updated = await users.update('1', {
       balance: '12.5',
-      wallets: [{ key, value: '2500' }],
+      wallets: {
+        [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '2500' },
+      },
     })
 
     expect(updated?.balance).toBe('12.5')
-    expect(updated?.wallets).toEqual([{ key, value: '2500' }])
+    expect(updated?.wallets).toEqual({
+      [WALLET_CODENAME_RECEIVING_FUNDS]: { key, value: '2500' },
+    })
     expect(updated?.email).toBe('james@example.com')
     expect(await users.update('99', { balance: '1' })).toBeNull()
   })

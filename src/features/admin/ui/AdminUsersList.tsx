@@ -112,7 +112,7 @@ export function AdminUsersList() {
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{user.email ?? 'No email'}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      id {user.id} · balance {user.balance ?? '—'} · {String(user.wallets.length)}{' '}
+                      id {user.id} · balance {user.balance ?? '—'} · {String(Object.keys(user.wallets).length)}{' '}
                       wallets
                     </span>
                   </span>

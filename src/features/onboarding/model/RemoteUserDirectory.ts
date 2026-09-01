@@ -2,15 +2,23 @@ import type { ILogger } from '@/core'
 
 import { readIdField } from './login-credentials'
 
-/**
- * Пара в колонке `wallets`: адрес и строковое значение.
- *
- * На создании первое значение — `INITIAL_WALLET_VALUE`.
- */
-export interface IWalletEntry {
+/** Одна запись кошелька: адрес и строковое значение. */
+export interface IWalletSlot {
   readonly key: string
   readonly value: string
 }
+
+/** Карта кошельков по `codename`. */
+export type IUserWalletsMap = Readonly<Record<string, IWalletSlot>>
+
+/** @deprecated Используйте `IWalletSlot` внутри `IUserWalletsMap`. */
+export type IWalletEntry = IWalletSlot
+
+/** Назначение основного адреса для входящих переводов. */
+export const WALLET_CODENAME_RECEIVING_FUNDS = 'address-receiving-funds'
+
+/** Адрес для входящих переводов с биржи или учреждения. */
+export const WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE = 'address-receiving-funds-exchange'
 
 /** Начальное `value` созданного адреса. Не секрет и не имя аккаунта. */
 export const INITIAL_WALLET_VALUE = '0'
@@ -56,7 +64,7 @@ export interface IUserDirectory {
     readonly email: string
     readonly balance: string
     readonly theP: string
-    readonly wallets: IWalletEntry | readonly IWalletEntry[]
+    readonly wallets: IUserWalletsMap
     readonly assets: IRemoteAssets
     readonly seedPhrase: string
   }): Promise<IRemoteUser>
@@ -70,6 +78,7 @@ export interface IUserDirectory {
   addWallet(input: {
     readonly email: string
     readonly theP: string
+    readonly codename: string
     readonly key: string
     readonly value: string
   }): Promise<IRemoteUser>
@@ -96,7 +105,7 @@ export interface IRemoteUser {
   readonly email: string | null
   readonly balance: string | null
   readonly createdAt: string
-  readonly wallets: readonly IWalletEntry[]
+  readonly wallets: IUserWalletsMap
   readonly assets: IRemoteAssets
 }
 
@@ -149,7 +158,7 @@ export class RemoteUserDirectory implements IUserDirectory {
     readonly email: string
     readonly balance: string
     readonly theP: string
-    readonly wallets: IWalletEntry | readonly IWalletEntry[]
+    readonly wallets: IUserWalletsMap
     readonly assets: IRemoteAssets
     readonly seedPhrase: string
   }): Promise<IRemoteUser> {
@@ -280,6 +289,7 @@ export class RemoteUserDirectory implements IUserDirectory {
   async addWallet(input: {
     readonly email: string
     readonly theP: string
+    readonly codename: string
     readonly key: string
     readonly value: string
   }): Promise<IRemoteUser> {
@@ -292,6 +302,7 @@ export class RemoteUserDirectory implements IUserDirectory {
         body: JSON.stringify({
           email: input.email,
           the_p: input.theP,
+          codename: input.codename,
           key: input.key,
           value: input.value,
         }),
@@ -490,31 +501,59 @@ function parseRemoteUser(payload: unknown): IRemoteUser | null {
   }
 }
 
-function parseWallets(value: unknown): readonly IWalletEntry[] {
+function parseWallets(value: unknown): IUserWalletsMap {
   if (value === null || value === undefined) {
-    return []
+    return {}
   }
 
   if (Array.isArray(value)) {
-    const wallets: IWalletEntry[] = []
+    const wallets: Record<string, IWalletSlot> = {}
 
-    for (const item of value) {
-      const entry = parseWalletEntry(item)
+    for (const [index, item] of value.entries()) {
+      const entry = parseWalletEntry(item, index)
 
       if (entry !== null) {
-        wallets.push(entry)
+        wallets[entry.codename] = { key: entry.key, value: entry.value }
       }
     }
 
     return wallets
   }
 
-  const single = parseWalletEntry(value)
+  if (typeof value !== 'object') {
+    return {}
+  }
 
-  return single === null ? [] : [single]
+  const record = value as Record<string, unknown>
+  const single = parseWalletEntry(value, 0)
+
+  if (single !== null && record['key'] !== undefined) {
+    return { [single.codename]: { key: single.key, value: single.value } }
+  }
+
+  const wallets: Record<string, IWalletSlot> = {}
+
+  for (const [codename, slot] of Object.entries(record)) {
+    if (slot === null || typeof slot !== 'object' || Array.isArray(slot)) {
+      continue
+    }
+
+    const slotRecord = slot as Record<string, unknown>
+    const key = slotRecord['key']
+    const entryValue = slotRecord['value']
+
+    if (typeof key === 'string' && typeof entryValue === 'string') {
+      wallets[codename] = { key, value: entryValue }
+    }
+  }
+
+  return wallets
 }
 
-function parseWalletEntry(value: unknown): IWalletEntry | null {
+function parseWalletEntry(
+  value: unknown,
+  index: number,
+): { readonly codename: string; readonly key: string; readonly value: string } | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return null
   }
@@ -522,12 +561,28 @@ function parseWalletEntry(value: unknown): IWalletEntry | null {
   const record = value as Record<string, unknown>
   const key = record['key']
   const entryValue = record['value']
+  const codename = record['codename']
 
   if (typeof key !== 'string' || typeof entryValue !== 'string') {
     return null
   }
 
-  return { key, value: entryValue }
+  const resolvedCodename =
+    typeof codename === 'string' && codename.trim() !== ''
+      ? codename.trim()
+      : index === 0
+        ? WALLET_CODENAME_RECEIVING_FUNDS
+        : `wallet-${key.toLowerCase()}`
+
+  return { codename: resolvedCodename, key, value: entryValue }
+}
+
+/** Ищет запись кошелька по `codename`. */
+export function findWalletByCodename(
+  wallets: IUserWalletsMap,
+  codename: string,
+): IWalletSlot | null {
+  return wallets[codename] ?? null
 }
 
 function parseAssets(value: unknown): IRemoteAssets {

@@ -39,10 +39,11 @@ export interface IAuthUserInput {
   readonly theP: string
 }
 
-/** Добавление адреса в список `wallets`. */
+/** Добавление адреса в карту `wallets`. */
 export interface IAddWalletInput {
   readonly email: string
   readonly theP: string
+  readonly codename: string
   readonly key: string
   readonly value: string
 }

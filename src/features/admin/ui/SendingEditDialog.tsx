@@ -10,6 +10,7 @@ import {
 } from '@/features/onboarding'
 import { Button, Dialog, Input, Label, Select, Textarea } from '@/shared/ui'
 
+import { formatAdminTimestamp } from '../lib/format-admin-timestamp'
 import type { IAdminSendingPatch } from '../model/AdminClient'
 import {
   FAILURE_MESSAGE_CUSTOM,
@@ -86,7 +87,7 @@ export function SendingEditDialog({
       {sending === null ? null : (
         <form id={`${fieldId}-form`} className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <ReadonlyField label="id" value={sending.id} />
-          <ReadonlyField label="createdAt" value={sending.createdAt} />
+          <ReadonlyField label="createdAt" value={formatAdminTimestamp(sending.createdAt)} />
           <ReadonlyField label="userId" value={sending.userId ?? '—'} />
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${fieldId}-symbol`}>symbol</Label>
@@ -135,6 +136,7 @@ export function SendingEditDialog({
               value={draft.status}
               disabled={isBusy}
               menuPlacement="top"
+              tone={draft.status === SENDING_STATUS.Success ? 'success' : 'default'}
               options={SENDING_STATUSES.map((status) => ({
                 value: status,
                 label: status,

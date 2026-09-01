@@ -32,6 +32,8 @@ import {
   SendPage,
   SettingsPage,
   TrustPage,
+  PrivacyPage,
+  TermsPage,
   AdminUsersPage,
   AdminSendingsPage,
   AdminUserPage,
@@ -183,6 +185,22 @@ export function AppRouter() {
           )}
           <Route path={ROUTE.Unlock} element={<UnlockWalletPage />} />
           <Route path={ROUTE.Trust} element={<TrustPage />} />
+          <Route
+            path={ROUTE.Privacy}
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <PrivacyPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path={ROUTE.Terms}
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <TermsPage />
+              </Suspense>
+            }
+          />
           <Route path={ROUTE.ForgotPassword} element={<ForgotPasswordPage />} />
         </Route>
 

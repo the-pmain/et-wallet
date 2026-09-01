@@ -67,7 +67,7 @@ export class MemoryUsersRepository implements IUsersRepository {
 
     const updated: IUserRecord = {
       ...record,
-      wallets: mergeWallet(record.wallets, input.key, input.value),
+      wallets: mergeWallet(record.wallets, input.codename, input.key, input.value),
     }
     const index = this.#records.indexOf(record)
 

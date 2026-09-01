@@ -14,6 +14,7 @@ import {
   hydratePendingQueue,
   sendingAmountLabel,
 } from '../model/admin-pending-toasts'
+import { formatAdminTimestampParts } from '../lib/format-admin-timestamp'
 import { useAdminSendingsLive } from '../model/admin-sendings-live'
 import { SendingEditDialog } from './SendingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
@@ -28,10 +29,10 @@ import { SendingStatusBadge } from './SendingStatusBadge'
  * ПОЧЕМУ СНИЗУ СПРАВА, А НЕ СВЕРХУ. Шапка и Lock живут сверху справа.
  * Обычные тосты кошелька — тоже сверху, но в кабинете их нет: это не
  * справка, а очередь работы. Карточка растёт вверх от угла, ближайшая
- * к пальцу и мыши — самая новая, с крупной кнопкой Edit.
+ * к пальцу и мыши — самая новая, с крупной кнопкой Handle.
  *
  * ПОЧЕМУ НЕ ИСЧЕЗАЕТ САМО. Четыре секунды хватает прочесть «сохранено»
- * и не хватает нажать Edit. Карточка живёт, пока перевод не разобрали
+ * и не хватает нажать Handle. Карточка живёт, пока перевод не разобрали
  * или её не закрыли.
  *
  * ПОЧЕМУ ЕЩЁ И СПИСОК ПРИ ВХОДЕ. Поток сообщает только новые кадры.
@@ -174,7 +175,8 @@ function PendingSendingCard({
 }) {
   const amount = sendingAmountLabel(sending)
   const recipient = sending.recipientAddress
-  const editName = amount === null ? 'Edit pending sending' : `Edit pending sending ${amount}`
+  const handleName = amount === null ? 'Handle pending sending' : `Handle pending sending ${amount}`
+  const timestamp = formatAdminTimestampParts(sending.createdAt)
 
   return (
     <article
@@ -198,6 +200,17 @@ function PendingSendingCard({
             User {sending.userId ?? '—'}
             {recipient === null || recipient === '' ? null : ` · ${shortenAddress(recipient)}`}
           </p>
+          {timestamp === null ? null : (
+            <p className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+              <time
+                dateTime={sending.createdAt}
+                className="text-xl font-semibold tracking-tight text-foreground/75 tabular-nums"
+              >
+                {timestamp.time}
+              </time>
+              <span className="text-sm text-muted-foreground">{timestamp.date}</span>
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -211,11 +224,11 @@ function PendingSendingCard({
       <Button
         type="button"
         className="h-16 min-h-16 w-full text-lg font-semibold"
-        aria-label={editName}
+        aria-label={handleName}
         onClick={onEdit}
       >
         <Pencil className="size-6" aria-hidden />
-        Edit
+        Handle
       </Button>
     </article>
   )

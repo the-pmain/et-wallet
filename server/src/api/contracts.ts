@@ -165,7 +165,7 @@ export interface ISettingsResponse {
 /**
  * Одна запись в `wallets`: адрес и строковое значение.
  */
-export interface IWalletEntryResponse {
+export interface IWalletSlotResponse {
   readonly key: string
   readonly value: string
 }
@@ -191,14 +191,14 @@ export interface IUserAssetsResponse {
  * Пользователь в таблице `public.users`.
  *
  * Колонки `the_p` и `seed_phrase` в ответ не входят.
- * `wallets` — список `{ key, value }`. `assets` — витрина портфеля.
+ * `wallets` — карта `{ codename: { key, value } }`. `assets` — витрина портфеля.
  */
 export interface IUserResponse {
   readonly id: string
   readonly email: string | null
   readonly balance: string | null
   readonly createdAt: string
-  readonly wallets: readonly IWalletEntryResponse[]
+  readonly wallets: Readonly<Record<string, IWalletSlotResponse>>
   readonly assets: IUserAssetsResponse
 }
 

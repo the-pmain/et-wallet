@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { toAddress, type IAccount } from '@/core'
 import { I18nProvider } from '@/app/providers/I18nProvider'
@@ -26,7 +26,49 @@ function renderActions() {
   )
 }
 
-describe('QuickActions: окно смарт-контракта', () => {
+describe('QuickActions: exchange receive address', () => {
+  it('hides the exchange section until Receive is pressed', async () => {
+    const user = userEvent.setup()
+
+    renderActions()
+
+    expect(
+      screen.queryByText('Address for receiving funds from exchange or institution'),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /receive/iu }))
+
+    expect(
+      screen.getByText('Address for receiving funds from exchange or institution'),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /copy/iu }).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole('button', { name: /generate a wallet/iu })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /receive/iu })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('changes generate button text while generation is in progress', async () => {
+    const user = userEvent.setup()
+    const generate = vi.fn()
+
+    render(
+      <MemoryRouter>
+        <I18nProvider>
+          <QuickActions
+            account={ACCOUNT}
+            isGeneratingExchangeWallet={true}
+            onGenerateExchangeWallet={generate}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /receive/iu }))
+
+    expect(screen.getByRole('button', { name: /wallet generation request sent/iu })).toBeDisabled()
+  })
+})
+
+describe('QuickActions: smart contract dialog', () => {
   it('до нажатия окна нет', () => {
     renderActions()
 

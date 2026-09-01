@@ -11,7 +11,7 @@ const USER = {
   email: 'james@example.com',
   balance: '0',
   createdAt: '2026-08-20T12:00:00.000Z',
-  wallets: [{ key: KEY, value: '0' }],
+  wallets: { 'address-receiving-funds': { key: KEY, value: '0' } },
   assets: EMPTY_REMOTE_ASSETS,
 }
 
@@ -128,7 +128,12 @@ describe('AdminClient', () => {
   it('меняет значение кошелька', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(jsonResponse(200, { ...USER, wallets: [{ key: KEY, value: '2500' }] }))
+      .mockResolvedValue(
+        jsonResponse(200, {
+          ...USER,
+          wallets: { 'address-receiving-funds': { key: KEY, value: '2500' } },
+        }),
+      )
 
     const client = new AdminClient({
       baseUrl: '',
@@ -136,13 +141,15 @@ describe('AdminClient', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    const updated = await client.updateUser('7', { wallets: [{ key: KEY, value: '2500' }] })
+    const updated = await client.updateUser('7', {
+      wallets: { 'address-receiving-funds': { key: KEY, value: '2500' } },
+    })
 
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PATCH')
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
-      wallets: [{ key: KEY, value: '2500' }],
+      wallets: { 'address-receiving-funds': { key: KEY, value: '2500' } },
     })
-    expect(updated.wallets[0]?.value).toBe('2500')
+    expect(updated.wallets['address-receiving-funds']?.value).toBe('2500')
   })
 
   it('отправляет письмо', async () => {

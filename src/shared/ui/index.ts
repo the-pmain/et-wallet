@@ -17,6 +17,8 @@ export {
 } from './segmented-control'
 export { Input } from './input'
 export { Label } from './label'
+export { LegalPageLayout, LegalSection } from './legal-page-layout'
+export { PasswordInput, type PasswordInputProps } from './password-input'
 export { Select, type ISelectOption, type SelectProps } from './select'
 export { Separator, type SeparatorProps } from './separator'
 export { Skeleton } from './skeleton'

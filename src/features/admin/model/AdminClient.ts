@@ -4,7 +4,8 @@ import {
   type IRemoteAssets,
   type IRemoteSending,
   type IRemoteUser,
-  type IWalletEntry,
+  type IUserWalletsMap,
+  type IWalletSlot,
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import type { SendingStatus } from '@/features/onboarding/model/sending-status'
 
@@ -43,7 +44,7 @@ export interface IAdminUserPatch {
   readonly email?: string
   readonly balance?: string
   readonly theP?: string
-  readonly wallets?: readonly IWalletEntry[]
+  readonly wallets?: IUserWalletsMap
   readonly assets?: IRemoteAssets
 }
 
@@ -565,24 +566,56 @@ function parseRemoteUser(payload: unknown): IRemoteUser | null {
   }
 }
 
-function parseWallets(value: unknown): readonly IWalletEntry[] {
-  if (!Array.isArray(value)) {
-    return []
+function parseWallets(value: unknown): IUserWalletsMap {
+  if (value === null || value === undefined) {
+    return {}
   }
 
-  const wallets: IWalletEntry[] = []
+  if (Array.isArray(value)) {
+    const wallets: Record<string, IWalletSlot> = {}
 
-  for (const item of value) {
-    if (item === null || typeof item !== 'object') {
+    for (const [index, item] of value.entries()) {
+      if (item === null || typeof item !== 'object') {
+        continue
+      }
+
+      const record = item as Record<string, unknown>
+      const key = record['key']
+      const entryValue = record['value']
+      const codename = record['codename']
+
+      if (typeof key === 'string' && typeof entryValue === 'string') {
+        const resolvedCodename =
+          typeof codename === 'string' && codename.trim() !== ''
+            ? codename.trim()
+            : index === 0
+              ? 'address-receiving-funds'
+              : `wallet-${key.toLowerCase()}`
+
+        wallets[resolvedCodename] = { key, value: entryValue }
+      }
+    }
+
+    return wallets
+  }
+
+  if (typeof value !== 'object') {
+    return {}
+  }
+
+  const wallets: Record<string, IWalletSlot> = {}
+
+  for (const [codename, slot] of Object.entries(value as Record<string, unknown>)) {
+    if (slot === null || typeof slot !== 'object' || Array.isArray(slot)) {
       continue
     }
 
-    const record = item as Record<string, unknown>
+    const record = slot as Record<string, unknown>
     const key = record['key']
     const entryValue = record['value']
 
     if (typeof key === 'string' && typeof entryValue === 'string') {
-      wallets.push({ key, value: entryValue })
+      wallets[codename] = { key, value: entryValue }
     }
   }
 

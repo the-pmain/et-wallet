@@ -82,6 +82,11 @@ const ENGLISH = {
   'nav.activity': 'Activity',
   'nav.settings': 'Settings',
 
+  'info.section': 'Legal & information',
+  'info.trust': 'Security & trust',
+  'info.privacy': 'Privacy policy',
+  'info.terms': 'Terms of service',
+
   'dashboard.balance': 'Balance',
   'dashboard.displayCurrency': 'Display currency',
   /* Свод двух прежних оговорок в одну. Раньше на главном экране стояли

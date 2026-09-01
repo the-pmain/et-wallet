@@ -21,7 +21,7 @@ export interface SelectProps<TValue extends string = string> {
    * Опасное поле — отказ перевода. Цвет тот же, что у остальных
    * разрушающих контролов, а не отдельная палитра.
    */
-  readonly tone?: 'default' | 'danger'
+  readonly tone?: 'default' | 'danger' | 'success'
 
   /**
    * Куда раскрывается список. У нижних полей окна список вверх:
@@ -152,7 +152,12 @@ export function Select<TValue extends string>({
     }
   }
 
-  const isDanger = tone === 'danger'
+  const toneClassName =
+    tone === 'danger'
+      ? 'border-destructive/50 bg-destructive/10 text-destructive'
+      : tone === 'success'
+        ? 'border-risk-low/50 bg-risk-low/10 text-risk-low'
+        : 'bg-transparent'
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
@@ -168,9 +173,7 @@ export function Select<TValue extends string>({
         className={cn(
           'focus-ring flex h-10 w-full cursor-pointer items-center gap-2 rounded-md border px-3 text-left text-sm shadow-xs',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          isDanger
-            ? 'border-destructive/50 bg-destructive/10 text-destructive'
-            : 'bg-transparent',
+          toneClassName,
         )}
         onClick={() => {
           if (!disabled) {

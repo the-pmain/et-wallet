@@ -1,5 +1,5 @@
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import type { PriceMap } from '@/core'
@@ -9,10 +9,17 @@ import type {
   IRemoteAssetToken,
   IRemoteAssets,
   IRemoteUser,
-  IWalletEntry,
+  IUserWalletsMap,
+  IWalletSlot,
+} from '@/features/onboarding/model/RemoteUserDirectory'
+import {
+  WALLET_CODENAME_RECEIVING_FUNDS,
+  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+  INITIAL_WALLET_VALUE,
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import { useRemoteAssetQuotes } from '@/features/onboarding/model/use-remote-asset-quotes'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
+import { cn } from '@/shared/lib/utils'
 import {
   Alert,
   AlertDescription,
@@ -23,7 +30,9 @@ import {
   CardTitle,
   Input,
   Label,
+  PasswordInput,
   SegmentedControl,
+  Select,
   Skeleton,
 } from '@/shared/ui'
 
@@ -41,6 +50,44 @@ import { AddAssetMenu } from './AddAssetMenu'
 import { UserAvatar } from './UserAvatar'
 
 const ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
+
+const ADMIN_WALLET_CODENAMES = [
+  WALLET_CODENAME_RECEIVING_FUNDS,
+  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+] as const
+
+interface IAdminWalletRow {
+  readonly rowId: string
+  readonly codename: string
+  readonly key: string
+  readonly value: string
+}
+
+function walletsToRows(wallets: IUserWalletsMap): IAdminWalletRow[] {
+  return Object.entries(wallets).map(([codename, slot]) => ({
+    rowId: codename,
+    codename,
+    key: slot.key,
+    value: slot.value,
+  }))
+}
+
+function rowsToWallets(rows: readonly IAdminWalletRow[]): IUserWalletsMap {
+  const wallets: Record<string, IWalletSlot> = {}
+
+  for (const row of rows) {
+    if (row.codename.trim() === '' || row.key.trim() === '' || row.value.trim() === '') {
+      continue
+    }
+
+    wallets[row.codename.trim()] = {
+      key: row.key.trim(),
+      value: row.value.trim(),
+    }
+  }
+
+  return wallets
+}
 
 const PROFILE_TAB = {
   Assets: 'assets',
@@ -157,12 +204,30 @@ function ProfileEditor({
   const emailId = useId()
   const balanceId = useId()
   const passwordId = useId()
+  const walletsFormId = useId()
   const [email, setEmail] = useState(user.email ?? '')
   const [balance, setBalance] = useState(user.balance ?? '')
   const [password, setPassword] = useState('')
-  const [wallets, setWallets] = useState<IWalletEntry[]>(() => [...(user.wallets ?? [])])
+  const [newCodename, setNewCodename] = useState('')
   const [newKey, setNewKey] = useState('')
-  const [newValue, setNewValue] = useState('0')
+  const [wallets, setWallets] = useState<IAdminWalletRow[]>(() => walletsToRows(user.wallets ?? {}))
+  const availableCodenames = useMemo(
+    () => ADMIN_WALLET_CODENAMES.filter((codename) => !wallets.some((entry) => entry.codename === codename)),
+    [wallets],
+  )
+
+  useEffect(() => {
+    if (availableCodenames.length === 0) {
+      setNewCodename('')
+
+      return
+    }
+
+    if (!availableCodenames.includes(newCodename as (typeof ADMIN_WALLET_CODENAMES)[number])) {
+      setNewCodename(availableCodenames[0] ?? '')
+    }
+  }, [availableCodenames, newCodename])
+
   const [assets, setAssets] = useState<IRemoteAssets>(
     () =>
       user.assets ?? {
@@ -474,13 +539,7 @@ function ProfileEditor({
           <CardContent className="flex flex-col gap-4">
             <Field id={emailId} label="Email" value={email} onChange={setEmail} />
             <Field id={balanceId} label="Balance" value={balance} onChange={setBalance} />
-            <Field
-              id={passwordId}
-              label="New password (the_p)"
-              value={password}
-              onChange={setPassword}
-              type="password"
-            />
+            <PasswordField id={passwordId} label="New password (the_p)" value={password} onChange={setPassword} />
             <Button
               type="button"
               disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
@@ -513,7 +572,8 @@ function ProfileEditor({
           <CardHeader>
             <CardTitle>Wallets</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Column `wallets`: each row is an address (`key`) and its stored value (`value`).
+              Each slot is keyed by a fixed codename. Edit the address only; codenames cannot be
+              renamed.
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -522,88 +582,90 @@ function ProfileEditor({
             ) : (
               <ul className="flex flex-col gap-3">
                 {wallets.map((entry, index) => (
-                  <li
-                    key={entry.key}
-                    className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_8rem_auto]"
-                  >
-                    <Input value={entry.key} readOnly aria-label={`Address ${String(index + 1)}`} />
-                    <Input
-                      value={entry.value}
-                      aria-label={`Value for ${entry.key}`}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        setWallets((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index ? { key: item.key, value } : item,
-                          ),
-                        )
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${entry.key}`}
-                      onClick={() => {
-                        setWallets((current) =>
-                          current.filter((_, itemIndex) => itemIndex !== index),
-                        )
-                      }}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </li>
+                  <WalletSlotRow
+                    key={entry.rowId}
+                    codename={entry.codename}
+                    address={entry.key}
+                    disabled={busy !== null}
+                    onAddressChange={(key) => {
+                      setWallets((current) =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, key } : item,
+                        ),
+                      )
+                    }}
+                    onRemove={() => {
+                      setWallets((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                    }}
+                  />
                 ))}
               </ul>
             )}
-            <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
-              <Input
-                value={newKey}
-                placeholder="0x…"
-                aria-label="New wallet address"
-                onChange={(event) => {
-                  setNewKey(event.target.value)
-                }}
-              />
-              <Input
-                value={newValue}
-                aria-label="New wallet value"
-                onChange={(event) => {
-                  setNewValue(event.target.value)
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!ADDRESS_SHAPE.test(newKey.trim()) || newValue.trim() === ''}
-                onClick={() => {
-                  const key = newKey.trim()
-                  const value = newValue.trim()
-                  setWallets((current) => {
-                    const without = current.filter(
-                      (item) => item.key.toLowerCase() !== key.toLowerCase(),
-                    )
+            {availableCodenames.length > 0 ? (
+              <div className="flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <WalletAddressGroup
+                    codename={newCodename}
+                    address={newKey}
+                    disabled={busy !== null}
+                    addressPlaceholder="0x…"
+                    onAddressChange={setNewKey}
+                    codenameControl={
+                      <Select
+                        id={`${walletsFormId}-new-wallet-codename`}
+                        value={newCodename}
+                        disabled={busy !== null}
+                        options={availableCodenames.map((codename) => ({
+                          value: codename,
+                          label: codename,
+                        }))}
+                        onChange={setNewCodename}
+                      />
+                    }
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    busy !== null || newCodename.trim() === '' || !ADDRESS_SHAPE.test(newKey.trim())
+                  }
+                  onClick={() => {
+                    const codename = newCodename.trim()
+                    const key = newKey.trim()
+                    setWallets((current) => {
+                      const without = current.filter((item) => item.codename !== codename)
 
-                    return [...without, { key, value }]
-                  })
-                  setNewKey('')
-                  setNewValue('0')
-                }}
-              >
-                <Plus />
-                Add
-              </Button>
-            </div>
+                      return [
+                        ...without,
+                        {
+                          rowId: codename,
+                          codename,
+                          key,
+                          value: INITIAL_WALLET_VALUE,
+                        },
+                      ]
+                    })
+                    setNewKey('')
+                  }}
+                >
+                  <Plus />
+                  Add
+                </Button>
+              </div>
+            ) : wallets.length > 0 ? (
+              <p className="text-sm text-muted-foreground">All standard wallet slots are already assigned.</p>
+            ) : null}
             <Button
               type="button"
-              disabled={busy !== null || wallets.some((entry) => entry.value.trim() === '')}
+              disabled={
+                busy !== null ||
+                wallets.some((entry) => entry.codename.trim() === '' || entry.key.trim() === '')
+              }
               onClick={() => {
                 void run('wallets', () =>
                   client.updateUser(user.id, {
-                    wallets: wallets.map((entry) => ({
-                      key: entry.key,
-                      value: entry.value.trim(),
-                    })),
+                    wallets: rowsToWallets(wallets),
                   }),
                 )
               }}
@@ -653,27 +715,155 @@ function BackLink() {
   )
 }
 
+function isExchangeWalletCodename(codename: string): boolean {
+  return codename === WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE
+}
+
+function WalletSlotRow({
+  codename,
+  address,
+  disabled,
+  onAddressChange,
+  onRemove,
+}: {
+  readonly codename: string
+  readonly address: string
+  readonly disabled: boolean
+  readonly onAddressChange: (address: string) => void
+  readonly onRemove: () => void
+}) {
+  const highlighted = isExchangeWalletCodename(codename)
+
+  return (
+    <li
+      className={cn(
+        'flex gap-3 rounded-lg border p-3 sm:items-center',
+        highlighted && 'border-primary/50 bg-primary/5',
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <WalletAddressGroup
+          codename={codename}
+          address={address}
+          disabled={disabled}
+          onAddressChange={onAddressChange}
+        />
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        disabled={disabled}
+        className="shrink-0"
+        aria-label={`Remove ${codename}`}
+        onClick={onRemove}
+      >
+        <Trash2 />
+      </Button>
+    </li>
+  )
+}
+
+function WalletAddressGroup({
+  codename,
+  address,
+  disabled,
+  addressPlaceholder,
+  onAddressChange,
+  codenameControl,
+}: {
+  readonly codename: string
+  readonly address: string
+  readonly disabled: boolean
+  readonly addressPlaceholder?: string
+  readonly onAddressChange: (address: string) => void
+  readonly codenameControl?: ReactNode
+}) {
+  const addressId = useId()
+  const highlighted = isExchangeWalletCodename(codename)
+
+  return (
+    <div
+      className={cn(
+        'overflow-hidden rounded-md border shadow-xs focus-within:ring-2 focus-within:ring-ring/40',
+        highlighted && 'border-primary/60 focus-within:ring-primary/30',
+      )}
+    >
+      <div
+        className={cn(
+          'border-b bg-muted/40 px-3 py-2',
+          highlighted && 'border-primary/25 bg-primary/10',
+        )}
+      >
+        {codenameControl ?? (
+          <p
+            className={cn(
+              'font-mono text-xs leading-snug break-all text-foreground/85',
+              highlighted && 'font-medium text-primary-emphasis',
+            )}
+          >
+            {codename}
+          </p>
+        )}
+      </div>
+      <Input
+        id={addressId}
+        value={address}
+        disabled={disabled}
+        placeholder={addressPlaceholder}
+        aria-label={`Address for ${codename}`}
+        className="rounded-none border-0 font-mono text-sm shadow-none focus-visible:ring-0"
+        onChange={(event) => {
+          onAddressChange(event.target.value)
+        }}
+      />
+    </div>
+  )
+}
+
 function Field({
   id,
   label,
   value,
   onChange,
-  type = 'text',
 }: {
   readonly id: string
   readonly label: string
   readonly value: string
   readonly onChange: (value: string) => void
-  readonly type?: 'text' | 'password'
 }) {
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
-        type={type}
         value={value}
-        autoComplete={type === 'password' ? 'new-password' : 'off'}
+        autoComplete="off"
+        onChange={(event) => {
+          onChange(event.target.value)
+        }}
+      />
+    </div>
+  )
+}
+
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  readonly id: string
+  readonly label: string
+  readonly value: string
+  readonly onChange: (value: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      <PasswordInput
+        id={id}
+        value={value}
         onChange={(event) => {
           onChange(event.target.value)
         }}

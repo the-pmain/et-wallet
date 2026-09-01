@@ -164,7 +164,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
       return null
     }
 
-    const wallets = mergeWallet(existing.wallets, input.key, input.value)
+    const wallets = mergeWallet(existing.wallets, input.codename, input.key, input.value)
     const endpoint = new URL(`${this.#url}/rest/v1/users`)
     endpoint.searchParams.set('id', `eq.${existing.id}`)
 

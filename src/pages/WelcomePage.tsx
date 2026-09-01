@@ -104,12 +104,26 @@ export function WelcomePage() {
         </AlertDescription>
       </Alert>
 
-      <Link
-        to="/trust"
-        className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-      >
-        {t('welcome.trust')}
-      </Link>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <Link
+          to={ROUTE.Trust}
+          className="underline-offset-4 hover:text-foreground hover:underline"
+        >
+          {t('welcome.trust')}
+        </Link>
+        <Link
+          to={ROUTE.Privacy}
+          className="underline-offset-4 hover:text-foreground hover:underline"
+        >
+          {t('info.privacy')}
+        </Link>
+        <Link
+          to={ROUTE.Terms}
+          className="underline-offset-4 hover:text-foreground hover:underline"
+        >
+          {t('info.terms')}
+        </Link>
+      </div>
     </div>
   )
 }

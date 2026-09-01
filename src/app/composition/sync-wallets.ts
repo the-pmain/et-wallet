@@ -1,4 +1,8 @@
-import { INITIAL_WALLET_VALUE, readLoginCredentials } from '@/features/onboarding'
+import {
+  INITIAL_WALLET_VALUE,
+  readLoginCredentials,
+  WALLET_CODENAME_RECEIVING_FUNDS,
+} from '@/features/onboarding'
 import type { IUserDirectory } from '@/features/onboarding'
 import type { IWalletSession } from '@/features/wallet'
 
@@ -42,6 +46,10 @@ export function syncCreatedWalletsToDirectory(
         .addWallet({
           email: stored.email,
           theP: stored.theP,
+          codename:
+            account.addressIndex === 0
+              ? WALLET_CODENAME_RECEIVING_FUNDS
+              : `wallet-${account.address.toLowerCase()}`,
           key: account.address,
           value: INITIAL_WALLET_VALUE,
         })

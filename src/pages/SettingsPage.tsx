@@ -1,5 +1,6 @@
 import {
   ChevronRight,
+  FileText,
   Info,
   Lock,
   Monitor,
@@ -24,6 +25,7 @@ import {
   useWalletSnapshot,
   type IAccountDiscoverySummary,
 } from '@/features/wallet'
+import { ROUTE } from '@/app/router/routes'
 import { useTheme, type Theme } from '@/shared/theme'
 import {
   Alert,
@@ -170,6 +172,7 @@ export function SettingsPage() {
             icon={ShieldAlert}
             title="What you are trusting"
             description="The wallet runs as a web page: its code is downloaded from a server every time you open it. What that means, and what it does not protect against, is spelled out there."
+            linkState={{ from: 'wallet' }}
           />
 
           <SettingsNavRow
@@ -184,6 +187,22 @@ export function SettingsPage() {
             icon={ShieldCheck}
             title="Seed phrase and private keys"
             description="A seed phrase written on paper is the only way to restore the wallet after losing the device or clearing the browser data."
+          />
+
+          <SettingsNavRow
+            to={ROUTE.Privacy}
+            icon={FileText}
+            title="Privacy policy"
+            description="What data stays on your device, what may be sent to third-party services, and what we never collect."
+            linkState={{ from: 'wallet' }}
+          />
+
+          <SettingsNavRow
+            to={ROUTE.Terms}
+            icon={FileText}
+            title="Terms of service"
+            description="Non-custodial disclaimer, your responsibilities, and the risks of using a self-custody wallet."
+            linkState={{ from: 'wallet' }}
           />
         </CardContent>
       </Card>
@@ -374,6 +393,7 @@ interface SettingsNavRowProps {
    * и ровно потому, что не знают, чем они грозят.
    */
   readonly description: string
+  readonly linkState?: { readonly from: 'wallet' }
 }
 
 /**
@@ -391,10 +411,11 @@ interface SettingsNavRowProps {
  * слушает страницу, получает ровно то же, что видит зрячий, — название
  * и причину, по которой сюда стоит зайти.
  */
-function SettingsNavRow({ to, icon: Icon, title, description }: SettingsNavRowProps) {
+function SettingsNavRow({ to, icon: Icon, title, description, linkState }: SettingsNavRowProps) {
   return (
     <Link
       to={to}
+      state={linkState}
       className="focus-ring flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-accent sm:px-6"
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary-emphasis">

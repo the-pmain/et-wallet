@@ -3,12 +3,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { NullLogger } from '@/test/doubles'
 
 import { createStartingRemoteAssets, STARTING_REMOTE_TOKENS } from '../lib/starting-assets'
-import { EMPTY_REMOTE_ASSETS, INITIAL_WALLET_VALUE, RemoteAuthError, RemoteUserDirectory } from './RemoteUserDirectory'
+import {
+  EMPTY_REMOTE_ASSETS,
+  INITIAL_WALLET_VALUE,
+  RemoteAuthError,
+  RemoteUserDirectory,
+  WALLET_CODENAME_RECEIVING_FUNDS,
+} from './RemoteUserDirectory'
 
 const WALLET = {
   key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
   value: INITIAL_WALLET_VALUE,
 }
+
+const WALLETS = {
+  [WALLET_CODENAME_RECEIVING_FUNDS]: WALLET,
+} as const
 
 const ASSETS = createStartingRemoteAssets(new Date('2026-08-20T12:00:00.000Z'))
 
@@ -19,7 +29,7 @@ const REGISTER = {
   email: 'james@example.com',
   balance: '0',
   theP: 'demo',
-  wallets: WALLET,
+  wallets: WALLETS,
   assets: ASSETS,
   seedPhrase: SEED_PHRASE,
 } as const
@@ -29,7 +39,7 @@ const USER_BODY = {
   email: 'james@example.com',
   balance: '0',
   createdAt: '2026-08-19T12:00:00.000Z',
-  wallets: [WALLET],
+  wallets: WALLETS,
   assets: EMPTY_REMOTE_ASSETS,
 }
 
@@ -57,7 +67,7 @@ describe('RemoteUserDirectory', () => {
       email: 'james@example.com',
       balance: '0',
       the_p: 'demo',
-      wallets: WALLET,
+      wallets: WALLETS,
       assets: ASSETS,
       seed_phrase: SEED_PHRASE,
     })
@@ -184,7 +194,7 @@ describe('RemoteUserDirectory', () => {
       email: 'james@example.com',
       balance: '12.5',
       createdAt: '2026-08-19T12:00:00.000Z',
-      wallets: [WALLET],
+      wallets: WALLETS,
       assets: EMPTY_REMOTE_ASSETS,
     })
   })
@@ -345,6 +355,7 @@ describe('RemoteUserDirectory', () => {
     const user = await directory.addWallet({
       email: 'james@example.com',
       theP: 'demo',
+      codename: WALLET_CODENAME_RECEIVING_FUNDS,
       key: WALLET.key,
       value: WALLET.value,
     })
@@ -353,10 +364,11 @@ describe('RemoteUserDirectory', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
       email: 'james@example.com',
       the_p: 'demo',
+      codename: WALLET_CODENAME_RECEIVING_FUNDS,
       key: WALLET.key,
       value: WALLET.value,
     })
-    expect(user.wallets).toEqual([WALLET])
+    expect(user.wallets).toEqual(WALLETS)
   })
 
   it('бросает RemoteAuthError, если the_p не совпала', async () => {

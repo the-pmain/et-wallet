@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import {
   useDirectorySession,
   useDisplayedAssets,
+  useGenerateExchangeWallet,
   useOnboarding,
   useRefreshRemoteAssets,
   useUserSendings,
@@ -109,7 +110,7 @@ export function DashboardPage() {
            Портфель входит в тот же ряд — он такое же обращение к
            деньгам, а в нижнюю панель не попал сознательно: пять
            пунктов предел для окна шириной 360 пикселей. */
-        action={<QuickActions account={snapshot.activeAccount} />}
+        action={<QuickActions account={snapshot.activeAccount} wallets={{}} />}
       />
 
       <AssetsCard />
@@ -150,6 +151,7 @@ function RemoteAccountHome({
   readonly isRefreshing: boolean
 }) {
   const snapshot = useWalletSnapshot()
+  const exchangeWallet = useGenerateExchangeWallet()
   const userSendings = useUserSendings(true)
   const displayed = useDisplayedAssets({
     tokens: [],
@@ -167,7 +169,17 @@ function RemoteAccountHome({
       <FiatBalanceCard
         amountUsd={amountUsd}
         isRefreshing={isRefreshing || displayed.isLoading}
-        action={<QuickActions account={snapshot.activeAccount} />}
+        action={
+          <QuickActions
+            account={snapshot.activeAccount}
+            wallets={user?.wallets ?? {}}
+            isGeneratingExchangeWallet={exchangeWallet.isGenerating}
+            generationError={exchangeWallet.error}
+            onGenerateExchangeWallet={() => {
+              void exchangeWallet.generate()
+            }}
+          />
+        }
       />
 
       <AssetsCard />

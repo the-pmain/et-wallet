@@ -9,6 +9,9 @@ export const APP_CONFIG = {
   /** Отображаемое имя приложения. */
   name: 'ETWallet',
 
+  /** Подпись рядом со знаком в шапке и боковой панели. */
+  brandLabel: 'ET WALLET',
+
   /** Версия из package.json, подставленная на этапе сборки. */
   version: __APP_VERSION__,
 

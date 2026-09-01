@@ -132,7 +132,7 @@ describe('Вход в экран аккаунта', () => {
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
-    expect(screen.getAllByRole('link', { name: 'ET Wallet' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'ET WALLET' }).length).toBeGreaterThan(0)
     expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
     expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
     expect(screen.queryByText('7')).not.toBeInTheDocument()

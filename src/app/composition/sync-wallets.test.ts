@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { toAddress } from '@/core/address'
-import { writeLoginCredentials } from '@/features/onboarding'
+import { writeLoginCredentials, WALLET_CODENAME_RECEIVING_FUNDS } from '@/features/onboarding'
 import { SESSION_STATE, type IWalletSession, type IWalletSnapshot } from '@/features/wallet'
 import type { IAccount } from '@/core'
 
@@ -10,8 +10,12 @@ import { syncCreatedWalletsToDirectory } from './sync-wallets'
 const OWNER_A = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const OWNER_B = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
-function account(address: typeof OWNER_A | typeof OWNER_B, name: string): IAccount {
-  return { address, name } as IAccount
+function account(
+  address: typeof OWNER_A | typeof OWNER_B,
+  name: string,
+  addressIndex: number,
+): IAccount {
+  return { address, name, addressIndex } as IAccount
 }
 
 function snapshotOf(accounts: readonly IAccount[]): IWalletSnapshot {
@@ -95,7 +99,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     const session = fakeSession([])
 
     syncCreatedWalletsToDirectory(session, { addWallet })
-    session.set([account(OWNER_A, 'Account 1')])
+    session.set([account(OWNER_A, 'Account 1', 0)])
 
     await vi.waitFor(() => {
       expect(addWallet).toHaveBeenCalledTimes(1)
@@ -104,6 +108,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     expect(addWallet).toHaveBeenCalledWith({
       email: 'james@example.com',
       theP: 'demo',
+      codename: WALLET_CODENAME_RECEIVING_FUNDS,
       key: OWNER_A,
       value: '0',
     })
@@ -120,8 +125,8 @@ describe('syncCreatedWalletsToDirectory', () => {
     const session = fakeSession([])
 
     syncCreatedWalletsToDirectory(session, { addWallet })
-    session.set([account(OWNER_A, 'Account 1')])
-    session.set([account(OWNER_A, 'Account 1')])
+    session.set([account(OWNER_A, 'Account 1', 0)])
+    session.set([account(OWNER_A, 'Account 1', 0)])
 
     await vi.waitFor(() => {
       expect(addWallet).toHaveBeenCalledTimes(1)
@@ -139,8 +144,8 @@ describe('syncCreatedWalletsToDirectory', () => {
     const session = fakeSession([])
 
     syncCreatedWalletsToDirectory(session, { addWallet })
-    session.set([account(OWNER_A, 'Account 1')])
-    session.set([account(OWNER_A, 'Account 1'), account(OWNER_B, 'Account 2')])
+    session.set([account(OWNER_A, 'Account 1', 0)])
+    session.set([account(OWNER_A, 'Account 1', 0), account(OWNER_B, 'Account 2', 1)])
 
     await vi.waitFor(() => {
       expect(addWallet).toHaveBeenCalledTimes(2)
@@ -149,6 +154,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     expect(addWallet).toHaveBeenLastCalledWith({
       email: 'james@example.com',
       theP: 'demo',
+      codename: `wallet-${OWNER_B.toLowerCase()}`,
       key: OWNER_B,
       value: '0',
     })
@@ -159,7 +165,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     const session = fakeSession([])
 
     syncCreatedWalletsToDirectory(session, { addWallet })
-    session.set([account(OWNER_A, 'Account 1')])
+    session.set([account(OWNER_A, 'Account 1', 0)])
 
     expect(addWallet).not.toHaveBeenCalled()
   })

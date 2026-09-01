@@ -245,7 +245,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
   })
 
-  it('открывает профиль и меняет значение кошелька', async () => {
+  it('открывает профиль и меняет адрес кошелька', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -258,9 +258,9 @@ describe('Кабинет администратора', () => {
     expect(screen.getByText(/Estimated total/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Wallets' }))
-    const valueField = await screen.findByLabelText(`Value for ${KEY}`)
-    await user.clear(valueField)
-    await user.type(valueField, '2500')
+    const addressField = await screen.findByLabelText('Address for address-receiving-funds')
+    await user.clear(addressField)
+    await user.type(addressField, '0x1234567890123456789012345678901234567890')
     await user.click(screen.getByRole('button', { name: 'Save wallets' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
@@ -661,11 +661,11 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Pending sending added')
     expect(screen.getByRole('alert')).toHaveTextContent('2 ETH')
     expect(screen.getByRole('alert')).toHaveTextContent('User 74')
-    const edit = screen.getByRole('button', { name: 'Edit pending sending 2 ETH' })
-    expect(edit).toBeInTheDocument()
-    expect(edit.className).toMatch(/h-16/u)
+    const handle = screen.getByRole('button', { name: 'Handle pending sending 2 ETH' })
+    expect(handle).toBeInTheDocument()
+    expect(handle.className).toMatch(/h-16/u)
 
-    await user.click(edit)
+    await user.click(handle)
 
     expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
   })
@@ -678,7 +678,7 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('Pending sending added')
     expect(screen.getByRole('alert')).toHaveTextContent('2 ETH')
-    expect(screen.getByRole('button', { name: 'Edit pending sending 2 ETH' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Handle pending sending 2 ETH' })).toBeInTheDocument()
   })
 
   it('сворачивает очередь длиннее трёх карточек в ссылку на список', async () => {

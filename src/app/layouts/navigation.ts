@@ -36,3 +36,20 @@ export const NAVIGATION: readonly INavigationItem[] = [
   { to: ROUTE.Activity, labelKey: 'nav.activity', icon: History },
   { to: ROUTE.Settings, labelKey: 'nav.settings', icon: Settings },
 ]
+
+export interface IInfoLink {
+  readonly to: string
+  readonly labelKey: TranslationKey
+}
+
+/**
+ * Правовые и информационные страницы в нижней части боковой панели.
+ *
+ * Не входят в основную навигацию: на узком экране нижняя панель
+ * переполнена, а на широком экране ссылки живут под разделами кошелька.
+ */
+export const INFO_LINKS: readonly IInfoLink[] = [
+  { to: ROUTE.Trust, labelKey: 'info.trust' },
+  { to: ROUTE.Privacy, labelKey: 'info.privacy' },
+  { to: ROUTE.Terms, labelKey: 'info.terms' },
+]

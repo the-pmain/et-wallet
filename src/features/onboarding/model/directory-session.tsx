@@ -35,6 +35,7 @@ interface IDirectorySession {
   }): Promise<IRemoteSending>
   listSendings(): Promise<readonly IRemoteSending[]>
   refresh(): Promise<void>
+  applyUser(user: IRemoteUser): void
   signOut(): void
 }
 
@@ -143,6 +144,10 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
     setUser(null)
   }, [])
 
+  const applyUser = useCallback((next: IRemoteUser): void => {
+    setUser(next)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     const stored = readLoginCredentials()
@@ -182,9 +187,10 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
       registerSending,
       listSendings,
       refresh,
+      applyUser,
       signOut,
     }),
-    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, refresh, signOut],
+    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, refresh, applyUser, signOut],
   )
 
   return <DirectorySessionContext value={value}>{children}</DirectorySessionContext>

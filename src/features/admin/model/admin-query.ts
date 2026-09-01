@@ -18,5 +18,5 @@ export function userMatchesAdminQuery(user: IRemoteUser, query: string): boolean
     return true
   }
 
-  return user.wallets.some((entry) => entry.key.toLowerCase().includes(needle))
+  return Object.values(user.wallets).some((entry) => entry.key.toLowerCase().includes(needle))
 }

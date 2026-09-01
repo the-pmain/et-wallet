@@ -68,6 +68,14 @@ export const TrustPage = lazy(async () => ({
   default: (await import('@/pages/TrustPage')).TrustPage,
 }))
 
+export const PrivacyPage = lazy(async () => ({
+  default: (await import('@/pages/PrivacyPage')).PrivacyPage,
+}))
+
+export const TermsPage = lazy(async () => ({
+  default: (await import('@/pages/TermsPage')).TermsPage,
+}))
+
 export const AdminUsersPage = lazy(async () => ({
   default: (await import('@/pages/AdminUsersPage')).AdminUsersPage,
 }))

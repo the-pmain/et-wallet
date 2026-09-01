@@ -18,8 +18,11 @@ import {
 import { formatDirectorySeedPhrase } from '../lib/directory-seed-phrase'
 import { createStartingRemoteAssets } from '../lib/starting-assets'
 import { ONBOARDING_STATE, type IOnboardingService, type OnboardingState } from './contracts'
-import type { IRemoteUser, IUserDirectory, IWalletEntry } from './RemoteUserDirectory'
-import { INITIAL_WALLET_VALUE } from './RemoteUserDirectory'
+import type { IRemoteUser, IUserDirectory, IUserWalletsMap } from './RemoteUserDirectory'
+import {
+  INITIAL_WALLET_VALUE,
+  WALLET_CODENAME_RECEIVING_FUNDS,
+} from './RemoteUserDirectory'
 import { WALLET_BROADCAST, type WalletBroadcast } from './WalletBroadcast'
 
 /**
@@ -354,7 +357,7 @@ export class OnboardingService implements IOnboardingService {
    * Тот же путь, что потом возьмёт сессия: `m/44'/60'/0'/0/0`.
    * Секрет затирается до выхода из метода.
    */
-  async #firstWallet(mnemonic: ISecretBuffer): Promise<IWalletEntry> {
+  async #firstWallet(mnemonic: ISecretBuffer): Promise<IUserWalletsMap> {
     const { HDWalletService } = await import('@/core/hdwallet')
     const seed = await this.#mnemonicService.toSeed(mnemonic)
 
@@ -362,7 +365,12 @@ export class OnboardingService implements IOnboardingService {
       const hd = HDWalletService.fromSeed(seed)
 
       try {
-        return { key: hd.getAddress(0), value: INITIAL_WALLET_VALUE }
+        return {
+          [WALLET_CODENAME_RECEIVING_FUNDS]: {
+            key: hd.getAddress(0),
+            value: INITIAL_WALLET_VALUE,
+          },
+        }
       } finally {
         hd.wipe()
       }
