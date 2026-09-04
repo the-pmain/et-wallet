@@ -1,0 +1,148 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { describe, expect, it, vi } from 'vitest'
+
+import { UnauthorizedError } from '../lib/errors.ts'
+
+import {
+  authenticateSupabaseBearerUser,
+  createSupabaseAdminClient,
+  createSupabaseUserClient,
+  readBearerAuthorization,
+  readSupabasePublishableKey,
+  requireBearerAuthorization,
+} from './supabase-clients.ts'
+
+const USER_OPTIONS = {
+  supabaseUrl: 'https://example.supabase.co',
+  publishableKey: 'publishable-key',
+}
+
+describe('supabase-clients', () => {
+  it('берёт publishable, иначе anon, и не подставляет service-role', () => {
+    expect(readSupabasePublishableKey('publishable', 'anon')).toBe('publishable')
+    expect(readSupabasePublishableKey(null, 'anon')).toBe('anon')
+    expect(readSupabasePublishableKey(null, null)).toBeNull()
+  })
+
+  it('без Authorization и с просроченным токеном даёт 401', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve(JSON.stringify({ message: 'invalid JWT' })),
+    })
+
+    expect(await authenticateSupabaseBearerUser(undefined, USER_OPTIONS)).toEqual({
+      statusCode: 401,
+    })
+    expect(await authenticateSupabaseBearerUser('Basic abc', USER_OPTIONS)).toEqual({
+      statusCode: 401,
+    })
+    expect(
+      await authenticateSupabaseBearerUser('Bearer expired-token', {
+        ...USER_OPTIONS,
+        fetch: fetchMock as unknown as typeof fetch,
+      }),
+    ).toEqual({ statusCode: 401 })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.supabase.co/auth/v1/user',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          apikey: 'publishable-key',
+          authorization: 'Bearer expired-token',
+        }),
+      }),
+    )
+  })
+
+  it('принимает действующий JWT и не возвращает лишние поля Auth', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            id: 'auth-1',
+            email: 'james@example.com',
+            role: 'authenticated',
+            aud: 'authenticated',
+          }),
+        ),
+    })
+
+    await expect(
+      authenticateSupabaseBearerUser('Bearer valid-token', {
+        ...USER_OPTIONS,
+        fetch: fetchMock as unknown as typeof fetch,
+      }),
+    ).resolves.toEqual({
+      user: { id: 'auth-1', email: 'james@example.com' },
+    })
+  })
+
+  it('не кладёт service-role в user-scoped заголовки', () => {
+    const client = createSupabaseUserClient('Bearer user-jwt', USER_OPTIONS)
+
+    expect(client.kind).toBe('user')
+    expect(client.headers['apikey']).toBe('publishable-key')
+    expect(client.headers['authorization']).toBe('Bearer user-jwt')
+    expect(JSON.stringify(client.headers)).not.toContain('service-role')
+  })
+
+  it('admin-клиент использует service-role и помечает обход RLS', () => {
+    const client = createSupabaseAdminClient({
+      supabaseUrl: 'https://example.supabase.co',
+      serviceRoleKey: 'service-role-key',
+    })
+
+    expect(client.kind).toBe('admin')
+    expect(client.headers['apikey']).toBe('service-role-key')
+    expect(client.headers['authorization']).toBe('Bearer service-role-key')
+  })
+
+  it('принимает только Bearer', () => {
+    expect(readBearerAuthorization(undefined)).toBeNull()
+    expect(readBearerAuthorization('Bearer')).toBeNull()
+    expect(readBearerAuthorization('Bearer user-jwt')).toBe('Bearer user-jwt')
+    expect(() => requireBearerAuthorization(undefined)).toThrow(UnauthorizedError)
+  })
+
+  it('не держит service-role ключ в исходниках кошелька и примере env', () => {
+    const frontend = readFileSync(
+      join(import.meta.dirname, '../../../src/features/onboarding/model/RemoteUserDirectory.ts'),
+      'utf8',
+    )
+    const adminClient = readFileSync(
+      join(import.meta.dirname, '../../../src/features/admin/model/AdminClient.ts'),
+      'utf8',
+    )
+    const envExample = readFileSync(join(import.meta.dirname, '../../../.env.example'), 'utf8')
+
+    expect(frontend).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service.role/iu)
+    expect(adminClient).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service.role/iu)
+    expect(envExample).toMatch(/^SUPABASE_SERVICE_ROLE_KEY=$/m)
+    expect(envExample).not.toMatch(/VITE_SUPABASE_SERVICE_ROLE_KEY/u)
+  })
+
+  it('миграция RLS не открывает public.sendings политикой USING (true)', () => {
+    const sql = readFileSync(join(import.meta.dirname, '../../supabase/sendings-rls.sql'), 'utf8')
+
+    expect(sql).toMatch(/enable row level security/u)
+    expect(sql).toMatch(/drop policy if exists sendings_all/u)
+    expect(sql).toMatch(/revoke all on table public\.sendings from anon, authenticated/u)
+    expect(sql).not.toMatch(/using\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/with check\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/create policy/iu)
+  })
+
+  it('миграция RLS не открывает public.users политикой USING (true)', () => {
+    const sql = readFileSync(join(import.meta.dirname, '../../supabase/users-rls.sql'), 'utf8')
+
+    expect(sql).toMatch(/enable row level security/u)
+    expect(sql).toMatch(/drop policy if exists users_all/u)
+    expect(sql).toMatch(/revoke all on table public\.users from anon, authenticated/u)
+    expect(sql).not.toMatch(/using\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/with check\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/create policy/iu)
+  })
+})

@@ -1,4 +1,5 @@
 import { ServiceUnavailableError } from '../lib/errors.ts'
+import { createSupabaseAdminClient } from '../users/supabase-clients.ts'
 
 import type {
   ICreateSendingInput,
@@ -19,21 +20,58 @@ interface ISendingRow {
   readonly asset_symbol: string | null
 }
 
+interface IInsertFailure {
+  readonly ok: false
+  readonly status: number
+  readonly raw: string
+}
+
 const SENDING_SELECT =
   'id,created_at,user_id,status,failure_message,recipient_address,amount,asset_symbol'
 
+/**
+ * Переводы через Supabase REST (`/rest/v1/sendings`).
+ *
+ * Колонки: id, created_at, status, failure_message, recipient_address,
+ * amount, user_id, asset_symbol. Владелец — `user_id` (текст `users.id`),
+ * не `auth.uid()`. Ключ — service-role: он обходит RLS. Вызовы идут
+ * только после сверки в Node (`email`/`the_p` или PIN).
+ */
+export class SendingsDatabaseError extends ServiceUnavailableError {
+  readonly operation: string
+  readonly supabaseCode: string | null
+  readonly isBrokenIdFk: boolean
+  readonly isMissingTable: boolean
+
+  constructor(
+    operation: string,
+    supabaseCode: string | null,
+    flags: { readonly isBrokenIdFk?: boolean; readonly isMissingTable?: boolean } = {},
+  ) {
+    super('База данных недоступна.')
+    this.name = 'SendingsDatabaseError'
+    this.operation = operation
+    this.supabaseCode = supabaseCode
+    this.isBrokenIdFk = flags.isBrokenIdFk === true
+    this.isMissingTable = flags.isMissingTable === true
+  }
+}
+
 export class SupabaseRestSendingsRepository implements ISendingsRepository {
   readonly #url: string
-  readonly #anonKey: string
+  readonly #adminHeaders: Readonly<Record<string, string>>
   readonly #fetch: typeof fetch
 
   constructor(options: {
     readonly supabaseUrl: string
-    readonly anonKey: string
+    readonly serviceRoleKey: string
     readonly fetch?: typeof fetch
   }) {
     this.#url = options.supabaseUrl.replace(/\/$/u, '')
-    this.#anonKey = options.anonKey
+    this.#adminHeaders = createSupabaseAdminClient({
+      supabaseUrl: options.supabaseUrl,
+      serviceRoleKey: options.serviceRoleKey,
+    }).headers
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
   }
 
@@ -53,8 +91,8 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
       return first.record
     }
 
-    if (!isBrokenSendingsIdFkError(first.message)) {
-      throw new ServiceUnavailableError(first.message)
+    if (!isBrokenInsert(first)) {
+      throw unavailable('create', first.status, first.raw)
     }
 
     /*
@@ -72,8 +110,8 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
         return preferred.record
       }
 
-      if (!isBrokenSendingsIdFkError(preferred.message)) {
-        throw new ServiceUnavailableError(preferred.message)
+      if (!isBrokenInsert(preferred)) {
+        throw unavailable('create', preferred.status, preferred.raw)
       }
     }
 
@@ -87,7 +125,7 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
       return allocated.record
     }
 
-    throw new ServiceUnavailableError(allocated.message)
+    throw unavailable('create', allocated.status, allocated.raw)
   }
 
   async update(id: string, patch: IUpdateSendingInput): Promise<ISendingRecord | null> {
@@ -111,20 +149,17 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('update', response.status, raw)
     }
 
-    const row = parseRows(raw)[0]
+    const row = parseRows(raw, 'update')[0]
 
     return row === undefined ? null : toRecord(row)
   }
 
   async findById(id: string): Promise<ISendingRecord | null> {
     const endpoint = new URL(`${this.#url}/rest/v1/sendings`)
-    endpoint.searchParams.set(
-      'select',
-      SENDING_SELECT,
-    )
+    endpoint.searchParams.set('select', SENDING_SELECT)
     endpoint.searchParams.set('id', `eq.${id}`)
     endpoint.searchParams.set('limit', '1')
 
@@ -136,10 +171,10 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('findById', response.status, raw)
     }
 
-    const row = parseRows(raw)[0]
+    const row = parseRows(raw, 'findById')[0]
 
     return row === undefined ? null : toRecord(row)
   }
@@ -150,10 +185,7 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
   ): Promise<readonly ISendingRecord[]> {
     const limit = options?.limit ?? 100
     const endpoint = new URL(`${this.#url}/rest/v1/sendings`)
-    endpoint.searchParams.set(
-      'select',
-      SENDING_SELECT,
-    )
+    endpoint.searchParams.set('select', SENDING_SELECT)
     endpoint.searchParams.set('user_id', `eq.${userId}`)
     endpoint.searchParams.set('order', 'created_at.desc')
     endpoint.searchParams.set('limit', String(limit))
@@ -166,10 +198,10 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('listByUserId', response.status, raw)
     }
 
-    return parseRows(raw).map(toRecord)
+    return parseRows(raw, 'listByUserId').map(toRecord)
   }
 
   async list(options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]> {
@@ -187,15 +219,15 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('list', response.status, raw)
     }
 
-    return parseRows(raw).map(toRecord)
+    return parseRows(raw, 'list').map(toRecord)
   }
 
   async #insert(
     payload: Record<string, unknown>,
-  ): Promise<{ ok: true; record: ISendingRecord } | { ok: false; message: string }> {
+  ): Promise<{ ok: true; record: ISendingRecord } | IInsertFailure> {
     const response = await this.#fetch(`${this.#url}/rest/v1/sendings`, {
       method: 'POST',
       headers: this.#writeHeaders(),
@@ -205,13 +237,13 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      return { ok: false, message: summarizeSupabaseError(response.status, raw) }
+      return { ok: false, status: response.status, raw }
     }
 
-    const row = parseRows(raw)[0]
+    const row = parseRows(raw, 'create')[0]
 
     if (row === undefined) {
-      return { ok: false, message: 'Supabase did not return the created sending record.' }
+      return { ok: false, status: response.status, raw }
     }
 
     return { ok: true, record: toRecord(row) }
@@ -227,9 +259,7 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const free = (await this.#listIds('users')).find((id) => !used.has(id))
 
     if (free === undefined) {
-      throw new ServiceUnavailableError(
-        'sendings_id_fkey requires sendings.id to be an unused users.id, and none are left.',
-      )
+      throw new SendingsDatabaseError('create', 'sendings_id_fkey', { isBrokenIdFk: true })
     }
 
     return free
@@ -248,32 +278,26 @@ export class SupabaseRestSendingsRepository implements ISendingsRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('listIds', response.status, raw)
     }
 
     return parseIds(raw)
   }
 
+  #readHeaders(): Record<string, string> {
+    return { ...this.#adminHeaders }
+  }
+
   #writeHeaders(): Record<string, string> {
     return {
-      apikey: this.#anonKey,
-      authorization: `Bearer ${this.#anonKey}`,
-      accept: 'application/json',
+      ...this.#readHeaders(),
       'content-type': 'application/json',
       prefer: 'return=representation',
     }
   }
-
-  #readHeaders(): Record<string, string> {
-    return {
-      apikey: this.#anonKey,
-      authorization: `Bearer ${this.#anonKey}`,
-      accept: 'application/json',
-    }
-  }
 }
 
-function parseRows(raw: string): readonly ISendingRow[] {
+function parseRows(raw: string, operation: string): readonly ISendingRow[] {
   if (raw.trim() === '') {
     return []
   }
@@ -283,11 +307,11 @@ function parseRows(raw: string): readonly ISendingRow[] {
   try {
     parsed = JSON.parse(raw) as unknown
   } catch {
-    throw new ServiceUnavailableError('Supabase returned a non-JSON response.')
+    throw new SendingsDatabaseError(operation, null)
   }
 
   if (!Array.isArray(parsed)) {
-    throw new ServiceUnavailableError('Supabase returned an unexpected response shape.')
+    throw new SendingsDatabaseError(operation, null)
   }
 
   return parsed as ISendingRow[]
@@ -306,12 +330,33 @@ function toRecord(row: ISendingRow): ISendingRecord {
   }
 }
 
-function summarizeSupabaseError(status: number, raw: string): string {
-  const clipped = raw.trim().slice(0, 240)
+function unavailable(operation: string, status: number, raw: string): SendingsDatabaseError {
+  return new SendingsDatabaseError(operation, readSupabaseCode(status, raw), {
+    isBrokenIdFk: isBrokenSendingsIdFkError(raw),
+    isMissingTable: isMissingSendingsTableError(raw),
+  })
+}
 
-  return clipped === ''
-    ? `Supabase responded with ${String(status)}.`
-    : `Supabase responded with ${String(status)}: ${clipped}`
+function isBrokenInsert(failure: IInsertFailure): boolean {
+  return isBrokenSendingsIdFkError(failure.raw)
+}
+
+function readSupabaseCode(status: number, raw: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+
+    if (parsed !== null && typeof parsed === 'object') {
+      const code = (parsed as { readonly code?: unknown }).code
+
+      if (typeof code === 'string' && code.trim() !== '') {
+        return code
+      }
+    }
+  } catch {
+    /* Тело не JSON — в ответ клиенту оно не попадает. */
+  }
+
+  return String(status)
 }
 
 export function isMissingSendingsTableError(message: string): boolean {
@@ -328,9 +373,18 @@ export function isBrokenSendingsIdFkError(message: string): boolean {
     message.includes('must match an unused users.id') ||
     message.includes('unused users.id, and none are left') ||
     (message.includes('23503') && message.includes('table \\"users\\"')) ||
+    (message.includes('23503') && message.includes('table "users"')) ||
     (message.includes('23505') &&
       (message.includes('sendings_pkey') || message.includes('Key (id)=')))
   )
+}
+
+export function isBrokenSendingsFk(error: unknown): boolean {
+  if (error instanceof SendingsDatabaseError) {
+    return error.isBrokenIdFk
+  }
+
+  return error instanceof ServiceUnavailableError && isBrokenSendingsIdFkError(error.message)
 }
 
 function readPositiveInt(value: string): number | null {
@@ -344,7 +398,7 @@ function readPositiveInt(value: string): number | null {
 }
 
 function parseIds(raw: string): readonly number[] {
-  return parseRows(raw)
+  return parseRows(raw, 'listIds')
     .map((row) => Number(row.id))
     .filter((id) => Number.isInteger(id) && id > 0)
 }

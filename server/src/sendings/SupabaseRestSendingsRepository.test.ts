@@ -4,6 +4,7 @@ import { ServiceUnavailableError } from '../lib/errors.ts'
 
 import {
   isBrokenSendingsIdFkError,
+  SendingsDatabaseError,
   SupabaseRestSendingsRepository,
 } from './SupabaseRestSendingsRepository.ts'
 import { SENDING_STATUS } from './status.ts'
@@ -41,7 +42,7 @@ describe('SupabaseRestSendingsRepository', () => {
     })
     const sendings = new SupabaseRestSendingsRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -54,6 +55,12 @@ describe('SupabaseRestSendingsRepository', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({
+        apikey: 'service-role',
+        authorization: 'Bearer service-role',
+      }),
+    })
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
       user_id: '72',
       status: 'pending',
@@ -81,7 +88,7 @@ describe('SupabaseRestSendingsRepository', () => {
       })
     const sendings = new SupabaseRestSendingsRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -149,7 +156,7 @@ describe('SupabaseRestSendingsRepository', () => {
       })
     const sendings = new SupabaseRestSendingsRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -178,19 +185,25 @@ describe('SupabaseRestSendingsRepository', () => {
     })
     const sendings = new SupabaseRestSendingsRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    await expect(
-      sendings.create({
-        userId: '72',
-        status: SENDING_STATUS.Pending,
-        recipientAddress: CREATED_ROW.recipient_address,
-        amount: CREATED_ROW.amount,
-        symbol: 'ETH',
-      }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableError)
+    const failure = sendings.create({
+      userId: '72',
+      status: SENDING_STATUS.Pending,
+      recipientAddress: CREATED_ROW.recipient_address,
+      amount: CREATED_ROW.amount,
+      symbol: 'ETH',
+    })
+
+    await expect(failure).rejects.toBeInstanceOf(SendingsDatabaseError)
+    await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableError)
+    await expect(failure).rejects.toMatchObject({
+      message: 'База данных недоступна.',
+      operation: 'create',
+      isBrokenIdFk: false,
+    })
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 

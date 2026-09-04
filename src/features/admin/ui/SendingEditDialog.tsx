@@ -47,6 +47,9 @@ export function SendingEditDialog({
   )
 
   const isOpen = sending !== null
+  const isFailure = draft.status === SENDING_STATUS.Failure
+  const hasFailureReason = (draft.failureMessage ?? '').trim() !== ''
+  const canSave = !isBusy && (!isFailure || hasFailureReason)
   const failureSelectValue = usesCustomMessage
     ? FAILURE_MESSAGE_CUSTOM
     : failureMessageSelectValue(draft.failureMessage)
@@ -54,7 +57,7 @@ export function SendingEditDialog({
   function handleSubmit(event: FormEvent): void {
     event.preventDefault()
 
-    if (sending === null) {
+    if (sending === null || !canSave) {
       return
     }
 
@@ -72,13 +75,13 @@ export function SendingEditDialog({
       isOpen={isOpen}
       onClose={onClose}
       title="Edit sending"
-      description="Status and the other writable fields. Id, time and user stay as they are."
+      description="Change the asset, amount, recipient, status, or failure reason. ID, created time, and user stay as they are."
       footer={
         <>
           <Button type="button" variant="ghost" disabled={isBusy} onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form={`${fieldId}-form`} disabled={isBusy}>
+          <Button type="submit" form={`${fieldId}-form`} disabled={!canSave}>
             {isBusy ? 'Saving…' : 'Save'}
           </Button>
         </>
@@ -86,11 +89,11 @@ export function SendingEditDialog({
     >
       {sending === null ? null : (
         <form id={`${fieldId}-form`} className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <ReadonlyField label="id" value={sending.id} />
-          <ReadonlyField label="createdAt" value={formatAdminTimestamp(sending.createdAt)} />
-          <ReadonlyField label="userId" value={sending.userId ?? '—'} />
+          <ReadonlyField label="ID" value={sending.id} />
+          <ReadonlyField label="Created" value={formatAdminTimestamp(sending.createdAt)} />
+          <ReadonlyField label="User" value={sending.userId ?? '—'} />
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${fieldId}-symbol`}>symbol</Label>
+            <Label htmlFor={`${fieldId}-symbol`}>Asset</Label>
             <Select
               id={`${fieldId}-symbol`}
               value={draft.symbol}
@@ -105,7 +108,7 @@ export function SendingEditDialog({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${fieldId}-amount`}>amount</Label>
+            <Label htmlFor={`${fieldId}-amount`}>Amount</Label>
             <Input
               id={`${fieldId}-amount`}
               name="amount"
@@ -117,7 +120,7 @@ export function SendingEditDialog({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${fieldId}-recipient`}>recipientAddress</Label>
+            <Label htmlFor={`${fieldId}-recipient`}>Recipient</Label>
             <Input
               id={`${fieldId}-recipient`}
               name="recipientAddress"
@@ -130,13 +133,17 @@ export function SendingEditDialog({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${fieldId}-status`}>status</Label>
+            <Label htmlFor={`${fieldId}-status`} className={isFailure ? 'text-destructive' : undefined}>
+              Status
+            </Label>
             <Select
               id={`${fieldId}-status`}
               value={draft.status}
               disabled={isBusy}
               menuPlacement="top"
-              tone={draft.status === SENDING_STATUS.Success ? 'success' : 'default'}
+              tone={
+                isFailure ? 'danger' : draft.status === SENDING_STATUS.Success ? 'success' : 'default'
+              }
               options={SENDING_STATUSES.map((status) => ({
                 value: status,
                 label: status,
@@ -150,14 +157,14 @@ export function SendingEditDialog({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${fieldId}-failure`} className="text-destructive">
-              failureMessage
+            <Label htmlFor={`${fieldId}-failure`} className={isFailure ? 'text-destructive' : undefined}>
+              Failure reason
             </Label>
             <Select
               id={`${fieldId}-failure`}
               value={failureSelectValue}
-              disabled={isBusy}
-              tone="danger"
+              disabled={isBusy || !isFailure}
+              tone={isFailure ? 'danger' : 'default'}
               menuPlacement="top"
               options={[
                 { value: FAILURE_MESSAGE_NONE, label: 'None' },
@@ -186,7 +193,7 @@ export function SendingEditDialog({
                 }))
               }}
             />
-            {usesCustomMessage ? (
+            {usesCustomMessage && isFailure ? (
               <Textarea
                 id={`${fieldId}-failure-custom`}
                 name="failureMessageCustom"

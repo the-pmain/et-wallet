@@ -20,6 +20,10 @@ const KEYS = [
   'R2_ENDPOINT',
   'R2_BUCKET',
   'EMAIL_WEBHOOK_SECRET',
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
 ] as const
 
 const snapshot = new Map<string, string | undefined>()
@@ -123,6 +127,23 @@ describe('loadConfig', () => {
     expect(config.r2Endpoint).toBe('https://example.r2.cloudflarestorage.com')
     expect(config.r2Bucket).toBe('etwallet-emails')
     expect(config.emailWebhookSecret).toBeNull()
+  })
+
+  it('читает ключи Supabase для users и не подменяет service-role publishable-ключом', () => {
+    isolateEnv({
+      NODE_ENV: 'development',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_ANON_KEY: 'anon-key',
+      SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
+      SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+    })
+
+    const config = loadConfig()
+
+    expect(config.supabaseUrl).toBe('https://example.supabase.co')
+    expect(config.supabaseAnonKey).toBe('anon-key')
+    expect(config.supabasePublishableKey).toBe('publishable-key')
+    expect(config.supabaseServiceRoleKey).toBe('service-role-key')
   })
 
   it('читает секрет входящего вебхука', () => {

@@ -31,6 +31,10 @@ import type { IUserResponse } from './contracts.ts'
  * к пользователям. Письма — отдельный PIN: `POST /v1/email-manager/auth`
  * и заголовок `x-email-manager-pin`. Колонка `the_p` в ответах не
  * участвует: её можно только заменить.
+ *
+ * Маршруты `/v1/admin/users` — trusted admin: PIN сверяется на сервере,
+ * затем service-role клиент читает `public.users`. Поле `role` в теле
+ * не является доказательством прав.
  */
 
 const PIN_MAX = 16

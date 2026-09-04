@@ -5,12 +5,12 @@ import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors
 import { API_CONTENT_SECURITY_POLICY } from '../lib/ui.ts'
 import { SENDING_AMOUNT_JSON_PATTERN } from '../sendings/amount.ts'
 import { SENDING_STATUS } from '../sendings/status.ts'
-import { formatSendingsSseFrame, SendingsHub } from '../sendings/SendingsHub.ts'
+import { formatSendingsSseFrame, type SendingsHub } from '../sendings/SendingsHub.ts'
 import { SENDING_SYMBOL_JSON_PATTERN } from '../sendings/symbol.ts'
 import {
   SendingsAuthError,
-  SendingsService,
   SendingsValidationError,
+  type SendingsService,
 } from '../sendings/SendingsService.ts'
 import type { ISendingRecord } from '../sendings/contracts.ts'
 import {
@@ -130,6 +130,16 @@ interface ISendingsSseQuery {
   readonly user_id?: string
 }
 
+/**
+ * Переводы в `public.sendings`.
+ *
+ * `POST /v1/users/sendings` и `GET /v1/users/:id/sendings` — trusted
+ * server: личность `email`+`the_p`, `user_id` обязан совпасть.
+ * `GET/PATCH /v1/admin/sendings` — trusted admin: `x-admin-pin`.
+ * Хранилище ходит service-role клиентом. User-scoped JWT здесь не
+ * подходит: `user_id` — это `users.id`, не `auth.uid()`.
+ * `GET /v1/sendings` — поток SSE из памяти процесса, таблицу не читает.
+ */
 export function registerSendingRoutes(
   app: FastifyInstance,
   sendingsService: SendingsService,

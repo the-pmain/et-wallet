@@ -88,3 +88,14 @@ export const AdminUserPage = lazy(async () => ({
   default: (await import('@/pages/AdminUserPage')).AdminUserPage,
 }))
 
+export const Variant1Page = lazy(async () => ({
+  default: (await import('@/pages/theme-variants/Variant1Page')).Variant1Page,
+}))
+
+export const Variant2Page = lazy(async () => ({
+  default: (await import('@/pages/theme-variants/Variant2Page')).Variant2Page,
+}))
+
+export const Variant3Page = lazy(async () => ({
+  default: (await import('@/pages/theme-variants/Variant3Page')).Variant3Page,
+}))

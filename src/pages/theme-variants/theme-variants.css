@@ -1,0 +1,299 @@
+/*
+  Изолированные темы этюдов кошелька.
+
+  Токены живут на корне с `data-wallet-theme` и перекрывают переменные
+  приложения только внутри этого корня. Боевой кабинет переменных не
+  видит: файл подключается ленивым экраном варианта.
+*/
+
+.tv-root {
+  --tv-studio-height: 3.25rem;
+  isolation: isolate;
+  min-height: 100svh;
+  background: var(--tv-page);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+.tv-studio {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  min-height: var(--tv-studio-height);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  background: #111216;
+  padding: 0.5rem 1rem;
+  color: #ece8e1;
+}
+
+.tv-studio-note {
+  margin-right: auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  color: #b4b0a8;
+}
+
+@media (max-width: 640px) {
+  .tv-studio {
+    gap: 0.45rem 0.65rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .tv-studio-note {
+    width: 100%;
+  }
+}
+
+.tv-studio-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tv-studio-link {
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #d8d4cc;
+  text-decoration: none;
+}
+
+.tv-studio-link:hover {
+  background: rgb(255 255 255 / 8%);
+  color: #fff;
+}
+
+.tv-studio-link.is-active {
+  background: #fff;
+  color: #111216;
+}
+
+.tv-studio-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.tv-stage {
+  display: flex;
+  justify-content: center;
+  min-height: calc(100svh - var(--tv-studio-height));
+}
+
+.tv-frame {
+  display: flex;
+  width: 100%;
+  min-height: calc(100svh - var(--tv-studio-height));
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.tv-inert {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+}
+
+.tv-inert:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+[data-wallet-theme='metamask'] {
+  color-scheme: dark;
+  --tv-page: #0c0d0f;
+  --background: #121314;
+  --foreground: #ffffff;
+  --card: #232426;
+  --card-foreground: #ffffff;
+  --muted: #31333a;
+  --muted-foreground: #9ca1af;
+  --primary: #ff5c16;
+  --primary-foreground: #ffffff;
+  --primary-emphasis: #ffa680;
+  --accent: #31333a;
+  --accent-foreground: #ffffff;
+  --border: #31333a;
+  --ring: #ff5c16;
+  --tv-action: #3b3d44;
+  --radius: 1.25rem;
+}
+
+[data-wallet-theme='metamask'] .tv-frame {
+  max-width: 26.25rem;
+  box-shadow:
+    0 0 0 1px #232426,
+    0 24px 64px rgb(0 0 0 / 45%);
+}
+
+[data-wallet-theme='metamask'] .tv-mm-action {
+  display: flex;
+  width: 4.25rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  color: #ffffff;
+}
+
+[data-wallet-theme='metamask'] .tv-mm-action-icon {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--tv-action);
+}
+
+[data-wallet-theme='metamask'] .tv-nav-item.is-active {
+  color: #ffffff;
+}
+
+[data-wallet-theme='trust'] {
+  color-scheme: dark;
+  --tv-page: #04050a;
+  --background: #07080d;
+  --foreground: #f4f6ff;
+  --card: #12131b;
+  --card-foreground: #f4f6ff;
+  --muted: #1a1c28;
+  --muted-foreground: #9aa3c2;
+  --primary: #2f6bff;
+  --primary-foreground: #ffffff;
+  --primary-emphasis: #7ea2ff;
+  --accent: #151826;
+  --accent-foreground: #f4f6ff;
+  --border: #222536;
+  --ring: #2f6bff;
+  --tv-green: #3dff8a;
+  --tv-blue: #2f6bff;
+  --radius: 1.5rem;
+}
+
+[data-wallet-theme='trust'] .tv-frame {
+  max-width: 26.25rem;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgb(47 107 255 / 28%), transparent 55%), var(--background);
+  box-shadow:
+    0 0 0 1px #171924,
+    0 24px 64px rgb(0 0 0 / 50%);
+}
+
+[data-wallet-theme='trust'] .tv-tw-action {
+  display: flex;
+  min-width: 3.6rem;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  color: #f4f6ff;
+}
+
+[data-wallet-theme='trust'] .tv-tw-action-icon {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #ffffff;
+}
+
+[data-wallet-theme='trust'] .tv-tw-action--send .tv-tw-action-icon {
+  background: #2f6bff;
+}
+
+[data-wallet-theme='trust'] .tv-tw-action--receive .tv-tw-action-icon {
+  background: #16c784;
+}
+
+[data-wallet-theme='trust'] .tv-tw-action--buy .tv-tw-action-icon {
+  background: #7b61ff;
+}
+
+[data-wallet-theme='trust'] .tv-tw-action--swap .tv-tw-action-icon {
+  background: #1aa7ec;
+}
+
+[data-wallet-theme='trust'] .tv-tw-action--earn .tv-tw-action-icon {
+  background: #f5a524;
+}
+
+[data-wallet-theme='trust'] .tv-nav-item.is-active {
+  color: #7ea2ff;
+}
+
+[data-wallet-theme='cabinet'] {
+  color-scheme: light;
+  --tv-page: oklch(0.97 0.012 293);
+  --background: oklch(0.99 0.004 293);
+  --foreground: oklch(0.17 0.015 293);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.17 0.015 293);
+  --muted: oklch(0.96 0.008 293);
+  --muted-foreground: oklch(0.42 0.03 293);
+  --primary: oklch(0.5 0.23 293);
+  --primary-foreground: oklch(0.99 0.005 293);
+  --primary-emphasis: oklch(0.5 0.23 293);
+  --accent: oklch(0.95 0.02 293);
+  --accent-foreground: oklch(0.3 0.09 293);
+  --border: oklch(0.9 0.012 293);
+  --ring: oklch(0.5 0.23 293);
+  --tv-hero: linear-gradient(157deg, oklch(0.97 0.035 296), oklch(0.99 0.012 268));
+  --elevation-raised: 0 2px 4px oklch(0.17 0.015 293 / 7%), 0 14px 36px oklch(0.4 0.16 293 / 12%);
+  --radius: 0.875rem;
+}
+
+[data-wallet-theme='cabinet'] .tv-frame {
+  max-width: 72rem;
+  background:
+    radial-gradient(80% 50% at 10% 0%, oklch(0.86 0.11 296 / 45%), transparent 55%),
+    radial-gradient(70% 40% at 90% 10%, oklch(0.88 0.08 268 / 40%), transparent 50%),
+    var(--background);
+}
+
+[data-wallet-theme='cabinet'] .tv-studio {
+  border-bottom-color: oklch(0.17 0.015 293 / 10%);
+}
+
+.tv-token-glyph {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+.tv-token-glyph[data-tone='eth'] {
+  background: #627eea;
+}
+
+.tv-token-glyph[data-tone='usdc'] {
+  background: #2775ca;
+}
+
+.tv-token-glyph[data-tone='usdt'] {
+  background: #26a17b;
+}
+
+@media (max-width: 480px) {
+  [data-wallet-theme='metamask'] .tv-frame,
+  [data-wallet-theme='trust'] .tv-frame {
+    max-width: none;
+    box-shadow: none;
+  }
+}

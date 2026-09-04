@@ -23,9 +23,11 @@ import type { ISettingsRepository } from './settings/contracts.ts'
 import { MemorySendingsRepository } from './sendings/MemorySendingsRepository.ts'
 import { SendingsHub } from './sendings/SendingsHub.ts'
 import { SendingsService } from './sendings/SendingsService.ts'
+import { SendingsDatabaseError } from './sendings/SupabaseRestSendingsRepository.ts'
 import type { ISendingsRepository } from './sendings/contracts.ts'
 import { MemoryUsersRepository } from './users/MemoryUsersRepository.ts'
 import { USERS_STORE_KIND, type IUsersRepository, type UsersStoreKind } from './users/contracts.ts'
+import { UsersDatabaseError } from './users/SupabaseRestUsersRepository.ts'
 
 /**
  * Зависимости приложения.
@@ -134,6 +136,17 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
+      if (error instanceof UsersDatabaseError || error instanceof SendingsDatabaseError) {
+        request.log.error(
+          {
+            route: request.routeOptions.url,
+            operation: error.operation,
+            supabaseCode: error.supabaseCode,
+          },
+          error instanceof SendingsDatabaseError ? 'sendings database error' : 'users database error',
+        )
+      }
+
       void reply.status(error.statusCode).send({
         error: { code: error.code, message: error.message },
       })

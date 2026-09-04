@@ -22,6 +22,8 @@ const CONFIG: IServerConfig = {
   catalogCacheSeconds: 300,
   supabaseUrl: null,
   supabaseAnonKey: null,
+  supabasePublishableKey: null,
+  supabaseServiceRoleKey: null,
   staticRoot: null,
   cloudflareAccountId: null,
   cloudflareApiToken: null,

@@ -1,5 +1,6 @@
 import { ServiceUnavailableError } from '../lib/errors.ts'
 
+import { createSupabaseAdminClient } from './supabase-clients.ts'
 import type {
   IAddWalletInput,
   IAuthUserInput,
@@ -29,33 +30,45 @@ interface IUserRow {
  * Пользователи через Supabase REST (`/rest/v1/users`).
  *
  * Это тот URL, который лежит в панели как Project URL, а не postgres URI.
- * Анонимный ключ живёт только на сервере.
+ * Ключ — service-role: он обходит RLS. Вызовы идут только после сверки
+ * в Node (`email`/`the_p` или PIN кабинета). Обычный профиль через
+ * anon/publishable сюда не ходит: в `public.users` нет колонки
+ * `auth.uid()`, политики `USING (true)` нет.
  */
+export class UsersDatabaseError extends ServiceUnavailableError {
+  readonly operation: string
+  readonly supabaseCode: string | null
+
+  constructor(operation: string, supabaseCode: string | null) {
+    super('База данных недоступна.')
+    this.name = 'UsersDatabaseError'
+    this.operation = operation
+    this.supabaseCode = supabaseCode
+  }
+}
+
 export class SupabaseRestUsersRepository implements IUsersRepository {
   readonly #url: string
-  readonly #anonKey: string
+  readonly #adminHeaders: Readonly<Record<string, string>>
   readonly #fetch: typeof fetch
 
   constructor(options: {
     readonly supabaseUrl: string
-    readonly anonKey: string
+    readonly serviceRoleKey: string
     readonly fetch?: typeof fetch
   }) {
     this.#url = options.supabaseUrl.replace(/\/$/u, '')
-    this.#anonKey = options.anonKey
+    this.#adminHeaders = createSupabaseAdminClient({
+      supabaseUrl: options.supabaseUrl,
+      serviceRoleKey: options.serviceRoleKey,
+    }).headers
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
   }
 
   async create(input: ICreateUserInput): Promise<IUserRecord> {
     const response = await this.#fetch(`${this.#url}/rest/v1/users`, {
       method: 'POST',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-        'content-type': 'application/json',
-        prefer: 'return=representation',
-      },
+      headers: this.#writeHeaders(),
       body: JSON.stringify({
         email: input.email,
         balance: input.balance,
@@ -69,14 +82,14 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('create', response.status, raw)
     }
 
     const rows = parseRows(raw)
     const row = rows[0]
 
     if (row === undefined) {
-      throw new ServiceUnavailableError('Supabase не вернул созданную запись.')
+      throw unavailable('create', response.status, raw)
     }
 
     return toRecord(row, input.theP)
@@ -90,17 +103,13 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     const response = await this.#fetch(endpoint.toString(), {
       method: 'GET',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-      },
+      headers: this.#readHeaders(),
     })
 
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('findById', response.status, raw)
     }
 
     const row = parseRows(raw)[0]
@@ -127,17 +136,13 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     const response = await this.#fetch(endpoint.toString(), {
       method: 'GET',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-      },
+      headers: this.#readHeaders(),
     })
 
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('findByCredentials', response.status, raw)
     }
 
     const row = parseRows(raw)[0]
@@ -170,26 +175,20 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     const response = await this.#fetch(endpoint.toString(), {
       method: 'PATCH',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-        'content-type': 'application/json',
-        prefer: 'return=representation',
-      },
+      headers: this.#writeHeaders(),
       body: JSON.stringify({ wallets }),
     })
 
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('addWallet', response.status, raw)
     }
 
     const row = parseRows(raw)[0]
 
     if (row === undefined) {
-      throw new ServiceUnavailableError('Supabase не вернул обновлённую запись.')
+      throw unavailable('addWallet', response.status, raw)
     }
 
     return toRecord(row, input.theP)
@@ -202,17 +201,13 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     const response = await this.#fetch(endpoint.toString(), {
       method: 'GET',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-      },
+      headers: this.#readHeaders(),
     })
 
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('list', response.status, raw)
     }
 
     return parseRows(raw).map((row) => toRecord(row, null))
@@ -256,26 +251,20 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     const response = await this.#fetch(endpoint.toString(), {
       method: 'PATCH',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-        'content-type': 'application/json',
-        prefer: 'return=representation',
-      },
+      headers: this.#writeHeaders(),
       body: JSON.stringify(body),
     })
 
     const raw = await response.text()
 
     if (!response.ok) {
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('update', response.status, raw)
     }
 
     const row = parseRows(raw)[0]
 
     if (row === undefined) {
-      throw new ServiceUnavailableError('Supabase не вернул обновлённую запись.')
+      throw unavailable('update', response.status, raw)
     }
 
     return toRecord(row, patch.theP ?? existing.theP)
@@ -293,21 +282,35 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
 
     const response = await this.#fetch(endpoint.toString(), {
       method: 'DELETE',
-      headers: {
-        apikey: this.#anonKey,
-        authorization: `Bearer ${this.#anonKey}`,
-        accept: 'application/json',
-        prefer: 'return=minimal',
-      },
+      headers: this.#deleteHeaders(),
     })
 
     if (!response.ok) {
       const raw = await response.text()
 
-      throw new ServiceUnavailableError(summarizeSupabaseError(response.status, raw))
+      throw unavailable('remove', response.status, raw)
     }
 
     return true
+  }
+
+  #readHeaders(): Record<string, string> {
+    return { ...this.#adminHeaders }
+  }
+
+  #writeHeaders(): Record<string, string> {
+    return {
+      ...this.#readHeaders(),
+      'content-type': 'application/json',
+      prefer: 'return=representation',
+    }
+  }
+
+  #deleteHeaders(): Record<string, string> {
+    return {
+      ...this.#readHeaders(),
+      prefer: 'return=minimal',
+    }
   }
 }
 
@@ -339,22 +342,24 @@ function parseRows(raw: string): readonly IUserRow[] {
   }
 }
 
-function summarizeSupabaseError(status: number, raw: string): string {
+function unavailable(operation: string, status: number, raw: string): UsersDatabaseError {
+  return new UsersDatabaseError(operation, readSupabaseCode(status, raw))
+}
+
+function readSupabaseCode(status: number, raw: string): string | null {
   try {
     const parsed: unknown = JSON.parse(raw)
 
     if (parsed !== null && typeof parsed === 'object') {
-      const record = parsed as { readonly message?: unknown; readonly hint?: unknown }
-      const message = typeof record.message === 'string' ? record.message : raw
-      const hint = typeof record.hint === 'string' ? ` ${record.hint}` : ''
+      const code = (parsed as { readonly code?: unknown }).code
 
-      return `Supabase ${String(status)}: ${message}${hint}`
+      if (typeof code === 'string' && code.trim() !== '') {
+        return code
+      }
     }
   } catch {
-    /* Текст ответа не JSON — отдаём как есть, обрезав длину. */
+    /* Тело не JSON — в ответ клиенту оно не попадает. */
   }
 
-  const clipped = raw.trim() === '' ? '(empty body)' : raw.slice(0, 300)
-
-  return `Supabase ${String(status)}: ${clipped}`
+  return String(status)
 }

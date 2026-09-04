@@ -32,6 +32,12 @@ export const ROUTE = {
   Settings: '/wallet/settings',
   Approvals: '/wallet/approvals',
   Backup: '/wallet/backup',
+
+  /* Неподвижные этюды темы главного экрана. Открыты без разблокировки:
+     это сравнение вида, а не кабинет. */
+  Variant1: '/variant-1',
+  Variant2: '/variant-2',
+  Variant3: '/variant-3',
 } as const
 
 export type Route = (typeof ROUTE)[keyof typeof ROUTE]

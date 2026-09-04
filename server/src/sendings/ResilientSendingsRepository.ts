@@ -1,5 +1,3 @@
-import { ServiceUnavailableError } from '../lib/errors.ts'
-
 import type {
   ICreateSendingInput,
   ISendingRecord,
@@ -7,7 +5,7 @@ import type {
   IUpdateSendingInput,
 } from './contracts.ts'
 import { MemorySendingsRepository } from './MemorySendingsRepository.ts'
-import { isBrokenSendingsIdFkError } from './SupabaseRestSendingsRepository.ts'
+import { isBrokenSendingsFk } from './SupabaseRestSendingsRepository.ts'
 
 export const BROKEN_SENDINGS_FK_WARNING =
   'Supabase sendings table has a mistaken foreign key on sendings.id. Run server/supabase/fix-sendings-fkey.sql in the Supabase SQL Editor, then restart the server. New transfers are kept in memory until then; existing rows stay in Supabase.'
@@ -74,7 +72,7 @@ export class ResilientSendingsRepository implements ISendingsRepository {
   }
 
   #isBrokenFk(error: unknown): boolean {
-    return error instanceof ServiceUnavailableError && isBrokenSendingsIdFkError(error.message)
+    return isBrokenSendingsFk(error)
   }
 
   #activateFallback(): void {

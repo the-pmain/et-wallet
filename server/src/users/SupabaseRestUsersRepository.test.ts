@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ServiceUnavailableError } from '../lib/errors.ts'
 
-import { SupabaseRestUsersRepository } from './SupabaseRestUsersRepository.ts'
+import {
+  SupabaseRestUsersRepository,
+  UsersDatabaseError,
+} from './SupabaseRestUsersRepository.ts'
 import { WALLET_CODENAME_RECEIVING_FUNDS } from './wallets.ts'
 
 const WALLET_MAP = (key: string, value: string) => ({
@@ -29,7 +32,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -40,6 +43,12 @@ describe('SupabaseRestUsersRepository', () => {
     })
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://example.supabase.co/rest/v1/users')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({
+        apikey: 'service-role',
+        authorization: 'Bearer service-role',
+      }),
+    })
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
       email: 'james@example.com',
       balance: '0',
@@ -75,7 +84,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -111,7 +120,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -164,7 +173,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -203,7 +212,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -222,7 +231,7 @@ describe('SupabaseRestUsersRepository', () => {
   it('возвращает null, если совпадения нет', async () => {
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: vi.fn().mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
@@ -237,7 +246,7 @@ describe('SupabaseRestUsersRepository', () => {
   it('пробрасывает отказ Supabase', async () => {
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
@@ -245,9 +254,14 @@ describe('SupabaseRestUsersRepository', () => {
       }) as unknown as typeof fetch,
     })
 
-    await expect(
-      users.create({ email: 'james@example.com', balance: '0', theP: 'demo' }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableError)
+    const failure = users.create({ email: 'james@example.com', balance: '0', theP: 'demo' })
+
+    await expect(failure).rejects.toBeInstanceOf(UsersDatabaseError)
+    await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableError)
+    await expect(failure).rejects.toMatchObject({
+      message: 'База данных недоступна.',
+      operation: 'create',
+    })
   })
 
   it('читает все записи без колонки the_p', async () => {
@@ -269,7 +283,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -320,7 +334,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 
@@ -357,7 +371,7 @@ describe('SupabaseRestUsersRepository', () => {
 
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
-      anonKey: 'anon',
+      serviceRoleKey: 'service-role',
       fetch: fetchMock as unknown as typeof fetch,
     })
 

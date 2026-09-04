@@ -37,6 +37,9 @@ import {
   AdminUsersPage,
   AdminSendingsPage,
   AdminUserPage,
+  Variant1Page,
+  Variant2Page,
+  Variant3Page,
 } from './lazy-pages'
 import { ROUTE } from './routes'
 
@@ -223,6 +226,33 @@ export function AppRouter() {
           <Route path="new" element={<EmailNewConversationPage />} />
           <Route path=":conversationId" element={<EmailConversationPage />} />
         </Route>
+
+        {/* Этюды темы главного экрана. Без оболочки и без стража:
+            сравнение вида не должно требовать пароля. */}
+        <Route
+          path={ROUTE.Variant1}
+          element={
+            <Suspense fallback={<LoadingScreen />}>
+              <Variant1Page />
+            </Suspense>
+          }
+        />
+        <Route
+          path={ROUTE.Variant2}
+          element={
+            <Suspense fallback={<LoadingScreen />}>
+              <Variant2Page />
+            </Suspense>
+          }
+        />
+        <Route
+          path={ROUTE.Variant3}
+          element={
+            <Suspense fallback={<LoadingScreen />}>
+              <Variant3Page />
+            </Suspense>
+          }
+        />
 
         <Route path={ROUTE.Dashboard} element={<UnlockedOnly />}>
           {/* Одна граница ожидания на все разделы: она лежит внутри

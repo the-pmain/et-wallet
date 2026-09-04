@@ -15,6 +15,8 @@ const BASE: IServerConfig = {
   catalogCacheSeconds: 300,
   supabaseUrl: null,
   supabaseAnonKey: null,
+  supabasePublishableKey: null,
+  supabaseServiceRoleKey: null,
   staticRoot: null,
   cloudflareAccountId: null,
   cloudflareApiToken: null,
@@ -34,13 +36,24 @@ describe('createUsersStore', () => {
     expect(store.kind).toBe(USERS_STORE_KIND.Memory)
   })
 
-  it('при URL и ключе пишет в Supabase REST', () => {
+  it('при URL и service-role пишет в Supabase REST', () => {
     const store = createUsersStore({
       ...BASE,
       supabaseUrl: 'https://example.supabase.co',
       supabaseAnonKey: 'anon',
+      supabaseServiceRoleKey: 'service-role',
     })
 
     expect(store.kind).toBe(USERS_STORE_KIND.Supabase)
+  })
+
+  it('отказывается стартовать Supabase без service-role ключа', () => {
+    expect(() =>
+      createUsersStore({
+        ...BASE,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon',
+      }),
+    ).toThrow(/SUPABASE_SERVICE_ROLE_KEY/u)
   })
 })

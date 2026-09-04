@@ -14,6 +14,8 @@ const BASE_CONFIG: IServerConfig = {
   catalogCacheSeconds: 300,
   supabaseUrl: 'https://example.supabase.co',
   supabaseAnonKey: 'anon-key',
+  supabasePublishableKey: null,
+  supabaseServiceRoleKey: null,
   staticRoot: null,
   cloudflareAccountId: null,
   cloudflareApiToken: null,

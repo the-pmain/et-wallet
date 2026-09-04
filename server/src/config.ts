@@ -53,8 +53,24 @@ export interface IServerConfig {
    */
   readonly supabaseUrl: string | null
 
-  /** Анонимный ключ проекта. Живёт только на сервере. */
+  /** Анонимный ключ проекта. Живёт только на сервере. Fallback для user-scoped клиента. */
   readonly supabaseAnonKey: string | null
+
+  /**
+   * Publishable-ключ проекта (`SUPABASE_PUBLISHABLE_KEY`).
+   *
+   * Для user-scoped клиента. Если пусто — берётся `SUPABASE_ANON_KEY`.
+   * Живёт только на сервере. В бандл кошелька не попадает.
+   */
+  readonly supabasePublishableKey: string | null
+
+  /**
+   * Service-role ключ. Обходит RLS на `public.users`.
+   *
+   * Только доверенный Node-процесс после сверки `email`/`the_p` или PIN.
+   * Не выбирать по полю запроса. Не отдавать клиенту.
+   */
+  readonly supabaseServiceRoleKey: string | null
 
   /**
    * Каталог собранного кошелька (`index.html`).
@@ -181,6 +197,8 @@ export function loadConfig(): IServerConfig {
     catalogCacheSeconds: readNumber('CATALOG_CACHE_SECONDS', DEFAULT_CATALOG_CACHE_SECONDS),
     supabaseUrl: readOptionalUrl('SUPABASE_URL'),
     supabaseAnonKey: readOptional('SUPABASE_ANON_KEY'),
+    supabasePublishableKey: readOptional('SUPABASE_PUBLISHABLE_KEY'),
+    supabaseServiceRoleKey: readOptional('SUPABASE_SERVICE_ROLE_KEY'),
     staticRoot: resolveStaticRoot({
       configured: readOptional('STATIC_ROOT'),
       searchDefaults: mode !== RUNTIME_MODE.Test,

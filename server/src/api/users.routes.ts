@@ -33,6 +33,11 @@ import type { IUserResponse } from './contracts.ts'
  * `GET /v1/users/:id` — свежая запись, та же сверка `email` и `the_p`.
  * `POST /v1/users/wallets` — ещё один слот `{ codename, key, value }` в карту кошельков.
  * Запрос не по схеме — 400, вход не выдаётся.
+ *
+ * Классификация: trusted server. Личность — `email`+`the_p`, не JWT
+ * `auth.uid()`. Хранилище ходит в `public.users` service-role клиентом
+ * после этой сверки. User-scoped JWT клиент здесь не подходит: в таблице
+ * нет колонки владельца Supabase Auth.
  */
 
 const WALLET_SLOT_BODY = {

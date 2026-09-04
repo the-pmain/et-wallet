@@ -20,6 +20,8 @@ function configWithStatic(staticRoot: string | null): IServerConfig {
     catalogCacheSeconds: 300,
     supabaseUrl: null,
     supabaseAnonKey: null,
+    supabasePublishableKey: null,
+    supabaseServiceRoleKey: null,
     staticRoot,
     cloudflareAccountId: null,
     cloudflareApiToken: null,

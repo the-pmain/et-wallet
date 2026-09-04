@@ -23,13 +23,11 @@ alter table public.sendings drop constraint if exists sendings_id_fkey;
 
 create index if not exists sendings_user_id_idx on public.sendings (user_id);
 
+alter table public.sendings add column if not exists asset_symbol text;
+
 create index if not exists sendings_created_at_idx on public.sendings (created_at desc);
 
+-- RLS policies live in sendings-rls.sql. Do not recreate USING (true).
 alter table public.sendings enable row level security;
 
 drop policy if exists sendings_all on public.sendings;
-create policy sendings_all on public.sendings
-  for all using (true) with check (true);
-
-grant select, insert, update, delete on public.sendings to anon, authenticated, service_role;
-grant usage, select on all sequences in schema public to anon, authenticated, service_role;
