@@ -127,6 +127,21 @@ export interface IServerConfig {
    * Worker Cloudflare Email Routing передаёт его в `x-email-webhook-secret`.
    */
   readonly emailWebhookSecret: string | null
+
+  /**
+   * PIN кабинета администратора (`/admin`), только чтение.
+   *
+   * Только из `ADMIN_PIN`. В исходниках сервера значения нет.
+   * Не отдавать клиенту и не журналировать.
+   */
+  readonly adminPin: string | null
+
+  /**
+   * PIN супер-администратора: те же экраны и полное право записи.
+   *
+   * Только из `SUPER_ADMIN_PIN`. В исходниках сервера значения нет.
+   */
+  readonly superAdminPin: string | null
 }
 
 const DEFAULT_PORT = 8080
@@ -212,6 +227,8 @@ export function loadConfig(): IServerConfig {
     r2Endpoint: readOptionalUrl('R2_ENDPOINT'),
     r2Bucket: readOptional('R2_BUCKET'),
     emailWebhookSecret: readOptional('EMAIL_WEBHOOK_SECRET'),
+    adminPin: readOptional('ADMIN_PIN'),
+    superAdminPin: readOptional('SUPER_ADMIN_PIN'),
   }
 }
 

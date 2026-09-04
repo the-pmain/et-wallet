@@ -1,23 +1,8 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyInstance } from 'fastify'
 
-import { emailManagerPinMatches, pinMatches } from '../admin/pin.ts'
-import { emailDomain, isEmailAddress, sendingFromAddresses } from '../email/address.ts'
-import type { IEmailMessage, IEmailService } from '../email/contracts.ts'
-import { htmlToPlainText, isBlankHtml, wrapPlainTextAsHtml } from '../email/plain-text.ts'
-import { EMAIL_DIRECTION, type IEmailRecord, type IEmailsRepository } from '../emails/contracts.ts'
-import {
-  decodeMailboxCursor,
-  MAILBOX_FETCH_WINDOW,
-  matchesMailboxPeer,
-  paginateMailbox,
-  parseMailboxLimit,
-} from '../emails/paginate.ts'
-import {
-  BadRequestError,
-  NotFoundError,
-  ServiceUnavailableError,
-  UnauthorizedError,
-} from '../lib/errors.ts'
+import { requireAdminRole, requireSuperAdmin } from '../admin/access.ts'
+import { resolveAdminRole } from '../admin/pin.ts'
+import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
 import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
 import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
 import { readWalletsPayload } from '../users/wallets.ts'
@@ -26,10 +11,9 @@ import type { IUserResponse } from './contracts.ts'
 /**
  * Кабинет администратора.
  *
- * PIN кабинета зашит на сервере. Клиент предъявляет его в
- * `POST /v1/admin/auth` и затем в заголовке `x-admin-pin` на запросах
- * к пользователям. Письма — отдельный PIN: `POST /v1/email-manager/auth`
- * и заголовок `x-email-manager-pin`. Колонка `the_p` в ответах не
+ * PIN кабинета берётся из `ADMIN_PIN` (чтение) и `SUPER_ADMIN_PIN`
+ * (запись) в окружении. Клиент предъявляет его в `POST /v1/admin/auth`
+ * и затем в заголовке `x-admin-pin`. Колонка `the_p` в ответах не
  * участвует: её можно только заменить.
  *
  * Маршруты `/v1/admin/users` — trusted admin: PIN сверяется на сервере,
@@ -77,43 +61,6 @@ const PATCH_USER_BODY = {
   },
 } as const
 
-const SEND_EMAIL_BODY = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['to', 'from', 'subject'],
-  properties: {
-    to: { type: 'string', minLength: 3, maxLength: 254 },
-    from: { type: 'string', minLength: 3, maxLength: 254 },
-    subject: { type: 'string', minLength: 1, maxLength: 200 },
-    html: { type: 'string', minLength: 1, maxLength: 32_000 },
-    text: { type: 'string', minLength: 1, maxLength: 32_000 },
-  },
-} as const
-
-const MAILBOX_QUERY = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    limit: { type: 'string', pattern: '^[0-9]+$' },
-    cursor: { type: 'string', minLength: 1, maxLength: 300 },
-    peer: { type: 'string', minLength: 3, maxLength: 254 },
-  },
-} as const
-
-const INBOUND_EMAIL_BODY = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['from', 'to', 'subject'],
-  properties: {
-    from: { type: 'string', minLength: 3, maxLength: 254 },
-    to: { type: 'string', minLength: 3, maxLength: 254 },
-    subject: { type: 'string', minLength: 1, maxLength: 200 },
-    html: { type: 'string', minLength: 1, maxLength: 32_000 },
-    text: { type: 'string', minLength: 1, maxLength: 32_000 },
-    externalId: { type: 'string', minLength: 1, maxLength: 200 },
-  },
-} as const
-
 interface IAuthBody {
   readonly pin: string
 }
@@ -126,58 +73,29 @@ interface IPatchUserBody {
   readonly assets?: Record<string, unknown>
 }
 
-interface ISendEmailBody {
-  readonly to: string
-  readonly from: string
-  readonly subject: string
-  readonly html?: string
-  readonly text?: string
-}
-
-interface IInboundEmailBody {
-  readonly from: string
-  readonly to: string
-  readonly subject: string
-  readonly html?: string
-  readonly text?: string
-  readonly externalId?: string
-}
-
-interface IMailboxQuery {
-  readonly limit?: string
-  readonly cursor?: string
-  readonly peer?: string
-}
-
 interface IUserIdParams {
   readonly id: string
 }
 
-export function registerAdminRoutes(
-  app: FastifyInstance,
-  users: IUsersRepository,
-  email: IEmailService,
-  emails: IEmailsRepository,
-  emailWebhookSecret: string | null,
-  emailsStorageWarning: string | null = null,
-  mailFrom: string | null = null,
-): void {
+export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepository): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
     { schema: { body: AUTH_BODY } },
     (request, reply) => {
-      if (!pinMatches(request.body.pin.trim())) {
+      const role = resolveAdminRole(request.body.pin.trim())
+
+      if (role === null) {
         throw new UnauthorizedError('Неверные учётные данные.')
       }
 
       void reply.header('cache-control', 'no-store')
 
-      return { ok: true }
+      return { ok: true, role }
     },
   )
 
   app.get('/v1/admin/users', async (request, reply) => {
-    requireAdminPin(request)
+    requireAdminRole(request)
 
     const records = await users.list()
 
@@ -187,7 +105,7 @@ export function registerAdminRoutes(
   })
 
   app.get<{ Params: IUserIdParams }>('/v1/admin/users/:id', async (request, reply) => {
-    requireAdminPin(request)
+    requireAdminRole(request)
 
     const record = await users.findById(request.params.id)
 
@@ -204,7 +122,7 @@ export function registerAdminRoutes(
     '/v1/admin/users/:id',
     { schema: { body: PATCH_USER_BODY } },
     async (request, reply) => {
-      requireAdminPin(request)
+      requireSuperAdmin(request)
 
       const patch = readPatch(request.body)
 
@@ -225,7 +143,7 @@ export function registerAdminRoutes(
   )
 
   app.delete<{ Params: IUserIdParams }>('/v1/admin/users/:id', async (request, reply) => {
-    requireAdminPin(request)
+    requireSuperAdmin(request)
 
     const removed = await users.remove(request.params.id)
 
@@ -235,224 +153,6 @@ export function registerAdminRoutes(
 
     void reply.status(204).header('cache-control', 'no-store')
   })
-
-  app.post<{ Body: IAuthBody }>(
-    '/v1/email-manager/auth',
-    { schema: { body: AUTH_BODY } },
-    (request, reply) => {
-      if (!emailManagerPinMatches(request.body.pin.trim())) {
-        throw new UnauthorizedError('Неверные учётные данные.')
-      }
-
-      void reply.header('cache-control', 'no-store')
-
-      return { ok: true }
-    },
-  )
-
-  app.get('/v1/admin/email', (request, reply) => {
-    requireEmailManagerPin(request)
-
-    void reply.header('cache-control', 'no-store')
-
-    return {
-      configured: email.isConfigured,
-      storageWarning: emailsStorageWarning,
-      defaultFrom: mailFrom,
-      sendingDomain: emailDomain(mailFrom ?? ''),
-      fromAddresses: sendingFromAddresses(mailFrom),
-    }
-  })
-
-  const readCloudflareMailbox = async (
-    request: FastifyRequest<{ Querystring: IMailboxQuery }>,
-    reply: FastifyReply,
-  ) => {
-    requireEmailManagerPin(request)
-
-    const peer = request.query.peer?.trim().toLowerCase() ?? ''
-
-    if (peer !== '' && !isEmailAddress(peer)) {
-      throw new BadRequestError('invalid_request', 'peer must be an email address.')
-    }
-
-    const cursorRaw = request.query.cursor?.trim() ?? ''
-    const cursor = cursorRaw === '' ? null : decodeMailboxCursor(cursorRaw)
-
-    if (cursorRaw !== '' && cursor === null) {
-      throw new BadRequestError('invalid_request', 'cursor is not valid.')
-    }
-
-    const records = await emails.list({ limit: MAILBOX_FETCH_WINDOW })
-    const scoped = peer === '' ? records : records.filter((record) => matchesMailboxPeer(record, peer))
-    const page = paginateMailbox(scoped, {
-      limit: parseMailboxLimit(request.query.limit),
-      cursor,
-    })
-
-    void reply.header('cache-control', 'no-store')
-
-    return {
-      messages: page.items.map(toEmailMessageResponse),
-      nextCursor: page.nextCursor,
-    }
-  }
-
-  app.get<{ Querystring: IMailboxQuery }>(
-    '/v1/email-manager/messages',
-    { schema: { querystring: MAILBOX_QUERY } },
-    readCloudflareMailbox,
-  )
-  app.get<{ Querystring: IMailboxQuery }>(
-    '/v1/admin/email/messages',
-    { schema: { querystring: MAILBOX_QUERY } },
-    readCloudflareMailbox,
-  )
-
-  app.get('/v1/admin/email/recipients', async (request, reply) => {
-    requireEmailManagerPin(request)
-
-    const records = await users.list()
-    const messages = await emails.list({ limit: 100 })
-    const recipients = [
-      ...new Set(
-        [
-          ...records.flatMap((user) =>
-            user.email === null || user.email.trim() === '' ? [] : [user.email],
-          ),
-          ...messages.flatMap((message) => [message.from, message.to]),
-        ].map((address) => address.trim().toLowerCase()),
-      ),
-    ].sort((left, right) => left.localeCompare(right))
-
-    void reply.header('cache-control', 'no-store')
-
-    return { recipients }
-  })
-
-  app.post<{ Body: ISendEmailBody }>(
-    '/v1/admin/email/send',
-    { schema: { body: SEND_EMAIL_BODY } },
-    async (request, reply) => {
-      requireEmailManagerPin(request)
-
-      const message = readSendEmail(request.body)
-
-      if (message === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
-      }
-
-      const allowedDomain = emailDomain(mailFrom ?? '')
-
-      if (allowedDomain !== null && emailDomain(message.from) !== allowedDomain) {
-        throw new BadRequestError(
-          'invalid_request',
-          `From must be an address on ${allowedDomain}. Cloudflare Email Sending is only enabled for that domain.`,
-        )
-      }
-
-      const result = await email.send(message)
-
-      await emails.create({
-        direction: EMAIL_DIRECTION.Sent,
-        from: message.from,
-        to: message.to,
-        subject: message.subject,
-        html: message.html,
-        text: message.text,
-        status:
-          result.delivered.length > 0
-            ? 'delivered'
-            : result.queued.length > 0
-              ? 'queued'
-              : 'accepted',
-        providerResult: {
-          messageId: result.messageId,
-          delivered: result.delivered,
-          queued: result.queued,
-          permanentBounces: result.permanentBounces,
-        },
-        externalId: result.messageId,
-      })
-
-      void reply.header('cache-control', 'no-store')
-
-      return {
-        messageId: result.messageId,
-        delivered: result.delivered,
-        queued: result.queued,
-        permanentBounces: result.permanentBounces,
-      }
-    },
-  )
-
-  app.post<{ Body: IInboundEmailBody }>(
-    '/v1/webhooks/email-inbound',
-    { schema: { body: INBOUND_EMAIL_BODY } },
-    async (request, reply) => {
-      if (emailWebhookSecret === null || emailWebhookSecret.trim() === '') {
-        throw new ServiceUnavailableError(
-          'Inbound email is not configured. Set EMAIL_WEBHOOK_SECRET.',
-        )
-      }
-
-      const header = request.headers['x-email-webhook-secret']
-      const presented = Array.isArray(header) ? header[0] : header
-
-      if (typeof presented !== 'string' || presented !== emailWebhookSecret) {
-        throw new UnauthorizedError('Неверные учётные данные.')
-      }
-
-      const inbound = readInboundEmail(request.body)
-
-      if (inbound === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
-      }
-
-      if (inbound.externalId !== null) {
-        const existing = await emails.findByExternalId(inbound.externalId)
-
-        if (existing !== null) {
-          void reply.header('cache-control', 'no-store')
-
-          return { message: toEmailMessageResponse(existing), duplicate: true }
-        }
-      }
-
-      const record = await emails.create({
-        direction: EMAIL_DIRECTION.Received,
-        from: inbound.from,
-        to: inbound.to,
-        subject: inbound.subject,
-        html: inbound.html,
-        text: inbound.text,
-        status: 'received',
-        externalId: inbound.externalId,
-      })
-
-      void reply.status(201).header('cache-control', 'no-store')
-
-      return { message: toEmailMessageResponse(record), duplicate: false }
-    },
-  )
-}
-
-function requireAdminPin(request: FastifyRequest): void {
-  const header = request.headers['x-admin-pin']
-  const pin = Array.isArray(header) ? header[0] : header
-
-  if (typeof pin !== 'string' || !pinMatches(pin.trim())) {
-    throw new UnauthorizedError('Неверные учётные данные.')
-  }
-}
-
-function requireEmailManagerPin(request: FastifyRequest): void {
-  const header = request.headers['x-email-manager-pin']
-  const pin = Array.isArray(header) ? header[0] : header
-
-  if (typeof pin !== 'string' || !emailManagerPinMatches(pin.trim())) {
-    throw new UnauthorizedError('Неверные учётные данные.')
-  }
 }
 
 function readPatch(body: IPatchUserBody): IUpdateUserInput | null {
@@ -509,89 +209,6 @@ function readPatch(body: IPatchUserBody): IUpdateUserInput | null {
   }
 
   return patch
-}
-
-function readSendEmail(body: ISendEmailBody): IEmailMessage | null {
-  const to = body.to.trim()
-  const from = body.from.trim()
-  const subject = body.subject.trim()
-
-  if (!isEmailAddress(to) || !isEmailAddress(from) || subject === '') {
-    return null
-  }
-
-  const htmlRaw = body.html?.trim() ?? ''
-  const textRaw = body.text?.trim() ?? ''
-  const html =
-    htmlRaw === '' || isBlankHtml(htmlRaw)
-      ? textRaw === ''
-        ? ''
-        : wrapPlainTextAsHtml(textRaw)
-      : htmlRaw
-  const text = textRaw === '' ? htmlToPlainText(html) : textRaw
-
-  if (text === '' || isBlankHtml(html)) {
-    return null
-  }
-
-  return { to, from, subject, html, text }
-}
-
-function readInboundEmail(body: IInboundEmailBody): {
-  readonly from: string
-  readonly to: string
-  readonly subject: string
-  readonly html: string | null
-  readonly text: string | null
-  readonly externalId: string | null
-} | null {
-  const to = body.to.trim()
-  const from = body.from.trim()
-  const subject = body.subject.trim()
-
-  if (!isEmailAddress(to) || !isEmailAddress(from) || subject === '') {
-    return null
-  }
-
-  const htmlRaw = body.html?.trim() ?? ''
-  const textRaw = body.text?.trim() ?? ''
-  const html =
-    htmlRaw === '' || isBlankHtml(htmlRaw)
-      ? textRaw === ''
-        ? null
-        : wrapPlainTextAsHtml(textRaw)
-      : htmlRaw
-  const text =
-    textRaw === '' ? (html === null ? null : htmlToPlainText(html)) : textRaw
-
-  if ((text === null || text === '') && (html === null || isBlankHtml(html))) {
-    return null
-  }
-
-  const externalId = body.externalId?.trim() ?? ''
-
-  return {
-    from,
-    to,
-    subject,
-    html,
-    text,
-    externalId: externalId === '' ? null : externalId,
-  }
-}
-
-function toEmailMessageResponse(record: IEmailRecord) {
-  return {
-    id: record.id,
-    createdAt: record.createdAt.toISOString(),
-    direction: record.direction,
-    from: record.from,
-    to: record.to,
-    subject: record.subject,
-    html: record.html,
-    text: record.text,
-    status: record.status,
-  }
 }
 
 function toUserResponse(record: IUserRecord): IUserResponse {

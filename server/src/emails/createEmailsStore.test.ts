@@ -26,6 +26,8 @@ const BASE_CONFIG: IServerConfig = {
   r2Endpoint: null,
   r2Bucket: null,
   emailWebhookSecret: null,
+    adminPin: null,
+    superAdminPin: null,
 }
 
 describe('createEmailsStore', () => {

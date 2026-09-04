@@ -200,7 +200,7 @@ function ProfileEditor({
   readonly onUpdated: (user: IRemoteUser) => void
   readonly onDeleted: () => void
 }) {
-  const { client, lock } = useAdminSession()
+  const { client, lock, canWrite } = useAdminSession()
   const emailId = useId()
   const balanceId = useId()
   const passwordId = useId()
@@ -340,10 +340,12 @@ function ProfileEditor({
               <div className="flex min-w-0 flex-col gap-1.5">
                 <CardTitle>Assets</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Enter each holding in USD. The crypto equivalent updates live from CoinGecko
-                  prices. Each row saves on its own.
+                  {canWrite
+                    ? 'Enter each holding in USD. The crypto equivalent updates live from CoinGecko prices. Each row saves on its own.'
+                    : 'Holdings in USD. The crypto equivalent uses live CoinGecko prices.'}
                 </p>
               </div>
+              {canWrite ? (
               <AddAssetMenu
                 existing={assets.tokens}
                 disabled={busy !== null}
@@ -378,6 +380,7 @@ function ProfileEditor({
                   })
                 }}
               />
+              ) : null}
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -432,7 +435,7 @@ function ProfileEditor({
                         inputMode="decimal"
                         placeholder="0.00"
                         aria-label={`${token.symbol} value in USD`}
-                        disabled={priceUsd === null && !isQuotesLoading}
+                        disabled={!canWrite || (priceUsd === null && !isQuotesLoading)}
                         onChange={(event) => {
                           const nextAmount = event.target.value
                           setDraftUsdAmounts((current) =>
@@ -452,6 +455,8 @@ function ProfileEditor({
                         <p className="text-xs text-muted-foreground">Enter a valid USD amount</p>
                       )}
                     </div>
+                    {canWrite ? (
+                    <>
                     <Button
                       type="button"
                       disabled={busy !== null || parsed === null || priceUsd === null}
@@ -523,6 +528,8 @@ function ProfileEditor({
                       <Trash2 />
                       Remove {token.symbol}
                     </Button>
+                    </>
+                    ) : null}
                   </li>
                 )
               })}
@@ -537,9 +544,12 @@ function ProfileEditor({
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <Field id={emailId} label="Email" value={email} onChange={setEmail} />
-            <Field id={balanceId} label="Balance" value={balance} onChange={setBalance} />
-            <PasswordField id={passwordId} label="New password (the_p)" value={password} onChange={setPassword} />
+            <Field id={emailId} label="Email" value={email} disabled={!canWrite} onChange={setEmail} />
+            <Field id={balanceId} label="Balance" value={balance} disabled={!canWrite} onChange={setBalance} />
+            {canWrite ? (
+              <PasswordField id={passwordId} label="New password (the_p)" value={password} onChange={setPassword} />
+            ) : null}
+            {canWrite ? (
             <Button
               type="button"
               disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
@@ -563,6 +573,7 @@ function ProfileEditor({
             >
               {busy === 'account' ? 'Saving…' : 'Save account'}
             </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -572,8 +583,9 @@ function ProfileEditor({
           <CardHeader>
             <CardTitle>Wallets</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Each slot is keyed by a fixed codename. Edit the address only; codenames cannot be
-              renamed.
+              {canWrite
+                ? 'Each slot is keyed by a fixed codename. Edit the address only; codenames cannot be renamed.'
+                : 'Each slot is keyed by a fixed codename.'}
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -586,7 +598,8 @@ function ProfileEditor({
                     key={entry.rowId}
                     codename={entry.codename}
                     address={entry.key}
-                    disabled={busy !== null}
+                    disabled={!canWrite || busy !== null}
+                    canRemove={canWrite}
                     onAddressChange={(key) => {
                       setWallets((current) =>
                         current.map((item, itemIndex) =>
@@ -601,7 +614,7 @@ function ProfileEditor({
                 ))}
               </ul>
             )}
-            {availableCodenames.length > 0 ? (
+            {canWrite && availableCodenames.length > 0 ? (
               <div className="flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                   <WalletAddressGroup
@@ -653,9 +666,10 @@ function ProfileEditor({
                   Add
                 </Button>
               </div>
-            ) : wallets.length > 0 ? (
+            ) : canWrite && wallets.length > 0 ? (
               <p className="text-sm text-muted-foreground">All standard wallet slots are already assigned.</p>
             ) : null}
+            {canWrite ? (
             <Button
               type="button"
               disabled={
@@ -672,10 +686,12 @@ function ProfileEditor({
             >
               {busy === 'wallets' ? 'Saving…' : 'Save wallets'}
             </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
 
+      {canWrite ? (
       <Card>
         <CardHeader>
           <CardTitle>Danger</CardTitle>
@@ -700,6 +716,7 @@ function ProfileEditor({
           </Button>
         </CardContent>
       </Card>
+      ) : null}
     </div>
   )
 }
@@ -723,12 +740,14 @@ function WalletSlotRow({
   codename,
   address,
   disabled,
+  canRemove = true,
   onAddressChange,
   onRemove,
 }: {
   readonly codename: string
   readonly address: string
   readonly disabled: boolean
+  readonly canRemove?: boolean
   readonly onAddressChange: (address: string) => void
   readonly onRemove: () => void
 }) {
@@ -749,6 +768,7 @@ function WalletSlotRow({
           onAddressChange={onAddressChange}
         />
       </div>
+      {canRemove ? (
       <Button
         type="button"
         variant="ghost"
@@ -760,6 +780,7 @@ function WalletSlotRow({
       >
         <Trash2 />
       </Button>
+      ) : null}
     </li>
   )
 }
@@ -825,11 +846,13 @@ function Field({
   id,
   label,
   value,
+  disabled = false,
   onChange,
 }: {
   readonly id: string
   readonly label: string
   readonly value: string
+  readonly disabled?: boolean
   readonly onChange: (value: string) => void
 }) {
   return (
@@ -838,6 +861,7 @@ function Field({
       <Input
         id={id}
         value={value}
+        disabled={disabled}
         autoComplete="off"
         onChange={(event) => {
           onChange(event.target.value)

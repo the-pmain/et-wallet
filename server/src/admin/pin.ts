@@ -1,34 +1,54 @@
 import { timingSafeEqual } from 'node:crypto'
 
-/**
- * PIN кабинета администратора (`/admin`).
- *
- * ЖЁСТКО ЗАШИТ В СЕРВЕР. Клиент его не знает: он только предъявляет
- * введённое значение, а решение принимает этот модуль.
- */
-export const ADMIN_PIN = '9100'
+export const ADMIN_ROLE = {
+  Admin: 'admin',
+  Super: 'super',
+} as const
+
+export type AdminRole = (typeof ADMIN_ROLE)[keyof typeof ADMIN_ROLE]
 
 /**
- * PIN менеджера писем (`/email-manager`).
+ * PIN кабинета (`/admin`).
  *
- * Отдельный код и отдельная сверка: кабинет пользователей и отправка
- * писем не делят один секрет.
+ * `ADMIN_PIN` — чтение. `SUPER_ADMIN_PIN` — полное право.
+ * Значений в исходниках нет: сверка только с окружением.
  */
-export const EMAIL_MANAGER_PIN = '3100'
+export function resolveAdminRole(value: string): AdminRole | null {
+  const presented = value.trim()
 
-/**
- * Совпадает ли предъявленное значение с PIN кабинета.
- *
- * Сравнение с постоянным временем: отказ по длине не должен отличаться
- * по задержке от отказа по содержимому.
- */
-export function pinMatches(value: string): boolean {
-  return constantTimeEquals(ADMIN_PIN, value)
+  if (presented === '') {
+    return null
+  }
+
+  const superPin = readEnvPin('SUPER_ADMIN_PIN')
+  const adminPin = readEnvPin('ADMIN_PIN')
+  const isSuper = superPin !== null && constantTimeEquals(superPin, presented)
+  const isAdmin = adminPin !== null && constantTimeEquals(adminPin, presented)
+
+  if (isSuper) {
+    return ADMIN_ROLE.Super
+  }
+
+  if (isAdmin) {
+    return ADMIN_ROLE.Admin
+  }
+
+  return null
 }
 
-/** Совпадает ли предъявленное значение с PIN менеджера писем. */
-export function emailManagerPinMatches(value: string): boolean {
-  return constantTimeEquals(EMAIL_MANAGER_PIN, value)
+/** Любая принятая роль кабинета. */
+export function pinMatches(value: string): boolean {
+  return resolveAdminRole(value) !== null
+}
+
+function readEnvPin(name: string): string | null {
+  const raw = process.env[name]
+
+  if (raw === undefined || raw.trim() === '') {
+    return null
+  }
+
+  return raw.trim()
 }
 
 function constantTimeEquals(expectedUtf8: string, value: string): boolean {

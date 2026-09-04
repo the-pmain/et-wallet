@@ -9,6 +9,8 @@ import {
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import type { SendingStatus } from '@/features/onboarding/model/sending-status'
 
+import { parseAdminRole, type AdminRole } from './admin-role'
+
 const EMPTY_ASSETS: IRemoteAssets = {
   quoteCurrency: 'USD',
   updatedAt: '1970-01-01T00:00:00.000Z',
@@ -16,10 +18,10 @@ const EMPTY_ASSETS: IRemoteAssets = {
 }
 
 /**
- * Клиент кабинета администратора и менеджера писем.
+ * Клиент кабинета администратора.
  *
- * PIN живёт только в заголовке (`x-admin-pin` или `x-email-manager-pin`).
- * Сервер сверяет его с зашитым значением; клиент PIN не знает заранее.
+ * PIN живёт только в заголовке `x-admin-pin`. Сервер сверяет его с
+ * `ADMIN_PIN` или `SUPER_ADMIN_PIN`; клиент PIN не знает заранее.
  */
 
 export class AdminAuthError extends Error {
@@ -48,66 +50,19 @@ export interface IAdminUserPatch {
   readonly assets?: IRemoteAssets
 }
 
-export interface IAdminEmailDraft {
-  readonly to: string
-  readonly from: string
-  readonly subject: string
-  readonly html: string
-  readonly text?: string
-}
-
-export interface IAdminEmailStatus {
-  readonly configured: boolean
-  readonly storageWarning: string | null
-  readonly defaultFrom: string | null
-  readonly sendingDomain: string | null
-  readonly fromAddresses: readonly string[]
-}
-
-export interface IAdminEmailSendResult {
-  readonly delivered: readonly string[]
-  readonly queued: readonly string[]
-  readonly permanentBounces: readonly string[]
-}
-
-export interface IAdminEmailMessage {
-  readonly id: string
-  readonly createdAt: string
-  readonly direction: 'sent' | 'received'
-  readonly from: string
-  readonly to: string
-  readonly subject: string
-  readonly html: string | null
-  readonly text: string | null
-  readonly status: string
-}
-
-export interface IAdminEmailMessagePage {
-  readonly messages: readonly IAdminEmailMessage[]
-  readonly nextCursor: string | null
-}
-
 export class AdminClient {
   readonly #baseUrl: string
   readonly #fetch: typeof fetch
-  readonly #authPath: string
-  readonly #pinHeader: string
   #pin: string | null
 
   constructor(options: {
     readonly baseUrl: string
     readonly pin?: string | null
     readonly fetch?: typeof fetch
-    /** Путь сверки PIN. По умолчанию кабинет. */
-    readonly authPath?: string
-    /** Имя заголовка с PIN. По умолчанию кабинет. */
-    readonly pinHeader?: string
   }) {
     this.#baseUrl = options.baseUrl.replace(/\/$/u, '')
     this.#pin = options.pin ?? null
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
-    this.#authPath = options.authPath ?? '/v1/admin/auth'
-    this.#pinHeader = options.pinHeader ?? 'x-admin-pin'
   }
 
   setPin(pin: string): void {
@@ -118,8 +73,8 @@ export class AdminClient {
     this.#pin = null
   }
 
-  async authenticate(pin: string): Promise<void> {
-    const response = await this.#request(this.#authPath, {
+  async authenticate(pin: string): Promise<AdminRole> {
+    const response = await this.#request('/v1/admin/auth', {
       method: 'POST',
       pin,
       body: { pin },
@@ -133,7 +88,15 @@ export class AdminClient {
       throw new AdminAuthError(response.status, `admin auth failed (${String(response.status)})`)
     }
 
+    const role = parseAdminAuthRole(parseJson(await response.text()))
+
+    if (role === null) {
+      throw new AdminAuthError(response.status, 'admin auth returned an unexpected response')
+    }
+
     this.#pin = pin
+
+    return role
   }
 
   async listUsers(): Promise<readonly IRemoteUser[]> {
@@ -283,101 +246,6 @@ export class AdminClient {
     }
   }
 
-  async getEmailStatus(): Promise<IAdminEmailStatus> {
-    const response = await this.#request('/v1/admin/email', { method: 'GET' })
-    const payload = parseJson(await response.text())
-
-    if (!response.ok) {
-      throw this.#failure(response.status, 'email status failed')
-    }
-
-    if (payload === null || typeof payload !== 'object') {
-      throw new AdminAuthError(response.status, 'email status returned an unexpected response')
-    }
-
-    return {
-      configured: (payload as Record<string, unknown>)['configured'] === true,
-      storageWarning: readOptionalString((payload as Record<string, unknown>)['storageWarning']),
-      defaultFrom: readOptionalString((payload as Record<string, unknown>)['defaultFrom']),
-      sendingDomain: readOptionalString((payload as Record<string, unknown>)['sendingDomain']),
-      fromAddresses: readStringList((payload as Record<string, unknown>)['fromAddresses']),
-    }
-  }
-
-  /** Cloudflare mailbox used by Email manager list and conversation screens. */
-  async listEmailMessages(options: {
-    readonly limit?: number
-    readonly cursor?: string | null
-    readonly peer?: string | null
-  } = {}): Promise<IAdminEmailMessagePage> {
-    const response = await this.#request(mailboxMessagesPath(options), { method: 'GET' })
-    const payload = parseJson(await response.text())
-
-    if (!response.ok) {
-      throw this.#failure(response.status, 'list email messages failed')
-    }
-
-    const page = parseEmailMessagePage(payload)
-
-    if (page === null) {
-      throw new AdminAuthError(response.status, 'list email messages returned an unexpected response')
-    }
-
-    return page
-  }
-
-  async listEmailRecipients(): Promise<readonly string[]> {
-    const response = await this.#request('/v1/admin/email/recipients', { method: 'GET' })
-    const payload = parseJson(await response.text())
-
-    if (!response.ok) {
-      throw this.#failure(response.status, 'list email recipients failed')
-    }
-
-    if (payload === null || typeof payload !== 'object') {
-      throw new AdminAuthError(response.status, 'list email recipients returned an unexpected response')
-    }
-
-    const recipients = (payload as Record<string, unknown>)['recipients']
-
-    if (!Array.isArray(recipients) || !recipients.every((item) => typeof item === 'string')) {
-      throw new AdminAuthError(response.status, 'list email recipients returned an unexpected response')
-    }
-
-    return recipients
-  }
-
-  async sendEmail(draft: IAdminEmailDraft): Promise<IAdminEmailSendResult> {
-    const body: Record<string, unknown> = {
-      to: draft.to,
-      from: draft.from,
-      subject: draft.subject,
-      html: draft.html,
-    }
-
-    if (draft.text !== undefined) {
-      body['text'] = draft.text
-    }
-
-    const response = await this.#request('/v1/admin/email/send', {
-      method: 'POST',
-      body,
-    })
-    const payload = parseJson(await response.text())
-
-    if (!response.ok) {
-      throw this.#failure(response.status, readErrorMessage(payload) ?? 'send email failed')
-    }
-
-    const result = parseEmailSendResult(payload)
-
-    if (result === null) {
-      throw new AdminAuthError(response.status, 'send email returned an unexpected response')
-    }
-
-    return result
-  }
-
   async #request(
     path: string,
     options: {
@@ -390,7 +258,7 @@ export class AdminClient {
     const headers: Record<string, string> = { accept: 'application/json' }
 
     if (pin !== null) {
-      headers[this.#pinHeader] = pin
+      headers['x-admin-pin'] = pin
     }
 
     if (options.body !== undefined) {
@@ -427,24 +295,12 @@ function joinBase(baseUrl: string, path: string): string {
   return `${baseUrl}${path}`
 }
 
-function mailboxMessagesPath(options: {
-  readonly limit?: number
-  readonly cursor?: string | null
-  readonly peer?: string | null
-}): string {
-  const params = new URLSearchParams()
-
-  params.set('limit', String(options.limit ?? 20))
-
-  if (options.cursor !== null && options.cursor !== undefined && options.cursor.trim() !== '') {
-    params.set('cursor', options.cursor)
+function parseAdminAuthRole(payload: unknown): AdminRole | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
   }
 
-  if (options.peer !== null && options.peer !== undefined && options.peer.trim() !== '') {
-    params.set('peer', options.peer.trim().toLowerCase())
-  }
-
-  return `/v1/email-manager/messages?${params.toString()}`
+  return parseAdminRole((payload as Record<string, unknown>)['role'])
 }
 
 function parseJson(raw: string): unknown {
@@ -457,24 +313,6 @@ function parseJson(raw: string): unknown {
   } catch {
     return null
   }
-}
-
-function readOptionalString(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const trimmed = value.trim()
-
-  return trimmed === '' ? null : trimmed
-}
-
-function readStringList(value: unknown): readonly string[] {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '')
 }
 
 function parseUserList(payload: unknown): readonly IRemoteUser[] | null {
@@ -686,126 +524,5 @@ function readRemoteAssetToken(value: unknown): IRemoteAssetToken | null {
     decimals,
     balance,
     isVerified,
-  }
-}
-
-function readErrorMessage(payload: unknown): string | null {
-  if (payload === null || typeof payload !== 'object') {
-    return null
-  }
-
-  const error = (payload as Record<string, unknown>)['error']
-
-  if (error === null || typeof error !== 'object') {
-    return null
-  }
-
-  const message = (error as Record<string, unknown>)['message']
-
-  return typeof message === 'string' && message.trim() !== '' ? message.trim() : null
-}
-
-function parseEmailSendResult(payload: unknown): IAdminEmailSendResult | null {
-  if (payload === null || typeof payload !== 'object') {
-    return null
-  }
-
-  const record = payload as Record<string, unknown>
-  const delivered = record['delivered']
-  const queued = record['queued']
-  const permanentBounces = record['permanentBounces']
-
-  if (!Array.isArray(delivered) || !Array.isArray(queued) || !Array.isArray(permanentBounces)) {
-    return null
-  }
-
-  return {
-    delivered: delivered.filter((item): item is string => typeof item === 'string'),
-    queued: queued.filter((item): item is string => typeof item === 'string'),
-    permanentBounces: permanentBounces.filter((item): item is string => typeof item === 'string'),
-  }
-}
-
-function parseEmailMessagePage(payload: unknown): IAdminEmailMessagePage | null {
-  const messages = parseEmailMessages(payload)
-
-  if (messages === null) {
-    return null
-  }
-
-  const nextCursor =
-    payload !== null && typeof payload === 'object'
-      ? readOptionalString((payload as Record<string, unknown>)['nextCursor'])
-      : null
-
-  return { messages, nextCursor }
-}
-
-function parseEmailMessages(payload: unknown): readonly IAdminEmailMessage[] | null {
-  if (payload === null || typeof payload !== 'object') {
-    return null
-  }
-
-  const messages = (payload as Record<string, unknown>)['messages']
-
-  if (!Array.isArray(messages)) {
-    return null
-  }
-
-  const parsed: IAdminEmailMessage[] = []
-
-  for (const item of messages) {
-    const message = parseEmailMessage(item)
-
-    if (message === null) {
-      return null
-    }
-
-    parsed.push(message)
-  }
-
-  return parsed
-}
-
-function parseEmailMessage(payload: unknown): IAdminEmailMessage | null {
-  if (payload === null || typeof payload !== 'object') {
-    return null
-  }
-
-  const record = payload as Record<string, unknown>
-  const id = record['id']
-  const createdAt = record['createdAt']
-  const direction = record['direction']
-  const from = record['from']
-  const to = record['to']
-  const subject = record['subject']
-  const html = record['html']
-  const text = record['text']
-  const status = record['status']
-
-  if (
-    typeof id !== 'string' ||
-    typeof createdAt !== 'string' ||
-    (direction !== 'sent' && direction !== 'received') ||
-    typeof from !== 'string' ||
-    typeof to !== 'string' ||
-    typeof subject !== 'string' ||
-    (html !== null && typeof html !== 'string') ||
-    (text !== null && typeof text !== 'string') ||
-    typeof status !== 'string'
-  ) {
-    return null
-  }
-
-  return {
-    id,
-    createdAt,
-    direction,
-    from,
-    to,
-    subject,
-    html,
-    text,
-    status,
   }
 }

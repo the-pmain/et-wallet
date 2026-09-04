@@ -1,12 +1,10 @@
 export {
   AdminAuthError,
   AdminClient,
-  type IAdminEmailMessage,
-  type IAdminEmailMessagePage,
-  type IAdminEmailStatus,
   type IAdminUserPatch,
 } from './model/AdminClient'
 export { AdminSessionContext, useAdminSession } from './model/admin-context'
+export { ADMIN_ROLE, parseAdminRole, type AdminRole } from './model/admin-role'
 export { AdminGate } from './ui/AdminGate'
 export { AdminPinForm } from './ui/AdminPinForm'
 export {

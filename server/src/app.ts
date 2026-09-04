@@ -9,10 +9,6 @@ import { registerUserRoutes } from './api/users.routes.ts'
 import { registerVersionRoutes } from './api/version.routes.ts'
 import { CatalogService } from './catalog/CatalogService.ts'
 import { RUNTIME_MODE, type IServerConfig } from './config.ts'
-import { CloudflareEmailService } from './email/CloudflareEmailService.ts'
-import type { IEmailService } from './email/contracts.ts'
-import { MemoryEmailsRepository } from './emails/MemoryEmailsRepository.ts'
-import type { IEmailsRepository } from './emails/contracts.ts'
 import { ApiError } from './lib/errors.ts'
 import { isApiUrl, isStaticAssetUrl } from './lib/ui.ts'
 import { registerSecretGuard } from './plugins/secret-guard.ts'
@@ -41,9 +37,6 @@ export interface IAppDependencies {
   readonly settings?: ISettingsRepository
   readonly users?: IUsersRepository
   readonly usersKind?: UsersStoreKind
-  readonly email?: IEmailService
-  readonly emails?: IEmailsRepository
-  readonly emailsStorageWarning?: string | null
   readonly sendings?: ISendingsRepository
   readonly sendingsStorageWarning?: string | null
   readonly sendingsHub?: SendingsHub
@@ -122,14 +115,6 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   const settings = dependencies.settings ?? new MemorySettingsRepository()
   const users = dependencies.users ?? new MemoryUsersRepository()
   const usersKind = dependencies.usersKind ?? USERS_STORE_KIND.Memory
-  const email =
-    dependencies.email ??
-    new CloudflareEmailService({
-      accountId: config.cloudflareAccountId,
-      apiToken: config.cloudflareApiToken,
-      authEmail: config.cloudflareAuthEmail,
-    })
-  const emails = dependencies.emails ?? new MemoryEmailsRepository()
   const sendings = dependencies.sendings ?? new MemorySendingsRepository()
   const sendingsService = new SendingsService(sendings, users)
   const sendingsHub = dependencies.sendingsHub ?? new SendingsHub()
@@ -205,15 +190,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
   registerSendingRoutes(app, sendingsService, sendingsHub)
-  registerAdminRoutes(
-    app,
-    users,
-    email,
-    emails,
-    config.emailWebhookSecret,
-    dependencies.emailsStorageWarning ?? null,
-    config.mailFrom,
-  )
+  registerAdminRoutes(app, users)
 
   if (config.staticRoot !== null) {
     await registerUi(app, config.staticRoot)

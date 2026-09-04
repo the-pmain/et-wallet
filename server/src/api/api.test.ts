@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../app.ts'
 import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
-import type { IEmailMessage, IEmailSendResult, IEmailService } from '../email/contracts.ts'
-import { MemoryEmailsRepository } from '../emails/MemoryEmailsRepository.ts'
-import { EmailUnavailableError } from '../lib/errors.ts'
 import { MemorySettingsRepository } from '../settings/MemorySettingsRepository.ts'
 import { MemorySendingsRepository } from '../sendings/MemorySendingsRepository.ts'
 import { SendingsHub } from '../sendings/SendingsHub.ts'
 import { STARTING_TOKENS } from '../users/assets.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
+
+process.env['ADMIN_PIN'] = '4200'
+process.env['SUPER_ADMIN_PIN'] = '9100'
 
 const CONFIG: IServerConfig = {
   mode: RUNTIME_MODE.Test,
@@ -34,6 +34,8 @@ const CONFIG: IServerConfig = {
   r2Endpoint: null,
   r2Bucket: null,
   emailWebhookSecret: 'webhook-secret',
+    adminPin: null,
+    superAdminPin: null,
 }
 
 const SYNC_ID = 'a'.repeat(64)
@@ -995,7 +997,7 @@ describe('Пользователи', () => {
 
     const controller = new AbortController()
     const stream = await fetch(`${address}/v1/sendings`, {
-      headers: { Accept: 'text/event-stream' },
+      headers: { Accept: 'text/event-stream', 'x-admin-pin': '9100' },
       signal: controller.signal,
     })
 
@@ -1050,6 +1052,19 @@ describe('Пользователи', () => {
     expect(body).toContain(`"userId":"${userId}"`)
     expect(body).toContain('"amount":"2"')
     expect(body).toContain(recipient)
+  })
+
+  it('GET /v1/sendings без user_id не открывает поток по PIN чтения', async () => {
+    const address = await app.listen({ host: '127.0.0.1', port: 0 })
+    const denied = await fetch(`${address}/v1/sendings`, {
+      headers: { Accept: 'text/event-stream' },
+    })
+    const reader = await fetch(`${address}/v1/sendings`, {
+      headers: { Accept: 'text/event-stream', 'x-admin-pin': '4200' },
+    })
+
+    expect(denied.status).toBe(401)
+    expect(reader.status).toBe(403)
   })
 
   it('отвергает отправку, если user_id не совпал с записью', async () => {
@@ -1359,7 +1374,7 @@ describe('Кабинет администратора', () => {
     return response.json<{ id: string }>().id
   }
 
-  it('принимает зашитый PIN и отвергает другой', async () => {
+  it('принимает PIN из окружения и отвергает другой', async () => {
     const ok = await app.inject({
       method: 'POST',
       url: '/v1/admin/auth',
@@ -1372,7 +1387,7 @@ describe('Кабинет администратора', () => {
     })
 
     expect(ok.statusCode).toBe(200)
-    expect(ok.json<{ ok: boolean }>().ok).toBe(true)
+    expect(ok.json()).toEqual({ ok: true, role: 'super' })
     expect(denied.statusCode).toBe(401)
   })
 
@@ -1691,416 +1706,4 @@ describe('Кабинет администратора', () => {
     expect(response.statusCode).toBe(204)
     expect(users.records).toHaveLength(0)
   })
-
-  it('сообщает, что отправка писем не настроена', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/v1/admin/email',
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.json<{ configured: boolean; defaultFrom: string | null }>().configured).toBe(false)
-    expect(response.json<{ defaultFrom: string | null }>().defaultFrom).toBe('support@etwalletx.com')
-    expect(response.json<{ sendingDomain: string | null }>().sendingDomain).toBe('etwalletx.com')
-    expect(response.json<{ fromAddresses: string[] }>().fromAddresses).toEqual([
-      'support@etwalletx.com',
-      'hello@etwalletx.com',
-      'info@etwalletx.com',
-      'contact@etwalletx.com',
-      'team@etwalletx.com',
-      'mail@etwalletx.com',
-      'enquiries@etwalletx.com',
-    ])
-  })
-
-  it('не открывает письма PIN кабинета', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/v1/admin/email',
-      headers: { 'x-admin-pin': '9100' },
-    })
-
-    expect(response.statusCode).toBe(401)
-  })
-
-  it('не отправляет письмо без PIN', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      payload: {
-        to: 'recipient@example.com',
-        from: 'custom123@etwalletx.com',
-        subject: 'Welcome!',
-        html: '<h1>Hello</h1>',
-        text: 'Hello',
-      },
-    })
-
-    expect(response.statusCode).toBe(401)
-  })
-
-  it('не отправляет письмо без ключей Cloudflare', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      headers: { 'x-email-manager-pin': '3100' },
-      payload: {
-        to: 'recipient@example.com',
-        from: 'custom123@etwalletx.com',
-        subject: 'Welcome!',
-        html: '<h1>Hello</h1>',
-        text: 'Hello',
-      },
-    })
-
-    expect(response.statusCode).toBe(503)
-    expect(response.json<{ error: { code: string } }>().error.code).toBe('email_unavailable')
-  })
 })
-
-describe('Менеджер писем', () => {
-  it('принимает PIN менеджера и отвергает PIN кабинета', async () => {
-    const ok = await app.inject({
-      method: 'POST',
-      url: '/v1/email-manager/auth',
-      payload: { pin: '3100' },
-    })
-    const denied = await app.inject({
-      method: 'POST',
-      url: '/v1/email-manager/auth',
-      payload: { pin: '9100' },
-    })
-
-    expect(ok.statusCode).toBe(200)
-    expect(denied.statusCode).toBe(401)
-  })
-})
-
-describe('Отправка писем кабинета', () => {
-  let mail: RecordingEmailService
-  let mailbox: MemoryEmailsRepository
-  let mailApp: FastifyInstance
-
-  beforeEach(async () => {
-    mail = new RecordingEmailService()
-    mailbox = new MemoryEmailsRepository()
-    mailApp = await buildApp({
-      config: CONFIG,
-      settings,
-      users,
-      email: mail,
-      emails: mailbox,
-    })
-  })
-
-  afterEach(async () => {
-    await mailApp.close()
-  })
-
-  it('отправляет письмо через службу и сохраняет в журнал', async () => {
-    const response = await mailApp.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      headers: { 'x-email-manager-pin': '3100' },
-      payload: {
-        to: 'recipient@example.com',
-        from: 'custom123@etwalletx.com',
-        subject: 'Welcome!',
-        html: '<h1>Hello</h1>',
-        text: 'Hello',
-      },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.json<{ delivered: string[] }>().delivered).toEqual(['recipient@example.com'])
-    expect(mail.sent).toEqual([
-      {
-        to: 'recipient@example.com',
-        from: 'custom123@etwalletx.com',
-        subject: 'Welcome!',
-        html: '<h1>Hello</h1>',
-        text: 'Hello',
-      },
-    ])
-    expect(mailbox.records).toHaveLength(1)
-    expect(mailbox.records[0]).toMatchObject({
-      direction: 'sent',
-      to: 'recipient@example.com',
-      from: 'custom123@etwalletx.com',
-      status: 'delivered',
-    })
-  })
-
-  it('собирает адреса из журнала писем', async () => {
-    await mailbox.create({
-      direction: 'sent',
-      from: 'support@etwalletx.com',
-      to: 'user@example.com',
-      subject: 'Hello',
-      text: 'Hi',
-      status: 'delivered',
-    })
-
-    const response = await mailApp.inject({
-      method: 'GET',
-      url: '/v1/admin/email/recipients',
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.json<{ recipients: string[] }>().recipients).toEqual([
-      'support@etwalletx.com',
-      'user@example.com',
-    ])
-  })
-
-  it('отдаёт журнал писем', async () => {
-    await mailbox.create({
-      direction: 'received',
-      from: 'user@example.com',
-      to: 'support@etwalletx.com',
-      subject: 'Help',
-      text: 'Need help',
-      status: 'received',
-    })
-
-    const response = await mailApp.inject({
-      method: 'GET',
-      url: '/v1/email-manager/messages',
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.json<{ messages: { subject: string; from: string }[] }>().messages[0]).toMatchObject({
-      subject: 'Help',
-      from: 'user@example.com',
-    })
-  })
-
-  it('листает журнал писем курсором', async () => {
-    await mailbox.create({
-      direction: 'received',
-      from: 'one@example.com',
-      to: 'support@etwalletx.com',
-      subject: 'One',
-      text: '1',
-      status: 'received',
-    })
-    await mailbox.create({
-      direction: 'received',
-      from: 'two@example.com',
-      to: 'support@etwalletx.com',
-      subject: 'Two',
-      text: '2',
-      status: 'received',
-    })
-    await mailbox.create({
-      direction: 'received',
-      from: 'three@example.com',
-      to: 'support@etwalletx.com',
-      subject: 'Three',
-      text: '3',
-      status: 'received',
-    })
-
-    const first = await mailApp.inject({
-      method: 'GET',
-      url: '/v1/email-manager/messages?limit=2',
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(first.statusCode).toBe(200)
-    const firstPage = first.json<{ messages: { id: string }[]; nextCursor: string | null }>()
-    expect(firstPage.messages).toHaveLength(2)
-    expect(firstPage.nextCursor).toEqual(expect.any(String))
-
-    const second = await mailApp.inject({
-      method: 'GET',
-      url: `/v1/email-manager/messages?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`,
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(second.statusCode).toBe(200)
-    const secondPage = second.json<{ messages: { id: string }[]; nextCursor: string | null }>()
-    expect(secondPage.messages).toHaveLength(1)
-    expect(secondPage.nextCursor).toBeNull()
-  })
-
-  it('отдаёт письма одного собеседника', async () => {
-    await mailbox.create({
-      direction: 'received',
-      from: 'user@example.com',
-      to: 'support@etwalletx.com',
-      subject: 'Help',
-      text: 'Need help',
-      status: 'received',
-    })
-    await mailbox.create({
-      direction: 'received',
-      from: 'other@example.com',
-      to: 'support@etwalletx.com',
-      subject: 'Other',
-      text: 'Hi',
-      status: 'received',
-    })
-
-    const response = await mailApp.inject({
-      method: 'GET',
-      url: '/v1/email-manager/messages?peer=user@example.com',
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.json<{ messages: { from: string }[] }>().messages).toEqual([
-      expect.objectContaining({ from: 'user@example.com' }),
-    ])
-  })
-
-  it('не открывает ящик PIN кабинета', async () => {
-    const response = await mailApp.inject({
-      method: 'GET',
-      url: '/v1/email-manager/messages',
-      headers: { 'x-admin-pin': '9100' },
-    })
-
-    expect(response.statusCode).toBe(401)
-  })
-
-  it('оставляет прежний путь журнала как синоним', async () => {
-    await mailbox.create({
-      direction: 'sent',
-      from: 'support@etwalletx.com',
-      to: 'user@example.com',
-      subject: 'Hello',
-      text: 'Hi',
-      status: 'delivered',
-    })
-
-    const response = await mailApp.inject({
-      method: 'GET',
-      url: '/v1/admin/email/messages',
-      headers: { 'x-email-manager-pin': '3100' },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.json<{ messages: { subject: string }[] }>().messages[0]?.subject).toBe('Hello')
-  })
-
-  it('принимает входящее письмо по вебхуку', async () => {
-    const response = await mailApp.inject({
-      method: 'POST',
-      url: '/v1/webhooks/email-inbound',
-      headers: { 'x-email-webhook-secret': 'webhook-secret' },
-      payload: {
-        from: 'user@example.com',
-        to: 'support@etwalletx.com',
-        subject: 'Inbound',
-        text: 'Hello support',
-        externalId: 'cf-1',
-      },
-    })
-
-    expect(response.statusCode).toBe(201)
-    expect(mailbox.records[0]).toMatchObject({
-      direction: 'received',
-      from: 'user@example.com',
-      subject: 'Inbound',
-      externalId: 'cf-1',
-    })
-  })
-
-  it('пропускает длинный текст письма мимо охранника секретов', async () => {
-    const response = await mailApp.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      headers: { 'x-email-manager-pin': '3100' },
-      payload: {
-        to: 'recipient@example.com',
-        from: 'custom123@etwalletx.com',
-        subject: 'Welcome!',
-        html: '<p>test test test test test test test test test test test junk</p>',
-      },
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(mail.sent).toHaveLength(1)
-  })
-
-  it('отвергает неверный адрес отправителя', async () => {
-    const response = await mailApp.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      headers: { 'x-email-manager-pin': '3100' },
-      payload: {
-        to: 'recipient@example.com',
-        from: 'not-an-email',
-        subject: 'Welcome!',
-        html: '<p>Hello</p>',
-      },
-    })
-
-    expect(response.statusCode).toBe(400)
-    expect(mail.sent).toHaveLength(0)
-  })
-
-  it('отвергает From вне домена Cloudflare Email Sending', async () => {
-    const response = await mailApp.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      headers: { 'x-email-manager-pin': '3100' },
-      payload: {
-        to: 'recipient@example.com',
-        from: 'me@gmail.com',
-        subject: 'Welcome!',
-        html: '<p>Hello</p>',
-      },
-    })
-
-    expect(response.statusCode).toBe(400)
-    expect(mail.sent).toHaveLength(0)
-  })
-
-  it('передаёт отказ службы кабинету', async () => {
-    mail.fail = new EmailUnavailableError(
-      'Email sending is not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.',
-    )
-
-    const response = await mailApp.inject({
-      method: 'POST',
-      url: '/v1/admin/email/send',
-      headers: { 'x-email-manager-pin': '3100' },
-      payload: {
-        to: 'recipient@example.com',
-        from: 'custom123@etwalletx.com',
-        subject: 'Welcome!',
-        html: '<p>Hello</p>',
-      },
-    })
-
-    expect(response.statusCode).toBe(503)
-    expect(response.json<{ error: { code: string } }>().error.code).toBe('email_unavailable')
-  })
-})
-
-class RecordingEmailService implements IEmailService {
-  readonly sent: IEmailMessage[] = []
-  fail: Error | null = null
-
-  readonly isConfigured = true
-
-  send(message: IEmailMessage): Promise<IEmailSendResult> {
-    if (this.fail !== null) {
-      return Promise.reject(this.fail)
-    }
-
-    this.sent.push(message)
-
-    return Promise.resolve({
-      messageId: null,
-      delivered: [message.to],
-      queued: [],
-      permanentBounces: [],
-    })
-  }
-}

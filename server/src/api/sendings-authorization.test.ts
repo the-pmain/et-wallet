@@ -6,6 +6,9 @@ import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { MemorySendingsRepository } from '../sendings/MemorySendingsRepository.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
 
+process.env['ADMIN_PIN'] = '4200'
+process.env['SUPER_ADMIN_PIN'] = '9100'
+
 const CONFIG: IServerConfig = {
   mode: RUNTIME_MODE.Test,
   host: '127.0.0.1',
@@ -28,6 +31,8 @@ const CONFIG: IServerConfig = {
   r2Endpoint: null,
   r2Bucket: null,
   emailWebhookSecret: null,
+    adminPin: null,
+    superAdminPin: null,
 }
 
 const SEED_PHRASE =
@@ -260,5 +265,32 @@ describe('public.sendings authorization', () => {
     })
     expect(response.body).not.toContain(SERVICE_ROLE)
     expect(response.body).not.toContain('demo')
+  })
+
+  it('PIN чтения не открывает sendings кабинета', async () => {
+    const id = await seedUser('james@example.com', 'demo')
+    const sendingId = await seedSending(id, 'james@example.com', 'demo')
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '4200' },
+    })
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/sendings/${sendingId}`,
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        status: 'success',
+        failureMessage: null,
+        recipientAddress: RECIPIENT,
+        amount: '0.02',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(listed.statusCode).toBe(403)
+    expect(patched.statusCode).toBe(403)
+    expect(sendings.records[0]?.status).toBe('pending')
   })
 })

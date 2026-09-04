@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { pinMatches } from '../admin/pin.ts'
+import { requireSuperAdmin } from '../admin/access.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
 import { API_CONTENT_SECURITY_POLICY } from '../lib/ui.ts'
 import { SENDING_AMOUNT_JSON_PATTERN } from '../sendings/amount.ts'
@@ -153,6 +153,10 @@ export function registerSendingRoutes(
          только переводы этого пользователя на экране отправки. */
       const userId = emptyToNull(request.query.user_id)
 
+      if (userId === null) {
+        requireSuperAdmin(request)
+      }
+
       reply.hijack()
       request.raw.setTimeout(0)
       request.raw.socket?.setTimeout(0)
@@ -215,7 +219,7 @@ export function registerSendingRoutes(
   )
 
   app.get('/v1/admin/sendings', async (request, reply) => {
-    requireAdminPin(request)
+    requireSuperAdmin(request)
 
     const records = await sendingsService.list()
 
@@ -228,7 +232,7 @@ export function registerSendingRoutes(
     '/v1/admin/sendings/:id',
     { schema: { body: UPDATE_SENDING_BODY } },
     async (request, reply) => {
-      requireAdminPin(request)
+      requireSuperAdmin(request)
 
       let record: ISendingRecord | null
 
@@ -326,15 +330,6 @@ function toSendingResponse(record: ISendingRecord): ISendingResponse {
     recipientAddress: record.recipientAddress,
     amount: record.amount,
     symbol: record.symbol,
-  }
-}
-
-function requireAdminPin(request: FastifyRequest): void {
-  const header = request.headers['x-admin-pin']
-  const pin = Array.isArray(header) ? header[0] : header
-
-  if (typeof pin !== 'string' || !pinMatches(pin.trim())) {
-    throw new UnauthorizedError('Неверные учётные данные.')
   }
 }
 

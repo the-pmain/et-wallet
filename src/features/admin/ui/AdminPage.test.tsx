@@ -148,9 +148,28 @@ beforeEach(() => {
 
     if (url.endsWith('/v1/admin/auth')) {
       const body = requestJson(init) as { pin?: string }
-      const accepted = body.pin === '9100'
 
-      return Promise.resolve(jsonResponse(accepted ? 200 : 401, accepted ? { ok: true } : {}))
+      if (body.pin === '9100') {
+        return Promise.resolve(jsonResponse(200, { ok: true, role: 'super' }))
+      }
+
+      if (body.pin === '4200') {
+        return Promise.resolve(jsonResponse(200, { ok: true, role: 'admin' }))
+      }
+
+      return Promise.resolve(jsonResponse(401, {}))
+    }
+
+    if (pin === '4200') {
+      if (url.endsWith('/v1/admin/users') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { users: [USER, MARIA] }))
+      }
+
+      if (url.endsWith('/v1/admin/users/7') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, USER))
+      }
+
+      return Promise.resolve(jsonResponse(403, {}))
     }
 
     if (pin !== '9100') {
@@ -215,12 +234,19 @@ describe('Кабинет администратора', () => {
     renderAdmin()
 
     expect(await screen.findByRole('heading', { name: 'Admin' })).toBeInTheDocument()
-    await user.type(screen.getByLabelText('PIN'), '9100')
-    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+    expect(
+      screen.getByText('Enter the PIN to manage users and wallet balances.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'PIN keypad' })).toBeInTheDocument()
+    for (const digit of ['9', '1', '0', '0']) {
+      await user.click(screen.getByRole('button', { name: digit }))
+    }
 
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(screen.getByText('Super Admin')).toBeInTheDocument()
     expect(await screen.findByText('james@example.com')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Avatar for james@example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('9100')
   })
@@ -231,10 +257,33 @@ describe('Кабинет администратора', () => {
 
     await screen.findByLabelText('PIN')
     await user.type(screen.getByLabelText('PIN'), '0000')
-    await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByText('That PIN is not accepted.')).toBeInTheDocument()
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBeNull()
+  })
+
+  it('PIN чтения открывает кабинет без Sendings, SSE и записи', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+
+    await screen.findByLabelText('PIN')
+    for (const digit of ['4', '2', '0', '0']) {
+      await user.click(screen.getByRole('button', { name: digit }))
+    }
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(screen.getByText('Admin')).toBeInTheDocument()
+    expect(screen.queryByText('Super Admin')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Sendings' })).not.toBeInTheDocument()
+    expect(
+      TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings')),
+    ).toHaveLength(0)
+
+    await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
+    expect(await screen.findByRole('heading', { name: 'james@example.com' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save ETH' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add crypto' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete user' })).not.toBeInTheDocument()
   })
 
   it('остаётся в кабинете по сохранённому PIN', async () => {

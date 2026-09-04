@@ -1,9 +1,12 @@
 import { createContext, useContext } from 'react'
 
 import type { AdminClient } from './AdminClient'
+import type { AdminRole } from './admin-role'
 
 export interface IAdminSession {
   readonly client: AdminClient
+  readonly role: AdminRole
+  readonly canWrite: boolean
   readonly lock: () => void
 }
 

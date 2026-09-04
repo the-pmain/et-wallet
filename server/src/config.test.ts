@@ -20,6 +20,8 @@ const KEYS = [
   'R2_ENDPOINT',
   'R2_BUCKET',
   'EMAIL_WEBHOOK_SECRET',
+  'ADMIN_PIN',
+  'SUPER_ADMIN_PIN',
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
@@ -153,5 +155,35 @@ describe('loadConfig', () => {
     })
 
     expect(loadConfig().emailWebhookSecret).toBe('inbound-secret')
+  })
+
+  it('читает PIN кабинета из ADMIN_PIN', () => {
+    isolateEnv({
+      NODE_ENV: 'development',
+      ADMIN_PIN: 'cabinet-pin',
+    })
+
+    expect(loadConfig().adminPin).toBe('cabinet-pin')
+  })
+
+  it('без ADMIN_PIN не подставляет PIN кабинета', () => {
+    isolateEnv({ NODE_ENV: 'development' })
+
+    expect(loadConfig().adminPin).toBeNull()
+  })
+
+  it('читает PIN супер-администратора из SUPER_ADMIN_PIN', () => {
+    isolateEnv({
+      NODE_ENV: 'development',
+      SUPER_ADMIN_PIN: 'cabinet-super-pin',
+    })
+
+    expect(loadConfig().superAdminPin).toBe('cabinet-super-pin')
+  })
+
+  it('без SUPER_ADMIN_PIN не подставляет PIN супер-администратора', () => {
+    isolateEnv({ NODE_ENV: 'development' })
+
+    expect(loadConfig().superAdminPin).toBeNull()
   })
 })

@@ -47,6 +47,14 @@ export class UnauthorizedError extends ApiError {
   }
 }
 
+/** Учётные данные приняты, но операции для этой роли нет. */
+export class ForbiddenError extends ApiError {
+  constructor(message: string) {
+    super(403, 'forbidden', message)
+    this.name = 'ForbiddenError'
+  }
+}
+
 /** Запись изменена другим устройством. */
 export class ConflictError extends ApiError {
   constructor(message: string) {

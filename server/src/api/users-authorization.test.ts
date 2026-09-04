@@ -6,6 +6,9 @@ import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { MemorySendingsRepository } from '../sendings/MemorySendingsRepository.ts'
 import { MemoryUsersRepository } from '../users/MemoryUsersRepository.ts'
 
+process.env['ADMIN_PIN'] = '4200'
+process.env['SUPER_ADMIN_PIN'] = '9100'
+
 const CONFIG: IServerConfig = {
   mode: RUNTIME_MODE.Test,
   host: '127.0.0.1',
@@ -28,6 +31,8 @@ const CONFIG: IServerConfig = {
   r2Endpoint: null,
   r2Bucket: null,
   emailWebhookSecret: null,
+    adminPin: null,
+    superAdminPin: null,
 }
 
 const SEED_PHRASE =
@@ -194,6 +199,40 @@ describe('public.users authorization', () => {
     expect(updated.json()).not.toHaveProperty('seed_phrase')
     expect(updated.body).not.toContain(SERVICE_ROLE)
     expect(listed.body).not.toContain(SERVICE_ROLE)
+  })
+
+  it('PIN чтения видит список и не меняет запись', async () => {
+    const id = await seed('james@example.com', 'demo')
+
+    const auth = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/auth',
+      payload: { pin: '4200' },
+    })
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/users',
+      headers: { 'x-admin-pin': '4200' },
+    })
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/v1/admin/users/${id}`,
+      headers: { 'x-admin-pin': '4200' },
+      payload: { balance: '99' },
+    })
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/v1/admin/users/${id}`,
+      headers: { 'x-admin-pin': '4200' },
+    })
+
+    expect(auth.statusCode).toBe(200)
+    expect(auth.json<{ role: string }>()).toEqual({ ok: true, role: 'admin' })
+    expect(listed.statusCode).toBe(200)
+    expect(patched.statusCode).toBe(403)
+    expect(removed.statusCode).toBe(403)
+    expect(users.records[0]?.balance).toBe('0')
+    expect(users.records).toHaveLength(1)
   })
 
   it('сохраняет форму ответа пользователя', async () => {
