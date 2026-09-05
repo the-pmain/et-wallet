@@ -7,36 +7,35 @@ import { Button } from '@/shared/ui'
 import { copyWithAutoClear, type ICopyHandle } from '../model/clipboard'
 
 interface SecretRevealProps {
-  /** Что показывается. Попадает в подпись, но не в буфер обмена. */
+  /** What is shown. Goes into the label, not the clipboard. */
   readonly label: string
 
-  /** Само значение. Строка неочищаема — см. пояснение ниже. */
+  /** The value itself. The string cannot be wiped — see below. */
   readonly value: string
 
-  /** Разрешено ли копирование в буфер обмена. */
   readonly canCopy?: boolean
 }
 
 /**
- * Показ секрета одной строкой — приватного ключа, расширенного ключа.
+ * Show a secret on one line — a private key, an extended key.
  *
- * ГРАНИЦА ЧЕСТНОСТИ. Показанный секрет существует строкой в дереве React
- * и в памяти вкладки. Строки в JavaScript неочищаемы: значение живёт
- * до сборки мусора, и устранить это нельзя. Смягчения ровно два —
- * значение скрыто до явного действия пользователя, и буфер обмена
- * очищается сам.
+ * HONESTY BOUNDARY. A shown secret exists as a string in the React
+ * tree and in tab memory. JavaScript strings cannot be wiped: the
+ * value lives until garbage collection, and that cannot be fixed.
+ * Mitigations are exactly two — the value is hidden until an
+ * explicit user action, and the clipboard clears itself.
  *
- * СКРЫТО ПО УМОЛЧАНИЮ. Экран, открывшийся с готовым ключом на виду,
- * раскрывает его случайному взгляду, демонстрации экрана и скриншоту,
- * сделанному не глядя.
+ * HIDDEN BY DEFAULT. A screen that opens with the key already
+ * visible reveals it to a glance over the shoulder, a screen share,
+ * and a screenshot taken without looking.
  */
 export function SecretReveal({ label, value, canCopy = true }: SecretRevealProps) {
   const [isRevealed, setRevealed] = useState(false)
   const [isCopied, setCopied] = useState(false)
 
-  /* Отмена запланированной очистки нужна при уходе с экрана: таймер,
-     переживший компонент, обратился бы к буферу обмена вкладки, которая
-     уже занята другим. */
+  /* Cancel a scheduled clear when leaving the screen: a timer
+     that outlived the component would touch the clipboard of a
+     tab already showing something else. */
   const copyHandle = useRef<ICopyHandle | null>(null)
 
   useEffect(() => {

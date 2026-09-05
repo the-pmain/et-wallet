@@ -2,15 +2,13 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 
 import { ThemeContext, type Theme, type ThemeContextValue } from '@/shared/theme'
 
-/** Медиазапрос, отражающий системную настройку тёмного оформления. */
 const DARK_MODE_QUERY = '(prefers-color-scheme: dark)'
 
-/** CSS-класс тёмной темы. Соответствует `@custom-variant dark` в index.css. */
+/** Dark-theme CSS class. Matches `@custom-variant dark` in index.css. */
 const DARK_CLASS = 'dark'
 
 interface ThemeProviderProps {
   children: ReactNode
-  /** Начальный режим. По умолчанию — системный. */
   defaultTheme?: Theme
 }
 
@@ -19,19 +17,18 @@ function getSystemTheme(): 'light' | 'dark' {
 }
 
 /**
- * Провайдер оформления.
+ * Theme provider.
  *
- * Выбор пользователя намеренно НЕ сохраняется между сессиями: постоянное
- * хранилище появится вместе со слоем `core/storage`, а прямое обращение
- * к localStorage запрещено правилом ESLint `no-restricted-globals`.
- * Промежуточное решение через localStorage создало бы исключение из правила,
- * которое затем пришлось бы вычищать.
+ * The user's choice is deliberately NOT persisted across sessions:
+ * durable storage will arrive with the `core/storage` layer, and
+ * talking to localStorage directly is banned by the ESLint rule
+ * `no-restricted-globals`. An interim localStorage exception would
+ * then have to be cleaned up.
  */
 export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme)
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(getSystemTheme)
 
-  /* Отслеживание смены системной темы на лету. */
   useEffect(() => {
     const mediaQuery = window.matchMedia(DARK_MODE_QUERY)
     const handleChange = (event: MediaQueryListEvent): void => {
@@ -46,7 +43,6 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
 
   const resolvedTheme = theme === 'system' ? systemTheme : theme
 
-  /* Применение класса к корневому элементу — единственный побочный эффект темы. */
   useEffect(() => {
     document.documentElement.classList.toggle(DARK_CLASS, resolvedTheme === 'dark')
   }, [resolvedTheme])

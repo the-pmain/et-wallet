@@ -13,7 +13,7 @@ function avatarSignature(element: HTMLElement): string {
 }
 
 describe('UserAvatar', () => {
-  it('рисует один и тот же узор для одной записи', () => {
+  it('draws the same pattern for the same record', () => {
     const first = render(<UserAvatar userId="51" email="james@example.com" />)
     const firstSignature = avatarSignature(first.container)
     first.unmount()
@@ -24,7 +24,7 @@ describe('UserAvatar', () => {
     expect(second.getByRole('img', { name: 'Avatar for james@example.com' })).toBeInTheDocument()
   })
 
-  it('различает разные записи', () => {
+  it('distinguishes different records', () => {
     const first = render(<UserAvatar userId="51" email="james@example.com" />)
     const firstSignature = avatarSignature(first.container)
     first.unmount()

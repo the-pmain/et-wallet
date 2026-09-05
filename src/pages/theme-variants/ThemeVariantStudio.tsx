@@ -20,10 +20,11 @@ interface ThemeVariantStudioProps {
 }
 
 /**
- * Оболочка этюда: переключатель тем и изоляция переменных.
+ * Study shell: theme switcher and CSS-variable isolation.
  *
- * ПЕРЕКЛЮЧАТЕЛЬ НЕ ЧАСТЬ КОШЕЛЬКА. Он живёт над макетом, чтобы сравнение
- * не требовало помнить адреса. Кнопки внутри макета нарочно пустые.
+ * THE SWITCHER IS NOT PART OF THE WALLET. It sits above the mock so
+ * comparison does not require remembering URLs. Buttons inside the
+ * mock are deliberately inert.
  */
 export function ThemeVariantStudio({ theme, children }: ThemeVariantStudioProps) {
   return (

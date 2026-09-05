@@ -25,18 +25,18 @@ const MARIA = {
 }
 
 describe('userMatchesAdminQuery', () => {
-  it('находит запись по почте', () => {
+  it('finds a record by email', () => {
     expect(userMatchesAdminQuery(JAMES, 'james@')).toBe(true)
     expect(userMatchesAdminQuery(MARIA, 'james@')).toBe(false)
   })
 
-  it('находит запись по адресу кошелька', () => {
+  it('finds a record by wallet address', () => {
     expect(userMatchesAdminQuery(JAMES, '5aaeb605')).toBe(true)
     expect(userMatchesAdminQuery(JAMES, KEY)).toBe(true)
     expect(userMatchesAdminQuery(MARIA, '5aaeb605')).toBe(false)
   })
 
-  it('пустой запрос не отсекает никого', () => {
+  it('an empty query does not filter anyone out', () => {
     expect(userMatchesAdminQuery(JAMES, '  ')).toBe(true)
     expect(userMatchesAdminQuery(MARIA, '')).toBe(true)
   })

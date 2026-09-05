@@ -1,9 +1,9 @@
 /**
- * Адреса экранов.
+ * Screen addresses.
  *
- * Собраны в одном месте, чтобы переход не задавался строковым литералом
- * в каждом обработчике: опечатка в такой строке даёт не ошибку сборки,
- * а тихий переход на несуществующий экран.
+ * Collected in one place so a navigation is not a string literal in
+ * every handler: a typo in such a string is not a build error, it is
+ * a silent trip to a screen that does not exist.
  */
 export const ROUTE = {
   Welcome: '/',
@@ -14,13 +14,13 @@ export const ROUTE = {
   Admin: '/admin',
   AdminSendings: '/admin/sendings',
 
-  /* Чему приходится доверять, пользуясь кошельком в браузере. Открыт
-     до создания кошелька: сведения нужны раньше решения. */
+  /* What you have to trust when using a wallet in the browser. Open
+     before wallet creation: the facts are needed before the decision. */
   Trust: '/trust',
   Privacy: '/privacy',
   Terms: '/terms',
 
-  /* Экраны разблокированного кошелька. Делят общую оболочку с навигацией. */
+  /* Unlocked-wallet screens. They share a shell with navigation. */
   Dashboard: '/wallet',
   Send: '/wallet/send',
   Assets: '/wallet/assets',
@@ -32,8 +32,8 @@ export const ROUTE = {
   Approvals: '/wallet/approvals',
   Backup: '/wallet/backup',
 
-  /* Неподвижные этюды темы главного экрана. Открыты без разблокировки:
-     это сравнение вида, а не кабинет. */
+  /* Static studies of the home-screen theme. Open without unlock:
+     this is a look comparison, not the cabinet. */
   Variant1: '/variant-1',
   Variant2: '/variant-2',
   Variant3: '/variant-3',

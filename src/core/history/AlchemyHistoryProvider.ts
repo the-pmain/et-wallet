@@ -20,19 +20,18 @@ import {
 const PROVIDER_ID = 'alchemy'
 const PROVIDER_NAME = 'Alchemy indexer'
 
-/** Метод индексатора. Не входит в стандарт JSON-RPC. */
 const METHOD = 'alchemy_getAssetTransfers'
 
 /**
- * Запрашиваемые категории.
+ * Requested categories.
  *
- * `external` — обычные переводы нативной валюты, `internal` — переводы,
- * выполненные контрактом внутри транзакции. Именно эти две категории
- * недостижимы разбором журналов: событий они не порождают.
+ * `external` — ordinary native-currency transfers, `internal` —
+ * transfers a contract made inside a transaction. Those two
+ * categories are unreachable by a log scan: they emit no events.
  */
 const CATEGORIES: readonly string[] = ['external', 'internal', 'erc20', 'erc721', 'erc1155']
 
-/** Сети, которые обслуживает индексатор. Совпадают с сетями RPC-источника. */
+/** Networks the indexer serves. Match the RPC source's networks. */
 const SUPPORTED: ReadonlySet<ChainId> = new Set([
   BUILT_IN_CHAIN_ID.Ethereum,
   BUILT_IN_CHAIN_ID.Optimism,
@@ -44,25 +43,25 @@ const SUPPORTED: ReadonlySet<ChainId> = new Set([
 ])
 
 /**
- * История переводов через индексатор Alchemy.
+ * Transfer history through the Alchemy indexer.
  *
- * ЧТО ПОЛУЧАЕМ. Полную историю всех категорий, включая переводы нативной
- * валюты и внутренние переводы контрактов, за всё время существования
- * адреса. Разбором журналов это недостижимо.
+ * WHAT WE GET. The full history of every category, including native
+ * transfers and internal contract transfers, for the whole life of
+ * the address. A log scan cannot reach that.
  *
- * ЧЕМ ПЛАТИМ. Оператор индексатора получает адрес пользователя и
- * возвращает всю его финансовую историю. Он узнаёт размер портфеля,
- * всех контрагентов и время каждой операции — разом, а не по мере
- * поступления запросов, как это происходит с обычным RPC-узлом.
- * Решение о таком обмене принимает владелец кошелька, и интерфейс
- * обязан показывать, какой источник использован.
+ * WHAT WE PAY. The indexer operator receives the user's address and
+ * returns their entire financial history. They learn portfolio size,
+ * every counterparty, and the time of every operation — at once,
+ * not as requests arrive, as with an ordinary RPC node.
+ * The wallet owner decides whether to make that trade, and the UI
+ * must show which source was used.
  *
- * ПОЧЕМУ СУММА БЕРЁТСЯ ИЗ `rawContract.value`, А НЕ ИЗ `value`.
- * Поле `value` приходит числом JSON, то есть двоичной плавающей точкой:
- * баланс в 0.1 токена в ней непредставим точно, а суммы свыше 2^53
- * теряют младшие разряды целиком. Для денег это недопустимо. Поле
- * `rawContract.value` содержит необработанные единицы шестнадцатеричной
- * строкой и переводится в `bigint` без потерь.
+ * WHY THE AMOUNT IS TAKEN FROM `rawContract.value`, NOT FROM `value`.
+ * `value` arrives as a JSON number, i.e. binary floating point: a
+ * balance of 0.1 tokens is not representable exactly, and amounts
+ * past 2^53 lose the low digits entirely. For money that is not
+ * acceptable. `rawContract.value` holds the raw units as a hex
+ * string and converts to `bigint` without loss.
  */
 export class AlchemyHistoryProvider implements IHistoryProvider {
   readonly id = PROVIDER_ID
@@ -75,15 +74,14 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
   async fetch(query: IHistoryQuery, provider: IProvider): Promise<IHistoryPage> {
     const position = resolvePosition(query.cursor)
 
-    /* Индексатор не умеет объединять условия «отправитель ИЛИ получатель»,
-       поэтому выборок две. Запрашиваются параллельно: последовательные
-       удвоили бы ожидание на экране, который открывают ради быстрого
-       взгляда.
+    /* The indexer cannot combine "sender OR recipient", so there
+       are two queries. They run in parallel: sequential ones would
+       double the wait on a screen opened for a quick look.
 
-       НА ПРОДОЛЖЕНИИ ИСЧЕРПАННАЯ ВЫБОРКА НЕ ПОВТОРЯЕТСЯ. Полученного
-       и отправленного у адреса разное количество, и без этого условия
-       более короткая сторона выдавала бы свою первую страницу заново
-       при каждом нажатии «показать более ранние». */
+       ON CONTINUATION AN EXHAUSTED QUERY IS NOT REPEATED. An address
+       has different counts of received and sent, and without this
+       the shorter side would serve its first page again on every
+       "show earlier". */
     const [sent, received] = await Promise.all([
       position.isFirstPage || position.sent !== null
         ? this.#request(provider, query, 'fromAddress', position.sent)
@@ -136,10 +134,10 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
   }
 
   /**
-   * Превращает запись индексатора в записи истории.
+   * Turns an indexer record into history records.
    *
-   * Одно событие ERC-1155 может нести несколько предметов, поэтому
-   * возвращается список, а не одна запись.
+   * One ERC-1155 event can carry several items, so a list is
+   * returned, not a single record.
    */
   #toRecords(raw: IRawTransfer, query: IHistoryQuery): readonly ITransferRecord[] {
     const kind = toKind(raw.category)
@@ -168,7 +166,7 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
       blockNumber: raw.blockNumber,
       timestamp: raw.timestamp,
       source: TRANSFER_SOURCE.Indexer,
-      /* Запись существует только потому, что уже попала в блок. */
+      /* The record exists only because it already landed in a block. */
       status: TRANSACTION_STATUS.Confirmed,
     }
 
@@ -185,8 +183,8 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
       {
         ...base,
         id: raw.uniqueId,
-        /* Для ERC-721 количество всегда единица: уникальный предмет
-           не делится, а поле суммы индексатор для него не заполняет. */
+        /* For ERC-721 the amount is always one: a unique item does
+           not divide, and the indexer does not fill the amount field. */
         value: kind === TRANSFER_KIND.Erc721 ? 1n : raw.rawValue,
         tokenId: raw.tokenId,
       },
@@ -194,17 +192,14 @@ export class AlchemyHistoryProvider implements IHistoryProvider {
   }
 }
 
-/** Ответ индексатора на одну выборку. */
 interface IRawBatch {
   readonly transfers: readonly IRawTransfer[]
 
-  /** Ключ следующей страницы. `null` — выборка исчерпана. */
   readonly pageKey: string | null
 }
 
 const EMPTY_BATCH: IRawBatch = { transfers: [], pageKey: null }
 
-/** Положение обеих выборок между страницами. */
 interface IPosition {
   readonly isFirstPage: boolean
   readonly sent: string | null
@@ -212,10 +207,10 @@ interface IPosition {
 }
 
 /**
- * Разбирает метку продолжения.
+ * Parses a continuation token.
  *
- * Чужая либо испорченная метка означает первую страницу: показать
- * начало истории заново лучше, чем отказать в ней целиком.
+ * A foreign or corrupted token means the first page: showing the
+ * start of history again is better than refusing it entirely.
  */
 function resolvePosition(cursor: IHistoryQuery['cursor']): IPosition {
   if (cursor === null || cursor === undefined || cursor.providerId !== PROVIDER_ID) {
@@ -250,11 +245,10 @@ function encodeCursor(sent: string | null, received: string | null): IHistoryCur
 }
 
 /**
- * Ключ следующей страницы из ответа.
+ * Next-page key from the response.
  *
- * Отсутствие поля — признак конца выдачи, установленный индексатором,
- * а не догадка по числу записей: последняя страница вполне может быть
- * полной.
+ * Absence of the field is an end-of-page mark set by the indexer,
+ * not a guess from the record count: the last page may well be full.
  */
 function extractPageKey(response: unknown): string | null {
   const record = asRecord(response)
@@ -262,7 +256,6 @@ function extractPageKey(response: unknown): string | null {
   return record === null ? null : readString(record, 'pageKey')
 }
 
-/** Запись ответа индексатора после проверки. */
 interface IRawTransfer {
   readonly uniqueId: string
   readonly hash: string
@@ -280,12 +273,12 @@ interface IRawTransfer {
 }
 
 /**
- * Разбирает ответ индексатора.
+ * Parses an indexer response.
  *
- * Ответ НЕДОВЕРЕННЫЙ: это внешний сервис, и его формат может измениться
- * без предупреждения. Каждое поле проверяется по отдельности, а записи,
- * не прошедшие проверку, отбрасываются молча. Исключение здесь означало бы,
- * что одна испорченная запись лишает пользователя всей истории.
+ * The response is UNTRUSTED: this is an external service, and its
+ * format can change without notice. Each field is checked on its
+ * own, and records that fail are dropped silently. Throwing here
+ * would mean one corrupted record deprives the user of all history.
  */
 function extractTransfers(response: unknown): readonly IRawTransfer[] {
   if (typeof response !== 'object' || response === null) {
@@ -347,11 +340,12 @@ function parseTransfer(entry: unknown): IRawTransfer | null {
 }
 
 /**
- * Число десятичных знаков.
+ * Decimal count.
  *
- * Отсутствие поля означает «неизвестно» и передаётся как `null`.
- * Подставлять привычные восемнадцать нельзя: токен с шестью знаками,
- * показанный как восемнадцатизначный, занизит сумму в триллион раз.
+ * Absence of the field means "unknown" and is passed as `null`.
+ * Substituting the familiar eighteen is not allowed: a token with
+ * six decimals shown as eighteen would understate the amount a
+ * trillionfold.
  */
 function parseDecimals(rawContract: Record<string, unknown> | null): number | null {
   if (rawContract === null) {
@@ -405,7 +399,6 @@ function parseErc1155(value: unknown): readonly { tokenId: bigint; value: bigint
   return items
 }
 
-/** Время включения в блок из метаданных. Индексатор отдаёт его строкой ISO. */
 function parseTimestamp(metadata: unknown): Timestamp | null {
   const record = asRecord(metadata)
   const value = record === null ? null : readString(record, 'blockTimestamp')
@@ -447,13 +440,12 @@ function resolveDirection(from: Address, to: Address | null, owner: Address) {
 }
 
 /**
- * Чтение поля недоверенного объекта.
+ * Reads a field of an untrusted object.
  *
- * Отдельный помощник, а не прямой доступ: настройка
- * `noPropertyAccessFromIndexSignature` требует скобочной записи для
- * полей, чьё существование не гарантировано типом. Это верное
- * требование — оно не даёт спутать разобранную структуру с сырым
- * ответом стороннего сервиса.
+ * A helper, not direct access: `noPropertyAccessFromIndexSignature`
+ * requires bracket notation for fields whose existence the type
+ * does not guarantee. That is the right requirement — it stops
+ * a parsed structure being confused with a raw third-party response.
  */
 function field(record: Record<string, unknown>, key: string): unknown {
   return record[key]

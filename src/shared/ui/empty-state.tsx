@@ -7,26 +7,27 @@ export interface EmptyStateProps {
   readonly title: string
 
   /**
-   * Объяснение, почему список пуст.
+   * Why the list is empty.
    *
-   * Обязательное поле, а не необязательное. Пустой список без объяснения
-   * пользователь читает как «у меня ничего нет» — и это опасное прочтение,
-   * когда настоящая причина в том, что кошелёк ещё не умеет читать эти
-   * данные. Разница между «активов нет» и «активы не отслеживаются»
-   * определяет, побежит ли человек искать пропавшие средства.
+   * Required, not optional. An empty list with no explanation is
+   * read as “I have nothing” — a dangerous reading when the real
+   * reason is that the wallet cannot read this data yet. The
+   * difference between “no assets” and “assets are not tracked”
+   * decides whether someone runs off looking for missing funds.
    */
   readonly description: ReactNode
 
   readonly action?: ReactNode
 
-  /* `| undefined` явно: при `exactOptionalPropertyTypes` необязательное
-     свойство и свойство со значением `undefined` — разные типы, а сюда
-     значение приходит прокинутым из другого необязательного поля. */
+  /* `| undefined` is explicit: under `exactOptionalPropertyTypes` an
+     optional property and a property whose value may be `undefined`
+     are different types, and the value arrives forwarded from another
+     optional field. */
   readonly className?: string | undefined
 }
 
 /**
- * Пустое состояние списка с обязательным объяснением причины.
+ * Empty list state with a required explanation.
  */
 export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (

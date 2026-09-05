@@ -12,9 +12,9 @@ import { thePMatches } from './theP.ts'
 import { emptyWallets, mergeWallet } from './wallets.ts'
 
 /**
- * Пользователи в памяти процесса.
+ * Users in process memory.
  *
- * Для проверок маршрута и для локального мока без живой базы.
+ * For route checks and a local mock without a live database.
  */
 export class MemoryUsersRepository implements IUsersRepository {
   readonly #records: IUserRecord[] = []

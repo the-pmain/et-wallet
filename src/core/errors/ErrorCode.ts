@@ -1,24 +1,24 @@
 /**
- * Реестр кодов ошибок ядра.
+ * Registry of core error codes.
  *
- * Единый список вместо строковых литералов, разбросанных по классам, нужен
- * по трём причинам:
- * - UI сопоставляет коду сообщение на языке пользователя, и полный перечень
- *   кодов должен быть виден в одном месте;
- * - компилятор не даст опечататься в коде при обработке;
- * - дублирование кода в двух разных ошибках станет заметно сразу.
+ * A single list instead of string literals scattered across classes is
+ * needed for three reasons:
+ * - the UI maps a code to a message in the user's language, so the full
+ *   set of codes must be visible in one place;
+ * - the compiler will not allow a typo in a handled code;
+ * - a duplicated code on two different errors becomes obvious immediately.
  *
- * Объект-константа вместо `enum`: `enum` порождает рантайм-код и запрещён
- * настройкой `erasableSyntaxOnly` в tsconfig этапа 1.
+ * A const object instead of `enum`: `enum` emits runtime code and is
+ * forbidden by `erasableSyntaxOnly` in the stage-1 tsconfig.
  */
 export const ERROR_CODE = {
-  /* --- Общие --- */
+  /* --- General --- */
   NotImplemented: 'NOT_IMPLEMENTED',
   InvalidArgument: 'INVALID_ARGUMENT',
   NotInitialized: 'NOT_INITIALIZED',
   Internal: 'INTERNAL',
 
-  /* --- Кошелёк и доступ --- */
+  /* --- Wallet and access --- */
   WalletLocked: 'WALLET_LOCKED',
   WalletNotInitialized: 'WALLET_NOT_INITIALIZED',
   WalletAlreadyInitialized: 'WALLET_ALREADY_INITIALIZED',
@@ -36,7 +36,7 @@ export const ERROR_CODE = {
   InvalidPublicKey: 'INVALID_PUBLIC_KEY',
   AddressChecksumMismatch: 'ADDRESS_CHECKSUM_MISMATCH',
 
-  /* --- Аккаунты и наборы ключей --- */
+  /* --- Accounts and keyrings --- */
   AccountNotFound: 'ACCOUNT_NOT_FOUND',
   AccountAlreadyExists: 'ACCOUNT_ALREADY_EXISTS',
   AccountNotRemovable: 'ACCOUNT_NOT_REMOVABLE',
@@ -44,20 +44,20 @@ export const ERROR_CODE = {
   KeyringCannotSign: 'KEYRING_CANNOT_SIGN',
   ExportNotPermitted: 'EXPORT_NOT_PERMITTED',
 
-  /* --- Шифрование --- */
+  /* --- Encryption --- */
   RandomnessUnavailable: 'RANDOMNESS_UNAVAILABLE',
   DecryptionFailed: 'DECRYPTION_FAILED',
   VaultCorrupted: 'VAULT_CORRUPTED',
   UnsupportedVaultVersion: 'UNSUPPORTED_VAULT_VERSION',
   SecretBufferWiped: 'SECRET_BUFFER_WIPED',
 
-  /* --- Хранилище --- */
+  /* --- Storage --- */
   StorageUnavailable: 'STORAGE_UNAVAILABLE',
   StorageWriteFailed: 'STORAGE_WRITE_FAILED',
   StorageReadFailed: 'STORAGE_READ_FAILED',
   MigrationFailed: 'MIGRATION_FAILED',
 
-  /* --- Сеть и провайдер --- */
+  /* --- Network and provider --- */
   NetworkNotFound: 'NETWORK_NOT_FOUND',
   NetworkAlreadyExists: 'NETWORK_ALREADY_EXISTS',
   BuiltInNetworkImmutable: 'BUILT_IN_NETWORK_IMMUTABLE',
@@ -69,7 +69,7 @@ export const ERROR_CODE = {
   ProviderUnavailable: 'PROVIDER_UNAVAILABLE',
   RpcError: 'RPC_ERROR',
 
-  /* --- Транзакции --- */
+  /* --- Transactions --- */
   InsufficientFunds: 'INSUFFICIENT_FUNDS',
   GasEstimationFailed: 'GAS_ESTIMATION_FAILED',
   NonceTooLow: 'NONCE_TOO_LOW',
@@ -77,7 +77,7 @@ export const ERROR_CODE = {
   TransactionUnderpriced: 'TRANSACTION_UNDERPRICED',
   UserRejected: 'USER_REJECTED',
 
-  /* --- Токены --- */
+  /* --- Tokens --- */
   TokenNotFound: 'TOKEN_NOT_FOUND',
   InvalidTokenContract: 'INVALID_TOKEN_CONTRACT',
   UnsupportedTokenStandard: 'UNSUPPORTED_TOKEN_STANDARD',

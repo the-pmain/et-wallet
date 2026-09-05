@@ -1,11 +1,11 @@
 import type { IClock, Timestamp, Unsubscribe } from '@/core'
 
 /**
- * Управляемые часы для тестов.
+ * Controllable clock for tests.
  *
- * Время не идёт само: оно двигается только вызовом `advance`. Это делает
- * тесты таймаутов детерминированными и мгновенными — проверка автоблокировки
- * через пятнадцать минут не должна занимать пятнадцать минут.
+ * Time does not move by itself: it advances only via `advance`.
+ * That makes timeout tests deterministic and instant — a
+ * fifteen-minute autolock check must not take fifteen minutes.
  */
 export class FakeClock implements IClock {
   #now: number
@@ -40,12 +40,12 @@ export class FakeClock implements IClock {
     }
   }
 
-  /** Двигает время вперёд и запускает наступившие таймеры. */
+  /** Moves time forward and fires due timers. */
   advance(deltaMs: number): void {
     const target = this.#now + deltaMs
 
-    /* Перебор в цикле, а не однократный проход: обработчик интервала
-       может сработать несколько раз за один шаг. */
+    /* Loop, not a single pass: an interval handler may fire
+       several times in one step. */
     let progressed = true
 
     while (progressed) {
@@ -72,7 +72,7 @@ export class FakeClock implements IClock {
     this.#now = target
   }
 
-  /** Число активных таймеров. Позволяет проверять отсутствие утечек. */
+  /** Active timer count. Lets tests check there are no leaks. */
   get pendingTimers(): number {
     return this.#timers.size
   }

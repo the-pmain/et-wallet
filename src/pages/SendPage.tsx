@@ -64,7 +64,6 @@ import {
   Label,
 } from '@/shared/ui'
 
-/** Этапы отправки. */
 const STEP = {
   Form: 'form',
   Confirm: 'confirm',
@@ -74,15 +73,15 @@ const STEP = {
 type Step = (typeof STEP)[keyof typeof STEP]
 
 /**
- * Задержка перед обращением к узлу при вводе получателя.
+ * Delay before talking to the node while the recipient is typed.
  *
- * Разрешение имени — сетевой запрос. Без задержки кошелёк спрашивал бы
- * узел на каждую букву: `v`, `vi`, `vit`… — десяток обращений за одно
- * имя и подробный след у оператора узла.
+ * Name resolution is a network request. Without a delay the wallet
+ * would ask the node on every letter: `v`, `vi`, `vit`… — a dozen
+ * calls for one name and a detailed trail at the node operator.
  */
 const RESOLVE_DEBOUNCE_MS = 350
 
-/** Совпадают ли активы. `null` с обеих сторон — нативная валюта. */
+/** Whether two assets match. `null` on both sides is the native currency. */
 function sameAsset(left: Address | null, right: Address | null): boolean {
   if (left === null || right === null) {
     return left === right
@@ -91,9 +90,7 @@ function sameAsset(left: Address | null, right: Address | null): boolean {
   return left.toLowerCase() === right.toLowerCase()
 }
 
-/** Разбор получателя вместе с вводом, которому он соответствует. */
 interface IResolvedRecipient {
-  /** Строка, для которой получен разбор. */
   readonly input: string
   readonly result: IRecipientResolution
 }
@@ -104,29 +101,29 @@ const EMPTY_RECIPIENT: IResolvedRecipient = {
 }
 
 /**
- * Отправка нативной валюты.
+ * Sending native currency.
  *
- * ГЛАВНОЕ СВОЙСТВО ЭКРАНА: показанное совпадает с подписываемым.
- * `prepareTransfer` возвращает готовую к подписи транзакцию, экран
- * подтверждения показывает поля именно этого объекта, и он же уходит
- * в подпись без промежуточных пересчётов. Расхождение показанного
- * с подписанным — основной класс атак на интерфейс кошелька.
+ * THE SCREEN'S CORE PROPERTY: what is shown is what is signed.
+ * `prepareTransfer` returns a ready-to-sign transaction, the confirm
+ * screen shows fields of that same object, and that object goes to
+ * signing with no intermediate recalculation. A mismatch between
+ * shown and signed is the main class of wallet-UI attacks.
  *
- * СЕТЬ И АККАУНТ ВЫБИРАЮТСЯ ДО ПОДГОТОВКИ. Переключение любого из них
- * сбрасывает подготовленную транзакцию: она содержит chainId, nonce
- * и адрес отправителя, и после смены перестала бы соответствовать тому,
- * что видит пользователь.
+ * NETWORK AND ACCOUNT ARE CHOSEN BEFORE PREPARE. Switching either
+ * resets the prepared transaction: it holds chainId, nonce, and the
+ * sender, and after a switch it would no longer match what the user
+ * sees.
  *
- * ТОКЕН ОТПРАВЛЯЕТСЯ ИНАЧЕ, И ЭКРАН ЭТОГО НЕ СКРЫВАЕТ. При переводе
- * ERC-20 поле `to` подписываемой транзакции указывает на контракт,
- * сумма нативной валюты равна нулю, а настоящий получатель и количество
- * лежат в данных вызова. Экран подтверждения показывает и то, и другое:
- * человек, сверяющий адрес получателя с полем `to`, обязан понимать,
- * почему они не совпадают, — иначе он решит, что кошелёк подменил адрес.
+ * A TOKEN IS SENT DIFFERENTLY, AND THE SCREEN DOES NOT HIDE THAT. On
+ * an ERC-20 transfer the signed `to` is the contract, the native
+ * amount is zero, and the real recipient and quantity live in the
+ * call data. The confirm screen shows both: someone comparing the
+ * recipient to `to` must understand why they differ, or they will
+ * think the wallet swapped the address.
  *
- * РАСШИФРОВКА ДАННЫХ ВЫЗОВА ЧИТАЕТСЯ ИЗ САМОЙ ТРАНЗАКЦИИ, а не берётся
- * из полей формы. Совпадение показанного с подписываемым тогда следует
- * из устройства экрана, а не из аккуратности того, кто его писал.
+ * CALL-DATA DECODE IS READ FROM THE TRANSACTION ITSELF, not from
+ * form fields. Shown matching signed then follows from how the
+ * screen is built, not from the author's care.
  */
 export function SendPage() {
   useRefreshRemoteAssets()
@@ -183,10 +180,10 @@ export function SendPage() {
   const [amount, setAmount] = useState('')
   const [success, setSuccess] = useState<string | null>(null)
 
-  /* Что отправляется. `null` — нативная валюта сети; иначе адрес
-     контракта токена. Хранится адрес, а не сам токен: список приходит
-     из снимка и пересоздаётся при каждом обновлении баланса, и ссылка
-     на прежний объект перестала бы совпадать. */
+  /* What is sent. `null` is the network native currency; otherwise the
+     token contract address. The address is stored, not the token
+     object: the list comes from the snapshot and is rebuilt on every
+     balance refresh, and a pointer to the old object would stop matching. */
   const [assetAddress, setAssetAddress] = useState<Address | null>(null)
   const [prepared, setPrepared] = useState<IPreparedTransfer | null>(null)
   const [risks, setRisks] = useState<readonly RecipientRisk[]>([])
@@ -197,17 +194,17 @@ export function SendPage() {
   const network = snapshot.activeNetwork
   const account = snapshot.activeAccount
 
-  /* Тот же список, что на главном и в Assets: для записи справочника
-     он приходит с сервера в `users.assets`. */
+  /* The same list as on home and in Assets: for a directory record it
+     arrives from the server in `users.assets`. */
   const selected = assets.find((item) => sameAsset(item.token.address, assetAddress)) ?? null
   const token = selected === null || selected.token.address === null ? null : selected.token
 
   const decimals = selected?.token.decimals ?? network?.nativeCurrency.decimals ?? 18
   const symbol = selected?.token.symbol ?? network?.nativeCurrency.symbol ?? ''
 
-  /* Доступное количество берётся у выбранного актива. `null` означает
-     «прочитать не удалось» и показывается прочерком: ноль на этом месте
-     сказал бы, что средств нет. */
+  /* Available amount comes from the selected asset. `null` means
+     "could not be read" and is shown as a dash: a zero here would
+     claim there are no funds. */
   const available =
     selected === null
       ? isAssetsLoading
@@ -217,8 +214,8 @@ export function SendPage() {
 
   const exceedsAvailable = isAmountOverAvailable(amount, available, decimals)
 
-  /* Первая строка списка выбирается автоматически: пустой выбор
-     оставлял бы поле «Что отправить» без значения и скрывал бы баланс. */
+  /* The first list row is selected automatically: an empty choice
+     would leave "What to send" blank and hide the balance. */
   useEffect(() => {
     if (assets.length === 0) {
       return
@@ -231,10 +228,10 @@ export function SendPage() {
     }
   }, [assetAddress, assets])
 
-  /* Обозначения и число знаков по адресу контракта — для показа
-     перемещений, найденных симуляцией. Собирается здесь, а не
-     в карточке подтверждения: там нет доступа к снимку кошелька,
-     а подставлять восемнадцать знаков «по умолчанию» нельзя. */
+  /* Symbols and decimals by contract address — for showing movements
+     found by simulation. Built here, not in the confirm card: that
+     card has no wallet snapshot, and defaulting to eighteen decimals
+     is not allowed. */
   const assetInfo = useMemo(() => {
     const map = new Map<string, ISimulationAsset>()
 
@@ -259,16 +256,16 @@ export function SendPage() {
 
   const trimmedRecipient = recipient.trim()
 
-  /* Признак «идёт разбор» выводится из данных, а не хранится отдельным
-     состоянием: два источника истины разошлись бы при отменённом
-     запросе, и кнопка осталась бы заблокированной навсегда. */
+  /* "Resolving" is derived from data, not stored as separate state:
+     two sources of truth would drift on a cancelled request, and the
+     button would stay disabled forever. */
   const isResolving = trimmedRecipient !== resolved.input
   const recipientAddress = isResolving ? null : resolved.result.address
   const recipientName = isResolving ? null : resolved.result.name
 
-  /* Кнопка «Далее» не должна ждать конца разбора, если адрес уже
-     выглядит как валидный hex: иначе форма кажется сломанной, хотя
-     введено верно. Имена ENS по-прежнему ждут асинхронного разбора. */
+  /* Next must not wait for resolution if the input already looks like
+     valid hex: otherwise the form looks broken though the value is
+     correct. ENS names still wait for async resolution. */
   const effectiveRecipientAddress = useMemo((): Address | null => {
     if (trimmedRecipient === '') {
       return null
@@ -290,11 +287,11 @@ export function SendPage() {
   }, [isResolving, recipientAddress, trimmedRecipient])
 
   /**
-   * Разбирает введённого получателя с задержкой.
+   * Resolves the typed recipient after a delay.
    *
-   * Устаревший ответ отбрасывается: пользователь дописал имя, пока
-   * шёл запрос по предыдущему, и показать ответ на старую строку
-   * значило бы показать чужой адрес рядом с новым именем.
+   * A stale reply is dropped: the user may have finished the name
+   * while the previous request was in flight, and showing a reply to
+   * the old string would put someone else's address next to the new name.
    */
   useEffect(() => {
     const value = recipient.trim()
@@ -314,7 +311,7 @@ export function SendPage() {
     }
   }, [recipient, session])
 
-  /** Возвращает форму в исходное состояние, сохраняя введённое. */
+  /** Returns the form to its starting step, keeping what was typed. */
   function backToForm(): void {
     setStep(STEP.Form)
     setPrepared(null)
@@ -382,19 +379,18 @@ export function SendPage() {
         return
       }
 
-      /* Два разных намерения — два разных вызова. У перевода токена
-         получатель и сумма уходят в данные вызова, и собирать их
-         в интерфейсе нельзя: ошибка кодирования отправит средства
-         не туда без возможности возврата. */
+      /* Two different intents — two different calls. On a token
+         transfer the recipient and amount go into the call data, and
+         they must not be assembled in the UI: an encoding mistake
+         would send funds somewhere they cannot come back from. */
       const result =
         token === null
           ? await session.prepareTransfer({
               chainId: sendChainId,
               from: account.address,
               to: effectiveRecipientAddress,
-              /* `toWei` — единственный допустимый способ получить
-                 брендированное значение: приведение типом обошло бы
-                 проверку диапазона. */
+              /* `toWei` is the only allowed way to get a branded
+                 value: a type cast would skip the range check. */
               value: toWei(value),
             })
           : await session.prepareTokenTransfer({
@@ -405,12 +401,11 @@ export function SendPage() {
               amount: value,
             })
 
-      /* Замечания считаются по ВВЕДЁННОЙ строке, а не по полю готовой
-         транзакции: `toAddress` приводит адрес к записи с контрольной
-         суммой, и признак «введено без неё» после нормализации теряется.
-         Исключение — адрес, полученный из имени: его пользователь
-         не набирал, и упрекать его в отсутствии контрольной суммы
-         не за что. */
+      /* Remarks are computed from the TYPED string, not from the
+         prepared transaction: `toAddress` checksums the address, and
+         the "typed without checksum" flag is lost after normalize.
+         Exception: an address from a name — the user did not type it,
+         so they cannot be blamed for a missing checksum. */
       const riskRecipient = isValidAddress(trimmedRecipient)
         ? trimmedRecipient
         : (effectiveRecipientAddress ?? trimmedRecipient)
@@ -419,23 +414,23 @@ export function SendPage() {
         ...findRecipientRisks(
           riskRecipient,
           account.address,
-          /* Адрес контракта отправляемого токена: перевод токена в его
-             собственный контракт — заведомая потеря. У нативной валюты
-             контракта нет, и сравнивать не с чем. */
+          /* Contract address of the token being sent: sending a token
+             to its own contract is a certain loss. Native currency has
+             no contract to compare against. */
           { assetContract: token?.address ?? null },
         ),
       ]
 
-      /* Признак контракта требует обращения к узлу, поэтому проверяется
-         здесь, один раз, а не в чистой функции выше. Отказ узла даёт
-         `null` и не добавляет замечания: «проверить не удалось» нельзя
-         показывать как «получатель обычный адрес». */
+      /* Detecting a contract needs a node call, so it is checked
+         here, once, not in the pure function above. A node failure
+         yields `null` and adds no remark: "could not check" must not
+         be shown as "the recipient is an ordinary address". */
       const isContract = await session.isContractRecipient(effectiveRecipientAddress)
 
       if (isContract === true) {
-        /* Для токена «получатель — контракт» звучит иначе: перевод
-           токена контракту, который его не ждёт, теряется так же
-           безвозвратно, но нативная валюта здесь ни при чём. */
+        /* For a token, "recipient is a contract" reads differently:
+           a token sent to a contract that does not expect it is lost
+           just as surely, but native currency is not involved. */
         found.push(RECIPIENT_RISK.ContractRecipient)
       }
 
@@ -499,7 +494,7 @@ export function SendPage() {
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Send</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Send</h1>
       </header>
 
       <Card>
@@ -538,17 +533,17 @@ export function SendPage() {
             </div>
           )}
 
-          {/* Выбор сети и аккаунта живёт в настройках: дублировать его здесь
-              значило бы дать два места смены одного и того же состояния
-              и получить расхождение между ними. */}
+          {/* Network and account live in settings: duplicating them
+              here would give two places to change the same state and
+              let them drift apart. */}
           <p className="text-xs text-muted-foreground">
             The network and the account are changed in the settings. The transfer leaves the{' '}
             {network?.name ?? '—'} network from the address shown above.
           </p>
 
-          {/* Доступная сумма переехала к полю ввода: это ограничение
-              на вводимое число, а стоя тремя блоками выше, оно
-              прочитывалось до того, как понадобится, и забывалось. */}
+          {/* Available amount moved next to the input: it is a limit
+              on the number being typed, and sitting three blocks
+              higher it was read before it was needed and forgotten. */}
         </CardContent>
       </Card>
 
@@ -593,10 +588,10 @@ export function SendPage() {
                 disabled={assets.length === 0}
                 isLoading={isAssetsLoading}
                 onChange={(address) => {
-                  /* Сумма сбрасывается вместе с активом: число знаков
-                     у токенов разное, и «10», набранное для актива
-                     с восемнадцатью знаками, при шести означало бы
-                     совсем другую величину. */
+                  /* The amount is cleared with the asset: tokens have
+                     different decimals, and "10" typed for an
+                     18-decimal asset would mean a different quantity
+                     at six. */
                   setAssetAddress(address)
                   setAmount('')
                   setError(null)
@@ -616,9 +611,10 @@ export function SendPage() {
               ) : null}
 
               {token === null ? null : (
-                /* Символ токена задаёт автор контракта, и выпустить токен
-                   с чужим символом может кто угодно. Адрес контракта —
-                   единственное, что отличает настоящий USDC от поддельного. */
+                /* The token symbol is set by the contract author, and
+                   anyone can mint a token with someone else's symbol.
+                   The contract address is what distinguishes real
+                   USDC from a fake. */
                 <p className="text-xs break-all text-muted-foreground">
                   Contract: <span className="font-mono">{token.address}</span>
                 </p>
@@ -651,9 +647,9 @@ export function SendPage() {
                 </span>
               </div>
 
-              {/* Поле крупнее прочих и с табличными цифрами: здесь
-                  вводят деньги, и ошибку в разряде надо увидеть
-                  до отправки, а не в подтверждении. */}
+              {/* The field is larger than the others and uses tabular
+                  figures: money is typed here, and a place-value
+                  mistake must be seen before send, not at confirm. */}
               <Input
                 id={`${fieldId}-amount`}
                 value={amount}
@@ -744,11 +740,11 @@ type SendingOutcome =
   | null
 
 /**
- * Статус перевода под формой, не в модальном окне.
+ * Transfer status under the form, not in a modal.
  *
- * Кабинет ждёт решение сервера. Крутящийся индикатор ничего не говорит
- * о записи — говорит слово статуса. Панель остаётся на странице, форму
- * не перекрывает.
+ * The cabinet waits for a server decision. A spinner says nothing
+ * about the record — the status word does. The panel stays on the
+ * page and does not cover the form.
  */
 function SendingStatusPanel({
   amount,
@@ -824,17 +820,18 @@ interface RecipientHintProps {
 }
 
 /**
- * Подсказка под полем получателя.
+ * Hint under the recipient field.
  *
- * ГЛАВНОЕ ЗДЕСЬ — РАЗНЫЕ ТЕКСТЫ ДЛЯ РАЗНЫХ ПРИЧИН. «Имени не существует»
- * и «узел не ответил» выглядят на экране одинаково безобидно, но требуют
- * противоположных действий: в первом случае имя набрано неверно,
- * во втором оно, возможно, верно, а проверить нечем. Одно сообщение
- * на оба случая отправило бы человека вводить адрес по памяти.
+ * THE POINT IS DIFFERENT COPY FOR DIFFERENT CAUSES. "The name does
+ * not exist" and "the node did not answer" look equally mild on
+ * screen but need opposite actions: in the first case the name is
+ * wrong, in the second it may be right and there is no way to check.
+ * One message for both would send the user typing an address from
+ * memory.
  *
- * РАЗРЕШЁННОЕ ИМЯ ПОКАЗЫВАЕТСЯ ВМЕСТЕ С ПОЛНЫМ АДРЕСОМ. Имя удобно,
- * но подписывается адрес, и увидеть его пользователь обязан до того,
- * как нажмёт «Далее».
+ * A RESOLVED NAME IS SHOWN TOGETHER WITH THE FULL ADDRESS. The name
+ * is convenient, but the address is signed, and the user must see
+ * it before they press Next.
  */
 function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHintProps) {
   if (isResolving) {
@@ -859,10 +856,10 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
         <p className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           <span>The name resolves to the address:</span>
           <span className="font-mono break-all text-foreground">{resolution.address}</span>
-          {/* ENSIP-15 запрещает смешивать письменности внутри метки,
-              но имя, целиком записанное другой письменностью, остаётся
-              законным — и может выглядеть как латинское. Запретить его
-              нельзя, промолчать о нём тоже. */}
+          {/* ENSIP-15 forbids mixing scripts inside a label, but a
+              name written entirely in another script stays legal —
+              and can look Latin. It cannot be banned, and it cannot
+              be left unspoken either. */}
           {resolution.isAscii ? null : (
             <span>
               The name is not written in Latin script. Names that look alike belong to different
@@ -913,7 +910,7 @@ function RecipientHint({ isResolving, resolution, isEnsSupported }: RecipientHin
   }
 }
 
-/** Применяет стандартный уровень комиссии к подготовленной транзакции. */
+/** Applies a standard fee level to the prepared transaction. */
 function applyPriority(
   prepared: IPreparedTransfer,
   priority: (typeof FEE_PRIORITY)[keyof typeof FEE_PRIORITY],
@@ -940,28 +937,28 @@ interface ConfirmTransferProps {
   readonly prepared: IPreparedTransfer
 
   /**
-   * Отправляемый токен. `null` — нативная валюта сети.
+   * Token being sent. `null` is the network native currency.
    *
-   * Нужен для подписей и числа знаков; получатель и сумма берутся
-   * не отсюда, а из данных подписываемой транзакции.
+   * Needed for labels and decimals; recipient and amount come from
+   * the signed transaction, not from here.
    */
   readonly token: IToken | null
 
   readonly risks: readonly RecipientRisk[]
 
   /**
-   * Известные активы для показа перемещений, найденных симуляцией.
+   * Known assets for showing movements found by simulation.
    *
-   * Собирается экраном, а не карточкой: число знаков токена живёт
-   * в снимке кошелька, и подставлять его «по умолчанию» нельзя —
-   * у одних токенов их восемнадцать, у других шесть.
+   * Built by the screen, not the card: token decimals live in the
+   * wallet snapshot, and defaulting them is not allowed — some
+   * tokens have eighteen, others six.
    */
   readonly assets: ReadonlyMap<string, ISimulationAsset>
 
   /**
-   * Имя ENS получателя, если оно известно.
+   * Recipient ENS name, if known.
    *
-   * Показывается ДОПОЛНИТЕЛЬНО к адресу и никогда вместо него.
+   * Shown IN ADDITION to the address, never instead of it.
    */
   readonly recipientName: string | null
 
@@ -975,12 +972,12 @@ interface ConfirmTransferProps {
 }
 
 /**
- * Подтверждение перевода.
+ * Transfer confirmation.
  *
- * ПОКАЗЫВАЮТСЯ ПОЛЯ ПОДПИСЫВАЕМОГО ОБЪЕКТА, а не пересчитанные заново
- * значения. Пользователь видит адрес получателя целиком: усечённый
- * невозможно сверить посимвольно, а именно посимвольная сверка защищает
- * от подмены содержимого буфера обмена.
+ * FIELDS OF THE SIGNED OBJECT ARE SHOWN, not values recalculated
+ * from scratch. The user sees the recipient address in full: a
+ * shortened one cannot be checked character by character, and that
+ * check is what protects against clipboard swap.
  */
 function ConfirmTransfer({
   prepared,
@@ -1003,14 +1000,14 @@ function ConfirmTransfer({
   const feePerGas = transaction.maxFeePerGas ?? transaction.gasPrice ?? 0n
   const maxFee = transaction.gasLimit * feePerGas
 
-  /* РАСШИФРОВКА ЧИТАЕТСЯ ИЗ ПОДПИСЫВАЕМОГО ОБЪЕКТА, а не из полей формы.
-     Показать получателя, взятого из состояния экрана, значило бы
-     утверждать, что в данных вызова записан именно он, — а проверено
-     это не было бы ничем. */
+  /* DECODE IS READ FROM THE SIGNED OBJECT, not from form fields.
+     Showing a recipient taken from screen state would claim that
+     the call data holds that address — and nothing would have
+     checked it. */
   const call = token === null ? null : decodeTransfer(transaction.data)
 
-  /* Настоящий получатель: у токена он в данных вызова, у нативной
-     валюты — в поле `to`. */
+  /* The real recipient: for a token it is in the call data, for
+     native currency it is the `to` field. */
   const recipient = call?.to ?? transaction.to
   const amount = call === null ? transaction.value : call.amount
 
@@ -1020,7 +1017,7 @@ function ConfirmTransfer({
         <Button variant="ghost" size="icon" aria-label="Back" onClick={onBack}>
           <ArrowLeft className="size-4" aria-hidden />
         </Button>
-        <h1 className="text-lg font-semibold">Confirmation</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Confirmation</h1>
       </header>
 
       <Card>
@@ -1041,10 +1038,10 @@ function ConfirmTransfer({
           <div className="flex flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">Recipient</span>
 
-            {/* Имя выводится НАД адресом и не заменяет его. Подписывается
-                адрес: показать вместо него имя значило бы показать не то,
-                что подписывается, — основной класс атак на интерфейс
-                кошелька. */}
+            {/* The name sits ABOVE the address and does not replace
+                it. The address is signed: showing the name instead
+                would show something other than what is signed — the
+                main class of wallet-UI attacks. */}
             {recipientName === null ? null : (
               <span className="text-sm font-medium">{recipientName}</span>
             )}
@@ -1060,9 +1057,10 @@ function ConfirmTransfer({
           </div>
 
           {token === null ? null : (
-            /* ЧЕЛОВЕК, СВЕРЯЮЩИЙ АДРЕСА, ОБЯЗАН ПОНИМАТЬ, ПОЧЕМУ ИХ ДВА.
-               В сети транзакция уйдёт контракту токена, а не получателю;
-               умолчать об этом значит показать одно, а подписать другое. */
+            /* SOMEONE COMPARING ADDRESSES MUST UNDERSTAND WHY THERE
+               ARE TWO. On-chain the tx goes to the token contract, not
+               the recipient; staying silent would show one thing and
+               sign another. */
             <div className="flex flex-col gap-1.5 rounded-xl border p-3">
               <span className="text-xs text-muted-foreground">
                 The transaction will be sent to the token contract
@@ -1104,14 +1102,15 @@ function ConfirmTransfer({
         <RiskAlert key={risk} risk={risk} />
       ))}
 
-      {/* Итог прогона идёт ПОСЛЕ замечаний о получателе: те говорят
-          о том, кому уйдут средства, и важнее. Прогон отвечает
-          на другой вопрос — состоится ли вызов вообще. */}
+      {/* The dry-run result comes AFTER recipient remarks: those
+          say who the funds go to, and matter more. The dry-run
+          answers a different question — whether the call will fire
+          at all. */}
       <PreflightNotice preflight={prepared.preflight} />
 
-      {/* Симуляция идёт ПОСЛЕ прогона: тот отвечает «состоится ли»,
-          эта — «что именно произойдёт». Второй вопрос имеет смысл
-          только при утвердительном ответе на первый. */}
+      {/* Simulation comes AFTER the dry-run: that answers "will it
+          fire", this answers "what will happen". The second question
+          only makes sense after a yes to the first. */}
       <SimulationNotice
         simulation={prepared.simulation}
         owner={prepared.transaction.from}
@@ -1135,9 +1134,9 @@ function ConfirmTransfer({
         </AlertDescription>
       </Alert>
 
-      {/* Повторный ввод пароля защищает от того, кто получил доступ
-          к уже разблокированному кошельку. Настройка включена
-          по умолчанию: цена ошибки здесь — все средства. */}
+      {/* Asking for the password again protects against someone who
+          reached an already unlocked wallet. The setting is on by
+          default: the cost of a mistake here is every fund. */}
       {isConfirming ? (
         <ConfirmPassword
           action="sending the transfer"
@@ -1245,7 +1244,7 @@ function RiskAlert({ risk }: { readonly risk: string }) {
   )
 }
 
-/** Итог отправки: хэш и путь к обозревателю. */
+/** Send result: hash and an explorer path. */
 function SendResult({
   hash,
   explorer,
@@ -1261,7 +1260,7 @@ function SendResult({
         </span>
 
         <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Transaction sent</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Transaction sent</h1>
           <p className="text-sm text-muted-foreground">
             It has been accepted by the node and is waiting to be included in a block.
           </p>

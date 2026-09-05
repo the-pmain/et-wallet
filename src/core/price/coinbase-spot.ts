@@ -2,10 +2,10 @@ const COINBASE_SPOT_URL = 'https://api.coinbase.com/v2/prices/ETH-USD/spot'
 const REQUEST_TIMEOUT_MS = 10_000
 
 /**
- * Курс ETH/USD с Coinbase.
+ * ETH/USD rate from Coinbase.
  *
- * Запасной источник, если единственный запрос к CoinGecko не прошёл:
- * бесплатный лимит там кончается на нескольких обращениях подряд.
+ * Fallback source if the single CoinGecko request failed: the free
+ * limit there runs out on a few calls in a row.
  */
 export async function fetchCoinbaseEthUsd(
   fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),

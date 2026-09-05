@@ -1,10 +1,10 @@
 /**
- * Предмет не принадлежит отправителю.
+ * The item does not belong to the sender.
  *
- * ПРОВЕРЯЕТСЯ ДО ПОДПИСИ. Контракт откатит такой вызов сам, но газ
- * при этом спишется, а причина отказа останется невнятной. Владелец
- * мог отдать предмет с другого устройства либо смотреть на устаревший
- * список — и то и другое надо назвать прямо.
+ * CHECKED BEFORE SIGNING. The contract would revert the call itself,
+ * but gas would still be spent and the refusal reason would stay
+ * unclear. The owner may have given the item away from another device
+ * or be looking at a stale list — both must be named plainly.
  */
 export class NftNotOwnedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NftNotOwned
@@ -15,20 +15,18 @@ export class NftNotOwnedError extends AppError {
 }
 
 /**
- * Токенов на балансе меньше, чем отправляется.
+ * The token balance is lower than the amount being sent.
  *
- * ПРОВЕРЯЕТСЯ ОТДЕЛЬНО ОТ НАТИВНОГО БАЛАНСА. Средств на комиссию может
- * хватать, а токенов — нет; контракт в этом случае откатит вызов, газ
- * спишется, а перевода не будет. Отказ узла в оценке газа сообщает лишь
- * «вызов завершится откатом» и не называет причину.
+ * CHECKED SEPARATELY FROM THE NATIVE BALANCE. There may be enough for
+ * the fee and not enough tokens; the contract then reverts, gas is
+ * spent, and no transfer happens. A node's gas-estimate refusal only
+ * says "the call will revert" and does not name the reason.
  */
 export class InsufficientTokenBalanceError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InsufficientTokenBalance
 
-  /** Требуемое количество в минимальных единицах токена. */
   readonly required: bigint
 
-  /** Доступное количество в минимальных единицах токена. */
   readonly available: bigint
 
   constructor(required: bigint, available: bigint) {
@@ -39,12 +37,12 @@ export class InsufficientTokenBalanceError extends AppError {
 }
 
 /**
- * Транзакцию нельзя заменить.
+ * The transaction cannot be replaced.
  *
- * Причина называется дословно и показывается пользователю: «ускорить
- * не удалось» без объяснения оставляет владельца наедине с зависшим
- * переводом, а причины требуют разных действий — подождать, обновить
- * приложение либо не делать ничего, потому что перевод уже прошёл.
+ * The reason is named verbatim and shown to the user: "could not
+ * speed up" without explanation leaves the owner alone with a stuck
+ * transfer, and the reasons need different actions — wait, update the
+ * app, or do nothing because the transfer already went through.
  */
 export class TransactionNotReplaceableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TransactionNotReplaceable
@@ -56,22 +54,18 @@ export class TransactionNotReplaceableError extends AppError {
 import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 
-/** Ошибки подготовки, подписи и отправки транзакций, а также работы с токенами. */
-
 /**
- * Недостаточно средств.
+ * Insufficient funds.
  *
- * Величины передаются как `bigint` и не форматируются: перевод в читаемый
- * вид зависит от `decimals` валюты и настроек локали, то есть относится
- * к слою представления.
+ * Amounts are passed as `bigint` and not formatted: conversion to a
+ * readable form depends on the currency `decimals` and locale
+ * settings, i.e. belongs to the presentation layer.
  */
 export class InsufficientFundsError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InsufficientFunds
 
-  /** Требуемая сумма в минимальных единицах. */
   readonly required: bigint
 
-  /** Доступная сумма в минимальных единицах. */
   readonly available: bigint
 
   constructor(required: bigint, available: bigint) {
@@ -82,36 +76,35 @@ export class InsufficientFundsError extends AppError {
 }
 
 /**
- * Оценить лимит газа не удалось.
+ * The gas limit could not be estimated.
  *
- * Практически всегда означает, что вызов контракта завершится откатом.
- * Отправлять транзакцию с произвольно назначенным лимитом в такой ситуации
- * нельзя: газ будет списан, а операция не выполнится.
+ * Almost always means the contract call will revert. Sending a
+ * transaction with an arbitrarily assigned limit in that situation
+ * is forbidden: gas would be spent and the operation would not run.
  */
 export class GasEstimationFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.GasEstimationFailed
 
   /**
-   * Данные отката, возвращённые контрактом.
+   * Revert data returned by the contract.
    *
-   * СОХРАНЯЮТСЯ СЫРЫМИ, потому что разобрать их можно не всегда.
-   * Стандартную причину `Error(string)` библиотека раскрывает сама,
-   * но собственные ошибки контрактов — это четырёхбайтовый признак,
-   * смысл которого без описания контракта неизвестен. Показать
-   * пользователю сам признак честнее, чем заменить его словами
-   * «вызов отклонён»: по признаку можно найти причину, по общей
-   * фразе — нельзя.
+   * KEPT RAW because it cannot always be decoded. A standard
+   * `Error(string)` reason is unpacked by the library, but custom
+   * contract errors are a four-byte selector whose meaning is
+   * unknown without the contract ABI. Showing the selector itself is
+   * more honest than replacing it with "call rejected": the selector
+   * can be looked up, a generic phrase cannot.
    *
-   * `null` — узел данных не вернул.
+   * `null` — the node returned no data.
    */
   readonly revertData: string | null
 
   /**
-   * Причина отдельно от текста ошибки.
+   * Reason separate from the error text.
    *
-   * Текст описывает неудачу оценки газа, а причина принадлежит вызову
-   * и годится там, где об оценке речи нет: при проверке вызова до
-   * подписи фраза «не удалось оценить газ» ввела бы в заблуждение.
+   * The text describes a failed gas estimate; the reason belongs to
+   * the call and is usable where estimation is not the topic: on a
+   * pre-sign call check, "could not estimate gas" would mislead.
    */
   readonly reason: string
 
@@ -123,14 +116,11 @@ export class GasEstimationFailedError extends AppError {
   }
 }
 
-/** Указанный nonce уже использован. */
 export class NonceTooLowError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NonceTooLow
 
-  /** Nonce, переданный в транзакции. */
   readonly provided: number
 
-  /** Nonce, ожидаемый сетью. */
   readonly expected: number
 
   constructor(provided: number, expected: number) {
@@ -140,7 +130,6 @@ export class NonceTooLowError extends AppError {
   }
 }
 
-/** Транзакция не найдена ни в истории, ни в мемпуле. */
 export class TransactionNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TransactionNotFound
 
@@ -150,10 +139,10 @@ export class TransactionNotFoundError extends AppError {
 }
 
 /**
- * Цена газа ниже минимально приемлемой для узла.
+ * The gas price is below the node's minimum acceptable.
  *
- * Возникает при ускорении и отмене транзакций: замещающая транзакция
- * обязана предлагать цену выше исходной, иначе узел её отвергнет.
+ * Arises when speeding up or cancelling transactions: a replacement
+ * must offer a higher price than the original, or the node rejects it.
  */
 export class TransactionUnderpricedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TransactionUnderpriced
@@ -164,16 +153,15 @@ export class TransactionUnderpricedError extends AppError {
 }
 
 /**
- * Пользователь отклонил операцию.
+ * The user rejected the operation.
  *
- * Соответствует коду 4001 стандарта EIP-1193. Это НЕ сбой: dApp обязано
- * получить именно этот код, чтобы отличить отказ пользователя от
- * технической ошибки и не показывать ему сообщение об ошибке.
+ * Matches EIP-1193 code 4001. This is NOT a failure: the dApp must
+ * receive exactly this code to distinguish a user refusal from a
+ * technical error and not show them an error message.
  */
 export class UserRejectedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.UserRejected
 
-  /** Код отказа по EIP-1193. */
   static readonly EIP1193_CODE = 4001
 
   constructor(operation: string) {
@@ -181,7 +169,6 @@ export class UserRejectedError extends AppError {
   }
 }
 
-/** Токен не найден в списке отслеживаемых. */
 export class TokenNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TokenNotFound
 
@@ -190,7 +177,6 @@ export class TokenNotFoundError extends AppError {
   }
 }
 
-/** По адресу нет контракта либо он не реализует заявленный стандарт. */
 export class InvalidTokenContractError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidTokenContract
 
@@ -200,23 +186,21 @@ export class InvalidTokenContractError extends AppError {
 }
 
 /**
- * Контракт выдаёт себя за проверенный токен.
+ * The contract impersonates a verified token.
  *
- * Символ и имя токена задаёт автор контракта: это строка, которую
- * контракт возвращает по запросу, а не свойство сети. Назваться `USDC`
- * может любой, и владелец, увидев в списке привычный символ, отправит
- * на него средства либо выдаст разрешение.
+ * Token symbol and name are set by the contract author: a string the
+ * contract returns on request, not a network property. Anyone can
+ * call themselves `USDC`, and an owner who sees a familiar symbol in
+ * the list will send funds to it or grant an allowance.
  *
- * Обработка: показать, за какой токен выдаёт себя контракт, назвать
- * подлинный адрес и добавить только по явному согласию.
+ * Handling: show which token the contract impersonates, name the
+ * genuine address, and add only on explicit consent.
  */
 export class TokenImpersonationError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TokenImpersonation
 
-  /** Подлинный адрес токена, за который выдаёт себя контракт. */
   readonly genuineAddress: string
 
-  /** Символы вне латиницы и цифр. Пусто при совпадении по буквам. */
   readonly foreignCharacters: readonly string[]
 
   constructor(
@@ -239,7 +223,6 @@ export class TokenImpersonationError extends AppError {
   }
 }
 
-/** Стандарт токена не поддерживается текущей версией приложения. */
 export class UnsupportedTokenStandardError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.UnsupportedTokenStandard
 

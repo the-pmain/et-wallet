@@ -1,4 +1,4 @@
 import { MarketCatalog } from './MarketCatalog'
 
-/** Общий каталог курсов. Заполняется один раз при открытии приложения. */
+/** Shared rate catalog. Filled once when the app opens. */
 export const appMarketCatalog = new MarketCatalog()

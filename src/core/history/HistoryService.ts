@@ -20,29 +20,27 @@ import {
 
 const SERVICE_NAME = 'HistoryService'
 
-/** Сколько записей запрашивается по умолчанию. */
 const DEFAULT_LIMIT = 50
 
-/** Уточнения запроса истории. */
 export interface IHistoryOptions {
   readonly limit?: number
 
   /**
-   * Продолжение предыдущей выдачи.
+   * Continuation of a previous page.
    *
-   * Отсутствие означает первую страницу — с самых свежих записей.
+   * Absence means the first page — from the newest records.
    */
   readonly cursor?: IHistoryCursor | null
 }
 
-/** Зависимости сервиса. */
 export interface IHistoryServiceDependencies {
   /**
-   * Источники истории в порядке предпочтения.
+   * History sources in preference order.
    *
-   * Первый обслуживающий сеть и ответивший без отказа определяет результат.
-   * Порядок задаётся снаружи: он выражает выбор между полнотой
-   * и приватностью, а это политика приложения, а не свойство механизма.
+   * The first that serves the network and answers without a reject
+   * decides the result. Order is set from outside: it expresses the
+   * choice between completeness and privacy, and that is application
+   * policy, not a property of the mechanism.
    */
   readonly providers: readonly IHistoryProvider[]
 
@@ -50,22 +48,22 @@ export interface IHistoryServiceDependencies {
   readonly networks: INetworkService
   readonly logger: ILogger
 
-  /** Локальные отправки. Подмешиваются всегда. */
+  /** Local sends. Always mixed in. */
   readonly localRepository: ITransactionRepository
 }
 
 /**
- * Сводная история переводов.
+ * Combined transfer history.
  *
- * ЛОКАЛЬНЫЕ ЗАПИСИ ПОДМЕШИВАЮТСЯ ВСЕГДА. Отправленная транзакция попадает
- * в локальное хранилище сразу, а во внешний источник — после включения
- * в блок и переиндексации. Без локальных записей пользователь, отправивший
- * средства, не увидел бы их в истории несколько минут и решил, что
- * отправка не состоялась.
+ * LOCAL RECORDS ARE ALWAYS MIXED IN. A sent transaction lands in
+ * local storage at once, and in an external source after inclusion
+ * in a block and reindexing. Without local records a user who sent
+ * funds would not see them in history for several minutes and would
+ * decide the send did not happen.
  *
- * ПОВТОРЫ УБИРАЮТСЯ ПО ХЭШУ. Когда внешний источник наконец отдаёт ту же
- * транзакцию, локальная запись уступает ей место: у внешней есть номер
- * блока, время и подтверждённое состояние.
+ * DUPLICATES ARE DROPPED BY HASH. When the external source finally
+ * returns the same transaction, the local record yields: the
+ * external one has a block number, a time, and a confirmed state.
  */
 export class HistoryService {
   readonly #providers: readonly IHistoryProvider[]
@@ -83,11 +81,12 @@ export class HistoryService {
   }
 
   /**
-   * История переводов адреса в сети.
+   * Transfer history of an address on a network.
    *
-   * Отказ внешнего источника не приводит к отказу всей операции:
-   * локальные записи возвращаются в любом случае. Пустая история
-   * из-за недоступной сети выглядела бы как отсутствие операций.
+   * A reject from an external source does not fail the whole
+   * operation: local records are returned either way. Empty history
+   * because the network is down would look like an absence of
+   * operations.
    */
   async getHistory(
     owner: Address,
@@ -97,11 +96,10 @@ export class HistoryService {
     const limit = options.limit ?? DEFAULT_LIMIT
     const cursor = options.cursor ?? null
 
-    /* СОБСТВЕННЫЕ ОТПРАВКИ ПОДМЕШИВАЮТСЯ ТОЛЬКО К ПЕРВОЙ СТРАНИЦЕ.
-       Они не принадлежат ни одному участку истории и хранятся целиком
-       у нас; повтори их каждая страница — ожидающая отправка
-       появлялась бы в списке заново после каждого «показать более
-       ранние». */
+    /* OWN SENDS ARE MIXED IN ONLY ON THE FIRST PAGE.
+       They belong to no stretch of history and are stored in full
+       here; repeating them on every page would make a pending send
+       reappear after every "show earlier". */
     const local = cursor === null ? await this.#loadLocal(owner, chainId) : []
     const remote = await this.#loadRemote({ owner, chainId, limit, cursor })
 
@@ -111,15 +109,15 @@ export class HistoryService {
         limits: {
           nativeTransfersUnavailable: false,
           scannedBlocks: null,
-          /* Ни один внешний источник не ответил. Показаны только
-             собственные отправки, и это обязано быть сказано прямо:
-             иначе пустой список читается как «операций не было». */
+          /* No external source answered. Only own sends are shown,
+             and that must be said plainly: otherwise an empty list
+             reads as "there were no operations". */
           sourceUnavailable: true,
           reason: remote.reason,
         },
-        /* Метка возвращается неизменной: отказ источника не означает,
-           что продолжения нет, и повторная попытка обязана начинаться
-           с того же места. */
+        /* The token is returned unchanged: a source reject does not
+           mean there is no continuation, and a retry must start
+           from the same place. */
         cursor,
       }
     }
@@ -131,7 +129,6 @@ export class HistoryService {
     }
   }
 
-  /** Локальные отправки, приведённые к общему виду записи истории. */
   async #loadLocal(owner: Address, chainId: ChainId): Promise<readonly ITransferRecord[]> {
     const records = await this.#local.findByAddress(owner, chainId)
 
@@ -139,9 +136,9 @@ export class HistoryService {
       const transfer = describeLocal(record)
 
       return {
-        /* Ключ строится так же, как у внешних источников: хэш плюс
-           порядковый номер. Локальная запись описывает транзакцию целиком,
-           поэтому номер нулевой. */
+        /* The key is built the same way as external sources: hash
+           plus an ordinal. A local record describes the whole
+           transaction, so the ordinal is zero. */
         id: `${record.hash}:local`,
         hash: record.hash,
         chainId: record.chainId,
@@ -155,21 +152,21 @@ export class HistoryService {
         blockNumber: record.blockNumber ?? 0n,
         timestamp: record.confirmedAt ?? record.submittedAt,
         source: TRANSFER_SOURCE.Local,
-        /* Состояние берётся из записи транзакции: именно оно
-           отличает ожидание от выполнения, отката и замещения. */
+        /* State is taken from the transaction record: that is what
+           distinguishes pending from done, reverted, and replaced. */
         status: record.status,
       }
     })
   }
 
   /**
-   * Первый источник, обслуживающий сеть и ответивший без отказа.
+   * The first source that serves the network and answers without a reject.
    *
-   * Причина отказа последнего источника возвращается вместе с
-   * результатом: она показывается пользователю дословно. Обобщённое
-   * «история недоступна» не сказало бы ему, что делать, а сообщение
-   * узла «укажите адрес контракта» прямо указывает на решение —
-   * подключить свой узел либо индексатор.
+   * The last source's reject reason is returned with the result: it
+   * is shown to the user verbatim. A generic "history unavailable"
+   * would not tell them what to do, while a node message "specify
+   * a contract address" points straight at the remedy — connect
+   * your own node or an indexer.
    */
   async #loadRemote(
     query: IHistoryQuery,
@@ -187,11 +184,11 @@ export class HistoryService {
         continue
       }
 
-      /* ПРОДОЛЖЕНИЕ ОБСЛУЖИВАЕТ ТОЛЬКО ВЫДАВШИЙ МЕТКУ ИСТОЧНИК.
-         Перейди мы на следующий, он истолковал бы чужую метку как
-         начало выдачи и вернул бы самые свежие записи под видом более
-         ранних: список продолжился бы тем, что уже показан, и человек
-         решил бы, что дальше истории нет. */
+      /* CONTINUATION IS SERVED ONLY BY THE SOURCE THAT ISSUED THE TOKEN.
+         If we moved to the next one, it would read a foreign token as
+         the start of a page and return the newest records disguised
+         as earlier ones: the list would continue with what is already
+         shown, and the person would decide there is no further history. */
       const cursor = query.cursor ?? null
 
       if (cursor !== null && cursor.providerId !== provider.id) {
@@ -204,10 +201,10 @@ export class HistoryService {
           reason: null,
         }
       } catch (error) {
-        /* Отказ одного источника — повод перейти к следующему, а не
-           лишить пользователя истории. Причина уходит и в журнал,
-           и наружу: молчаливый переход скрыл бы неработающий ключ
-           индексатора либо узел, не принимающий выборку журналов. */
+        /* A reject from one source is a reason to try the next, not
+           to deprive the user of history. The reason goes to the log
+           and outward: a silent fallback would hide a broken indexer
+           key or a node that does not accept log queries. */
         lastReason = error instanceof Error ? error.message : String(error)
 
         this.#logger.warn('The history source is unavailable', {
@@ -222,11 +219,11 @@ export class HistoryService {
 }
 
 /**
- * Объединяет локальные и внешние записи.
+ * Merges local and external records.
  *
- * Локальная запись отбрасывается, если тот же хэш пришёл извне: внешняя
- * содержит номер блока, время и подтверждённое состояние, локальная —
- * только намерение отправить.
+ * A local record is dropped if the same hash arrived from outside:
+ * the external one has a block number, a time, and a confirmed
+ * state; the local one is only the intent to send.
  */
 function merge(
   local: readonly ITransferRecord[],
@@ -239,10 +236,10 @@ function merge(
 }
 
 /**
- * Сортировка от новых к старым.
+ * Newest-first sort.
  *
- * Записи без номера блока — ещё не включённые в блок отправки — идут
- * первыми: именно их пользователь ждёт и ищет глазами.
+ * Records with no block number — sends not yet included — go first:
+ * those are what the user waits for and looks for by eye.
  */
 function compareByRecency(left: ITransferRecord, right: ITransferRecord): number {
   if (left.blockNumber === 0n && right.blockNumber !== 0n) {
@@ -260,23 +257,23 @@ function compareByRecency(left: ITransferRecord, right: ITransferRecord): number
   return (right.timestamp ?? 0) - (left.timestamp ?? 0)
 }
 
-/** Совпадает ли адрес с владельцем истории. Вынесено для читаемости условий. */
 export function isOwner(candidate: Address | null, owner: Address): boolean {
   return candidate !== null && areAddressesEqual(candidate, owner)
 }
 
 /**
- * Что именно перевела собственная транзакция.
+ * What an own transaction actually transferred.
  *
- * ЧИТАЕТСЯ ИЗ ПОДПИСАННЫХ ДАННЫХ, А НЕ ИЗ НАМЕРЕНИЯ. У перевода токена
- * поле `to` указывает на контракт, сумма нативной валюты нулевая,
- * а настоящий получатель и количество лежат в данных вызова. Показать
- * такую запись по полям транзакции значило бы сообщить пользователю
- * о переводе нуля неизвестно кому.
+ * READ FROM THE SIGNED DATA, NOT FROM THE INTENT. On a token
+ * transfer the `to` field points at the contract, the native
+ * amount is zero, and the real recipient and quantity sit in the
+ * call data. Showing such a record from the transaction fields
+ * would tell the user about a transfer of zero to nobody.
  *
- * Разбор данных, а не отдельное поле в записи, выбран сознательно:
- * так в историю попадает ровно то, что ушло в сеть. Разойдись форма
- * с подписью — запись покажет действительное содержимое.
+ * Parsing the data, rather than a separate field on the record,
+ * is a deliberate choice: history then holds exactly what went
+ * on-chain. If the form and the signature diverged, the record
+ * shows the actual contents.
  */
 function describeLocal(record: ITransactionRecord): {
   readonly kind: TransferKind
@@ -294,7 +291,6 @@ function describeLocal(record: ITransactionRecord): {
     kind: TRANSFER_KIND.Erc20,
     to: call.to,
     value: toWei(call.amount),
-    /* Адресат транзакции и есть контракт токена. */
     contract: record.to,
   }
 }

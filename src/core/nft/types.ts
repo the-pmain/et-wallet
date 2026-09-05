@@ -2,83 +2,83 @@ import type { TokenStandard } from '@/core/token'
 import type { Address, ChainId } from '@/core/types'
 
 /**
- * Коллекционный предмет, принадлежащий адресу.
+ * A collectible belonging to an address.
  *
- * ПРИНАДЛЕЖНОСТЬ ПРОВЕРЕНА НА МОМЕНТ ЗАПРОСА, а не выведена из того,
- * что предмет когда-то приходил на адрес. Журнал переводов показывает
- * историю, а не текущее состояние: предмет, полученный вчера и отданный
- * сегодня, остаётся в журнале навсегда. Показать его как свой значило бы
- * сообщить владельцу об имуществе, которого у него нет.
+ * OWNERSHIP IS CHECKED AT QUERY TIME, not inferred from the fact
+ * that the item once arrived at the address. The transfer log
+ * shows history, not current state: an item received yesterday
+ * and given away today stays in the log forever. Showing it as
+ * owned would tell the owner they have property they do not.
  */
 export interface INftItem {
   readonly chainId: ChainId
 
-  /** Адрес контракта коллекции. */
+  /** Collection contract address. */
   readonly contract: Address
 
-  /** Номер предмета внутри коллекции. */
+  /** Item number inside the collection. */
   readonly tokenId: bigint
 
   readonly standard: TokenStandard
 
   /**
-   * Сколько экземпляров принадлежит владельцу.
+   * How many copies belong to the owner.
    *
-   * У ERC-721 всегда единица: предмет неделим и существует в одном
-   * экземпляре. У ERC-1155 бывает больше — один и тот же номер выпускают
-   * тиражом.
+   * Always one for ERC-721: the item is indivisible and exists
+   * in a single copy. ERC-1155 can be more — the same id is
+   * issued in a run.
    */
   readonly balance: bigint
 
   /**
-   * Название коллекции из контракта. `null`, если контракт его не отдаёт.
+   * Collection name from the contract. `null` if the contract does not return one.
    *
-   * НЕДОВЕРЕННОЕ ЗНАЧЕНИЕ: его задаёт автор контракта, и назвать свою
-   * коллекцию именем известной может кто угодно. Интерфейс обязан
-   * показывать рядом адрес контракта — единственное, что отличает
-   * подлинник от подделки.
+   * UNTRUSTED VALUE: the contract author sets it, and anyone can
+   * name their collection after a well-known one. The UI must
+   * show the contract address beside it — the only thing that
+   * distinguishes the genuine item from a fake.
    */
   readonly collectionName: string | null
 
-  /** Краткое обозначение коллекции. `null`, если контракт его не отдаёт. */
+  /** Short collection label. `null` if the contract does not return one. */
   readonly collectionSymbol: string | null
 }
 
 /**
- * Чем ограничен показанный список предметов.
+ * How the shown item list is bounded.
  *
- * НЕПОЛНЫЙ СПИСОК, ВЫДАННЫЙ ЗА ПОЛНЫЙ, ЧИТАЕТСЯ КАК ПРОПАЖА. Владелец,
- * не нашедший своего предмета, решит, что его украли, — поэтому границы
- * выборки называются прямо и всегда.
+ * AN INCOMPLETE LIST PRESENTED AS COMPLETE READS AS A THEFT.
+ * An owner who cannot find their item will decide it was stolen —
+ * so the sample bounds are named plainly and always.
  */
 export interface INftLimits {
   /**
-   * Сколько блоков просмотрено назад от последнего.
+   * How many blocks were scanned back from the latest.
    *
-   * Предметы, полученные раньше этого окна и с тех пор не двигавшиеся,
-   * в списке отсутствуют: их появление осталось за границей выборки.
+   * Items received before this window and not moved since are
+   * absent from the list: their arrival stayed outside the sample.
    */
   readonly scannedBlocks: number | null
 
-  /** Источник не ответил. Список при этом пуст, но это не значит «пусто». */
+  /** The source did not answer. The list is then empty, but that does not mean "empty". */
   readonly sourceUnavailable: boolean
 
   /**
-   * Сколько найденных предметов осталось непроверенными.
+   * How many found items were left unchecked.
    *
-   * Принадлежность каждого предмета требует отдельного обращения
-   * к контракту. У адреса с сотнями поступлений это сотни запросов —
-   * лимиты публичного узла и минуты ожидания, поэтому число проверок
-   * ограничено. Пропущенные не показываются, но и не замалчиваются:
-   * ноль здесь означает «проверено всё».
+   * Ownership of each item needs a separate contract call. An
+   * address with hundreds of arrivals is hundreds of requests —
+   * public-node limits and minutes of waiting — so the number
+   * of checks is capped. Skipped items are not shown, and not
+   * silenced either: zero here means "everything was checked".
    */
   readonly skipped: number
 
-  /** Причина отказа источника дословно. `null`, если отказа не было. */
+  /** Source rejection reason verbatim. `null` if there was no rejection. */
   readonly reason: string | null
 }
 
-/** Список предметов вместе с границами выборки. */
+/** Item list together with the sample bounds. */
 export interface INftPage {
   readonly items: readonly INftItem[]
   readonly limits: INftLimits

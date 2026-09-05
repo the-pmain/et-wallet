@@ -20,24 +20,25 @@ import { SendingEditDialog } from './SendingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
 
 /**
- * Срочное уведомление о pending-отправке.
+ * Urgent notice of a pending send.
  *
- * ПОЧЕМУ В ОБОЛОЧКЕ, А НЕ НА ВКЛАДКЕ SENDINGS. Администратор чаще сидит
- * в пользователях. Ждать перехода на вкладку — значит узнать о переводе
- * после того, как пользователь уже ждёт.
+ * WHY IN THE SHELL, NOT THE SENDINGS TAB. The admin usually sits in
+ * users. Waiting for a tab switch means learning about a transfer
+ * after the user is already waiting.
  *
- * ПОЧЕМУ СНИЗУ СПРАВА, А НЕ СВЕРХУ. Шапка и Lock живут сверху справа.
- * Обычные тосты кошелька — тоже сверху, но в кабинете их нет: это не
- * справка, а очередь работы. Карточка растёт вверх от угла, ближайшая
- * к пальцу и мыши — самая новая, с крупной кнопкой Handle.
+ * WHY BOTTOM-RIGHT, NOT TOP. Header and Lock live top-right.
+ * Ordinary wallet toasts are top too, but the cabinet has none:
+ * this is a work queue, not a tip. The card grows up from the
+ * corner; the newest, with a large Handle button, is nearest
+ * finger and mouse.
  *
- * ПОЧЕМУ НЕ ИСЧЕЗАЕТ САМО. Четыре секунды хватает прочесть «сохранено»
- * и не хватает нажать Handle. Карточка живёт, пока перевод не разобрали
- * или её не закрыли.
+ * WHY IT DOES NOT AUTO-DISMISS. Four seconds is enough to read
+ * "saved" and not enough to press Handle. The card stays until
+ * the transfer is handled or the card is closed.
  *
- * ПОЧЕМУ ЕЩЁ И СПИСОК ПРИ ВХОДЕ. Поток сообщает только новые кадры.
- * Переводы, которые появились, пока кабинет был закрыт, иначе остались
- * бы невидимыми до следующего create.
+ * WHY ALSO A LIST ON ENTER. The stream reports only new frames.
+ * Transfers that appeared while the cabinet was closed would
+ * otherwise stay invisible until the next create.
  */
 export function AdminPendingSendingToasts() {
   const { client, lock } = useAdminSession()

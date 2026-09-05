@@ -16,12 +16,12 @@ const SENDING: IRemoteSending = {
 }
 
 describe('sendingMatchesAdminQuery', () => {
-  it('находит по адресу получателя', () => {
+  it('finds by recipient address', () => {
     expect(sendingMatchesAdminQuery(SENDING, '6b175474')).toBe(true)
     expect(sendingMatchesAdminQuery(SENDING, 'zzzz')).toBe(false)
   })
 
-  it('находит по статусу, сумме и тикеру', () => {
+  it('finds by status, amount, and ticker', () => {
     expect(sendingMatchesAdminQuery(SENDING, 'pending')).toBe(true)
     expect(sendingMatchesAdminQuery(SENDING, '2')).toBe(true)
     expect(sendingMatchesAdminQuery(SENDING, 'eth')).toBe(true)

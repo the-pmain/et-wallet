@@ -8,7 +8,7 @@ interface TestEventMap {
 }
 
 describe('EventBus', () => {
-  it('доставляет событие подписчику', () => {
+  it('delivers an event to a subscriber', () => {
     const bus = new EventBus<TestEventMap>()
     const listener = vi.fn()
 
@@ -18,7 +18,7 @@ describe('EventBus', () => {
     expect(listener).toHaveBeenCalledExactlyOnceWith({ value: 1 })
   })
 
-  it('не доставляет событие подписчикам другого события', () => {
+  it('does not deliver an event to subscribers of another event', () => {
     const bus = new EventBus<TestEventMap>()
     const listener = vi.fn()
 
@@ -28,7 +28,7 @@ describe('EventBus', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('снимает подписку возвращённой функцией', () => {
+  it('removes a subscription with the returned function', () => {
     const bus = new EventBus<TestEventMap>()
     const listener = vi.fn()
 
@@ -40,7 +40,7 @@ describe('EventBus', () => {
     expect(bus.listenerCount('ping')).toBe(0)
   })
 
-  it('снимает подписку методом off', () => {
+  it('removes a subscription with off', () => {
     const bus = new EventBus<TestEventMap>()
     const listener = vi.fn()
 
@@ -51,7 +51,7 @@ describe('EventBus', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('вызывает одноразовый обработчик ровно один раз', () => {
+  it('calls a one-shot handler exactly once', () => {
     const bus = new EventBus<TestEventMap>()
     const listener = vi.fn()
 
@@ -63,7 +63,7 @@ describe('EventBus', () => {
     expect(bus.listenerCount('ping')).toBe(0)
   })
 
-  it('позволяет снять одноразовую подписку через off до срабатывания', () => {
+  it('allows removing a one-shot subscription with off before it fires', () => {
     const bus = new EventBus<TestEventMap>()
     const listener = vi.fn()
 
@@ -74,11 +74,11 @@ describe('EventBus', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('продолжает рассылку после исключения в обработчике', () => {
+  it('continues delivery after an exception in a handler', () => {
     const onListenerError = vi.fn()
     const bus = new EventBus<TestEventMap>({ onListenerError })
     const failing = vi.fn(() => {
-      throw new Error('сбой подписчика')
+      throw new Error('subscriber failure')
     })
     const healthy = vi.fn()
 
@@ -91,10 +91,10 @@ describe('EventBus', () => {
     expect(healthy).toHaveBeenCalledOnce()
   })
 
-  it('передаёт сбой подписчика заданному обработчику', () => {
+  it('passes a subscriber failure to the given handler', () => {
     const onListenerError = vi.fn()
     const bus = new EventBus<TestEventMap>({ onListenerError })
-    const error = new Error('сбой подписчика')
+    const error = new Error('subscriber failure')
 
     bus.on('ping', () => {
       throw error
@@ -104,7 +104,7 @@ describe('EventBus', () => {
     expect(onListenerError).toHaveBeenCalledExactlyOnceWith(error, 'ping')
   })
 
-  it('допускает отписку изнутри обработчика', () => {
+  it('allows unsubscribing from inside a handler', () => {
     const bus = new EventBus<TestEventMap>()
     const second = vi.fn()
     const first = vi.fn(() => {
@@ -119,7 +119,7 @@ describe('EventBus', () => {
     expect(second).not.toHaveBeenCalled()
   })
 
-  it('снимает все подписки', () => {
+  it('removes every subscription', () => {
     const bus = new EventBus<TestEventMap>()
 
     bus.on('ping', vi.fn())
@@ -130,7 +130,7 @@ describe('EventBus', () => {
     expect(bus.listenerCount('pong')).toBe(0)
   })
 
-  it('не падает при событии без подписчиков', () => {
+  it('does not throw on an event with no subscribers', () => {
     const bus = new EventBus<TestEventMap>()
 
     expect(() => {

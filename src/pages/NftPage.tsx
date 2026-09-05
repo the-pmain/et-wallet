@@ -16,23 +16,23 @@ import {
 } from '@/shared/ui'
 
 /**
- * Коллекционные токены активного аккаунта.
+ * Collectible tokens of the active account.
  *
- * СПИСОК СТРОИТСЯ В ДВА ШАГА, И ЭТО НЕ ИЗБЫТОЧНОСТЬ. Узел не умеет
- * отвечать на вопрос «что принадлежит адресу»: сначала находятся
- * поступления в журналах, затем у каждого контракта спрашивается,
- * принадлежит ли предмет владельцу сейчас. Список по одним журналам
- * показывал бы отданное как своё.
+ * THE LIST IS BUILT IN TWO STEPS, AND THAT IS NOT REDUNDANT. A node
+ * cannot answer "what belongs to this address": first inflows are
+ * found in logs, then each contract is asked whether the item still
+ * belongs to the owner. A list from logs alone would show given-away
+ * items as owned.
  *
- * ПОИСК ЗАПУСКАЕТ ВЛАДЕЛЕЦ, ОТКРЫВАЯ РАЗДЕЛ. Это десятки обращений
- * к узлу и подробный след активности у его оператора: делать это
- * при каждом входе значило бы платить за то, чего никто не просил.
+ * THE OWNER STARTS THE SEARCH BY OPENING THE SECTION. It is dozens of
+ * node calls and a detailed activity trail at the operator: doing it
+ * on every unlock would pay for something nobody asked for.
  *
- * ИЗОБРАЖЕНИЙ ЗДЕСЬ НЕТ, И ЭТО РЕШЕНИЕ, А НЕ НЕДОДЕЛКА. Ссылки на них
- * задаёт автор контракта; загрузка раскрыла бы IP-адрес владельца
- * произвольному серверу и позволила бы связать его с кошельком.
- * Показываются название коллекции, адрес контракта и номер предмета —
- * этого достаточно, чтобы предмет опознать.
+ * THERE ARE NO IMAGES, AND THAT IS A DECISION, NOT A GAP. Their URLs
+ * are set by the contract author; loading them would reveal the
+ * owner's IP to an arbitrary server and let it be tied to the wallet.
+ * Collection name, contract address, and item id are enough to
+ * recognize the item.
  */
 export function NftPage() {
   const session = useWallet()
@@ -43,19 +43,18 @@ export function NftPage() {
   const items = snapshot.nfts
   const limits = snapshot.nftLimits
 
-  /* Для какой пары «аккаунт и сеть» поиск уже запускали. Хранится
-     в ссылке, а не в состоянии: это не данные для показа, а защита
-     от повторного запуска, и перерисовка при её смене не нужна.
-     Ключ, а не флаг, — потому что смена аккаунта или сети обязана
-     запустить поиск заново. */
+  /* Which account+network pair already started a search. Stored in a
+     ref, not in state: this is not display data, it is a guard against
+     a second run, and a redraw on change is not needed. A key, not a
+     flag, because a change of account or network must start search
+     again. */
   const requestedFor = useRef<string | null>(null)
 
-  /* Предмет, который передают прямо сейчас. `null` — идёт обычный
-     просмотр списка. */
+  /* Item being transferred right now. `null` means ordinary list view. */
   const [sending, setSending] = useState<INftItem | null>(null)
 
-  /* Хэш отправленной передачи. Показывается вместо формы: без него
-     владелец не узнает, ушла операция или нет. */
+  /* Hash of the sent transfer. Shown instead of the form: without it
+     the owner would not know whether the operation left. */
   const [sentHash, setSentHash] = useState<TxHash | null>(null)
   const scope = `${snapshot.activeNetwork?.chainId.toString() ?? ''}:${snapshot.activeAccount?.id ?? ''}`
 
@@ -69,7 +68,7 @@ export function NftPage() {
   if (sending !== null) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-semibold">Transfer an item</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Transfer an item</h1>
 
         <NftTransferCard
           item={sending}
@@ -80,9 +79,9 @@ export function NftPage() {
             setSending(null)
             setSentHash(hash)
 
-            /* Список перезапрашивается: предмет больше не принадлежит
-               владельцу, и оставить его на экране значило бы показывать
-               чужое имущество как своё. */
+            /* The list is fetched again: the item no longer belongs to
+               the owner, and leaving it on screen would show someone
+               else's property as theirs. */
             void session.loadNfts()
           }}
         />
@@ -93,7 +92,7 @@ export function NftPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">NFT</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">NFT</h1>
 
         <Button
           variant="ghost"
@@ -206,17 +205,17 @@ export function NftPage() {
         </CardContent>
       </Card>
 
-      {/* ПОСТОЯННОЕ СВОЙСТВО — СНОСКОЙ, А НЕ ПРЕДУПРЕЖДЕНИЕМ.
-          Прежде здесь стоял `Alert variant="warning"` — тот же вид, что
-          у сообщения о подозрительной операции. Но предупреждать не
-          о чем: изображения не загружаются всегда, это решение кошелька,
-          а не событие. Оранжевый цвет в этой палитре означает риск, и
-          трата его на неизменное свойство приучает не отличать
-          настоящий риск от пояснения.
+      {/* A STANDING PROPERTY IS A FOOTNOTE, NOT A WARNING.
+          This used to be `Alert variant="warning"` — the same look as
+          a suspicious-operation message. There is nothing to warn
+          about: images are never loaded; that is a wallet decision,
+          not an event. Orange in this palette means risk, and spending
+          it on a standing property trains people not to tell real risk
+          from a footnote.
 
-          Текст сохранён дословно, включая указание сверять адрес
-          контракта, а не имя: имя задаёт автор контракта, и подделать
-          его ничего не стоит. */}
+          The wording is kept verbatim, including the instruction to
+          check the contract address, not the name: the name is set by
+          the contract author and costs nothing to fake. */}
       <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
         <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span>
@@ -230,11 +229,12 @@ export function NftPage() {
 }
 
 /**
- * Строка списка предметов.
+ * A row in the items list.
  *
- * АДРЕС КОНТРАКТА ПОКАЗЫВАЕТСЯ ВСЕГДА. Название коллекции задаёт автор
- * контракта, и назвать свою коллекцию именем известной может кто угодно;
- * адрес — единственное, что отличает подлинник от подделки.
+ * THE CONTRACT ADDRESS IS ALWAYS SHOWN. The collection name is set by
+ * the contract author, and anyone can name their collection after a
+ * famous one; the address is what distinguishes the original from a
+ * fake.
  */
 function NftRow({
   item,
@@ -268,11 +268,10 @@ function NftRow({
         </span>
       </span>
 
-      {/* ДЕЙСТВИЯ В СТРОКУ, А НЕ СТОЛБИКОМ. Прежде количество, кнопка
-          и ссылка на обозреватель стояли друг под другом, и строка
-          вырастала втрое против содержания. Количество к тому же
-          относится к предмету, а не к действиям, и стояло не в том
-          столбце. */}
+      {/* ACTIONS IN A ROW, NOT A COLUMN. Quantity, the button, and the
+          explorer link used to stack, and the row grew to three times
+          its content. Quantity also belongs to the item, not to the
+          actions, and sat in the wrong column. */}
       <span className="flex shrink-0 items-center gap-2">
         {item.standard === TOKEN_STANDARD.Erc1155 ? (
           <span className="text-base font-semibold tabular-nums">×{item.balance.toString()}</span>
@@ -283,9 +282,9 @@ function NftRow({
         </Button>
 
         {explorer === null ? null : (
-          /* Ссылка стала значком: слово «Explorer» рядом с «Transfer»
-             читалось как второе равнозначное действие, хотя это уход
-             из кошелька. Доступное имя при этом полное. */
+          /* The link is an icon: the word "Explorer" next to "Transfer"
+             read as a second equal action, though it leaves the wallet.
+             The accessible name stays full. */
           <Button asChild variant="ghost" size="icon" className="size-8 text-muted-foreground">
             <a
               href={`${explorer}/token/${item.contract}`}

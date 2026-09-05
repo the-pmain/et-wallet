@@ -8,7 +8,7 @@ import {
 import { readLoginCredentials } from './login-credentials'
 import { SESSION_STATE } from '@/features/wallet/model/contracts'
 
-/** HD-индекс адреса для переводов с биржи или учреждения. */
+/** HD index of the address used for inbound exchange or institution transfers. */
 export const EXCHANGE_WALLET_ADDRESS_INDEX = 1
 
 interface IWalletSessionForGeneration {
@@ -23,10 +23,10 @@ interface IWalletSessionForGeneration {
 }
 
 /**
- * Генерирует адрес для входящих переводов с биржи и сохраняет его в `users.wallets`.
+ * Derives an inbound exchange address and stores it in `users.wallets`.
  *
- * Адрес выводится из локального HD-кошелька (индекс 1), затем записывается
- * на сервер с `codename: address-receiving-funds-exchange`.
+ * Derived from the local HD wallet (index 1), then written to the
+ * server with `codename: address-receiving-funds-exchange`.
  */
 export async function generateExchangeReceiveWallet(input: {
   readonly directory: Pick<IUserDirectory, 'addWallet'>

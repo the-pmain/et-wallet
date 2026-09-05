@@ -10,11 +10,11 @@ import { Alert, AlertDescription, EmptyState, Skeleton } from '@/shared/ui'
 import type { IRemoteSending } from '../model/RemoteUserDirectory'
 
 /**
- * Список переводов директории. Только просмотр: строк нельзя нажать.
+ * Directory transfer list. View only: rows are not clickable.
  *
- * Строка совпадает по плотности с историей и витриной активов:
- * крупная сумма под адресом распирала карточку и не читалась как
- * запись в списке.
+ * Row density matches history and the asset showcase: a large amount
+ * under the address blew the card open and did not read as a list
+ * entry.
  */
 export function UserSendingsList({
   sendings,

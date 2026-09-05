@@ -4,22 +4,22 @@ import { SecretBufferWipedError } from '@/core/errors'
 
 import { SecretBuffer } from './SecretBuffer'
 
-describe('SecretBuffer: создание', () => {
-  it('принимает владение переданным массивом', () => {
+describe('SecretBuffer: creation', () => {
+  it('takes ownership of the given array', () => {
     const source = new Uint8Array([1, 2, 3])
     const buffer = SecretBuffer.own(source)
 
     expect(buffer.bytes).toBe(source)
   })
 
-  it('затирает исходный массив при own', () => {
+  it('wipes the source array on own', () => {
     const source = new Uint8Array([1, 2, 3])
     SecretBuffer.own(source).wipe()
 
     expect([...source]).toEqual([0, 0, 0])
   })
 
-  it('создаёт независимую копию при copyOf', () => {
+  it('creates an independent copy on copyOf', () => {
     const source = new Uint8Array([1, 2, 3])
     const buffer = SecretBuffer.copyOf(source)
     buffer.wipe()
@@ -27,51 +27,51 @@ describe('SecretBuffer: создание', () => {
     expect([...source]).toEqual([1, 2, 3])
   })
 
-  /* Сравнение через развёртывание в обычный массив, а не toEqual
-     на Uint8Array: TextEncoder в jsdom возвращает типизированный массив
-     из другого realm, и прямое сравнение объектов даёт ложный отказ.
-     В браузере такой проблемы нет — это особенность тестовой среды. */
-  it('кодирует текст в UTF-8', () => {
+  /* Compare by spreading into a plain array, not toEqual on Uint8Array:
+     TextEncoder in jsdom returns a typed array from another realm, and
+     a direct object compare fails. Browsers do not have this — it is a
+     test-environment quirk. */
+  it('encodes text as UTF-8', () => {
     const buffer = SecretBuffer.fromUtf8('abc')
 
     expect([...buffer.bytes]).toEqual([97, 98, 99])
   })
 
-  it('корректно кодирует многобайтовые символы', () => {
-    const buffer = SecretBuffer.fromUtf8('тест')
+  it('encodes multibyte characters correctly', () => {
+    const buffer = SecretBuffer.fromUtf8('café')
 
-    expect(buffer.byteLength).toBe(8)
+    expect(buffer.byteLength).toBe(5)
   })
 
-  it('выделяет нулевой буфер заданного размера', () => {
+  it('allocates a zeroed buffer of the given size', () => {
     expect([...SecretBuffer.allocate(4).bytes]).toEqual([0, 0, 0, 0])
   })
 })
 
-describe('SecretBuffer: затирание', () => {
-  it('обнуляет содержимое', () => {
+describe('SecretBuffer: wiping', () => {
+  it('zeroes the contents', () => {
     const source = new Uint8Array([9, 9, 9, 9])
     SecretBuffer.own(source).wipe()
 
     expect(source.every((byte) => byte === 0)).toBe(true)
   })
 
-  it('помечает буфер затёртым', () => {
-    const buffer = SecretBuffer.fromUtf8('секрет')
+  it('marks the buffer as wiped', () => {
+    const buffer = SecretBuffer.fromUtf8('secret')
     buffer.wipe()
 
     expect(buffer.isWiped).toBe(true)
   })
 
-  it('отказывает в доступе к содержимому после затирания', () => {
-    const buffer = SecretBuffer.fromUtf8('секрет')
+  it('denies access to the contents after wipe', () => {
+    const buffer = SecretBuffer.fromUtf8('secret')
     buffer.wipe()
 
     expect(() => buffer.bytes).toThrow(SecretBufferWipedError)
   })
 
-  it('допускает повторное затирание', () => {
-    const buffer = SecretBuffer.fromUtf8('секрет')
+  it('allows wiping again', () => {
+    const buffer = SecretBuffer.fromUtf8('secret')
     buffer.wipe()
 
     expect(() => {
@@ -79,44 +79,43 @@ describe('SecretBuffer: затирание', () => {
     }).not.toThrow()
   })
 
-  it('сообщает нулевой размер после затирания', () => {
-    const buffer = SecretBuffer.fromUtf8('секрет')
+  it('reports zero length after wipe', () => {
+    const buffer = SecretBuffer.fromUtf8('secret')
     buffer.wipe()
 
     expect(buffer.byteLength).toBe(0)
   })
 })
 
-describe('SecretBuffer: защита от случайной утечки', () => {
-  /* Прямая подстановка `${buffer}` в шаблон здесь не проверяется:
-     правило ESLint `restrict-template-expressions` запрещает подставлять
-     в шаблонную строку значение, не являющееся строкой или числом.
-     То есть от этого конкретного способа утечки защищает линтер, а
-     переопределённый toString закрывает остальные пути — String(),
-     конкатенацию и Array.prototype.join. */
-  it('не раскрывает содержимое при приведении к строке', () => {
-    const buffer = SecretBuffer.fromUtf8('очень секретная фраза')
+describe('SecretBuffer: accidental-leak guards', () => {
+  /* Direct `${buffer}` in a template is not tested here: the ESLint
+     `restrict-template-expressions` rule forbids interpolating a value
+     that is not a string or number. So the linter already blocks that
+     leak path, and the overridden toString covers the rest — String(),
+     concatenation, and Array.prototype.join. */
+  it('does not reveal contents when coerced to a string', () => {
+    const buffer = SecretBuffer.fromUtf8('very secret phrase')
 
     expect(String(buffer)).toBe('[SECRET]')
-    expect(buffer.toString()).not.toContain('секретная')
+    expect(buffer.toString()).not.toContain('secret')
   })
 
-  it('не раскрывает содержимое при конкатенации', () => {
-    const buffer = SecretBuffer.fromUtf8('очень секретная фраза')
+  it('does not reveal contents on concatenation', () => {
+    const buffer = SecretBuffer.fromUtf8('very secret phrase')
 
     expect(['seed:', buffer].join(' ')).toBe('seed: [SECRET]')
   })
 
-  it('не раскрывает содержимое при JSON.stringify', () => {
-    const buffer = SecretBuffer.fromUtf8('очень секретная фраза')
+  it('does not reveal contents under JSON.stringify', () => {
+    const buffer = SecretBuffer.fromUtf8('very secret phrase')
     const state = { mnemonic: buffer, other: 1 }
 
-    expect(JSON.stringify(state)).not.toContain('секретная')
+    expect(JSON.stringify(state)).not.toContain('secret')
     expect(JSON.stringify(state)).toContain('[SECRET]')
   })
 
-  it('не раскрывает содержимое в массиве', () => {
-    const buffers = [SecretBuffer.fromUtf8('слово')]
+  it('does not reveal contents in an array', () => {
+    const buffers = [SecretBuffer.fromUtf8('word')]
 
     expect(JSON.stringify(buffers)).toBe('["[SECRET]"]')
   })

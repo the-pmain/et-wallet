@@ -1,11 +1,11 @@
 import { EventBus, type SessionTransportEventMap } from '@/core'
 
 /**
- * Шина событий транспорта.
+ * Transport event bus.
  *
- * Отдельный класс, а не прямое использование `EventBus`: транспорт
- * будет не один, и одинаковая типизация подписки нужна каждому.
- * Наследование здесь было бы лишним — достаточно узкой обёртки.
+ * A separate class, not a raw `EventBus`: there will be more than
+ * one transport, and each needs the same subscription typing.
+ * Inheritance would be surplus — a narrow wrapper is enough.
  */
 export class TransportEvents {
   readonly #bus = new EventBus<SessionTransportEventMap>()

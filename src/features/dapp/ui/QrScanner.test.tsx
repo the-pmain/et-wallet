@@ -6,10 +6,8 @@ import { isPairingUri } from '../lib/pairing-uri'
 
 import { QrScanner } from './QrScanner'
 
-/** Ссылка подключения такого вида, какой её выдаёт приложение. */
 const PAIRING_URI = `wc:${'a'.repeat(64)}@2?relay-protocol=irn&symKey=${'b'.repeat(64)}`
 
-/** Дорожка потока: важно, что её останавливают. */
 class FakeTrack {
   stopped = false
 
@@ -18,7 +16,6 @@ class FakeTrack {
   }
 }
 
-/** Поток камеры-дублёра. */
 class FakeStream {
   readonly track = new FakeTrack()
 
@@ -30,7 +27,6 @@ class FakeStream {
 let stream: FakeStream | null
 let getUserMedia: ReturnType<typeof vi.fn>
 
-/** Ставит камеру-дублёр вместо настоящей. */
 function installCamera(): void {
   stream = new FakeStream()
   getUserMedia = vi.fn(() => Promise.resolve(stream))
@@ -41,7 +37,6 @@ function installCamera(): void {
   })
 }
 
-/** Убирает камеру целиком: так выглядит браузер без неё. */
 function removeCamera(): void {
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined })
 }
@@ -50,9 +45,9 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   installCamera()
 
-  /* Кадры в тестовой среде не рисуются: полотно возвращает пустой
-     контекст. Разбор подставляется свойством, поэтому изображение
-     значения не имеет — важна только его доступность. */
+  /* Frames are not drawn in tests: the canvas returns an empty
+     context. Decode is injected via a prop, so the image does not
+     matter — only that it is available. */
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
     drawImage: vi.fn(),
     getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 })),
@@ -75,8 +70,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('Чтение ссылки подключения', () => {
-  it('прочитанная ссылка уходит вызывающему', async () => {
+describe('Reading a pairing URI', () => {
+  it('the scanned URI is passed to the caller', async () => {
     const onScanned = vi.fn()
 
     render(<QrScanner onScanned={onScanned} onCancel={vi.fn()} decode={() => PAIRING_URI} />)
@@ -86,8 +81,8 @@ describe('Чтение ссылки подключения', () => {
     })
   })
 
-  it('камера выключается сразу после чтения', async () => {
-    /* Оставленный поток — живая картинка комнаты в открытой вкладке. */
+  it('the camera turns off immediately after a read', async () => {
+    /* A stream left on is a live picture of the room in an open tab. */
     const onScanned = vi.fn()
 
     render(<QrScanner onScanned={onScanned} onCancel={vi.fn()} decode={() => PAIRING_URI} />)
@@ -97,7 +92,7 @@ describe('Чтение ссылки подключения', () => {
     })
   })
 
-  it('камера выключается при закрытии видоискателя', async () => {
+  it('the camera turns off when the viewfinder closes', async () => {
     const { unmount } = render(
       <QrScanner onScanned={vi.fn()} onCancel={vi.fn()} decode={() => null} />,
     )
@@ -111,8 +106,8 @@ describe('Чтение ссылки подключения', () => {
     expect(stream?.track.stopped).toBe(true)
   })
 
-  it('ссылка передаётся один раз, сколько бы кадров ни прочиталось', async () => {
-    /* Второй вызов запустил бы подключение повторно. */
+  it('the URI is passed once no matter how many frames are read', async () => {
+    /* A second call would start the connection again. */
     const onScanned = vi.fn()
 
     render(<QrScanner onScanned={onScanned} onCancel={vi.fn()} decode={() => PAIRING_URI} />)
@@ -127,10 +122,10 @@ describe('Чтение ссылки подключения', () => {
   })
 })
 
-describe('Посторонний код и недоступная камера', () => {
-  it('посторонний код назван посторонним, а не проигнорирован', async () => {
-    /* Молчащая камера неотличима от сломанной: человек будет водить
-       телефоном, пока не бросит. */
+describe('Foreign code and an unavailable camera', () => {
+  it('foreign code is named foreign, not ignored', async () => {
+    /* A silent camera is indistinguishable from a broken one: the
+       person will wave the phone until they give up. */
     const onScanned = vi.fn()
 
     render(
@@ -141,7 +136,7 @@ describe('Посторонний код и недоступная камера',
     expect(onScanned).not.toHaveBeenCalled()
   })
 
-  it('отказ в доступе к камере объяснён и предлагает вставку ссылки', async () => {
+  it('camera denial is explained and offers pasting the URI', async () => {
     getUserMedia.mockRejectedValue(new Error('Permission denied'))
 
     render(<QrScanner onScanned={vi.fn()} onCancel={vi.fn()} decode={() => null} />)
@@ -150,7 +145,7 @@ describe('Посторонний код и недоступная камера',
     expect(screen.getByText(/Paste the connection link/i)).toBeInTheDocument()
   })
 
-  it('без камеры видоискатель не показывается вовсе', () => {
+  it('without a camera the viewfinder is not shown', () => {
     removeCamera()
 
     render(<QrScanner onScanned={vi.fn()} onCancel={vi.fn()} decode={() => null} />)
@@ -159,15 +154,15 @@ describe('Посторонний код и недоступная камера',
     expect(screen.queryByLabelText('Camera viewfinder')).not.toBeInTheDocument()
   })
 
-  it('сказано, что кадры остаются на устройстве', async () => {
-    /* Разрешение на камеру дают неохотно и правильно делают.
-       Умолчание здесь стоит отказа от способа. */
+  it('says that frames stay on the device', async () => {
+    /* Camera permission is given reluctantly, and rightly so.
+       Silence here is as bad as refusing the method. */
     render(<QrScanner onScanned={vi.fn()} onCancel={vi.fn()} decode={() => null} />)
 
     expect(await screen.findByText(/is not sent anywhere/i)).toBeInTheDocument()
   })
 
-  it('видоискатель закрывается кнопкой', async () => {
+  it('the viewfinder closes with the button', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onCancel = vi.fn()
 
@@ -179,28 +174,28 @@ describe('Посторонний код и недоступная камера',
   })
 })
 
-describe('Проверка прочитанного', () => {
-  it('ссылка подключения принимается', () => {
+describe('Checking what was read', () => {
+  it('a pairing URI is accepted', () => {
     expect(isPairingUri(PAIRING_URI)).toBe(true)
   })
 
-  it('адрес сайта со ссылкой внутри не принимается', () => {
-    /* Поиск подстроки принял бы это. Схема проверяется с начала
-       строки именно поэтому. */
+  it('a site URL containing the URI is not accepted', () => {
+    /* A substring search would accept this. The scheme is checked
+       from the start of the string for that reason. */
     expect(isPairingUri(`https://evil.example/${PAIRING_URI}`)).toBe(false)
   })
 
-  it('одна схема без содержимого не принимается', () => {
+  it('a scheme with no contents is not accepted', () => {
     expect(isPairingUri('wc:')).toBe(false)
   })
 
-  it('полотно текста не принимается', () => {
-    /* Штрих-код вмещает несколько тысяч символов, и занимать ими поле
-       ввода посторонний не должен. */
+  it('a wall of text is not accepted', () => {
+    /* A barcode holds several thousand characters, and a stranger
+       must not fill the input with them. */
     expect(isPairingUri(`wc:${'a'.repeat(5_000)}`)).toBe(false)
   })
 
-  it('пробелы по краям не мешают', () => {
+  it('surrounding spaces do not matter', () => {
     expect(isPairingUri(`  ${PAIRING_URI}  `)).toBe(true)
   })
 })

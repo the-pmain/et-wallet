@@ -8,31 +8,31 @@ interface OnboardingProviderProps {
   readonly children: ReactNode
 
   /**
-   * Готовый сервис.
+   * Ready-made service.
    *
-   * Обязателен. Раньше провайдер создавал сервис сам, когда его не передали,
-   * и это было удобно ровно до появления второго потребителя защищённого
-   * хранилища: экран кошелька работает с той же сессией дешифрования,
-   * а собранный внутри провайдера сервис невозможно передать ему.
-   * Сборка выполняется в composition root.
+   * Required. The provider used to build the service itself when none
+   * was passed, which was convenient until a second consumer of the
+   * secure store appeared: the wallet screen uses the same decryption
+   * session, and a service built inside the provider cannot be handed
+   * to it. Assembly happens in the composition root.
    */
   readonly service: IOnboardingService
 
   /**
-   * Канал оповещения между вкладками.
+   * Inter-tab notification channel.
    *
-   * Необязателен: без него вкладка узнаёт о стирании кошелька
-   * в соседней только при перезагрузке.
+   * Optional: without it this tab learns of a sibling erase only
+   * on reload.
    */
   readonly broadcast?: WalletBroadcast
 }
 
 /**
- * Провайдер операций онбординга.
+ * Provider of onboarding operations.
  *
- * Сервис живёт всё время работы приложения: он владеет состоянием блокировки
- * и сессионным ключом шифрования, поэтому пересоздание при перерисовке
- * означало бы неожиданную блокировку кошелька.
+ * The service lives for the life of the app: it owns lock state and
+ * the session encryption key, so recreating it on rerender would
+ * unexpectedly lock the wallet.
  */
 export function OnboardingProvider({ children, service, broadcast }: OnboardingProviderProps) {
   useEffect(() => {
@@ -40,13 +40,13 @@ export function OnboardingProvider({ children, service, broadcast }: OnboardingP
   }, [service])
 
   /**
-   * Стирание кошелька в соседней вкладке закрывает эту.
+   * A wallet erase in a sibling tab closes this one.
    *
-   * ХРАНИЛИЩЕ ОБЩЕЕ, А ПАМЯТЬ — НЕТ. Вкладка держит ключ шифрования
-   * и снимок состояния у себя, поэтому уничтожение хранилища проходит
-   * мимо неё: она продолжает показывать балансы и позволяет подписать
-   * перевод. Человек, стерший кошелёк перед передачей устройства,
-   * оставлял бы открытую дверь.
+   * STORAGE IS SHARED, MEMORY IS NOT. The tab holds the encryption key
+   * and state snapshot locally, so destroying storage passes it by:
+   * it keeps showing balances and can still sign a transfer. Someone
+   * who erased the wallet before handing the device over would leave
+   * a door open.
    */
   useEffect(() => {
     return broadcast?.subscribe(() => {

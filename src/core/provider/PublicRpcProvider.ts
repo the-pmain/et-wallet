@@ -6,28 +6,30 @@ import { RPC_PROVIDER_ID, type IRpcEndpoint, type IRpcProvider } from './rpc-end
 const PROVIDER_NAME = 'Public node'
 
 /**
- * Публичные адреса из конфигурации сети.
+ * Public addresses from network config.
  *
- * ЗАЧЕМ НУЖЕН ОТДЕЛЬНЫЙ ИСТОЧНИК ДЛЯ ТОГО, ЧТО УЖЕ ЛЕЖИТ В КОНФИГУРАЦИИ.
- * Перебор обязан быть однородным: если публичные адреса подмешивались бы
- * в обход общего механизма, они не получили бы ни отметки происхождения,
- * ни участия в проверке доступности, ни места в порядке предпочтения.
+ * WHY A SEPARATE SOURCE FOR WHAT ALREADY LIVES IN CONFIG.
+ * Rotation must be uniform: if public addresses were mixed in
+ * outside the shared mechanism, they would get neither an origin
+ * mark, nor a place in the health check, nor a place in preference
+ * order.
  *
- * Второе назначение — работоспособность без ключа. Alchemy без ключа
- * не даёт ни одного адреса, и без этого источника кошелёк не подключился
- * бы никуда вообще.
+ * Second purpose — working without a key. Alchemy with no key gives
+ * no addresses, and without this source the wallet would connect
+ * nowhere at all.
  *
- * ПРИВАТНОСТЬ. Оператор публичного узла видит IP-адрес пользователя
- * и все его запросы. Несколько независимых операторов на сеть — смягчение,
- * а не решение: полное решение это собственный узел (см. `CustomRpcProvider`).
+ * PRIVACY. A public-node operator sees the user's IP and every
+ * request. Several independent operators per network is mitigation,
+ * not a solution: the full solution is an own node (see
+ * `CustomRpcProvider`).
  */
 export class PublicRpcProvider implements IRpcProvider {
   readonly id = RPC_PROVIDER_ID.Public
   readonly name = PROVIDER_NAME
 
   supports(_chainId: ChainId): boolean {
-    /* Наличие адресов проверяется по самой конфигурации сети: список
-       различается от сети к сети, и заранее он неизвестен. */
+    /* Whether addresses exist is checked on the network config
+       itself: the list differs per network and is not known ahead. */
     return true
   }
 

@@ -3,33 +3,32 @@ import { SecretBufferWipedError } from '@/core/errors'
 import { wipeBytes } from './random'
 import type { ISecretBuffer } from './types'
 
-/** Значение, подставляемое вместо секрета при попытке его сериализовать. */
+/** Value substituted when something tries to serialise the secret. */
 const REDACTED = '[SECRET]'
 
 /**
- * Владение секретом в оперативной памяти.
+ * Ownership of a secret in memory.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Тип `string` непригоден для хранения секретов: строки
- * в JavaScript иммутабельны и интернируются движком, поэтому затереть их
- * содержимое невозможно — оно остаётся в куче до сборки мусора, момент
- * которой не контролируется. `Uint8Array` затирается явно.
+ * WHY THIS EXISTS. `string` is unfit for secrets: JavaScript strings are
+ * immutable and interned, so their contents cannot be wiped — they stay
+ * on the heap until garbage collection, whose timing is uncontrolled.
+ * `Uint8Array` can be wiped explicitly.
  *
- * ЧЕГО ЭТОТ КЛАСС НЕ ДАЁТ. Затирание сокращает окно присутствия секрета
- * в памяти, но не устраняет риск: V8 использует перемещающий сборщик мусора
- * и вправе скопировать буфер, оставив прежнюю копию в освобождённой странице.
- * Защитой от дампа памяти процесса это не является, и обещать обратное было бы
- * обманом.
+ * WHAT THIS CLASS DOES NOT GIVE. Wiping shortens the window the secret
+ * is in memory, but does not remove the risk: V8 uses a moving GC and
+ * may copy the buffer, leaving the old copy on a freed page. This is
+ * not process-dump protection, and promising otherwise would be a lie.
  *
- * ЗАЩИТА ОТ СЛУЧАЙНОЙ УТЕЧКИ. Переопределены `toString` и `toJSON`.
- * Без них секрет попадает в журнал при подстановке в шаблонную строку
- * и в отладочный дамп при `JSON.stringify` состояния приложения — два самых
- * частых способа непреднамеренно раскрыть ключ.
+ * ACCIDENTAL-LEAK GUARDS. `toString` and `toJSON` are overridden.
+ * Without them the secret lands in logs via a template string and in
+ * debug dumps via `JSON.stringify` of app state — the two most common
+ * ways to leak a key by accident.
  *
- * ПРАВИЛА ИСПОЛЬЗОВАНИЯ:
- * - вызывать `wipe()` в блоке `finally` сразу после использования;
- * - не сохранять в состоянии UI и не передавать между слоями дольше,
- *   чем требуется для одной операции;
- * - не создавать копий `bytes` без последующего затирания копии.
+ * RULES:
+ * - call `wipe()` in a `finally` block immediately after use;
+ * - do not keep it in UI state or pass it across layers longer than one
+ *   operation requires;
+ * - do not copy `bytes` without wiping the copy afterwards.
  */
 export class SecretBuffer implements ISecretBuffer {
   #bytes: Uint8Array | null
@@ -39,47 +38,46 @@ export class SecretBuffer implements ISecretBuffer {
   }
 
   /**
-   * Принимает владение переданным массивом.
+   * Takes ownership of the given array.
    *
-   * Вызывающий обязан больше не использовать исходную ссылку: `wipe()`
-   * затрёт именно её содержимое.
+   * The caller must not use the original reference again: `wipe()`
+   * zeroes that same memory.
    */
   static own(bytes: Uint8Array): SecretBuffer {
     return new SecretBuffer(bytes)
   }
 
   /**
-   * Создаёт независимую копию.
+   * Creates an independent copy.
    *
-   * Нужен, когда исходный массив принадлежит другому владельцу и будет
-   * затёрт им самостоятельно.
+   * Needed when the source array belongs to another owner who will
+   * wipe it themselves.
    */
   static copyOf(bytes: Uint8Array): SecretBuffer {
     return new SecretBuffer(Uint8Array.from(bytes))
   }
 
   /**
-   * Переводит текст в буфер.
+   * Encodes text into a buffer.
    *
-   * ВНИМАНИЕ: исходная строка остаётся в куче и затиранию не подлежит.
-   * Метод не устраняет утечку, а ограничивает её одним значением — тем,
-   * которое уже было создано вызывающим кодом.
+   * WARNING: the source string stays on the heap and cannot be wiped.
+   * This method does not close that leak — it confines it to the one
+   * value the caller already created.
    */
   static fromUtf8(text: string): SecretBuffer {
     return new SecretBuffer(new TextEncoder().encode(text))
   }
 
-  /** Выделяет нулевой буфер заданного размера. */
   static allocate(size: number): SecretBuffer {
     return new SecretBuffer(new Uint8Array(size))
   }
 
   /**
-   * Содержимое буфера.
+   * Buffer contents.
    *
-   * @throws SecretBufferWipedError если буфер уже затёрт. Исключение,
-   *         а не пустой массив: молчаливый возврат нулей привёл бы
-   *         к выводу ключа из пустого секрета.
+   * @throws SecretBufferWipedError if the buffer has already been wiped.
+   *         An exception, not an empty array: silently returning zeroes
+   *         would derive a key from an empty secret.
    */
   get bytes(): Uint8Array {
     if (this.#bytes === null) {
@@ -93,14 +91,14 @@ export class SecretBuffer implements ISecretBuffer {
     return this.#bytes === null
   }
 
-  /** Размер в байтах. Доступен и после затирания — секретом не является. */
+  /** Byte length. Available after wipe — it is not a secret. */
   get byteLength(): number {
     return this.#bytes?.length ?? 0
   }
 
   /**
-   * Затирает содержимое нулями и помечает буфер недействительным.
-   * Повторный вызов безопасен.
+   * Zeroes the contents and marks the buffer invalid.
+   * A second call is safe.
    */
   wipe(): void {
     if (this.#bytes === null) {
@@ -111,12 +109,12 @@ export class SecretBuffer implements ISecretBuffer {
     this.#bytes = null
   }
 
-  /** Не раскрывает содержимое при подстановке в строку. */
+  /** Does not reveal contents when coerced to a string. */
   toString(): string {
     return REDACTED
   }
 
-  /** Не раскрывает содержимое при JSON.stringify. */
+  /** Does not reveal contents under JSON.stringify. */
   toJSON(): string {
     return REDACTED
   }

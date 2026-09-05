@@ -16,26 +16,25 @@ interface DappRequestCardProps {
 }
 
 /**
- * Запрос приложения, ожидающий решения.
+ * An application request awaiting a decision.
  *
- * ПОКАЗЫВАЕТСЯ СОДЕРЖИМОЕ, А НЕ ХЭШ. Хэш структуры не говорит
- * пользователю ничего, и он нажимает «подписать», потому что иначе
- * приложение не работает. Именно так отдают неограниченное разрешение
- * на токены, не увидев ни списания, ни комиссии.
+ * THE CONTENTS ARE SHOWN, NOT A HASH. A structure hash tells the
+ * user nothing, so they press "sign" because otherwise the app
+ * does not work. That is how unlimited token approvals are given
+ * without seeing a debit or a fee.
  *
- * ЗАМЕЧАНИЯ ИДУТ ПЕРЕД СОДЕРЖИМЫМ, А НЕ ПОСЛЕ. Предупреждение под
- * длинной структурой не читает никто.
+ * FINDINGS COME BEFORE THE CONTENTS, NOT AFTER. A warning under a
+ * long structure is read by no one.
  *
- * ИМЯ И АДРЕС ПРИЛОЖЕНИЯ — ЗАЯВЛЕНИЕ СТОРОНЫ, А НЕ ФАКТ. Назваться
- * известным приложением может кто угодно, поэтому они показаны как
- * присланные значения и обезврежены от скрытых символов.
+ * THE APP NAME AND URL ARE A CLAIM, NOT A FACT. Anyone can call
+ * themselves a known app, so they are shown as sent values and
+ * stripped of hidden characters.
  *
- * ПАРОЛЬ СПРАШИВАЕТСЯ ПО ТОЙ ЖЕ НАСТРОЙКЕ, ЧТО И ПРИ ОТПРАВКЕ ИЗ
- * КОШЕЛЬКА. Раньше не спрашивался вовсе, и это было хуже всего:
- * удалённый запрос приходит от постороннего приложения, а собственная
- * отправка — от владельца за устройством. Требовать подтверждение
- * у второго и не требовать у первого значит защищать слабее там,
- * где опаснее.
+ * THE PASSWORD IS ASKED UNDER THE SAME SETTING AS A WALLET SEND.
+ * It used to be asked never, which was worst of all: a remote
+ * request comes from a stranger's app, a local send from the
+ * owner at the device. Asking the second and not the first means
+ * protecting less where it is more dangerous.
  */
 export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRequestCardProps) {
   const { request, risks, preflight } = pending
@@ -75,13 +74,13 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
 
         <RequestBody request={request} />
 
-        {/* ИТОГ ПРОГОНА ИДЁТ ПОСЛЕ СОДЕРЖИМОГО И ЗАМЕЧАНИЙ. Он отвечает
-            на вопрос «состоится ли вызов», тогда как выше сказано, что
-            именно подписывается, — и это важнее.
+        {/* THE PREFLIGHT RESULT COMES AFTER CONTENTS AND FINDINGS.
+            It answers "will the call succeed", while above it is
+            said what is being signed — and that matters more.
 
-            Пока узла нет ответа, здесь не показывается ничего:
-            крутящееся ожидание рядом с кнопкой «подтвердить» торопит
-            нажать, не дождавшись. */}
+            While the node has not answered, nothing is shown here:
+            a spinner next to "confirm" rushes a press before the
+            result arrives. */}
         {preflight === null ? null : <PreflightNotice preflight={preflight} />}
 
         <Alert variant="warning">
@@ -92,11 +91,11 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
           </AlertDescription>
         </Alert>
 
-        {/* Повторный ввод пароля защищает от того, кто получил доступ
-            к уже разблокированному кошельку, и от приложения, которое
-            дождалось разблокировки. Настройка одна с отправкой:
-            два переключателя означали бы, что владелец защитил один
-            путь и не заметил второго. */}
+        {/* Re-entering the password protects against someone who
+            reached an already unlocked wallet, and against an app
+            that waited for unlock. The setting is shared with send:
+            two toggles would mean the owner protected one path and
+            missed the other. */}
         {isConfirming ? (
           <ConfirmPassword
             action="signing on behalf of an application"
@@ -138,7 +137,6 @@ export function DappRequestCard({ pending, isBusy, onApprove, onReject }: DappRe
   )
 }
 
-/** Человекочитаемое название запрошенного действия. */
 function describeKind(kind: IDappRequest['payload']['kind']): string {
   switch (kind) {
     case DAPP_REQUEST_KIND.SignMessage:
@@ -152,7 +150,6 @@ function describeKind(kind: IDappRequest['payload']['kind']): string {
   }
 }
 
-/** Содержимое запроса в разобранном виде. */
 function RequestBody({ request }: { readonly request: IDappRequest }) {
   const payload = request.payload
 
@@ -209,10 +206,10 @@ function RequestBody({ request }: { readonly request: IDappRequest }) {
 }
 
 /**
- * Готовит поля структуры к показу.
+ * Prepare structure fields for display.
  *
- * `JSON.stringify` не умеет больших целых и падает на них, а значения
- * разрешений приходят именно такими.
+ * `JSON.stringify` cannot handle big integers and throws on them,
+ * and allowance values arrive as those.
  */
 function formatMessage(message: Readonly<Record<string, unknown>>): string {
   return JSON.stringify(
@@ -231,7 +228,6 @@ function Row({ label, children }: { readonly label: string; readonly children: R
   )
 }
 
-/** Предупреждение по одному замечанию. */
 function RiskAlert({ risk, detail }: { readonly risk: DappRisk; readonly detail: string | null }) {
   const text = RISK_TEXT[risk]
 
@@ -247,7 +243,6 @@ function RiskAlert({ risk, detail }: { readonly risk: DappRisk; readonly detail:
   )
 }
 
-/** Пояснения к замечаниям. */
 const RISK_TEXT: Readonly<
   Record<DappRisk, { title: string; description: string; isCritical: boolean }>
 > = {

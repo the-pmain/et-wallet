@@ -7,14 +7,13 @@ import { useDirectorySession } from './directory-session'
 import { readLoginCredentials } from './login-credentials'
 import { useRemoteAssetQuotes } from './use-remote-asset-quotes'
 
-/** Локальный снимок, которым пользуются, пока записи справочника нет. */
+/** Local snapshot used until a directory record exists. */
 export interface ILocalAssetSnapshot {
   readonly tokens: readonly ITokenAmount[]
   readonly portfolio: IPortfolioSummary | null
   readonly isLoading: boolean
 }
 
-/** Список, который рисуют экран активов и карточка на главном. */
 export interface IDisplayedAssets {
   readonly tokens: readonly ITokenAmount[]
   readonly portfolio: IPortfolioSummary | null
@@ -23,10 +22,10 @@ export interface IDisplayedAssets {
 }
 
 /**
- * Один источник строк для экрана активов и для карточки на главном.
+ * One source of rows for the assets screen and the home card.
  *
- * ЗАПИСЬ СПРАВОЧНИКА ВАЖНЕЕ СНИМКА СЕССИИ. Курсы для неё берутся
- * из снимка рынка, загруженного при открытии приложения.
+ * THE DIRECTORY RECORD OUTRANKS THE SESSION SNAPSHOT. Quotes for it
+ * come from the market snapshot loaded when the app opened.
  */
 export function useDisplayedAssets(local: ILocalAssetSnapshot): IDisplayedAssets {
   const directory = useDirectorySession()

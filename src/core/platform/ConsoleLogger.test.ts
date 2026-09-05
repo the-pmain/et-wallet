@@ -5,7 +5,6 @@ import { LOG_LEVEL } from './Logger'
 
 const ADDRESS = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
-/** Перехватывает вывод в консоль и возвращает записанные аргументы. */
 function captureWarn(): { calls: unknown[][]; restore: () => void } {
   const calls: unknown[][] = []
   const spy = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
@@ -24,16 +23,16 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('ConsoleLogger: редакция секретов', () => {
-  it('не выводит значение поля, похожего на секрет', () => {
+describe('ConsoleLogger: secret redaction', () => {
+  it('does not print a field whose name looks like a secret', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.warn('Проверка', {
+    logger.warn('Check', {
       password: 'Korova-7-Luna!',
       mnemonic: 'abandon abandon about',
       privateKey: '0xdeadbeef',
-      seedPhrase: 'нечто',
+      seedPhrase: 'something',
       accountXprv: 'xprv…',
     })
 
@@ -44,56 +43,56 @@ describe('ConsoleLogger: редакция секретов', () => {
     expect(serialized).not.toContain('Korova-7-Luna!')
     expect(serialized).not.toContain('abandon')
     expect(serialized).not.toContain('0xdeadbeef')
-    expect(serialized).not.toContain('нечто')
+    expect(serialized).not.toContain('something')
     expect(serialized).not.toContain('xprv…')
   })
 
-  it('редактирует поле независимо от написания имени', () => {
+  it('redacts a field regardless of how the name is spelled', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.warn('Проверка', {
-      PRIVATE_KEY: 'секрет-1',
-      userPassword: 'секрет-2',
-      recoverySeed: 'секрет-3',
+    logger.warn('Check', {
+      PRIVATE_KEY: 'secret-1',
+      userPassword: 'secret-2',
+      recoverySeed: 'secret-3',
     })
 
     restore()
 
-    expect(JSON.stringify(calls)).not.toContain('секрет')
+    expect(JSON.stringify(calls)).not.toContain('secret')
   })
 
-  it('усекает адрес EVM', () => {
+  it('truncates an EVM address', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.warn('Проверка', { owner: ADDRESS })
+    logger.warn('Check', { owner: ADDRESS })
 
     restore()
 
     const serialized = JSON.stringify(calls)
 
-    /* Полный адрес в журнале связывает пользователя со всей его историей
-       операций. Регистр контрольной суммы при этом сохраняется. */
+    /* A full address in the log ties the user to their whole
+       history. Checksum case is preserved. */
     expect(serialized).not.toContain(ADDRESS)
     expect(serialized).toContain('0x5aAe…1BeAed')
   })
 
-  it('скрывает адрес почты, названный полем-маркером', () => {
+  it('hides an email named by a marker field', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.warn('Проверка', { email: 'owner@example.com' })
+    logger.warn('Check', { email: 'owner@example.com' })
 
     restore()
 
     expect(JSON.stringify(calls)).not.toContain('owner@example.com')
   })
 
-  it('скрывает адрес почты и под посторонним именем поля', () => {
-    /* Адрес попадает в журнал как имя аккаунта: первый аккаунт
-       подписывается адресом владельца. Проверка по имени поля такой
-       случай не поймала бы. */
+  it('hides an email under an unrelated field name as well', () => {
+    /* An address lands in the log as an account name: the first
+       account is labelled with the owner's address. A check on the
+       field name would miss that case. */
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
@@ -104,14 +103,14 @@ describe('ConsoleLogger: редакция секретов', () => {
     expect(JSON.stringify(calls)).not.toContain('owner@example.com')
   })
 
-  it('переводит bigint в строку вместо отказа', () => {
+  it('turns bigint into a string instead of failing', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    /* `JSON.stringify` на bigint выбрасывает исключение. Запись журнала
-       не имеет права уронить вызывающий код. */
+    /* `JSON.stringify` throws on bigint. A log write must not crash
+       the caller. */
     expect(() => {
-      logger.warn('Проверка', { chainId: 1n })
+      logger.warn('Check', { chainId: 1n })
     }).not.toThrow()
 
     restore()
@@ -119,11 +118,11 @@ describe('ConsoleLogger: редакция секретов', () => {
     expect(JSON.stringify(calls)).toContain('"1"')
   })
 
-  it('усекает адреса внутри массива', () => {
+  it('truncates addresses inside an array', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.warn('Проверка', { accounts: [ADDRESS] })
+    logger.warn('Check', { accounts: [ADDRESS] })
 
     restore()
 
@@ -131,26 +130,26 @@ describe('ConsoleLogger: редакция секретов', () => {
   })
 })
 
-describe('ConsoleLogger: уровни', () => {
-  it('по умолчанию не выводит debug и info', () => {
+describe('ConsoleLogger: levels', () => {
+  it('does not print debug and info by default', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger()
 
-    logger.debug('подробность')
-    logger.info('сведение')
+    logger.debug('detail')
+    logger.info('info')
 
     restore()
 
     expect(calls).toHaveLength(0)
   })
 
-  it('выводит warn и error', () => {
+  it('prints warn and error', () => {
     const { calls, restore } = captureWarn()
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const logger = new ConsoleLogger()
 
-    logger.warn('предупреждение')
-    logger.error('отказ')
+    logger.warn('warning')
+    logger.error('failure')
 
     restore()
 
@@ -158,11 +157,11 @@ describe('ConsoleLogger: уровни', () => {
     expect(errorSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('пропускает info при пониженном пороге', () => {
+  it('lets info through when the threshold is lowered', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger({ minimumLevel: LOG_LEVEL.Debug })
 
-    logger.info('сведение')
+    logger.info('info')
 
     restore()
 
@@ -170,34 +169,34 @@ describe('ConsoleLogger: уровни', () => {
   })
 })
 
-describe('ConsoleLogger: область', () => {
-  it('добавляет имя модуля к сообщению', () => {
+describe('ConsoleLogger: scope', () => {
+  it('adds the module name to the message', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger().child('WalletSession')
 
-    logger.warn('Сообщение')
+    logger.warn('Message')
 
     restore()
 
-    expect(calls[0]?.[0]).toBe('[WalletSession] Сообщение')
+    expect(calls[0]?.[0]).toBe('[WalletSession] Message')
   })
 
-  it('накапливает вложенные области', () => {
+  it('accumulates nested scopes', () => {
     const { calls, restore } = captureWarn()
     const logger = new ConsoleLogger().child('WalletSession').child('BalanceService')
 
-    logger.warn('Сообщение')
+    logger.warn('Message')
 
     restore()
 
-    expect(calls[0]?.[0]).toBe('[WalletSession.BalanceService] Сообщение')
+    expect(calls[0]?.[0]).toBe('[WalletSession.BalanceService] Message')
   })
 
-  it('сохраняет порог уровня у дочернего логгера', () => {
+  it('keeps the level threshold on a child logger', () => {
     const { calls, restore } = captureWarn()
-    const logger = new ConsoleLogger({ minimumLevel: LOG_LEVEL.Debug }).child('Модуль')
+    const logger = new ConsoleLogger({ minimumLevel: LOG_LEVEL.Debug }).child('Module')
 
-    logger.debug('подробность')
+    logger.debug('detail')
 
     restore()
 

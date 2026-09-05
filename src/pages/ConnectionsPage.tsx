@@ -18,16 +18,15 @@ import {
 } from '@/shared/ui'
 
 /**
- * Подключения к приложениям.
+ * Connections to apps.
  *
- * ТРАНСПОРТ ПОДНИМАЕТСЯ ПРИ ВХОДЕ НА ЭКРАН, А НЕ ПРИ ЗАПУСКЕ.
- * Библиотека WalletConnect весит около трёх мегабайт: загружать её
- * ради экрана, куда большинство не заходит, значит замедлить всем
- * вход в кошелёк.
+ * THE TRANSPORT STARTS WHEN THIS SCREEN OPENS, NOT AT APP LAUNCH.
+ * WalletConnect is about three megabytes: loading it for a screen
+ * most people never open would slow every wallet unlock.
  *
- * ЗАПРОС И ПРЕДЛОЖЕНИЕ ПОКАЗЫВАЮТСЯ НАД СПИСКОМ. Решение требуется
- * немедленно, и прокручивать до него — верный способ подтвердить
- * не глядя.
+ * THE REQUEST AND THE PROPOSAL SIT ABOVE THE LIST. A decision is
+ * needed immediately, and scrolling to it is a reliable way to
+ * confirm without looking.
  */
 export function ConnectionsPage() {
   const dapp = useDapp()
@@ -38,13 +37,13 @@ export function ConnectionsPage() {
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  /* Видоискатель открывается по требованию, а не сам: камера
-     включается только тогда, когда человек этого попросил. */
+  /* The viewfinder opens on demand, not by itself: the camera turns
+     on only when the person asked for it. */
   const [isScanning, setScanning] = useState(false)
 
-  /* Зависимость — только само действие, а не весь контекст. Контекст
-     меняется при каждом изменении снимка, и эффект, зависящий от него,
-     вызывал бы подъём транспорта заново после каждой такой смены. */
+  /* Depend on the action itself, not the whole context. The context
+     changes on every snapshot update, and an effect that depended on
+     it would restart the transport after every such change. */
   const { init } = dapp
 
   useEffect(() => {
@@ -81,7 +80,7 @@ export function ConnectionsPage() {
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Connections</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
       </header>
 
       {dapp.snapshot.proposal === null ? null : (
@@ -106,9 +105,9 @@ export function ConnectionsPage() {
       {dapp.snapshot.error === null ? null : (
         <Alert variant="warning">
           <AlertTitle>Connections are unavailable</AlertTitle>
-          {/* Причина показывается дословно и без дополнений: транспорт
-              уже объясняет последствие, и вторая такая же фраза рядом
-              выглядит сбоем разметки. */}
+          {/* The reason is shown verbatim, with no extra sentence: the
+              transport already explains the consequence, and a second
+              copy next to it looks like a layout bug. */}
           <AlertDescription>{dapp.snapshot.error}</AlertDescription>
         </Alert>
       )}
@@ -143,9 +142,9 @@ export function ConnectionsPage() {
               />
             </div>
 
-            {/* Прямое указание источника: ссылку выдаёт само приложение,
-                и вставлять сюда что-то, пришедшее из письма или чата, —
-                верный способ подключить чужого. */}
+            {/* Name the source: the app itself issues the URI, and
+                pasting something from email or chat is a reliable way
+                to connect a stranger. */}
             <p className="text-xs text-muted-foreground">
               The link is shown by an application you opened yourself. Do not paste links from
               emails or messages here: a connection lets the other side send you signing requests.
@@ -161,11 +160,11 @@ export function ConnectionsPage() {
                 Connect
               </Button>
 
-              {/* Чтение кода — второй способ ввести ту же ссылку, а не
-                  отдельный путь подключения: прочитанное попадает в то
-                  же поле и проходит те же проверки. На телефоне это
-                  основной способ, набрать полторы сотни символов
-                  руками там невозможно. */}
+              {/* Scanning the code is a second way to enter the same
+                  URI, not a separate connection path: the scan lands
+                  in the same field and passes the same checks. On a
+                  phone this is the main way; typing a hundred and
+                  fifty characters by hand is not realistic. */}
               <Button
                 type="button"
                 variant="outline"
@@ -189,10 +188,10 @@ export function ConnectionsPage() {
                   setScanning(false)
                   setUri(scanned)
 
-                  /* Подключение начинается сразу: прочитанное видно
-                     в поле, а решение о доступе принимается позже,
-                     на экране предложения. Лишнее нажатие здесь
-                     не добавило бы ни одной проверки. */
+                  /* Connection starts at once: the scan is visible in
+                     the field, and the access decision comes later on
+                     the proposal screen. An extra tap here would add
+                     no extra check. */
                   void run(async () => {
                     await dapp.pair(scanned)
                     setUri('')

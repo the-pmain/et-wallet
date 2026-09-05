@@ -2,12 +2,12 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
 /**
- * Объединяет классы Tailwind с разрешением конфликтов.
+ * Joins Tailwind classes and resolves conflicts.
  *
- * clsx собирает условные классы, twMerge отбрасывает проигравшие в конфликте
- * (например, из `px-2 px-4` останется `px-4`). Без twMerge порядок классов в
- * итоговой строке не определяет победителя — им управляет порядок правил в CSS,
- * что делает переопределение стилей в компонентах ненадёжным.
+ * clsx collects conditional classes; twMerge drops the losers of a
+ * conflict (from `px-2 px-4` only `px-4` remains). Without twMerge
+ * the order in the final string does not pick a winner — CSS rule
+ * order does — which makes style overrides in components unreliable.
  */
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))

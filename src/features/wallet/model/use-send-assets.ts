@@ -7,20 +7,20 @@ import type { ITokenBalance } from './contracts'
 import { useWalletSnapshot } from './wallet-context'
 
 interface ISendAssets {
-  /** Активы, доступные для отправки в текущей сети. */
+  /** Assets available to send on the current chain. */
   readonly assets: readonly ITokenBalance[]
   readonly isLoading: boolean
   readonly isRemote: boolean
 
-  /** Сеть перевода: активная сеть кошелька или сеть выбранного актива. */
+  /** Transfer chain: the wallet's active network or the selected asset's. */
   readonly chainId: ChainId | null
 }
 
 /**
- * Список активов для экрана отправки.
+ * Asset list for the send screen.
  *
- * Берёт тот же источник, что главный экран и раздел Assets: для записи
- * справочника — `users.assets` с сервера, иначе — снимок локальной сессии.
+ * Same source as the home screen and Assets: for a directory record,
+ * `users.assets` from the server; otherwise the local session snapshot.
  */
 export function useSendAssets(): ISendAssets {
   const snapshot = useWalletSnapshot()

@@ -5,49 +5,49 @@ import { InsecureRpcUrlError, InvalidArgumentError, InvalidRpcUrlError } from '@
 import { assertValidExplorerUrl, assertValidRpcUrl, assertValidRpcUrls } from './rpc-url'
 
 describe('assertValidRpcUrl', () => {
-  it('принимает https', () => {
+  it('accepts https', () => {
     expect(() => {
       assertValidRpcUrl('https://ethereum-rpc.publicnode.com')
     }).not.toThrow()
   })
 
-  it('принимает wss', () => {
+  it('accepts wss', () => {
     expect(() => {
       assertValidRpcUrl('wss://node.example.com/ws')
     }).not.toThrow()
   })
 
-  it('отвергает открытый http', () => {
+  it('rejects plain http', () => {
     expect(() => {
       assertValidRpcUrl('http://node.example.com')
     }).toThrow(InsecureRpcUrlError)
   })
 
-  it('отвергает незащищённый websocket', () => {
+  it('rejects an unsecured websocket', () => {
     expect(() => {
       assertValidRpcUrl('ws://node.example.com')
     }).toThrow(InsecureRpcUrlError)
   })
 
-  it('отвергает file и прочие локальные схемы', () => {
+  it('rejects file and other local schemes', () => {
     expect(() => {
       assertValidRpcUrl('file:///etc/passwd')
     }).toThrow(InsecureRpcUrlError)
   })
 
-  it('отвергает javascript: как вектор исполнения кода', () => {
+  it('rejects javascript: as a code-execution vector', () => {
     expect(() => {
       assertValidRpcUrl('javascript:alert(1)')
     }).toThrow(InsecureRpcUrlError)
   })
 
-  it('отвергает строку, не являющуюся URL', () => {
+  it('rejects a string that is not a URL', () => {
     expect(() => {
-      assertValidRpcUrl('не url')
+      assertValidRpcUrl('not-a-url')
     }).toThrow(InvalidRpcUrlError)
   })
 
-  it('отвергает пустую строку', () => {
+  it('rejects an empty string', () => {
     expect(() => {
       assertValidRpcUrl('')
     }).toThrow(InvalidRpcUrlError)
@@ -55,19 +55,19 @@ describe('assertValidRpcUrl', () => {
 })
 
 describe('assertValidRpcUrls', () => {
-  it('принимает непустой список защищённых адресов', () => {
+  it('accepts a non-empty list of secured addresses', () => {
     expect(() => {
       assertValidRpcUrls(['https://a.example.com', 'wss://b.example.com'])
     }).not.toThrow()
   })
 
-  it('отвергает пустой список', () => {
+  it('rejects an empty list', () => {
     expect(() => {
       assertValidRpcUrls([])
     }).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает список, где незащищён хотя бы один адрес', () => {
+  it('rejects a list where at least one address is unsecured', () => {
     expect(() => {
       assertValidRpcUrls(['https://a.example.com', 'http://b.example.com'])
     }).toThrow(InsecureRpcUrlError)
@@ -75,19 +75,19 @@ describe('assertValidRpcUrls', () => {
 })
 
 describe('assertValidExplorerUrl', () => {
-  it('принимает https', () => {
+  it('accepts https', () => {
     expect(() => {
       assertValidExplorerUrl('https://etherscan.io')
     }).not.toThrow()
   })
 
-  it('отвергает http', () => {
+  it('rejects http', () => {
     expect(() => {
       assertValidExplorerUrl('http://etherscan.io')
     }).toThrow(InsecureRpcUrlError)
   })
 
-  it('отвергает wss: обозреватель открывается в браузере, а не по сокету', () => {
+  it('rejects wss: the explorer opens in a browser, not over a socket', () => {
     expect(() => {
       assertValidExplorerUrl('wss://etherscan.io')
     }).toThrow(InsecureRpcUrlError)

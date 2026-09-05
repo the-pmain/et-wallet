@@ -1,6 +1,6 @@
-/* Примитивы кодировки живут в `core/abi`: они одинаковы для любого
-   контракта. Здесь они реэкспортируются, чтобы потребители модуля
-   предметов не знали о двух источниках. */
+/* Encoding primitives live in `core/abi`: they are the same for any
+   contract. They are re-exported here so item-module consumers do
+   not know about two sources. */
 export {
   decodeAddress,
   decodeBool,

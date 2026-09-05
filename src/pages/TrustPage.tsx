@@ -15,22 +15,22 @@ import {
 } from '@/shared/ui'
 
 /**
- * Чему приходится доверять, пользуясь кошельком в браузере.
+ * What you have to trust when using a wallet in the browser.
  *
- * ЗАЧЕМ ОТДЕЛЬНЫЙ ЭКРАН. Всё остальное в кошельке защищает средства
- * от чужих действий: шифрование, подтверждения, предупреждения
- * о получателе. Здесь речь о том, чего кошелёк защитить не может
- * в принципе, — о доверии к тому, кто раздаёт его код. Умолчать об этом
- * значило бы обещать безопасность, которой у веб-приложения нет.
+ * WHY A SEPARATE SCREEN. Everything else in the wallet protects funds
+ * from other people's actions: encryption, confirmations, recipient
+ * warnings. This page is about what the wallet cannot protect at all —
+ * trust in whoever serves its code. Staying silent would promise a
+ * kind of safety a web app does not have.
  *
- * ПОЧЕМУ НЕ ВТОРЫМ ПРЕДУПРЕЖДЕНИЕМ НА ПЕРВОМ ЭКРАНЕ. Там уже стоит
- * предупреждение о seed-фразе, и оно важнее в тот момент: человек
- * создаёт кошелёк. Два блока одинакового веса рядом соперничают
- * за внимание, и читатель пропускает оба.
+ * WHY NOT A SECOND WARNING ON THE FIRST SCREEN. That screen already
+ * warns about the seed phrase, and that warning matters more at that
+ * moment: the person is creating a wallet. Two blocks of equal weight
+ * compete for attention, and the reader skips both.
  *
- * ЗДЕСЬ НЕТ ПРИЗЫВА «НЕ ПОЛЬЗУЙТЕСЬ». Названы риск, его величина
- * и то, что с ним делать. Решение принимает владелец средств; кошелёк
- * обязан дать ему сведения, а не выбирать за него.
+ * THERE IS NO "DO NOT USE THIS" CALL. The risk, its size, and what to
+ * do about it are named. The owner of the funds decides; the wallet
+ * must inform, not choose for them.
  */
 export function TrustPage() {
   return (
@@ -56,18 +56,17 @@ export function TrustPage() {
       </Alert>
 
       {/*
-        ТРИ РАЗДЕЛА СТРАНИЦЫ ОЗНАЧАЮТ ПРОТИВОПОЛОЖНОЕ И ОБЯЗАНЫ
-        РАЗЛИЧАТЬСЯ НА ВИД.
+        THE THREE SECTIONS MEAN OPPOSITE THINGS AND MUST LOOK DIFFERENT.
 
-        Прежде «что защищено», «чего защитить нельзя» и «как снизить
-        риск» шли тремя одинаковыми карточками подряд. Страница
-        существует ради того, чтобы владелец удержал в голове модель
-        угрозы, а одинаковые блоки эту модель сглаживают: читается
-        сплошной текст, из которого не видно, где граница защищённого.
+        "What is protected", "what cannot be protected", and "how to
+        reduce the risk" used to be three identical cards in a row.
+        The page exists so the owner can hold a threat model in mind;
+        identical blocks flatten that model into a wall of text with
+        no visible boundary.
 
-        Цвета взяты из смысловой шкалы риска и продублированы значком
-        в заголовке: цвет как единственный признак недоступен людям
-        с нарушением цветовосприятия.
+        Colors come from the semantic risk scale and are doubled by an
+        icon in the heading: color alone is unavailable to people with
+        impaired color vision.
       */}
       <Card className="border-risk-low/40">
         <CardHeader>

@@ -31,17 +31,17 @@ const ETH_HOLDING = {
 }
 
 describe('assets', () => {
-  it('пустой ввод даёт пустую витрину', () => {
+  it('empty input yields an empty showcase', () => {
     expect(parseAssets(null)).toEqual(emptyAssets())
     expect(parseAssets(undefined)).toEqual(emptyAssets())
     expect(parseAssets([])).toEqual(emptyAssets())
   })
 
-  it('принимает витрину из остатков без оценки', () => {
+  it('accepts a showcase of balances without valuation', () => {
     expect(parseAssets(ETH_HOLDING)).toEqual(ETH_HOLDING)
   })
 
-  it('игнорирует устаревшие поля оценки', () => {
+  it('ignores stale valuation fields', () => {
     expect(
       parseAssets({
         ...ETH_HOLDING,
@@ -58,13 +58,13 @@ describe('assets', () => {
     ).toEqual(ETH_HOLDING)
   })
 
-  it('отвергает тело без валюты и списка', () => {
+  it('rejects a body without currency and list', () => {
     expect(readAssetsPayload(undefined)).toBeNull()
     expect(readAssetsPayload({ quoteCurrency: 'EUR' })).toBeNull()
     expect(readAssetsPayload({ ...ETH_HOLDING, tokens: [{ symbol: 'ETH' }] })).toBeNull()
   })
 
-  it('стартовая витрина — нулевые остатки и только хранимые поля', () => {
+  it('starting showcase is zero balances and stored fields only', () => {
     const assets = createStartingAssets(new Date('2026-08-21T00:00:00.000Z'))
     const serialized = JSON.stringify(assets)
 
@@ -96,7 +96,7 @@ describe('assets', () => {
     }
   })
 
-  it('sanitizeAssets вырезает оценку из старой записи', () => {
+  it('sanitizeAssets strips valuation from an old record', () => {
     const dirty = {
       quoteCurrency: 'USD',
       updatedAt: '2026-08-21T00:00:00.000Z',
@@ -134,7 +134,7 @@ describe('assets', () => {
     expect(JSON.stringify(cleaned)).not.toMatch(/priceUsd|valueUsd|totalValueUsd|change24hPercent/u)
   })
 
-  it('withZeroTokenBalances обнуляет любой пришедший остаток', () => {
+  it('withZeroTokenBalances zeros any incoming balance', () => {
     const zeroed = withZeroTokenBalances({
       quoteCurrency: 'USD',
       updatedAt: '2026-08-21T00:00:00.000Z',

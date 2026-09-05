@@ -1,13 +1,14 @@
 import { MemoryStorageService } from '@/core'
 
 /**
- * Хранилище в памяти для тестов.
+ * In-memory store for tests.
  *
- * Псевдоним `MemoryStorageService` из ядра. Отдельная реализация здесь
- * существовала до того, как хранилище в памяти понадобилось приложению
- * для сессионного режима; две копии одного кода неизбежно разошлись бы,
- * и тесты перестали бы проверять то, что работает в приложении.
+ * An alias of `MemoryStorageService` from the core. A separate
+ * implementation existed here before in-memory storage was needed
+ * by the app for session mode; two copies of one code would
+ * inevitably drift, and tests would stop checking what the app
+ * actually runs.
  *
- * Имя сохранено, чтобы не переписывать обращения в двух десятках тестов.
+ * The name is kept so two dozen tests do not have to be rewritten.
  */
 export class InMemoryStorageService extends MemoryStorageService {}

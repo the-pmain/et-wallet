@@ -1,52 +1,50 @@
 /**
- * ВРЕМЕННЫЕ ПОСЛАБЛЕНИЯ ДЛЯ УСКОРЕННОГО ТЕСТИРОВАНИЯ.
+ * Temporary relaxations for faster testing.
  *
- * ЭТОТ ФАЙЛ — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ ОНИ ВКЛЮЧАЮТСЯ И ВЫКЛЮЧАЮТСЯ.
- * Код защит не удалён: он остаётся на месте и включается обратно
- * сменой одного значения. Удаление вместо флага означало бы, что
- * возврат — это восстановление по памяти через три экрана, а не правка
- * строки.
+ * THIS FILE IS THE ONLY PLACE THEY ARE TURNED ON AND OFF.
+ * The protection code is not deleted: it stays in place and turns back
+ * on by flipping one value. Deleting instead of a flag would make
+ * restore a memory exercise across three screens, not a one-line edit.
  *
- * ЧЕМ ИМЕННО ЖЕРТВУЕМ. Каждое послабление ниже снимает защиту, ради
- * которой был написан соответствующий экран. Ни одно из них не должно
- * попасть в сборку, которой пользуются с настоящими средствами:
+ * WHAT IS GIVEN UP. Each relaxation below removes a protection that
+ * the matching screen was written for. None of them may ship in a
+ * build used with real funds:
  *
- * - без импорта по seed-фразе исчезает единственный способ
- *   восстановления. Забытый пароль после этого означает, что
- *   расшифровать хранилище нечем, и кошелёк потерян вместе с ним.
+ * - hiding seed-phrase import removes the only recovery path. A
+ *   forgotten password then leaves nothing to decrypt storage with,
+ *   and the wallet is lost with it.
  *
- * Сборка в боевом режиме с включённым флагом останавливается: см.
+ * A production build with the flag on is stopped: see
  * `assertTestModeIsDisabledInProduction`.
  */
 
 /**
- * Включены ли временные послабления.
+ * Whether temporary relaxations are on.
  *
- * ВЕРНУЛОСЬ В `false` ПО УКАЗАНИЮ ВЛАДЕЛЬЦА: вход по seed-фразе
- * работает.
+ * SET BACK TO `false` BY THE OWNER: seed-phrase sign-in works.
  *
- * Проверка записи фразы сюда больше не относится — она выключена
- * постоянным решением, см. `APP_CONFIG.requiresSeedConfirmation`.
+ * Phrase-writing confirmation no longer belongs here — it is off by a
+ * permanent decision, see `APP_CONFIG.requiresSeedConfirmation`.
  */
 export const IS_TEST_MODE = false
 
-/** Какие именно защиты сняты. Перечислены явно, а не подразумеваются. */
+/** Which protections are lifted. Listed explicitly, not implied. */
 export const TEST_MODE = {
   /**
-   * Скрытие входа по seed-фразе.
+   * Hide seed-phrase sign-in.
    *
-   * Экран импорта и маршрут к нему недоступны. Восстановление кошелька
-   * при этом невозможно ничем.
+   * The import screen and its route are unavailable. Wallet recovery
+   * is then impossible by any means.
    */
   hideSeedImport: IS_TEST_MODE,
 } as const
 
 /**
- * Останавливает боевую сборку с включёнными послаблениями.
+ * Stops a production build with relaxations enabled.
  *
- * Вызывается точкой входа приложения. Проверка нужна именно в бою:
- * забытый флаг — это не гипотетическая оплошность, а обычный способ
- * потерять чужие деньги.
+ * Called from the application entry. The check belongs in production:
+ * a forgotten flag is not a hypothetical slip — it is a common way to
+ * lose someone else's money.
  */
 export function assertTestModeIsDisabledInProduction(): void {
   if (IS_TEST_MODE && import.meta.env.PROD) {

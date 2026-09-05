@@ -3,20 +3,20 @@ import type { FastifyInstance } from 'fastify'
 import type { CatalogService } from '../catalog/CatalogService.ts'
 
 /**
- * Проверка версии приложения.
+ * App version check.
  *
- * ОТВЕТ НЕ СОДЕРЖИТ АДРЕСА ЗАГРУЗКИ. Сервис, сообщающий «скачайте
- * обновление отсюда», — готовый способ увести пользователя
- * на поддельный установщик: достаточно однажды подменить строку
- * в ответе. Адрес магазина расширений зашит в клиенте.
+ * THE RESPONSE HAS NO DOWNLOAD URL. A service that says "download the
+ * update from here" is a ready way to send the user to a fake
+ * installer: one swapped string in the response is enough. The store
+ * URL is baked into the client.
  *
- * ЭТО ЗАЯВЛЕНИЕ О ПОДДЕРЖКЕ, А НЕ ВЫКЛЮЧАТЕЛЬ. Некастодиальный кошелёк
- * обязан работать, даже когда его сервис недоступен или враждебен.
- * Клиент показывает предупреждение и продолжает работать.
+ * THIS IS A SUPPORT STATEMENT, NOT A KILL SWITCH. A non-custodial
+ * wallet must work even when its service is down or hostile.
+ * The client shows a warning and keeps working.
  *
- * ВЕРСИЯ КЛИЕНТА НЕОБЯЗАТЕЛЬНА. Без неё сравнивать не с чем, и признаки
- * поддержки возвращаются как `null`: «не знаем» нельзя подменять
- * ни на «всё в порядке», ни на «пора обновляться».
+ * CLIENT VERSION IS OPTIONAL. Without it there is nothing to compare,
+ * and support flags return `null`: "we do not know" must not become
+ * "all is well" or "time to update".
  */
 
 const VERSION_QUERY = {

@@ -22,7 +22,6 @@ function renderApp() {
   )
 }
 
-/** Вводит имя, пароль и нажимает разблокировку. */
 async function attempt(password: string): Promise<void> {
   const user = userEvent.setup()
   const nameField = await screen.findByLabelText('Email')
@@ -35,7 +34,6 @@ async function attempt(password: string): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'Unlock' }))
 }
 
-/** Открывает экран входа: создаёт кошелёк и блокирует его. */
 async function openLockedWallet(): Promise<void> {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
   services.onboarding.lock()
@@ -49,8 +47,8 @@ beforeEach(async () => {
   await openLockedWallet()
 })
 
-describe('Вход без ограничения попыток', () => {
-  it('неудача не закрывает ввод и не показывает счётчик', async () => {
+describe('Sign-in without attempt throttling', () => {
+  it('a failure does not close the form or show a counter', async () => {
     renderApp()
 
     await attempt(WRONG_PASSWORD)
@@ -64,7 +62,7 @@ describe('Вход без ограничения попыток', () => {
     expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
-  it('много неудач подряд оставляют форму открытой', async () => {
+  it('many failures in a row leave the form open', async () => {
     renderApp()
 
     for (let index = 0; index < 8; index += 1) {
@@ -77,7 +75,7 @@ describe('Вход без ограничения попыток', () => {
     expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
-  it('верный пароль открывает кошелёк после нескольких неудач', async () => {
+  it('the correct password opens the wallet after several failures', async () => {
     renderApp()
 
     for (let index = 0; index < 8; index += 1) {
@@ -89,7 +87,7 @@ describe('Вход без ограничения попыток', () => {
     expect(await screen.findByText('Account 1')).toBeInTheDocument()
   })
 
-  it('счётчик остаётся пустым', async () => {
+  it('the throttle counter stays empty', async () => {
     renderApp()
 
     await attempt(WRONG_PASSWORD)
@@ -102,8 +100,8 @@ describe('Вход без ограничения попыток', () => {
   })
 })
 
-describe('Подтверждение пароля не закрывает вход', () => {
-  it('неудачи проверки не мешают разблокировать кошелёк', async () => {
+describe('Password confirmation does not lock sign-in', () => {
+  it('verify failures do not prevent unlocking the wallet', async () => {
     for (let index = 0; index < 8; index += 1) {
       await expect(services.onboarding.verifyPassword(WRONG_PASSWORD)).resolves.toBe(false)
     }

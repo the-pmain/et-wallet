@@ -1,15 +1,15 @@
 declare const brandSymbol: unique symbol
 
 /**
- * Номинальная типизация поверх структурной системы типов TypeScript.
+ * Nominal typing on top of TypeScript's structural system.
  *
- * Зачем это кошельку: `string` — слишком широкий тип для адреса, приватного
- * ключа и хэша транзакции. Без брендирования компилятор допустит передачу
- * приватного ключа туда, где ожидается адрес, — обе величины являются строками.
- * Брендированные типы делают такую ошибку ошибкой компиляции.
+ * Why a wallet needs this: `string` is too wide for an address, a
+ * private key, and a transaction hash. Without branding the compiler
+ * would allow passing a private key where an address is expected —
+ * both are strings. Branded types make that a compile error.
  *
- * Конкретные типы (`Address`, `TxHash` и т. п.) будут объявлены в своих доменных
- * модулях на соответствующих этапах. Здесь только базовый механизм.
+ * Concrete types (`Address`, `TxHash`, and so on) are declared in
+ * their domain modules. This file is only the base mechanism.
  *
  * @example
  * type Address = Brand<string, 'Address'>

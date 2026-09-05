@@ -9,51 +9,51 @@ const SENDER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const PEER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
 describe('findRecipientRisks', () => {
-  it('не находит замечаний у обычного адреса с контрольной суммой', () => {
+  it('finds no remarks on an ordinary checksummed address', () => {
     expect(findRecipientRisks(PEER, SENDER)).toHaveLength(0)
   })
 
-  it('предупреждает об адресе сжигания', () => {
-    /* Средства уйдут безвозвратно: получить их не сможет никто. */
+  it('warns about a burn address', () => {
+    /* The funds leave for good: no one will be able to get them. */
     expect(findRecipientRisks(ZERO_ADDRESS, SENDER)).toContain(RECIPIENT_RISK.BurnAddress)
   })
 
-  it('предупреждает о переводе самому себе', () => {
+  it('warns about a transfer to oneself', () => {
     expect(findRecipientRisks(SENDER, SENDER)).toContain(RECIPIENT_RISK.SelfTransfer)
   })
 
-  it('замечает перевод себе независимо от регистра записи', () => {
+  it('notices a self-transfer regardless of address case', () => {
     const lowercase = SENDER.toLowerCase() as Address
 
     expect(findRecipientRisks(lowercase, SENDER)).toContain(RECIPIENT_RISK.SelfTransfer)
   })
 
-  it('предупреждает об адресе без контрольной суммы', () => {
-    /* Контрольная сумма выражена регистром букв: адрес целиком
-       в нижнем регистре её не несёт, и опечатка не обнаруживается. */
+  it('warns about an address without a checksum', () => {
+    /* The checksum is expressed in letter case: an all-lowercase
+       address carries none, and a typo is not detected. */
     const lowercase = PEER.toLowerCase() as Address
 
     expect(findRecipientRisks(lowercase, SENDER)).toContain(RECIPIENT_RISK.NoChecksum)
   })
 
-  it('предупреждает об адресе целиком в верхнем регистре', () => {
+  it('warns about an all-uppercase address', () => {
     const uppercase = `0x${PEER.slice(2).toUpperCase()}` as Address
 
     expect(findRecipientRisks(uppercase, SENDER)).toContain(RECIPIENT_RISK.NoChecksum)
   })
 
-  it('не предупреждает об адресе из одних цифр', () => {
-    /* Такой адрес неотличим от записанного с контрольной суммой:
-       требовать иного значило бы предупреждать без причины, а ложная
-       тревога приучает не читать предупреждения. */
+  it('does not warn about an all-digit address', () => {
+    /* Such an address is indistinguishable from a checksummed one:
+       demanding otherwise would warn without cause, and a false
+       alarm trains people not to read warnings. */
     const digitsOnly = `0x${'1234567890'.repeat(4)}` as Address
 
     expect(findRecipientRisks(digitsOnly, SENDER)).not.toContain(RECIPIENT_RISK.NoChecksum)
   })
 
-  it('находит несколько замечаний сразу', () => {
-    /* Адрес сжигания `0x…dEaD`, записанный в нижнем регистре: и уход
-       средств в никуда, и отсутствие контрольной суммы. */
+  it('finds several remarks at once', () => {
+    /* The burn address `0x…dEaD` written in lowercase: both funds
+       going nowhere and a missing checksum. */
     const risks = findRecipientRisks(DEAD_ADDRESS.toLowerCase(), SENDER)
 
     expect(risks).toContain(RECIPIENT_RISK.BurnAddress)
@@ -61,45 +61,43 @@ describe('findRecipientRisks', () => {
   })
 })
 
-describe('Перевод актива в его собственный контракт', () => {
+describe('Sending an asset to its own contract', () => {
   const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-  it('получатель, совпавший с контрактом токена, помечается', () => {
-    /* Самая частая безвозвратная ошибка с токенами: адрес контракта
-       копируют из обозревателя или из списка активов и вставляют
-       в поле получателя. */
+  it('a recipient that matches the token contract is flagged', () => {
+    /* The most common irreversible token mistake: the contract
+       address is copied from an explorer or the asset list and
+       pasted into the recipient field. */
     const risks = findRecipientRisks(TOKEN, SENDER, { assetContract: TOKEN })
 
     expect(risks).toContain(RECIPIENT_RISK.AssetContractRecipient)
   })
 
-  it('регистр адреса значения не имеет', () => {
+  it('address case does not matter', () => {
     const risks = findRecipientRisks(TOKEN.toLowerCase(), SENDER, { assetContract: TOKEN })
 
     expect(risks).toContain(RECIPIENT_RISK.AssetContractRecipient)
   })
 
-  it('другой контракт этого замечания не вызывает', () => {
-    /* Перевод токена на адрес другого контракта бывает законным:
-       биржи и хранилища принимают такие переводы. */
+  it('a different contract does not trigger this remark', () => {
+    /* Sending a token to another contract can be lawful: exchanges
+       and vaults accept such transfers. */
     const risks = findRecipientRisks(PEER, SENDER, { assetContract: TOKEN })
 
     expect(risks).not.toContain(RECIPIENT_RISK.AssetContractRecipient)
   })
 
-  it('без сведений об активе замечание не появляется', () => {
-    /* Перевод нативной валюты: контракта у неё нет, и сравнивать
-       не с чем. */
+  it('without asset details the remark does not appear', () => {
+    /* A native-currency transfer: it has no contract to compare. */
     const risks = findRecipientRisks(TOKEN, SENDER)
 
     expect(risks).not.toContain(RECIPIENT_RISK.AssetContractRecipient)
   })
 
-  it('замечание идёт первым', () => {
-    /* Оно означает заведомую потерю, а не повод задуматься, и должно
-       быть замечено раньше остальных: адрес контракта записан
-       с контрольной суммой не всегда, и «нет контрольной суммы»
-       не должно оказаться выше. */
+  it('the remark comes first', () => {
+    /* It means a certain loss, not a reason to think twice, and
+       must be seen before the others: a contract address is not
+       always checksummed, and "no checksum" must not rank higher. */
     const risks = findRecipientRisks(TOKEN.toLowerCase(), SENDER, { assetContract: TOKEN })
 
     expect(risks[0]).toBe(RECIPIENT_RISK.AssetContractRecipient)

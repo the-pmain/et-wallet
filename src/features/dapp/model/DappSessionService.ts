@@ -13,45 +13,42 @@ import {
   type Unsubscribe,
 } from '@/core'
 
-/** Предложение подключения, ожидающее решения. */
 export interface IPendingProposal {
   readonly id: string
   readonly dapp: IDappSession['dapp']
   readonly chainIds: readonly ChainId[]
 }
 
-/** Запрос вместе с разбором его последствий. */
 export interface IPendingRequest {
   readonly request: IDappRequest
   readonly risks: readonly IDappRiskFinding[]
 
   /**
-   * Итог прогона вызова на узле.
+   * Result of running the call on the node.
    *
-   * `null` — прогон ещё идёт. ЭКРАН НЕ ЖДЁТ ЕГО: подтверждение
-   * показывается сразу, а итог доходит отдельным обновлением. Задержись
-   * экран на время ответа узла — человек решил бы, что кошелёк
-   * не откликнулся, и нажал бы в приложении ещё раз.
+   * `null` — the run is still going. THE SCREEN DOES NOT WAIT FOR IT:
+   * confirmation is shown at once, and the result arrives as a later
+   * update. If the screen paused for the node, the person would think
+   * the wallet had hung and press again in the app.
    */
   readonly preflight: IPreflightResult | null
 }
 
-/** Снимок состояния подключений для интерфейса. */
 export interface IDappSnapshot {
   readonly isReady: boolean
 
-  /** Причина, по которой транспорт недоступен. `null`, если доступен. */
+  /** Why the transport is unavailable. `null` if it is available. */
   readonly error: string | null
 
   readonly sessions: readonly IDappSession[]
 
-  /** Предложение, ожидающее решения. Одно за раз: очередь запутала бы. */
+  /** Proposal awaiting a decision. One at a time: a queue would confuse. */
   readonly proposal: IPendingProposal | null
 
   readonly request: IPendingRequest | null
 }
 
-/** Пустой снимок. Отдельная константа ради стабильности ссылки. */
+/** Empty snapshot. A separate constant so the reference stays stable. */
 const EMPTY_SNAPSHOT: IDappSnapshot = {
   isReady: false,
   error: null,
@@ -60,47 +57,43 @@ const EMPTY_SNAPSHOT: IDappSnapshot = {
   request: null,
 }
 
-/** Зависимости сервиса. */
 export interface IDappSessionServiceDependencies {
   readonly transport: ISessionTransport
   readonly logger: ILogger
 
-  /** Адреса кошелька, доступные приложениям. */
   readonly getAddresses: () => readonly Address[]
 
-  /** Активная сеть кошелька. Нужна для сверки с сетью запроса. */
+  /** Active wallet network. Used to compare with the request network. */
   readonly getActiveChainId: () => ChainId | null
 
-  /** Сети, которые кошелёк готов предоставить приложению. */
   readonly getAvailableChainIds: () => readonly ChainId[]
 
-  /** Выполняет одобренный запрос и возвращает результат для приложения. */
   readonly execute: (request: IDappRequest) => Promise<string>
 
   /**
-   * Прогоняет транзакцию запроса на узле до подписи.
+   * Runs the request transaction on the node before signing.
    *
-   * Необязательна: подключения работают и там, где узла нет. Её
-   * отсутствие означает «не проверялось» и показывается именно так.
+   * Optional: connections work where there is no node. Its absence
+   * means "not checked" and is shown that way.
    */
   readonly preflight?: (request: IDappRequest) => Promise<IPreflightResult>
 }
 
 /**
- * Подключения к приложениям.
+ * Connections to applications.
  *
- * ОДНО ПРЕДЛОЖЕНИЕ И ОДИН ЗАПРОС ЗА РАЗ. Очередь из наложенных друг
- * на друга экранов подтверждения — это способ подписать не то: человек
- * отвечает на верхний, а подтверждает нижний. Пришедшее вторым
- * отклоняется с внятной причиной, и приложение вправе повторить.
+ * ONE PROPOSAL AND ONE REQUEST AT A TIME. A stack of confirmation
+ * screens is a way to sign the wrong thing: the person answers the
+ * top one and confirms the bottom. A second arrival is rejected with
+ * a clear reason, and the app may retry.
  *
- * ЗАПРОС ОТ ЧУЖОГО ИМЕНИ ОТКЛОНЯЕТСЯ БЕЗ ВОПРОСА К ПОЛЬЗОВАТЕЛЮ.
- * Подписать транзакцию с чужим отправителем всё равно нечем, а лишний
- * экран приучает нажимать «подтвердить», не читая.
+ * A REQUEST IN SOMEONE ELSE'S NAME IS REJECTED WITHOUT ASKING.
+ * There is nothing to sign a foreign sender with, and an extra
+ * screen trains people to press "confirm" without reading.
  *
- * СЕРВИС НЕ ПОДПИСЫВАЕТ САМ. Выполнение одобренного запроса передано
- * снаружи: ключи живут в сессии кошелька, и второй путь к ним
- * означал бы вторую точку отказа.
+ * THE SERVICE DOES NOT SIGN ITSELF. Execution of an approved request
+ * is injected: keys live in the wallet session, and a second path
+ * to them would be a second point of failure.
  */
 export class DappSessionService {
   readonly #transport: ISessionTransport
@@ -111,7 +104,6 @@ export class DappSessionService {
 
   #snapshot: IDappSnapshot = EMPTY_SNAPSHOT
 
-  /** Попытка подъёма транспорта уже выполнялась. */
   #hasAttempted = false
 
   constructor(dependencies: IDappSessionServiceDependencies) {
@@ -133,19 +125,18 @@ export class DappSessionService {
   }
 
   /**
-   * Поднимает транспорт.
+   * Starts the transport.
    *
-   * Отказ не выбрасывается наружу: раздел подключений обязан открыться
-   * и объяснить, почему он не работает, а не остаться пустым экраном.
+   * Failure is not thrown outward: the connections section must open
+   * and explain why it does not work, not stay a blank screen.
    */
   async init(): Promise<void> {
     /*
-      Повторная попытка после отказа не выполняется автоматически.
+      A retry after failure is not automatic.
 
-      Транспорт отказывает по причинам, которые сами не проходят:
-      не задан ключ проекта, нет сети. Повтор при каждом обращении
-      превратился бы в бесконечный круг попыток, а вместе с ним —
-      в подвисающий экран.
+      The transport fails for reasons that do not heal themselves:
+      missing project key, no network. Retrying on every call would
+      become an endless loop and a hung screen.
     */
     if (this.#snapshot.isReady || this.#hasAttempted) {
       return
@@ -171,21 +162,19 @@ export class DappSessionService {
     }
   }
 
-  /** Подключается по строке приглашения. */
   async pair(uri: string): Promise<void> {
     await this.#transport.pair(uri.trim())
   }
 
   /**
-   * Сообщает подключённым приложениям текущие сеть и аккаунт кошелька.
+   * Tells connected apps the wallet's current network and account.
    *
-   * ВЫЗЫВАЕТСЯ ПРИ СМЕНЕ СОСТОЯНИЯ КОШЕЛЬКА, а не по расписанию: событие
-   * должно совпасть с действием владельца, иначе приложение узнаёт
-   * о переключении с запозданием и успевает подготовить операцию
-   * для прежней сети.
+   * CALLED ON WALLET STATE CHANGE, not on a timer: the event must
+   * coincide with the owner's action, or the app learns of the switch
+   * late and prepares an operation for the previous network.
    *
-   * НИЧЕГО НЕ ДЕЛАЕТ ДО ГОТОВНОСТИ ТРАНСПОРТА И БЕЗ АКТИВНОЙ СЕТИ:
-   * уведомлять некому и нечем.
+   * DOES NOTHING UNTIL THE TRANSPORT IS READY AND THERE IS AN ACTIVE
+   * NETWORK: there is no one and nothing to notify.
    */
   async notifyWalletState(): Promise<void> {
     if (!this.#snapshot.isReady) {
@@ -201,16 +190,15 @@ export class DappSessionService {
     try {
       await this.#transport.notifyStateChange(chainId, this.#dependencies.getAddresses())
     } catch (error) {
-      /* Уведомление — удобство, а не операция со средствами: его отказ
-         не должен всплывать ошибкой в кошельке. Причина уходит
-         в журнал. */
+      /* Notification is a convenience, not a funds operation: its
+         failure must not surface as a wallet error. The reason goes
+         to the log. */
       this.#logger.warn('Connected applications could not be notified of the state change', {
         reason: error instanceof Error ? error.message : String(error),
       })
     }
   }
 
-  /** Отвечает на предложение подключения. */
   async respondToProposal(isApproved: boolean): Promise<void> {
     const proposal = this.#snapshot.proposal
 
@@ -227,10 +215,9 @@ export class DappSessionService {
     }
 
     /*
-      Приложению выдаются только те сети, которые есть в кошельке.
-      Согласиться на неизвестную сеть значило бы пообещать подпись
-      там, где кошелёк не может ни оценить комиссию, ни показать
-      баланс.
+      The app is given only networks the wallet has. Agreeing to an
+      unknown network would promise a signature where the wallet
+      cannot estimate a fee or show a balance.
     */
     const available = this.#dependencies.getAvailableChainIds()
     const chainIds = proposal.chainIds.filter((chainId) => available.includes(chainId))
@@ -243,7 +230,6 @@ export class DappSessionService {
     this.#publish({ ...this.#snapshot, sessions: this.#transport.listSessions() })
   }
 
-  /** Отвечает на запрос подписи. */
   async respondToRequest(isApproved: boolean): Promise<void> {
     const pending = this.#snapshot.request
 
@@ -274,8 +260,8 @@ export class DappSessionService {
 
       this.#logger.warn('The application request could not be carried out', { reason: message })
 
-      /* Приложению отправляется отказ, а не молчание: иначе оно ждёт
-         ответа и подталкивает пользователя нажать ещё раз. */
+      /* The app is sent a rejection, not silence: otherwise it waits
+         and nudges the user to press again. */
       await this.#transport.respondToRequest(pending.request.id, {
         kind: 'rejected',
         reason: message,
@@ -283,14 +269,12 @@ export class DappSessionService {
     }
   }
 
-  /** Разрывает подключение. */
   async disconnect(sessionId: string): Promise<void> {
     await this.#transport.disconnect(sessionId)
 
     this.#publish({ ...this.#snapshot, sessions: this.#transport.listSessions() })
   }
 
-  /** Закрывает транспорт и сбрасывает состояние. */
   async destroy(): Promise<void> {
     for (const unsubscribe of this.#subscriptions) {
       unsubscribe()
@@ -300,13 +284,12 @@ export class DappSessionService {
 
     await this.#transport.destroy()
 
-    /* Признак попытки сбрасывается вместе с состоянием: следующее
-       открытие раздела вправе попробовать снова. */
+    /* The attempt flag is cleared with state: the next open of the
+       section may try again. */
     this.#hasAttempted = false
     this.#publish(EMPTY_SNAPSHOT)
   }
 
-  /** Подписывается на события транспорта. */
   #listen(): void {
     this.#subscriptions.push(
       this.#transport.on('session:proposal', (proposal) => {
@@ -327,10 +310,9 @@ export class DappSessionService {
     )
   }
 
-  /** Принимает запрос к показу либо отклоняет его сразу. */
   async #acceptRequest(request: IDappRequest): Promise<void> {
     if (this.#snapshot.request !== null) {
-      /* Второй экран поверх первого — способ подписать не то. */
+      /* A second screen on top of the first is a way to sign the wrong thing. */
       await this.#transport.respondToRequest(request.id, {
         kind: 'rejected',
         reason: 'The wallet is busy with another request',
@@ -347,8 +329,8 @@ export class DappSessionService {
         : payload.transaction.from
 
     if (!isKnownSender(sender, this.#dependencies.getAddresses())) {
-      /* Подписать чужим адресом всё равно нечем; лишний экран приучает
-         нажимать «подтвердить», не читая. */
+      /* There is nothing to sign a foreign address with; an extra
+         screen trains people to press "confirm" without reading. */
       await this.#transport.respondToRequest(request.id, {
         kind: 'rejected',
         reason: 'The request targets an account that does not exist in this wallet',
@@ -370,12 +352,12 @@ export class DappSessionService {
   }
 
   /**
-   * Прогоняет вызов запроса и дописывает итог к показанному экрану.
+   * Runs the request call and attaches the result to the shown screen.
    *
-   * ИТОГ ПРИКЛАДЫВАЕТСЯ ТОЛЬКО К ТОМУ ЖЕ ЗАПРОСУ. Пока узел отвечал,
-   * пользователь мог отклонить запрос, а приложение — прислать другой;
-   * итог проверки чужого вызова, показанный рядом с новым, был бы
-   * прямым обманом.
+   * THE RESULT IS APPLIED ONLY TO THE SAME REQUEST. While the node
+   * answered, the user may have rejected it and the app sent another;
+   * a check of a foreign call shown next to a new one would be a
+   * direct lie.
    */
   async #runPreflight(request: IDappRequest): Promise<void> {
     const preflight = this.#dependencies.preflight

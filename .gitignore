@@ -1,25 +1,25 @@
-# Зависимости
+# Dependencies
 node_modules
 .pnp
 .pnp.js
 
-# Сборка
+# Build
 dist
 dist-ssr
 build/output
 *.local
 server/public
 
-# Тесты и покрытие
+# Tests and coverage
 coverage
 .vitest
 
-# Кэш инструментов
+# Tool caches
 .eslintcache
 .vite
 *.tsbuildinfo
 
-# Логи
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -27,12 +27,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Секреты. Никакие .env-файлы, кроме примера, не попадают в репозиторий.
+# Secrets. No .env files except the example enter the repository.
 .env
 .env.*
 !.env.example
 
-# Редакторы и ОС
+# Editors and OS
 .idea
 .vscode/*
 !.vscode/extensions.json
@@ -40,9 +40,9 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Сквозные проверки
+# End-to-end checks
 playwright-report
 test-results
 
-# Выгрузки строк, создаваемые при переводе интерфейса.
+# String dumps created when translating the interface.
 strings_*.txt

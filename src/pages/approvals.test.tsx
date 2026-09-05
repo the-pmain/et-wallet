@@ -23,7 +23,7 @@ const PASSWORD = 'Korova-7-Luna!'
 
 const BALANCE = 1_000_000_000_000_000_000n as Wei
 
-/** Владелец кошелька: первый адрес тестовой seed-фразы. */
+/** Wallet owner: first address of the test seed phrase. */
 const OWNER = toAddress(TEST_MNEMONIC_ADDRESSES[0] as string)
 
 const EXCHANGE = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
@@ -32,14 +32,14 @@ const PUNKS = toAddress('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D')
 
 const LATEST_BLOCK = 19_500n
 
-/** Наибольшее значение uint256: так выглядит неограниченное разрешение. */
+/** The largest uint256 value: that is how an unlimited approval looks. */
 const UNLIMITED = (1n << 256n) - 1n
 
 function word(value: bigint): string {
   return value.toString(16).padStart(64, '0')
 }
 
-/** Событие выдачи разрешения на токен. */
+/** Token-approval grant event. */
 function approval(contract: Address, spender: Address, amount: bigint): ILogEntry {
   return {
     address: contract,
@@ -52,7 +52,7 @@ function approval(contract: Address, spender: Address, amount: bigint): ILogEntr
   }
 }
 
-/** Событие разрешения на всю коллекцию. */
+/** Approval event for a whole collection. */
 function approvalForAll(contract: Address, operator: Address): ILogEntry {
   return {
     address: contract,
@@ -75,7 +75,6 @@ function renderApp() {
   )
 }
 
-/** Открывает раздел разрешений через настройки. */
 async function openApprovals(): Promise<void> {
   const user = userEvent.setup()
 
@@ -92,8 +91,8 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Разрешения: список', () => {
-  it('показывает действующее разрешение с получателем', async () => {
+describe('Approvals: list', () => {
+  it('shows a live approval and its spender', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -111,10 +110,9 @@ describe('Разрешения: список', () => {
     expect(list.getByText(new RegExp(EXCHANGE.slice(0, 6), 'u'))).toBeInTheDocument()
   })
 
-  it('отозванное разрешение не показывается', async () => {
-    /* Журнал хранит выдачу навсегда. Показать её как действующую значило
-       бы пугать владельца тем, чего нет, и обесценить настоящие
-       находки. */
+  it('a revoked approval is not shown', async () => {
+    /* The log keeps the grant forever. Showing it as live would scare
+       the owner with something that is gone and devalue real findings. */
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -127,9 +125,10 @@ describe('Разрешения: список', () => {
     expect(await screen.findByText('No active approvals found')).toBeInTheDocument()
   })
 
-  it('неограниченное разрешение выделено как опасность', async () => {
-    /* Разница между «разрешено 50 USDC» и «разрешено всё» — это разница
-       между потерей пятидесяти долларов и потерей баланса. */
+  it('an unlimited approval is marked as danger', async () => {
+    /* The difference between "50 USDC allowed" and "everything allowed"
+       is the difference between losing fifty dollars and losing the
+       balance. */
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -143,7 +142,7 @@ describe('Разрешения: список', () => {
     expect(await screen.findByText('Unlimited amount')).toBeInTheDocument()
   })
 
-  it('ограниченное разрешение показывает сумму в единицах токена', async () => {
+  it('a limited approval shows the amount in token units', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -155,11 +154,11 @@ describe('Разрешения: список', () => {
     renderApp()
     await openApprovals()
 
-    /* Пятьдесят миллионов единиц при шести знаках — это 50 USDC. */
+    /* Fifty million units at six decimals is 50 USDC. */
     expect(await screen.findByText(/50 USDC/u)).toBeInTheDocument()
   })
 
-  it('разрешение на коллекцию объясняется словами', async () => {
+  it('a collection approval is explained in words', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -175,7 +174,7 @@ describe('Разрешения: список', () => {
     ).toBeInTheDocument()
   })
 
-  it('объясняет, что разрешение не истекает само', async () => {
+  it('explains that an approval does not expire on its own', async () => {
     services.providerFactory.configure({ balance: BALANCE, latestBlock: LATEST_BLOCK })
 
     renderApp()
@@ -184,7 +183,7 @@ describe('Разрешения: список', () => {
     expect(await screen.findByText(/does not\s+expire/iu)).toBeInTheDocument()
   })
 
-  it('отказ узла не выдаётся за отсутствие разрешений', async () => {
+  it('a node failure is not shown as an empty approvals list', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -198,7 +197,7 @@ describe('Разрешения: список', () => {
   })
 })
 
-describe('Разрешения: отзыв', () => {
+describe('Approvals: revoke', () => {
   beforeEach(() => {
     services.providerFactory.configure({
       balance: BALANCE,
@@ -209,7 +208,7 @@ describe('Разрешения: отзыв', () => {
     })
   })
 
-  it('подтверждение называет контракт и получателя разрешения', async () => {
+  it('confirmation names the contract and the spender', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -222,7 +221,7 @@ describe('Разрешения: отзыв', () => {
     expect(screen.getByText(EXCHANGE)).toBeInTheDocument()
   })
 
-  it('оговаривает, что прошлые операции отзыв не отменяет', async () => {
+  it('notes that a revoke does not undo past operations', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -234,7 +233,7 @@ describe('Разрешения: отзыв', () => {
     ).toBeInTheDocument()
   })
 
-  it('отзыв требует пароля и отправляет транзакцию контракту', async () => {
+  it('revoke asks for the password and sends a transaction to the contract', async () => {
     const user = userEvent.setup()
 
     renderApp()

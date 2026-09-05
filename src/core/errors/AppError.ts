@@ -1,41 +1,43 @@
 /**
- * Базовый класс всех прикладных ошибок.
+ * Base class of every application error.
  *
- * Зачем отдельная иерархия вместо `new Error(...)`:
+ * Why a separate hierarchy instead of `new Error(...)`:
  *
- * 1. Поле `code` — стабильный машиночитаемый идентификатор. Именно по нему
- *    строится обработка ошибок и локализация. Имя класса для этого непригодно:
- *    минификатор бандла переименует классы, и `error.name` станет мусором.
+ * 1. The `code` field is a stable machine-readable identifier. Error
+ *    handling and localisation are built on it. The class name is
+ *    unfit: a bundler minifier will rename classes, and `error.name`
+ *    becomes garbage.
  *
- * 2. Разделение сообщений. `message` предназначен для разработчика и логов,
- *    пользовательский текст формируется по `code` на уровне UI. Это исключает
- *    попадание технических деталей (путей, значений, фрагментов данных)
- *    в интерфейс кошелька.
+ * 2. Split messages. `message` is for the developer and logs; user
+ *    copy is built from `code` in the UI. That keeps technical details
+ *    (paths, values, data fragments) out of the wallet interface.
  *
- * 3. `cause` сохраняет исходную ошибку, не смешивая её текст с прикладным.
+ * 3. `cause` keeps the original error without mixing its text into
+ *    the application one.
  */
 export abstract class AppError extends Error {
   /**
-   * Стабильный код ошибки. Единственный идентификатор, на который допустимо
-   * опираться в коде обработки. Формат: SCREAMING_SNAKE_CASE.
+   * Stable error code. The only identifier handling code may rely on.
+   * Format: SCREAMING_SNAKE_CASE.
    */
   abstract readonly code: string
 
   protected constructor(message: string, options?: ErrorOptions) {
     super(message, options)
 
-    /* new.target указывает на фактически инстанцируемый класс, а не на AppError.
-       Значение полезно при отладке в dev-сборке; в production полагаться на него
-       нельзя из-за минификации — для этого существует `code`. */
+    /* new.target points at the class actually instantiated, not
+       AppError. Useful when debugging a dev build; in production it
+       cannot be relied on because of minification — that is what
+       `code` is for. */
     this.name = new.target.name
   }
 }
 
 /**
- * Проверка принадлежности значения к прикладным ошибкам.
+ * Whether a value is an application error.
  *
- * `instanceof` в связке с этой функцией даёт сужение типа в блоках catch,
- * где переменная имеет тип `unknown`.
+ * Combined with `instanceof` this narrows the type in catch blocks,
+ * where the variable is `unknown`.
  */
 export function isAppError(value: unknown): value is AppError {
   return value instanceof AppError

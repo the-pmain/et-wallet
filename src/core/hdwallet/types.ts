@@ -1,38 +1,38 @@
 import type { Address, DerivationPath } from '@/core/types'
 
-/* `PUBLIC_KEY_FORMAT` перенесён в `core/address`: адрес выводится
-   и из HD-ключа, и из импортированного приватного ключа, поэтому тип
-   должен лежать в общем для них модуле. Направление зависимости —
-   `hdwallet -> address`, обратной связи нет. */
+/* `PUBLIC_KEY_FORMAT` was moved to `core/address`: an address is
+   derived both from an HD key and from an imported private key, so
+   the type must live in a module they share. The dependency
+   direction is `hdwallet -> address`; there is no reverse link. */
 
 /**
- * Аккаунт, выведенный из HD-дерева.
+ * An account derived from the HD tree.
  *
- * ПУБЛИЧНАЯ структура: приватного ключа в ней нет и быть не может.
- * Она свободно попадает в состояние UI и сериализуется. Приватный ключ
- * выдаётся отдельным методом, возвращающим `ISecretBuffer`, который
- * вызывающий обязан затереть.
+ * A PUBLIC structure: there is no private key in it and there must
+ * not be. It freely enters UI state and is serialised. The private
+ * key is issued by a separate method that returns an
+ * `ISecretBuffer`, which the caller must wipe.
  */
 export interface IHdAccount {
-  /** Индекс адреса — последний уровень пути. */
+  /** Address index — the last level of the path. */
   readonly addressIndex: number
 
-  /** Полный путь деривации. */
   readonly path: DerivationPath
 
-  /** Адрес EVM в контрольной сумме EIP-55. */
+  /** EVM address in EIP-55 checksum form. */
   readonly address: Address
 
-  /** Публичный ключ в сжатой форме SEC1, 33 байта. */
+  /** Public key in compressed SEC1 form, 33 bytes. */
   readonly publicKey: Uint8Array
 }
 
 /**
- * Верхняя граница числа аккаунтов, выводимых за один вызов.
+ * Upper bound on accounts derived in one call.
  *
- * Ограничение защищает от случайного запроса на миллион аккаунтов:
- * каждая деривация — это HMAC-SHA512 плюс операция на эллиптической кривой,
- * и такой цикл заблокирует поток на минуты. Осознанный обход возможен
- * повторными вызовами с указанием начального индекса.
+ * The cap protects against an accidental request for a million
+ * accounts: each derivation is HMAC-SHA512 plus an elliptic-curve
+ * operation, and such a loop would block the thread for minutes.
+ * A deliberate bypass is possible by repeated calls with a start
+ * index.
  */
 export const MAX_ACCOUNTS_PER_CALL = 100

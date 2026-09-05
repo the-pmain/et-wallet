@@ -14,37 +14,40 @@ import type {
 } from './types'
 
 /**
- * Подготовка, отправка и отслеживание транзакций.
+ * Preparing, sending, and tracking transactions.
  *
- * Сервис не подписывает: подпись выполняет `IKeyring`, единственный владелец
- * секретов. Разделение обязательно — иначе транзакционный слой получил бы
- * доступ к ключам, и периметр секретов расширился бы на весь домен.
+ * The service does not sign: signing is done by `IKeyring`, the only
+ * owner of secrets. The split is required — otherwise the transaction
+ * layer would gain access to keys, and the secret perimeter would
+ * expand across the whole domain.
  *
- * Все денежные величины — `bigint`. Тип `number` теряет точность за пределами
- * 2^53-1, а значения в wei доходят до 2^256-1.
+ * All money values are `bigint`. `number` loses precision past
+ * 2^53-1, and wei values reach 2^256-1.
  */
 export interface ITransactionService extends IEventSource<TransactionEventMap> {
   /**
-   * Превращает намерение пользователя в транзакцию, готовую к подписи.
+   * Turns a user intent into a transaction ready to sign.
    *
-   * Реализация обязана:
-   * 1. Получить nonce с тегом `pending`, иначе новая транзакция заменит
-   *    собой ожидающую вместо постановки в очередь.
-   * 2. Оценить лимит газа. Отказ оценки означает, что вызов завершится
-   *    откатом, и транзакцию отправлять нельзя.
-   * 3. Подставить chainId активной сети — он входит в подписываемые данные
-   *    по EIP-155 и защищает подпись от проигрывания в другой сети.
+   * The implementation must:
+   * 1. Fetch the nonce with the `pending` tag, or a new transaction
+   *    will replace a pending one instead of queuing.
+   * 2. Estimate the gas limit. A failed estimate means the call
+   *    will revert, and the transaction must not be sent.
+   * 3. Fill in the active network's chainId — it is part of the
+   *    signed data per EIP-155 and protects the signature from
+   *    replay on another network.
    *
    * @throws GasEstimationFailedError, InsufficientFundsError
    */
   prepare(request: ITransactionRequest): Promise<ISignableTransaction>
 
   /**
-   * Готовит перевод токена ERC-20.
+   * Prepares an ERC-20 token transfer.
    *
-   * Данные вызова собирает сервис: получатель и количество лежат в них,
-   * а не в полях транзакции, и кодировать их в интерфейсе значило бы
-   * держать место с ценой ошибки в потерянные средства вне ядра.
+   * The service assembles the call data: recipient and amount live
+   * in it, not in the transaction fields, and encoding them in the
+   * UI would keep a place whose cost of error is lost funds outside
+   * the core.
    *
    * @throws InsufficientTokenBalanceError, GasEstimationFailedError,
    *         InsufficientFundsError
@@ -52,95 +55,95 @@ export interface ITransactionService extends IEventSource<TransactionEventMap> {
   prepareTokenTransfer(request: ITokenTransferRequest): Promise<ISignableTransaction>
 
   /**
-   * Готовит отзыв выданного разрешения.
+   * Prepares a revoke of a granted allowance.
    *
-   * Отзыв — транзакция: разрешение живёт в контракте, и убрать его
-   * можно только вызовом, который стоит газа и требует подписи.
+   * A revoke is a transaction: the allowance lives in the contract,
+   * and removing it takes a call that costs gas and needs a signature.
    */
   prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<ISignableTransaction>
 
   /**
-   * Варианты комиссии для показа пользователю.
+   * Fee options to show the user.
    *
-   * Возвращает несколько уровней срочности сразу: выбор между скоростью
-   * и стоимостью принимает пользователь, а не кошелёк.
+   * Returns several urgency levels at once: the choice between
+   * speed and cost is the user's, not the wallet's.
    */
   estimateFees(transaction: ISignableTransaction): Promise<readonly IFeeEstimate[]>
 
   /**
-   * Публикует подписанную транзакцию и заносит её в историю.
+   * Publishes a signed transaction and writes it to history.
    *
-   * Принимает результат подписи, а не запрос: сервис не имеет доступа
-   * к ключам и не может подписать сам.
+   * Accepts a signature result, not a request: the service has no
+   * access to keys and cannot sign itself.
    */
   send(signed: ISignedTransaction): Promise<TxHash>
 
-  /** История транзакций адреса в сети, от новых к старым. */
+  /** Transaction history of an address on a network, newest first. */
   getHistory(address: Address, chainId: ChainId): Promise<readonly ITransactionRecord[]>
 
-  /** Отдельная запись истории. */
   getByHash(hash: TxHash): Promise<ITransactionRecord | null>
 
   /**
-   * Формирует замещающую транзакцию с повышенной комиссией.
+   * Builds a replacement transaction with a higher fee.
    *
-   * Тот же nonce, повышенная цена газа. Возвращает транзакцию для подписи —
-   * пользователь обязан подтвердить новую комиссию.
+   * Same nonce, higher gas price. Returns a transaction to sign —
+   * the user must confirm the new fee.
    *
-   * @throws TransactionUnderpricedError если повышение недостаточно для узла.
+   * @throws TransactionUnderpricedError if the raise is not enough for the node.
    */
   prepareSpeedUp(hash: TxHash): Promise<ISignableTransaction>
 
   /**
-   * Формирует транзакцию отмены.
+   * Builds a cancel transaction.
    *
-   * Отменить транзакцию в блокчейне нельзя. Единственный способ — вытеснить
-   * её из мемпула переводом нулевой суммы самому себе с тем же nonce
-   * и большей комиссией. Успех не гарантирован: исходная транзакция могла
-   * быть уже включена в блок. Интерфейс обязан сообщать об этом явно.
+   * A transaction cannot be cancelled on the blockchain. The only
+   * way is to evict it from the mempool with a zero-amount transfer
+   * to self at the same nonce and a higher fee. Success is not
+   * guaranteed: the original may already be in a block. The UI
+   * must say so plainly.
    */
   prepareCancel(hash: TxHash): Promise<ISignableTransaction>
 
   /**
-   * Запускает отслеживание статусов отправленных транзакций.
+   * Starts tracking statuses of sent transactions.
    *
-   * Реализация обязана учитывать реорганизацию цепи: подтверждённая
-   * транзакция может вернуться в состояние ожидания.
+   * The implementation must account for a chain reorg: a confirmed
+   * transaction may return to a pending state.
    */
   startTracking(): void
 
-  /** Останавливает отслеживание и освобождает подписки. */
   stopTracking(): void
 }
 
-/** Долговременное хранение истории транзакций. */
+/** Long-term storage of transaction history. */
 export interface ITransactionRepository {
   findByAddress(address: Address, chainId: ChainId): Promise<readonly ITransactionRecord[]>
   findByHash(hash: TxHash): Promise<ITransactionRecord | null>
 
-  /** Транзакции, ожидающие подтверждения. Читаются при запуске приложения. */
+  /** Transactions awaiting confirmation. Read when the app starts. */
   findPending(chainId: ChainId): Promise<readonly ITransactionRecord[]>
 
   /**
-   * Транзакции, за которыми ещё нужно следить, из всех сетей.
+   * Transactions that still need watching, from every network.
    *
-   * ЭТО НЕ ТО ЖЕ САМОЕ, ЧТО «ОЖИДАЮЩИЕ». Сюда входят и уже включённые
-   * в блок записи, набравшие меньше `maxConfirmations` подтверждений:
-   * блок с ними может быть вытеснен реорганизацией цепи, и перестать
-   * следить за ними значило бы оставить на экране подтверждение того,
-   * чего в цепи уже нет.
+   * THIS IS NOT THE SAME AS "PENDING". Included here are records
+   * already in a block that have fewer than `maxConfirmations`
+   * confirmations: their block can be evicted by a reorg, and
+   * stopping the watch would leave a confirmation on screen of
+   * something that is no longer on the chain.
    *
-   * Порог задаёт вызывающий: сколько подтверждений считать
-   * достаточными — политика слоя транзакций, а не свойство хранилища.
+   * The threshold is set by the caller: how many confirmations
+   * are enough is a policy of the transaction layer, not a
+   * property of the store.
    *
-   * Выборка идёт по всем сетям: транзакция не перестаёт существовать
-   * оттого, что пользователь переключился на другую сеть.
+   * The query spans every network: a transaction does not cease
+   * to exist because the user switched networks.
    */
   findUnsettled(maxConfirmations: number): Promise<readonly ITransactionRecord[]>
 
   save(record: ITransactionRecord): Promise<void>
   updateStatus(hash: TxHash, status: TransactionStatus): Promise<void>
 
-  /** Удаляет историю адреса. Используется при удалении аккаунта. */
+  /** Deletes an address's history. Used when an account is removed. */
   deleteByAddress(address: Address): Promise<void>
 }

@@ -1,25 +1,24 @@
 /**
- * Официальные тестовые векторы BIP-39.
+ * Official BIP-39 test vectors.
  *
- * Источник: эталонный набор из репозитория Trezor (python-mnemonic),
- * на который ссылается сам текст BIP-39. Парольная фраза во всех векторах —
- * строка `TREZOR`.
+ * Source: the reference set from the Trezor repository
+ * (python-mnemonic), which the BIP-39 text itself cites. The
+ * passphrase in every vector is the string `TREZOR`.
  *
- * Зачем они здесь, если `@scure/bip39` уже проверена этими же векторами:
- * тесты защищают не библиотеку, а обёртку над ней. Нормализация ввода,
- * порядок преобразований, работа с буферами — всё это наш код, и ошибка
- * в нём даст неверный seed при формально корректной библиотеке.
+ * Why they are here if `@scure/bip39` is already checked against
+ * these same vectors: the tests protect the wrapper, not the
+ * library. Input normalisation, the order of conversions, buffer
+ * handling — that is our code, and a bug in it yields a wrong seed
+ * with a formally correct library.
  *
- * Файл не имеет расширения `.test.ts` сознательно: это данные,
- * используемые несколькими тестовыми файлами.
+ * The file has no `.test.ts` extension on purpose: it is data used
+ * by several test files.
  */
 
 export interface IBip39Vector {
-  /** Энтропия в шестнадцатеричном виде. */
   readonly entropy: string
-  /** Ожидаемая мнемоническая фраза. */
   readonly mnemonic: string
-  /** Ожидаемый seed при парольной фразе `TREZOR`. `null`, если не проверяется. */
+  /** Expected seed with passphrase `TREZOR`. `null` if not checked. */
   readonly seed: string | null
 }
 
@@ -61,7 +60,7 @@ export const BIP39_VECTORS: readonly IBip39Vector[] = [
   },
 ]
 
-/** Преобразует шестнадцатеричную строку в байты. Только для тестов. */
+/** Hex string to bytes. Tests only. */
 export function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2)
 
@@ -72,7 +71,7 @@ export function hexToBytes(hex: string): Uint8Array {
   return bytes
 }
 
-/** Преобразует байты в шестнадцатеричную строку. Только для тестов. */
+/** Bytes to a hex string. Tests only. */
 export function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }

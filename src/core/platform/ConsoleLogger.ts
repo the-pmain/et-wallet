@@ -1,6 +1,5 @@
 import { LOG_LEVEL, type ILogger, type LogContext, type LogLevel } from './Logger'
 
-/** Порядок уровней для сравнения важности. */
 const LEVEL_ORDER: Readonly<Record<LogLevel, number>> = {
   [LOG_LEVEL.Debug]: 0,
   [LOG_LEVEL.Info]: 1,
@@ -9,11 +8,11 @@ const LEVEL_ORDER: Readonly<Record<LogLevel, number>> = {
 }
 
 /**
- * Ключи контекста, значение которых не выводится никогда.
+ * Context keys whose value is never printed.
  *
- * Сравнение по подстроке в нижнем регистре: поле может называться
- * `privateKey`, `private_key` или `accountPrivateKey`, и перечислять
- * все написания бессмысленно.
+ * Compared as a lower-case substring: a field may be named
+ * `privateKey`, `private_key`, or `accountPrivateKey`, and listing
+ * every spelling is pointless.
  */
 const SECRET_KEY_MARKERS: readonly string[] = [
   'password',
@@ -26,61 +25,60 @@ const SECRET_KEY_MARKERS: readonly string[] = [
   'xprv',
   'signature',
   'entropy',
-  /* Адрес почты секретом не является, но связывает записи журнала
-     с личностью владельца — ровно то, ради чего адреса кошелька здесь
-     усекаются. Журнал попадает в отчёты об ошибках и в консоль,
-     доступную расширениям. */
+  /* An email address is not a secret, but it ties log entries to
+     the owner's identity — exactly why wallet addresses are
+     truncated here. The log ends up in error reports and in a
+     console that extensions can read. */
   'email',
 ]
 
-/** Замена, выводимая вместо секретного значения. */
 const REDACTED = '[hidden]'
 
 /**
- * Адрес электронной почты.
+ * Email address.
  *
- * Проверяется не только имя поля: адрес попадает в журнал и как
- * значение поля с посторонним именем — например, `name` аккаунта,
- * подписанного адресом владельца.
+ * Not only the field name is checked: an address also lands in the
+ * log as the value of an unrelated field — for example the `name`
+ * of an account labelled with the owner's address.
  */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u
 
-/** Адрес EVM в шестнадцатеричной записи. */
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 
-/** Сколько символов адреса показывается с каждой стороны. */
+/** How many address characters are shown on each side. */
 const ADDRESS_VISIBLE_CHARS = 6
 
-/** Настройки логгера. */
 export interface IConsoleLoggerOptions {
   /**
-   * Минимальный выводимый уровень.
+   * Minimum level that is printed.
    *
-   * По умолчанию `Warn`. Записи уровня `Debug` и `Info` содержат подробности
-   * работы кошелька и в боевой сборке представляют собой шум и утечку:
-   * консоль браузера доступна расширениям и попадает в отчёты об ошибках.
+   * Default `Warn`. `Debug` and `Info` entries contain wallet
+   * internals and in a production build are both noise and a leak:
+   * the browser console is available to extensions and ends up in
+   * error reports.
    */
   readonly minimumLevel?: LogLevel
 }
 
 /**
- * Журналирование в консоль браузера с обязательной редакцией секретов.
+ * Browser-console logging with mandatory redaction of secrets.
  *
- * ПОЧЕМУ РЕДАКЦИЯ ЗАШИТА В РЕАЛИЗАЦИЮ, А НЕ ОСТАВЛЕНА ВЫЗЫВАЮЩЕМУ КОДУ.
- * Контракт `ILogger` требует редакции от любой реализации. Правило,
- * соблюдение которого зависит от внимательности каждого места вызова,
- * нарушается при первом же добавлении нового поля в контекст. Здесь
- * оно выполняется один раз и для всех.
+ * WHY REDACTION IS BUILT INTO THE IMPLEMENTATION, NOT LEFT TO THE
+ * CALLER. The `ILogger` contract requires redaction of every
+ * implementation. A rule that depends on every call site being
+ * careful is broken the first time a new field is added to the
+ * context. Here it is applied once, for everyone.
  *
- * Что происходит со значениями:
- * - поле, чьё имя похоже на секрет, заменяется целиком;
- * - адрес EVM усекается до первых и последних символов — полный адрес
- *   в журнале связывает пользователя со всей его историей операций;
- * - `bigint` переводится в строку: `JSON.stringify` на нём выбрасывает
- *   исключение, и запись журнала уронила бы вызывающий код.
+ * What happens to values:
+ * - a field whose name looks like a secret is replaced entirely;
+ * - an EVM address is truncated to the first and last characters —
+ *   a full address in the log ties the user to their whole history;
+ * - `bigint` is turned into a string: `JSON.stringify` throws on
+ *   it, and a log write would crash the caller.
  *
- * Уровни `Debug` и `Info` по умолчанию не выводятся, поэтому `console.log`
- * не используется вовсе — правило ESLint допускает только `warn` и `error`.
+ * `Debug` and `Info` are not printed by default, so `console.log`
+ * is not used at all — the ESLint rule allows only `warn` and
+ * `error`.
  */
 export class ConsoleLogger implements ILogger {
   readonly #scope: string
@@ -122,10 +120,10 @@ export class ConsoleLogger implements ILogger {
     const prefix = this.#scope === '' ? message : `[${this.#scope}] ${message}`
     const safeContext = context === undefined ? undefined : redactContext(context)
 
-    /* Записи уровня Debug и Info сюда не доходят: они отсечены проверкой
-       выше при любом допустимом минимальном уровне, кроме явно
-       пониженного разработчиком. Для них применяется тот же `console.warn`,
-       потому что `console.log` запрещён правилом ESLint. */
+    /* Debug and Info entries do not reach here: they are cut by the
+       check above at every allowed minimum level except one the
+       developer has explicitly lowered. The same `console.warn` is
+       used for them because `console.log` is forbidden by ESLint. */
     if (level === LOG_LEVEL.Error) {
       console.error(prefix, safeContext ?? '')
 
@@ -136,7 +134,6 @@ export class ConsoleLogger implements ILogger {
   }
 }
 
-/** Заменяет секретные значения и усекает адреса. */
 function redactContext(context: LogContext): Record<string, unknown> {
   const result: Record<string, unknown> = {}
 
@@ -162,8 +159,9 @@ function redactValue(value: unknown): unknown {
     return shortenAddress(value)
   }
 
-  /* Адрес почты скрывается целиком независимо от имени поля: он попадает
-     в журнал и как имя аккаунта, подписанного адресом владельца. */
+  /* An email is hidden entirely regardless of the field name: it
+     also lands in the log as the name of an account labelled with
+     the owner's address. */
   if (typeof value === 'string' && EMAIL_PATTERN.test(value)) {
     return REDACTED
   }

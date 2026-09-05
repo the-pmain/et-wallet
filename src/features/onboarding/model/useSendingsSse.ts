@@ -3,14 +3,14 @@ import { useEffect, useRef } from 'react'
 import { parseSendingSseEvent, type ISendingSseEvent } from './sending-sse'
 
 /**
- * Поток `GET /v1/sendings`.
+ * `GET /v1/sendings` stream.
  *
- * На `/wallet/send` открывается с `user_id` сессии: кадры чужих
- * переводов туда не приходят. В кабинете на вкладке Sendings
- * передают `null` — сервер шлёт каждую новую запись.
+ * On `/wallet/send` it opens with the session `user_id`: frames for
+ * other people's transfers do not arrive. The cabinet Sendings tab
+ * passes `null` — the server sends every new record.
  *
- * Соединение закрывается при уходе со экрана. `onEvent` читается
- * из ссылки: новая функция на каждый рендер не должна рвать поток.
+ * The connection closes on leave. `onEvent` is read from a ref: a new
+ * function every render must not tear the stream down.
  */
 export function useSendingsSse(
   userId: string | null,

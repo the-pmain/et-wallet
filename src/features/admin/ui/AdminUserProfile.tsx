@@ -103,9 +103,6 @@ const PROFILE_TABS = [
   { value: PROFILE_TAB.Wallets, label: 'Wallets' },
 ] as const
 
-/**
- * Профиль записи: вкладки Assets (первая), Account, Wallets.
- */
 export function AdminUserProfile() {
   const { userId } = useParams()
   const navigate = useNavigate()

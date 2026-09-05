@@ -13,51 +13,52 @@ import type { Address, HexString, Wei } from '@/core/types'
 import { decodeRevertReason } from './preflight'
 
 /**
- * Псевдоадрес нативной валюты (ERC-7528).
+ * Native-currency pseudo-address (ERC-7528).
  *
- * Перевод эфира событий не порождает, поэтому при `traceTransfers`
- * узел дописывает синтетический журнал с этим адресом и обычным
- * событием `Transfer`. Значение измерено на живом узле, а не взято
- * из описания: соглашение молодое, и реализации могли разойтись.
+ * An ether transfer emits no events, so with `traceTransfers` the
+ * node appends a synthetic log at this address with an ordinary
+ * `Transfer` event. The value was measured on a live node, not taken
+ * from a write-up: the convention is young, and implementations may
+ * have diverged.
  */
 const NATIVE_ASSET_ADDRESS = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 
-/** Код JSON-RPC «метода не существует». */
+/** JSON-RPC code "method does not exist". */
 const JSON_RPC_METHOD_NOT_FOUND = -32601
 
-/** Число тем у события ERC-721: признак события плюс три параметра. */
+/** Topic count of an ERC-721 event: the event id plus three parameters. */
 const ERC721_TOPIC_COUNT = 4
 
-/** Чем закончилась симуляция. */
+/** How the simulation ended. */
 export const SIMULATION_OUTCOME = {
-  /** Узел выполнил транзакцию на текущем состоянии и вернул её следствия. */
+  /** The node ran the transaction on current state and returned its effects. */
   Succeeded: 'succeeded',
 
-  /** Транзакция откатится: отправлять её — сжечь газ впустую. */
+  /** The transaction will revert: sending it would burn gas for nothing. */
   Reverted: 'reverted',
 
   /**
-   * Узел не умеет `eth_simulateV1`.
+   * The node cannot do `eth_simulateV1`.
    *
-   * ОТДЕЛЬНО ОТ «НЕ УДАЛОСЬ». Метода нет — это свойство узла, которое
-   * не изменится от повтора, и владельцу стоит знать, что дело в узле,
-   * а не в его транзакции.
+   * SEPARATE FROM "FAILED". The method is missing — that is a node
+   * property that a retry will not change, and the owner should know
+   * the issue is the node, not their transaction.
    */
   Unsupported: 'unsupported',
 
   /**
-   * Узел не ответил либо отказал.
+   * The node did not answer or refused.
    *
-   * ОТЛИЧАТЬ ОТ УСПЕХА ОБЯЗАТЕЛЬНО. Молчание узла не подтверждает
-   * ничего; выдать его за «изменений нет» значило бы показать пустой
-   * список там, где список неизвестен.
+   * DISTINGUISHING FROM SUCCESS IS REQUIRED. Node silence confirms
+   * nothing; treating it as "no changes" would show an empty list
+   * where the list is unknown.
    */
   Unavailable: 'unavailable',
 } as const
 
 export type SimulationOutcome = (typeof SIMULATION_OUTCOME)[keyof typeof SIMULATION_OUTCOME]
 
-/** Что за предмет перемещается. */
+/** What kind of asset is moving. */
 export const MOVEMENT_KIND = {
   Native: 'native',
   Erc20: 'erc20',
@@ -67,61 +68,61 @@ export const MOVEMENT_KIND = {
 
 export type MovementKind = (typeof MOVEMENT_KIND)[keyof typeof MOVEMENT_KIND]
 
-/** Одно перемещение средств, которое произойдёт при отправке. */
+/** One asset movement that will happen on send. */
 export interface IAssetMovement {
   readonly kind: MovementKind
 
-  /** Адрес контракта. `null` — нативная валюта сети. */
+  /** Contract address. `null` — the network native currency. */
   readonly contract: Address | null
 
   readonly from: Address
   readonly to: Address
 
   /**
-   * Количество в наименьших единицах.
+   * Amount in smallest units.
    *
-   * `null` означает «известно, что перемещение есть, а сколько —
-   * разобрать не удалось». Ноль на этом месте был бы утверждением
-   * о сумме, которого симуляция не делала.
+   * `null` means "the movement is known to exist, but how much
+   * could not be parsed". A zero here would be a claim about the
+   * amount that the simulation did not make.
    */
   readonly amount: bigint | null
 
-  /** Номер предмета для ERC-721 и ERC-1155. */
+  /** Item id for ERC-721 and ERC-1155. */
   readonly tokenId: bigint | null
 }
 
-/** Итог симуляции. */
+/** Simulation result. */
 export interface ISimulationResult {
   readonly outcome: SimulationOutcome
 
-  /** Израсходованный газ. `null` — узел не сообщил. */
+  /** Gas used. `null` — the node did not report it. */
   readonly gasUsed: bigint | null
 
   /**
-   * Перемещения средств в порядке их наступления.
+   * Asset movements in the order they occur.
    *
-   * Пустой список ЗНАЧИМ только при исходе `succeeded`: он означает,
-   * что транзакция не двигает средства вовсе. При прочих исходах
-   * список пуст потому, что сведений нет.
+   * An empty list is MEANINGFUL only on outcome `succeeded`: it
+   * means the transaction moves no assets at all. On other outcomes
+   * the list is empty because there is no information.
    */
   readonly movements: readonly IAssetMovement[]
 
-  /** Причина отката словами. `null` — неизвестна. */
+  /** Revert reason in words. `null` — unknown. */
   readonly reason: string | null
 }
 
-/** Что симулируется. */
+/** What is being simulated. */
 export interface ISimulationRequest {
   readonly from: Address
 
-  /** `null` — развёртывание контракта. */
+  /** `null` — contract deployment. */
   readonly to: Address | null
 
   readonly data: HexString
   readonly value: Wei
 }
 
-/** Итог, когда симуляция не проводилась. */
+/** Result when simulation was not run. */
 export const UNCHECKED_SIMULATION: ISimulationResult = {
   outcome: SIMULATION_OUTCOME.Unavailable,
   gasUsed: null,
@@ -130,36 +131,36 @@ export const UNCHECKED_SIMULATION: ISimulationResult = {
 }
 
 /**
- * Показывает, что транзакция сделает, ещё до подписи.
+ * Shows what a transaction will do, before signing.
  *
- * ЧЕМ ЭТО ОТЛИЧАЕТСЯ ОТ ПРОГОНА `preflightCall`. Прогон отвечает на
- * вопрос «пройдёт ли», симуляция — на вопрос «что произойдёт». Первое
- * защищает от сожжённого газа, второе от подписи под тем, чего человек
- * не имел в виду: экран показывает получателя и сумму, взятые из полей
- * формы, а перемещения — то, что насчитал узел, выполнив вызов.
- * Расхождение между ними и есть признак подмены.
+ * HOW THIS DIFFERS FROM A `preflightCall` RUN. The run answers
+ * "will it go through", simulation answers "what will happen". The
+ * first protects against burned gas, the second against signing
+ * something the person did not mean: the screen shows the recipient
+ * and amount taken from form fields, and the movements are what the
+ * node computed by executing the call. A mismatch between them is
+ * the sign of a swap.
  *
- * ПОЧЕМУ ЭТО ПУТЬ ПО УМОЛЧАНИЮ. `eth_simulateV1` — обычный метод узла,
- * с которым кошелёк уже разговаривает: ни ключа, ни учётной записи,
- * ни ещё одного оператора, узнающего намерение владельца.
+ * WHY THIS IS THE DEFAULT PATH. `eth_simulateV1` is an ordinary node
+ * method the wallet already talks to: no key, no account, no extra
+ * operator learning the owner's intent.
  *
- * Прежде здесь стояло, что сторонний сервис не нужен вовсе. Это
- * оказалось неверно в одной части: разбор журналов не видит того,
- * чего в журналах нет, а публичные узлы метод либо не знают, либо
- * отвечают отказом по частоте — измерено. Поэтому сторонний источник
- * добавлен (`core/simulation`), но именно как ДОБАВЛЕНИЕ: он
- * спрашивается первым только при явном согласии владельца, а узел
- * остаётся основанием и опрашивается всегда, когда источник промолчал.
+ * It used to say a third-party service was not needed at all. That
+ * turned out to be wrong in one part: log parsing cannot see what
+ * is not in the logs, and public nodes either do not know the method
+ * or refuse on rate — measured. So a third-party source was added
+ * (`core/simulation`), but as an ADDITION: it is asked first only
+ * with the owner's explicit consent, and the node remains the base
+ * and is always queried when the source stayed silent.
  *
- * ПОДДЕРЖКА У УЗЛОВ РАЗНАЯ, и это не исключение, а обычное положение
- * дел: измерено, что часть публичных узлов метод не знает, а часть
- * отказывает по частоте обращений. Оба случая различаются в исходе
- * и не выдаются за «изменений нет».
+ * NODE SUPPORT VARIES, and that is the usual state of affairs, not
+ * an exception: measured that some public nodes do not know the
+ * method and some refuse on rate. Both cases are distinguished in
+ * the outcome and are not treated as "no changes".
  *
- * СИМУЛЯЦИЯ НЕ ГАРАНТИЯ. Она выполнена на состоянии цепи в этот миг;
- * к моменту включения в блок состояние может стать другим. Интерфейс
- * обязан говорить «произойдёт по нынешнему состоянию», а не
- * «произойдёт».
+ * SIMULATION IS NOT A GUARANTEE. It ran on chain state at this
+ * moment; by inclusion time the state may be different. The UI must
+ * say "will happen on current state", not "will happen".
  */
 export async function simulateTransaction(
   provider: IProvider,
@@ -184,14 +185,14 @@ export async function simulateTransaction(
               ],
             },
           ],
-          /* Без этого перевод нативной валюты не виден вовсе: событий
-             он не порождает, и список перемещений оказался бы пустым
-             у самой обычной отправки. */
+          /* Without this a native-currency transfer is invisible:
+             it emits no events, and the movement list would be empty
+             for the most ordinary send. */
           traceTransfers: true,
-          /* Проверка баланса и nonce отключена намеренно. Их проверяют
-             оценка комиссии и прогон вызова, а здесь отказ по нехватке
-             средств скрыл бы то единственное, ради чего симуляция
-             и нужна, — перечень перемещений. */
+          /* Balance and nonce checks are off on purpose. Fee
+             estimation and the call run already check them, and a
+             refusal here for insufficient funds would hide the one
+             thing simulation exists for — the movement list. */
           validation: false,
         },
         'latest',
@@ -210,11 +211,12 @@ export async function simulateTransaction(
 }
 
 /**
- * Разбирает ответ узла.
+ * Parses the node response.
  *
- * Ответ недоверенный: узел может вернуть что угодно, поэтому каждое
- * поле проверяется отдельно, а неожиданная форма даёт «проверить
- * не удалось», а не исключение посреди подготовки транзакции.
+ * The response is untrusted: the node may return anything, so each
+ * field is checked separately, and an unexpected shape yields "could
+ * not check", not an exception in the middle of preparing a
+ * transaction.
  */
 function readResponse(response: unknown): ISimulationResult {
   if (!Array.isArray(response)) {
@@ -237,8 +239,8 @@ function readResponse(response: unknown): ISimulationResult {
 
   const gasUsed = typeof call.gasUsed === 'string' ? hexToBigInt(call.gasUsed) : null
 
-  /* Признак успеха у `eth_simulateV1` тот же, что у квитанции:
-     `0x1` — выполнено, `0x0` — откат. */
+  /* The success flag on `eth_simulateV1` is the same as on a receipt:
+     `0x1` — executed, `0x0` — revert. */
   if (call.status !== '0x1') {
     return {
       outcome: SIMULATION_OUTCOME.Reverted,
@@ -256,7 +258,7 @@ function readResponse(response: unknown): ISimulationResult {
   }
 }
 
-/** Отбирает из журналов те, что означают перемещение средств. */
+/** Picks from the logs those that mean an asset movement. */
 function readMovements(logs: readonly unknown[]): readonly IAssetMovement[] {
   const movements: IAssetMovement[] = []
 
@@ -270,9 +272,10 @@ function readMovements(logs: readonly unknown[]): readonly IAssetMovement[] {
     const movement = readMovement(
       log.address,
       log.topics as readonly HexString[],
-      /* Пустые данные — законный случай: у ERC-721 всё лежит в темах.
-         Приведение здесь безопасно: `splitDataWords` разбирает строку
-         посимвольно и на пустой возвращает пустой список. */
+      /* Empty data is a legal case: on ERC-721 everything lives in
+         topics. The cast here is safe: `splitDataWords` parses the
+         string character by character and returns an empty list on
+         empty input. */
       log.data ?? ('0x' as HexString),
     )
 
@@ -285,17 +288,18 @@ function readMovements(logs: readonly unknown[]): readonly IAssetMovement[] {
 }
 
 /**
- * Разбирает один журнал в перемещение.
+ * Parses one log into a movement.
  *
- * ГРАММАТИКА СОБЫТИЙ ТА ЖЕ, ЧТО У ИСТОРИИ ПЕРЕВОДОВ, и разбор здесь
- * отдельный: история собирает запись с блоком, временем и источником,
- * а подтверждение — перемещение без привязки к цепи, потому что
- * ничего этого ещё не произошло. Общими остаются признаки событий:
- * ошибиться в них дважды нельзя, они берутся из одного места.
+ * EVENT GRAMMAR IS THE SAME AS TRANSFER HISTORY, and parsing here is
+ * separate: history builds a record with a block, a time, and a
+ * source, and confirmation is a movement with no chain binding,
+ * because none of that has happened yet. What is shared are the
+ * event ids: they cannot be gotten wrong twice, they come from one
+ * place.
  *
- * НЕРАЗОБРАННОЕ НЕ ОТБРАСЫВАЕТСЯ МОЛЧА там, где событие опознано:
- * количество может остаться неизвестным, но сам факт перемещения
- * доходит до экрана. Умолчание о перемещении опаснее неполноты.
+ * UNPARSED IS NOT DROPPED IN SILENCE where the event is recognized:
+ * the amount may stay unknown, but the fact of the movement reaches
+ * the screen. Omitting a movement is more dangerous than incompleteness.
  */
 function readMovement(
   address: string,
@@ -337,11 +341,11 @@ function readMovement(
   }
 
   if (topic === TRANSFER_BATCH_TOPIC && second !== undefined && third !== undefined) {
-    /* Пакетная передача содержит массивы номеров и количеств. Разбирать
-       их здесь незачем: на экране подтверждения важен сам факт, что
-       предметы уходят, а перечислять их по одному — задача истории,
-       где событие уже состоялось. Количество остаётся неизвестным,
-       и об этом сказано значением `null`, а не нулём. */
+    /* A batch transfer contains arrays of ids and amounts. Parsing
+       them here is unnecessary: on the confirmation screen the fact
+       that items are leaving matters, and listing them one by one
+       is history's job, where the event has already happened. The
+       amount stays unknown, and that is said by `null`, not zero. */
     return {
       kind: MOVEMENT_KIND.Erc1155,
       contract,
@@ -355,7 +359,7 @@ function readMovement(
   return null
 }
 
-/** Отличает «метода нет» от прочих отказов узла. */
+/** Distinguishes "no such method" from other node refusals. */
 function isMethodNotFound(error: unknown): boolean {
   const code = (error as { rpcCode?: unknown }).rpcCode
 

@@ -7,31 +7,31 @@ import {
   type PriceMap,
 } from '@/core'
 
-/** Настройки поведения источника курсов в конкретном тесте. */
 export interface IFakePriceOptions {
   /**
-   * Котировки по ключу `priceRefKey`.
+   * Quotes keyed by `priceRefKey`.
    *
-   * Отсутствие записи означает «курс неизвестен» — тот же случай,
-   * что и пустой ответ настоящего сервиса на неизвестный контракт.
+   * A missing entry means “rate unknown” — the same case as an
+   * empty reply from a real service for an unknown contract.
    */
   readonly quotes?: ReadonlyMap<string, IPriceQuote>
 
-  /** Причина отказа. Источник бросает исключение вместо ответа. */
+  /** Failure reason. The source throws instead of answering. */
   readonly failure?: string
 }
 
 /**
- * Источник курсов-дублёр.
+ * Price-source double.
  *
- * Позволяет проверить главное свойство экрана портфеля: позиция
- * без курса не обнуляет оценку и не исчезает из списка.
+ * Lets a test check the main property of the portfolio screen: a
+ * position without a rate does not zero the estimate and does not
+ * vanish from the list.
  */
 export class FakePriceProvider implements IPriceProvider {
   readonly id = 'fake'
-  readonly name = 'Дублёр курсов'
+  readonly name = 'Price double'
 
-  /** Сколько раз источник опрашивался. Показывает, что без согласия его не трогают. */
+  /** How many times the source was queried. Shows it is left alone without consent. */
   callCount = 0
 
   #options: IFakePriceOptions = {}

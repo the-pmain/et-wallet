@@ -7,18 +7,19 @@ import type { IUserDirectory } from '@/features/onboarding'
 import type { IWalletSession } from '@/features/wallet'
 
 /**
- * Дописывает созданные адреса в `users.wallets`.
+ * Appends created addresses to `users.wallets`.
  *
- * КОГДА. Создание уже кладёт первый адрес в `POST /v1/users`.
- * Подписка ловит поздние аккаунты (`createAccount`, поиск).
- * Повтор того же адреса на сервере заменяет значение, не плодит дубликат.
+ * WHEN. Creation already puts the first address in `POST /v1/users`.
+ * The subscription catches later accounts (`createAccount`, discovery).
+ * Repeating the same address on the server replaces the value; it does
+ * not spawn a duplicate.
  *
- * КЛЮЧ — АДРЕС, ЗНАЧЕНИЕ — `0`. Секретов в записи нет: seed и ключи
- * на сервер не уходят.
+ * THE KEY IS THE ADDRESS, THE VALUE IS `0`. The record holds no secrets:
+ * seed and keys never go to the server.
  *
- * ПОВТОР ТОГО ЖЕ АДРЕСА НЕ ШЛЁТСЯ. Снимок обновляется на каждый баланс;
- * без запоминания уже записанных адресов сервер получал бы тот же
- * `POST` десятки раз за сессию.
+ * THE SAME ADDRESS IS NOT POSTED AGAIN. The snapshot updates on every
+ * balance; without remembering already written addresses the server
+ * would get the same `POST` dozens of times per session.
  */
 export function syncCreatedWalletsToDirectory(
   session: Pick<IWalletSession, 'subscribe' | 'getSnapshot'>,

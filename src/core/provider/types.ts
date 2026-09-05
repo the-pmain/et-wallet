@@ -1,40 +1,40 @@
 import type { Address, BlockHash, ChainId, HexString, TxHash, Wei } from '@/core/types'
 
-/** Запрос JSON-RPC. */
+/** JSON-RPC request. */
 export interface IRpcRequest {
   readonly method: string
 
   /**
-   * Параметры метода.
+   * Method parameters.
    *
-   * Тип `unknown[]`, а не строгая схема, сознательно: набор методов
-   * JSON-RPC открыт и различается у разных узлов. Типобезопасность
-   * обеспечивается типизированными методами интерфейса `IProvider`,
-   * а сырой `request` остаётся аварийным выходом для нестандартных вызовов.
-   * Валидация ответа — обязанность вызывающего кода.
+   * Typed as `unknown[]`, not a strict schema, on purpose: the set of
+   * JSON-RPC methods is open and differs across nodes. Type safety
+   * comes from the typed methods on `IProvider`; raw `request` stays
+   * an escape hatch for non-standard calls. Validating the response
+   * is the caller's duty.
    */
   readonly params?: readonly unknown[]
 }
 
-/** Данные о стоимости газа. */
+/** Gas-cost data. */
 export interface IFeeData {
   /**
-   * Базовая комиссия текущего блока (EIP-1559).
-   * `null` в сетях без поддержки EIP-1559.
+   * Base fee of the current block (EIP-1559).
+   * `null` on networks without EIP-1559.
    */
   readonly baseFeePerGas: bigint | null
 
-  /** Максимальная суммарная цена за единицу газа (EIP-1559). */
+  /** Maximum total price per gas unit (EIP-1559). */
   readonly maxFeePerGas: bigint | null
 
-  /** Чаевые валидатору за единицу газа (EIP-1559). */
+  /** Validator tip per gas unit (EIP-1559). */
   readonly maxPriorityFeePerGas: bigint | null
 
-  /** Цена газа для транзакций прежнего формата. */
+  /** Gas price for legacy-format transactions. */
   readonly gasPrice: bigint | null
 }
 
-/** Параметры вызова контракта без изменения состояния (`eth_call`). */
+/** Parameters of a contract call that does not change state (`eth_call`). */
 export interface ICallRequest {
   readonly to: Address
   readonly from?: Address
@@ -43,24 +43,24 @@ export interface ICallRequest {
 }
 
 /**
- * Запрос оценки газа.
+ * Gas-estimate request.
  *
- * ОТЛИЧАЕТСЯ ОТ `ICallRequest` ОДНИМ ПОЛЕМ, И ОТЛИЧИЕ СУЩЕСТВЕННОЕ.
- * Чтение контракта без адреса бессмысленно, а оценка газа без него —
- * законный случай: отсутствие получателя означает развёртывание
- * контракта. Узел различает эти запросы именно по наличию поля `to`,
- * и подставить туда что-нибудь «для совместимости» значит оценить
- * не ту операцию.
+ * DIFFERS FROM `ICallRequest` BY ONE FIELD, AND THE DIFFERENCE MATTERS.
+ * Reading a contract without an address is meaningless, but a gas
+ * estimate without one is a legal case: no recipient means contract
+ * deployment. The node distinguishes those requests by the presence
+ * of `to`, and stuffing something in "for compatibility" means
+ * estimating the wrong operation.
  */
 export interface IGasEstimateRequest {
-  /** Получатель. `null` — развёртывание контракта. */
+  /** Recipient. `null` — contract deployment. */
   readonly to: Address | null
   readonly from?: Address
   readonly data?: HexString
   readonly value?: Wei
 }
 
-/** Запись журнала событий контракта. */
+/** Contract event-log entry. */
 export interface ILogEntry {
   readonly address: Address
   readonly topics: readonly HexString[]
@@ -68,11 +68,11 @@ export interface ILogEntry {
   readonly blockNumber: bigint
   readonly transactionHash: TxHash
   readonly logIndex: number
-  /** Удалён ли лог из-за реорганизации цепи. */
+  /** Whether the log was removed by a chain reorganization. */
   readonly removed: boolean
 }
 
-/** Квитанция подтверждённой транзакции. */
+/** Receipt of a confirmed transaction. */
 export interface ITransactionReceipt {
   readonly transactionHash: TxHash
   readonly blockNumber: bigint
@@ -81,23 +81,24 @@ export interface ITransactionReceipt {
   readonly to: Address | null
 
   /**
-   * Успешность выполнения.
+   * Whether execution succeeded.
    *
-   * Транзакция, включённая в блок, могла завершиться откатом. Газ при этом
-   * списан. Отображать такую транзакцию как успешную нельзя.
+   * A transaction included in a block may still have reverted. Gas
+   * was still spent. Showing such a transaction as successful is not
+   * allowed.
    */
   readonly status: 'success' | 'reverted'
 
   readonly gasUsed: bigint
   readonly effectiveGasPrice: bigint
 
-  /** Адрес развёрнутого контракта, если транзакция его создавала. */
+  /** Deployed contract address, if the transaction created one. */
   readonly contractAddress: Address | null
 
   readonly logs: readonly ILogEntry[]
 }
 
-/** Фильтр выборки логов. */
+/** Log-query filter. */
 export interface ILogFilter {
   readonly address?: Address
   readonly topics?: readonly (HexString | null)[]
@@ -105,12 +106,12 @@ export interface ILogFilter {
   readonly toBlock?: bigint
 }
 
-/** События транспортного слоя. */
+/** Transport-layer events. */
 export interface ProviderEventMap {
-  /** Появился новый блок. */
+  /** A new block appeared. */
   'provider:block': { readonly blockNumber: bigint }
-  /** Соединение с узлом восстановлено. */
+  /** Connection to the node was restored. */
   'provider:connected': { readonly chainId: ChainId; readonly rpcUrl: string }
-  /** Соединение потеряно. */
+  /** Connection was lost. */
   'provider:disconnected': { readonly chainId: ChainId; readonly reason: string }
 }

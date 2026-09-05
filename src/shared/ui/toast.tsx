@@ -27,14 +27,14 @@ const TONE_ICON: Record<ToastTone, typeof Info> = {
 }
 
 /**
- * Область показа уведомлений.
+ * Toast region.
  *
- * МОНТИРУЕТСЯ ОДИН РАЗ В ОБОЛОЧКЕ. Несколько областей показывали бы одно
- * уведомление дважды: хранилище общее.
+ * MOUNTED ONCE IN THE SHELL. Several regions would show one toast
+ * twice: the store is shared.
  *
- * СТОИТ ПОД ФИКСИРОВАННЫМ УГЛОМ, НАД ВСЕМ. Уведомление сообщает об уже
- * случившемся и не должно перехватывать нажатия по тому, что под ним, —
- * поэтому слой прозрачен для указателя, а сами карточки нет.
+ * FIXED IN A CORNER, ABOVE EVERYTHING. A toast reports something
+ * that already happened and must not steal clicks on what is under
+ * it — so the layer is pointer-transparent and the cards are not.
  */
 export function Toaster() {
   const items = useSyncExternalStore(subscribeToasts, getToasts)
@@ -55,9 +55,9 @@ export function Toaster() {
 function ToastCard({ toast: item }: { readonly toast: IToast }) {
   const Icon = TONE_ICON[item.tone]
 
-  /* Само уведомление снимает себя по времени. Таймер живёт в эффекте,
-     а не в общем хранилище: так он привязан к жизни карточки и не
-     переживёт её удаление пользователем. */
+  /* The toast dismisses itself on a timer. The timer lives in the
+     effect, not the shared store: it is tied to the card's life and
+     will not outlive a user dismiss. */
   useEffect(() => {
     const timer = globalThis.setTimeout(() => {
       dismissToast(item.id)

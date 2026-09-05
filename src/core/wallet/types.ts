@@ -3,57 +3,56 @@ import type { ISerializedKeyring } from '@/core/keyring'
 import type { Timestamp } from '@/core/types'
 
 /**
- * Состояние кошелька.
+ * Wallet state.
  *
- * Три состояния, а не флаг «заблокирован»: «не создан» и «заблокирован» —
- * принципиально разные ситуации. В первом случае интерфейс обязан предложить
- * создание или импорт, во втором — ввод пароля. Сведение их к одному булеву
- * значению приводит к экрану ввода пароля от несуществующего кошелька.
+ * Three states, not a "locked" flag: "not created" and "locked" are
+ * fundamentally different situations. In the first the UI must offer
+ * create or import, in the second — a password. Collapsing them to
+ * one boolean leads to a password screen for a wallet that does not
+ * exist.
  */
 export const WALLET_STATUS = {
-  /** Хранилище не создано. Требуется создание или импорт. */
+  /** The vault has not been created. Create or import is required. */
   Uninitialized: 'uninitialized',
-  /** Хранилище существует, ключи зашифрованы. Требуется пароль. */
+  /** The vault exists, keys are encrypted. A password is required. */
   Locked: 'locked',
-  /** Ключи расшифрованы и находятся в памяти. */
+  /** Keys are decrypted and in memory. */
   Unlocked: 'unlocked',
 } as const
 
 export type WalletStatus = (typeof WALLET_STATUS)[keyof typeof WALLET_STATUS]
 
 /**
- * Причина блокировки.
+ * Reason for the lock.
  *
- * Различается для интерфейса: блокировку по таймауту стоит сопроводить
- * пояснением, блокировку по требованию пользователя — нет.
+ * Distinguished for the UI: a timeout lock should be accompanied by
+ * an explanation, a user-requested lock should not.
  */
 export const LOCK_REASON = {
-  /** Пользователь заблокировал вручную. */
   User: 'user',
-  /** Истёк таймаут бездействия. */
   Timeout: 'timeout',
-  /** Приложение закрывается либо вкладка выгружается. */
+  /** The app is closing or the tab is unloading. */
   Shutdown: 'shutdown',
 } as const
 
 export type LockReason = (typeof LOCK_REASON)[keyof typeof LOCK_REASON]
 
 /**
- * Расшифрованное содержимое хранилища.
+ * Decrypted vault contents.
  *
- * Существует только в памяти при снятой блокировке. Никогда не сохраняется
- * и не сериализуется в открытом виде.
+ * Exists only in memory while unlocked. Never saved and never
+ * serialised in the clear.
  */
 export interface IVaultContent {
   readonly keyrings: readonly ISerializedKeyring[]
 }
 
 /**
- * Зашифрованное хранилище в том виде, в каком оно лежит в постоянной памяти.
+ * Encrypted vault as it sits in persistent storage.
  *
- * Метаданные (`createdAt`, `updatedAt`) снаружи шифрования сознательно:
- * они не являются секретом, а их доступность без пароля позволяет показать
- * пользователю сведения о резервной копии до разблокировки.
+ * Metadata (`createdAt`, `updatedAt`) is outside the encryption on
+ * purpose: it is not a secret, and being available without a
+ * password lets the user see backup details before unlock.
  */
 export interface IVault {
   readonly payload: IEncryptedPayload
@@ -62,44 +61,41 @@ export interface IVault {
 }
 
 /**
- * Результат создания нового кошелька.
+ * Result of creating a new wallet.
  *
- * Мнемоника возвращается буфером, а не строкой, и подлежит затиранию сразу
- * после того, как пользователь подтвердил её сохранение. Держать seed-фразу
- * в состоянии React до конца сессии недопустимо.
+ * The mnemonic is returned as a buffer, not a string, and must be
+ * wiped as soon as the user confirms they have saved it. Holding a
+ * seed phrase in React state for the rest of the session is
+ * forbidden.
  */
 export interface IWalletCreationResult {
   readonly mnemonic: ISecretBuffer
 }
 
-/** Параметры создания кошелька. */
 export interface ICreateWalletParams {
   readonly password: string
 
   /**
-   * Стойкость мнемоники в битах: 128 (12 слов) либо 256 (24 слова).
+   * Mnemonic strength in bits: 128 (12 words) or 256 (24 words).
    *
-   * Энтропия берётся исключительно из `crypto.getRandomValues`.
-   * `Math.random` непригоден: он не криптостойкий, и выведенные из него
-   * ключи предсказуемы.
+   * Entropy comes exclusively from `crypto.getRandomValues`.
+   * `Math.random` is unsuitable: it is not cryptographically
+   * strong, and keys derived from it are predictable.
    */
   readonly strength?: 128 | 256
 }
 
-/** Параметры импорта существующего кошелька. */
 export interface IImportWalletParams {
   readonly mnemonic: ISecretBuffer
   readonly password: string
-  /** Сколько аккаунтов восстановить сразу. */
   readonly accountCount?: number
 }
 
-/** События кошелька. */
 export interface WalletEventMap {
   'wallet:initialized': { readonly at: Timestamp }
   'wallet:unlocked': { readonly at: Timestamp }
   'wallet:locked': { readonly at: Timestamp; readonly reason: LockReason }
   'wallet:reset': { readonly at: Timestamp }
-  /** Состав наборов ключей изменён: добавлен или удалён источник аккаунтов. */
+  /** Keyring set changed: an account source was added or removed. */
   'wallet:keyringsChanged': { readonly count: number }
 }

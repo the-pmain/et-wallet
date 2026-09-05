@@ -1,30 +1,27 @@
 /**
- * Словарь интерфейса.
+ * Interface dictionary.
  *
- * ПОЧЕМУ БЕЗ БИБЛИОТЕКИ. `i18next` с реактовской обвязкой добавляет
- * к бандлу десятки килобайт ради возможностей, которых здесь нет:
- * загрузки словарей по сети (запрещена политикой безопасности),
- * подстановки по числам во многих формах и разбора ICU. Нужен словарь
- * и функция подстановки — это тридцать строк.
+ * WHY NO LIBRARY. `i18next` with its React wrapper adds tens of
+ * kilobytes for features this app does not use: loading dictionaries
+ * over the network (forbidden by the security policy), plural forms,
+ * and ICU parsing. A dictionary plus substitution is thirty lines.
  *
- * ЯЗЫК ОДИН. Кошелёк говорит по-английски: это язык, на котором
- * написаны стандарты, названия сетей и сообщения узлов, и смешение
- * с переводом порождало бы фразы вроде «Недостаточно средств для gas».
- * Механизм подстановки сохранён — он понадобится, когда языков станет
- * больше, — но выбора языка в интерфейсе нет.
+ * ONE LANGUAGE. The wallet speaks English: that is the language of
+ * the standards, network names, and node messages, and mixing in a
+ * translation produced phrases like "Insufficient funds for gas" mixed with another language.
+ * Substitution is kept — it will be needed when there are more
+ * languages — but there is no language picker in the UI.
  */
 
-/** Поддерживаемые языки. */
 export const LANGUAGE = {
   English: 'en',
 } as const
 
 export type Language = (typeof LANGUAGE)[keyof typeof LANGUAGE]
 
-/** Язык по умолчанию и единственный. */
+/** Default and only language. */
 export const DEFAULT_LANGUAGE: Language = LANGUAGE.English
 
-/** Словарь интерфейса. */
 const ENGLISH = {
   'common.back': 'Back',
   'common.next': 'Next',
@@ -89,30 +86,29 @@ const ENGLISH = {
 
   'dashboard.balance': 'Balance',
   'dashboard.displayCurrency': 'Display currency',
-  /* Свод двух прежних оговорок в одну. Раньше на главном экране стояли
-     подряд «Showing the native currency balance…» и «The native currency
-     of the network is sent here…» — два абзаца об одном и том же в самом
-     центре экрана. Утрачено при сведении ничего: и то, что показанная
-     сумма не покрывает токены, и то, что отправка отсюда касается только
-     нативной валюты, и предупреждение про поле получателя — на месте. */
+  /* Two former caveats merged into one. The home screen used to show
+     “Showing the native currency balance…” and “The native currency
+     of the network is sent here…” in a row — two paragraphs about the
+     same thing in the middle of the screen. Nothing was lost in the
+     merge: that the shown amount excludes tokens, that send from here
+     is native currency only, and the recipient-field warning remain. */
   'dashboard.nativeOnly':
     'The native currency of the network is sent here, and the balance above shows only it. Token balances live in the portfolio; token transfers have their own screen, where the recipient is written into the call data, not into the recipient field.',
-  /* ОЦЕНКА В ДОЛЛАРАХ ПОД САМОЙ СУММОЙ. Число в эфире отвечает
-     на вопрос «сколько у меня монет», а не «сколько у меня денег»,
-     и второй вопрос — тот, ради которого экран открывают.
+  /* DOLLAR ESTIMATE DIRECTLY UNDER THE AMOUNT. The ether figure
+     answers “how many coins do I have”, not “how much money do I
+     have”, and the second question is why the screen is opened.
 
-     Слово «approximately» стоит в каждом из состояний не для мягкости:
-     оценка получена умножением баланса на курс стороннего сервиса,
-     она меняется ежеминутно и не является суммой, которую кто-либо
-     обязался заплатить. */
+     “approximately” is in every state on purpose, not for softness:
+     the estimate is balance times a third-party rate, it changes
+     every minute, and nobody has promised to pay that amount. */
   'dashboard.approxValue': 'approximately {value}',
   'dashboard.valueLoading': 'Estimating the value…',
   'dashboard.valueUnknown': 'The value could not be estimated',
   'dashboard.valueOff': 'Show the value in dollars',
-  /* Время котировки, а не «обновлено только что». Кошелёк спрашивает
-     курс раз в минуту, пока экран открыт, но при отказе источника
-     на экране остаётся прежний — и отличить одно от другого можно
-     только по времени. */
+  /* Quote time, not “updated just now”. The wallet asks for a rate
+     once a minute while the screen is open, but a source failure
+     leaves the previous one — and the only way to tell them apart
+     is the timestamp. */
   'dashboard.rateAsOf': 'Rate as of {time}',
   'dashboard.portfolio': 'Portfolio',
   'dashboard.send': 'Send',
@@ -121,31 +117,31 @@ const ENGLISH = {
   'dashboard.lock': 'Lock',
   'dashboard.smartContract': 'Smart contract',
 
-  /* ОКНО-ЗАГЛУШКА ДЛЯ ПРОВЕРКИ ВНЕШНЕГО ВИДА. Вызывать контракты
-     кошелёк пока не умеет; окно показывает, как будет выглядеть
-     включённый режим. См. A-172 в TECH_DEBT. */
+  /* PLACEHOLDER DIALOG TO CHECK THE LOOK. The wallet cannot call
+     contracts yet; the dialog shows how the enabled mode will look.
+     See A-172 in TECH_DEBT. */
   'contract.activatedTitle': 'Smart contract mode activated',
   'contract.activatedDescription': 'The wallet is ready to prepare contract calls.',
   'contract.activatedStatus': 'Contract module is active',
   'contract.activatedConfirm': 'Got it',
   'dashboard.recent': 'Recent activity',
-  /* ОДНО ИМЯ У ЭКРАНА. Панель звала его «Activity», заголовок —
-     «History», ссылка с главного — «Full history», текст рядом —
-     «History section»: одно место под двумя именами, и связать их
-     приходилось пользователю.
+  /* ONE NAME FOR THE SCREEN. The nav called it “Activity”, the
+     heading “History”, the home link “Full history”, the nearby
+     copy “History section”: one place under two names, and the
+     user had to join them.
 
-     Выбрано «Activity», потому что экран показывает не только
-     состоявшееся: незавершённые отправки с кнопками «ускорить»
-     и «отменить» — это не история. Имя выбрано по содержанию. */
+     “Activity” won because the screen is not only completed
+     transfers: pending sends with speed-up and cancel are not
+     history. The name follows the content. */
   'dashboard.allActivity': 'All activity',
 
-  /* Витрина активов на главном: те же строки, что на экране Assets. */
+  /* Asset showcase on home: the same strings as the Assets screen. */
   'dashboard.assets': 'Assets',
   'dashboard.allAssets': 'All assets',
   'dashboard.assetsEmptyTitle': 'No assets yet',
   'dashboard.assetsEmpty': 'Tracked tokens of this account will appear here.',
 
-  /* Публичный рынок, не портфель: запрос не называет адреса владельца. */
+  /* Public market, not the portfolio: the request never names the owner. */
   'dashboard.prices': 'Cryptocurrency Prices',
   'dashboard.pricesCaption': 'Cryptocurrency market prices in US dollars',
   'dashboard.pricesRank': '#',
@@ -165,10 +161,8 @@ const ENGLISH = {
   'dashboard.pricesEmpty': 'The source returned no coins.',
 } as const
 
-/** Ключ перевода. */
 export type TranslationKey = keyof typeof ENGLISH
 
-/** Словари по языкам. */
 export const DICTIONARIES: Readonly<Record<Language, Readonly<Record<TranslationKey, string>>>> = {
   [LANGUAGE.English]: ENGLISH,
 }

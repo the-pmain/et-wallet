@@ -3,39 +3,40 @@ import type { Address, ChainId } from '@/core/types'
 
 import { listVerifiedTokens, type IVerifiedToken } from './verified'
 
-/** Обнаруженная попытка выдать чужой контракт за проверенный токен. */
+/** A detected attempt to pass a foreign contract off as a verified token. */
 export interface ITokenImpersonation {
-  /** Проверенный токен, за который выдаёт себя контракт. */
+  /** The verified token the contract is impersonating. */
   readonly verified: IVerifiedToken
 
-  /** Что именно совпало: символ либо имя. */
+  /** What matched: symbol or name. */
   readonly field: 'symbol' | 'name'
 
-  /** Символы вне латиницы и цифр. Пусто при совпадении по буквам. */
+  /** Characters outside Latin and digits. Empty on a letter match. */
   readonly foreignCharacters: readonly string[]
 }
 
 /**
- * Ищет контракт, выдающий себя за проверенный токен.
+ * Looks for a contract impersonating a verified token.
  *
- * ЗАЧЕМ. Символ и имя токена задаёт автор контракта — это не свойство
- * сети и не факт, а строка, которую контракт возвращает по запросу.
- * Назваться `USDC` может любой. Дальше владелец видит в списке
- * привычный символ, отправляет на этот «USDC» средства и обнаруживает,
- * что перевёл ничего не стоящий токен, либо выдаёт разрешение
- * контракту, которого не проверял никто.
+ * WHY. A token's symbol and name are set by the contract author —
+ * not a network property or a fact, but a string the contract
+ * returns on request. Anyone can call themselves `USDC`. The owner
+ * then sees the familiar symbol in the list, sends funds to this
+ * "USDC", and finds they transferred a worthless token, or grants
+ * an approval to a contract nobody checked.
  *
- * ЭТО ТА ЖЕ АТАКА, ЧТО И С ИМЕНЕМ СЕТИ, и ловится тем же приёмом:
- * `USDС` с кириллической `С` не совпадает с настоящим ни в одном
- * байте, а на экране это то же слово. Сравнение идёт по «скелету».
+ * THIS IS THE SAME ATTACK AS WITH A NETWORK NAME, and is caught the
+ * same way: `USDC` with a Cyrillic C (U+0421) matches the real one in no
+ * byte, and on screen it is the same word. Comparison is by
+ * "skeleton".
  *
- * ЭТАЛОН ЕСТЬ ТОЛЬКО ДЛЯ ПРОВЕРЕННЫХ ТОКЕНОВ, и в этом ограничение
- * проверки: подделку под токен, которого нет в списке, сравнивать
- * не с чем. Список покрывает то, ради чего подделки и делают, —
- * стейблкоины и обёрнутые активы.
+ * A REFERENCE EXISTS ONLY FOR VERIFIED TOKENS, and that is the
+ * check's limit: a fake of a token that is not on the list has
+ * nothing to compare against. The list covers what fakes are made
+ * for — stablecoins and wrapped assets.
  *
- * СОВПАДЕНИЕ С САМИМ СОБОЙ ПОДДЕЛКОЙ НЕ СЧИТАЕТСЯ: проверенный
- * контракт вправе называться своим именем.
+ * A MATCH WITH ITSELF IS NOT A FAKE: a verified contract is allowed
+ * to use its own name.
  */
 export function findTokenImpersonation(
   candidate: {
@@ -54,8 +55,9 @@ export function findTokenImpersonation(
       continue
     }
 
-    /* Символ сравнивается первым: именно он показан в списке активов
-       и в подтверждении отправки, тогда как полное имя видно не везде. */
+    /* The symbol is compared first: it is what is shown in the
+       asset list and on send confirmation, while the full name is
+       not visible everywhere. */
     if (symbolSkeleton !== '' && toNameSkeleton(verified.symbol) === symbolSkeleton) {
       return {
         verified,

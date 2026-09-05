@@ -2,27 +2,27 @@ import { validateMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 
 /**
- * Допустимые длины BIP-39: 128–256 бит энтропии.
+ * Allowed BIP-39 lengths: 128–256 bits of entropy.
  *
- * Создание кошелька даёт 12 слов, импорт может принести любую
- * стандартную длину. Отказ 15/18/21 слова отрезал бы чужую фразу.
+ * Wallet create yields 12 words; import may bring any standard length.
+ * Rejecting 15/18/21 words would cut off someone else's phrase.
  */
 const VALID_WORD_COUNTS: ReadonlySet<number> = new Set([12, 15, 18, 21, 24])
 
 /**
- * Канонический вид колонки `seed_phrase`.
+ * Canonical `seed_phrase` column form.
  *
- * Слова через запятую, без пробелов: `word1,word2,…,word12`.
- * Пробельный BIP-39 и вариант `word1, word2` не принимаются.
+ * Words comma-separated, no spaces: `word1,word2,…,word12`.
+ * Space-separated BIP-39 and `word1, word2` are rejected.
  */
 const COMMA_PHRASE = /^[a-z]+(?:,[a-z]+)+$/u
 
 /**
- * Проверяет `seed_phrase` из тела создания пользователя.
+ * Checks `seed_phrase` from the user-create body.
  *
- * `null` — строка пустая, не того формата, не из словаря BIP-39
- * или с неверной контрольной суммой. Сообщение наружу одно:
- * фраза непригодна. Различать причину не нужно.
+ * `null` — empty, wrong format, not in the BIP-39 wordlist, or bad
+ * checksum. One outbound message: the phrase is unfit. The reason
+ * need not be distinguished.
  */
 export function readSeedPhrase(value: unknown): string | null {
   if (typeof value !== 'string') {

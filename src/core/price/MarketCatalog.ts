@@ -26,12 +26,12 @@ export interface IMarketCatalogOptions {
 const EMPTY_SNAPSHOT: IMarketCatalogSnapshot = { status: 'idle', coins: [] }
 
 /**
- * Один снимок публичного рынка на всё приложение.
+ * One public-market snapshot for the whole app.
  *
- * ЗАПРОС УХОДИТ ОДИН РАЗ. Бесплатный CoinGecko отвечает 429 уже на
- * несколько обращений: отдельный `simple/price` на каждый кошелёк
- * и на каждую карточку рынка съедал лимит до показа долларов.
- * `/coins/markets` даёт и таблицу курсов, и цены нативных монет.
+ * THE REQUEST GOES OUT ONCE. Free CoinGecko answers 429 already on
+ * a few calls: a separate `simple/price` per wallet and per market
+ * card ate the limit before dollars were shown. `/coins/markets`
+ * gives both the rate table and native-coin prices.
  */
 export class MarketCatalog {
   #loadMarkets: (signal?: AbortSignal) => Promise<readonly IMarketCoin[]>
@@ -144,10 +144,11 @@ export class MarketCatalog {
   }
 
   /**
-   * Монета каталога для актива. Нужна графику: курс уже есть в сводке,
-   * а ряд за семь дней живёт только здесь.
+   * Catalog coin for an asset. Needed by the chart: the rate is
+   * already in the summary, and the seven-day series lives only here.
    *
-   * `null` — в снимке этой монеты нет. График тогда не выдумывает ряд.
+   * `null` — this coin is not in the snapshot. The chart then does
+   * not invent a series.
    */
   coinForAsset(ref: IMarketAssetRef): IMarketCoin | null {
     return this.#coinForAsset(ref) ?? null

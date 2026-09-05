@@ -1,7 +1,7 @@
 export type { ITokenRepository, ITokenService } from './contracts'
-/* Примитивы кодировки живут в `core/abi`: они одинаковы для любого
-   контракта. Здесь они реэкспортируются, чтобы потребители токенов
-   не знали о двух источниках. */
+/* Encoding primitives live in `core/abi`: they are the same for any
+   contract. They are re-exported here so token consumers do not
+   know about two sources. */
 export { decodeUint, encodeCall, encodeCallWithAddress, functionSelector } from '@/core/abi'
 export {
   BALANCE_OF_SELECTOR,

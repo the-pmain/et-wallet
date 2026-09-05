@@ -24,7 +24,7 @@ const PASSWORD = 'Korova-7-Luna!'
 
 const BALANCE = 1_000_000_000_000_000_000n as Wei
 
-/** Владелец кошелька: первый адрес тестовой seed-фразы. */
+/** Wallet owner: first address of the test seed phrase. */
 const OWNER = toAddress(TEST_MNEMONIC_ADDRESSES[0] as string)
 
 const PEER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
@@ -33,12 +33,12 @@ const EDITIONS = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
 const LATEST_BLOCK = 19_500n
 
-/** 32-байтовое слово из числа. */
+/** A 32-byte word from a number. */
 function word(value: bigint): string {
   return value.toString(16).padStart(64, '0')
 }
 
-/** Поступление предмета ERC-721 владельцу: четыре темы, номер в теме. */
+/** ERC-721 inflow to the owner: four topics, the id in a topic. */
 function incoming721(contract: Address, tokenId: bigint): ILogEntry {
   return {
     address: contract,
@@ -56,7 +56,7 @@ function incoming721(contract: Address, tokenId: bigint): ILogEntry {
   }
 }
 
-/** Поступление ERC-1155 владельцу: номер и количество в данных. */
+/** ERC-1155 inflow to the owner: id and quantity in the data. */
 function incoming1155(contract: Address, tokenId: bigint, amount: bigint): ILogEntry {
   return {
     address: contract,
@@ -84,7 +84,6 @@ function renderApp() {
   )
 }
 
-/** Открывает раздел коллекционных токенов. */
 async function openNft(): Promise<void> {
   await screen.findByText('Account 1')
   openPath('/wallet/nft')
@@ -98,8 +97,8 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('NFT: список принадлежащих предметов', () => {
-  it('показывает предмет, оставшийся у владельца', async () => {
+describe('NFT: list of owned items', () => {
+  it('shows an item that is still owned', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -115,9 +114,9 @@ describe('NFT: список принадлежащих предметов', () =
     expect(screen.getByText(/#777/u)).toBeInTheDocument()
   })
 
-  it('не показывает предмет, отданный после получения', async () => {
-    /* Журнал показывает историю, а не текущее состояние. Предмет,
-       полученный вчера и отданный сегодня, остаётся в нём навсегда. */
+  it('does not show an item given away after it was received', async () => {
+    /* The log shows history, not current state. An item received
+       yesterday and given away today stays in it forever. */
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -131,7 +130,7 @@ describe('NFT: список принадлежащих предметов', () =
     expect(await screen.findByText('No items found')).toBeInTheDocument()
   })
 
-  it('показывает количество экземпляров ERC-1155', async () => {
+  it('shows the ERC-1155 instance count', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -142,14 +141,14 @@ describe('NFT: список принадлежащих предметов', () =
     renderApp()
     await openNft()
 
-    /* Количество берётся из остатка на момент запроса, а не из события:
-       часть тиража могла уйти дальше. */
+    /* The count comes from the balance at query time, not from the
+       event: part of the supply may have moved on. */
     expect(await screen.findByText('×2')).toBeInTheDocument()
   })
 
-  it('показывает адрес контракта рядом с названием', async () => {
-    /* Название коллекции задаёт автор контракта, и назвать свою
-       коллекцию именем известной может кто угодно. */
+  it('shows the contract address next to the name', async () => {
+    /* The collection name is set by the contract author, and anyone
+       can name their collection after a famous one. */
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -166,7 +165,7 @@ describe('NFT: список принадлежащих предметов', () =
     expect(row.getByText(new RegExp(PUNKS.slice(0, 6), 'u'))).toBeInTheDocument()
   })
 
-  it('коллекция без названия не получает выдуманного', async () => {
+  it('a collection without a name does not get an invented one', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -181,10 +180,9 @@ describe('NFT: список принадлежащих предметов', () =
   })
 })
 
-describe('NFT: границы поиска', () => {
-  it('называет глубину просмотра в пустом состоянии', async () => {
-    /* Пустой список без объяснения читается владельцем как пропажа
-       имущества. */
+describe('NFT: search bounds', () => {
+  it('names the scan depth in the empty state', async () => {
+    /* An empty list with no explanation reads as missing property. */
     services.providerFactory.configure({ balance: BALANCE, latestBlock: LATEST_BLOCK })
 
     renderApp()
@@ -193,7 +191,7 @@ describe('NFT: границы поиска', () => {
     expect(await screen.findByText(/scans the last/i)).toBeInTheDocument()
   })
 
-  it('отказ узла не выдаётся за отсутствие коллекции', async () => {
+  it('a node failure is not shown as an empty collection', async () => {
     services.providerFactory.configure({
       balance: BALANCE,
       latestBlock: LATEST_BLOCK,
@@ -207,7 +205,7 @@ describe('NFT: границы поиска', () => {
     expect(screen.getByText(/the range is too wide/i)).toBeInTheDocument()
   })
 
-  it('предупреждает, что изображения не загружаются', async () => {
+  it('warns that images are not loaded', async () => {
     services.providerFactory.configure({ balance: BALANCE, latestBlock: LATEST_BLOCK })
 
     renderApp()
@@ -217,7 +215,7 @@ describe('NFT: границы поиска', () => {
   })
 })
 
-describe('NFT: передача предмета', () => {
+describe('NFT: item transfer', () => {
   beforeEach(() => {
     services.providerFactory.configure({
       balance: BALANCE,
@@ -228,7 +226,6 @@ describe('NFT: передача предмета', () => {
     })
   })
 
-  /** Открывает форму передачи найденного предмета. */
   async function openTransfer(): Promise<void> {
     const user = userEvent.setup()
 
@@ -237,14 +234,14 @@ describe('NFT: передача предмета', () => {
     await screen.findByRole('heading', { level: 1, name: 'Transfer an item' })
   }
 
-  it('форма называет предмет и коллекцию', async () => {
+  it('the form names the item and the collection', async () => {
     renderApp()
     await openTransfer()
 
     expect(screen.getByText(/CryptoPunks · #777/u)).toBeInTheDocument()
   })
 
-  it('подтверждение показывает получателя и контракт коллекции', async () => {
+  it('confirmation shows the recipient and the collection contract', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -252,14 +249,14 @@ describe('NFT: передача предмета', () => {
     await user.type(screen.getByLabelText(/Recipient address/), PEER)
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    /* Человек, сверяющий адреса, обязан понимать, почему их два:
-       передачу выполняет контракт коллекции. */
+    /* Someone comparing addresses must understand why there are two:
+       the collection contract performs the transfer. */
     expect(await screen.findByText('Confirm the transfer')).toBeInTheDocument()
     expect(screen.getByText(PEER)).toBeInTheDocument()
     expect(screen.getByText(PUNKS)).toBeInTheDocument()
   })
 
-  it('предупреждает о необратимости', async () => {
+  it('warns that the transfer is irreversible', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -267,12 +264,12 @@ describe('NFT: передача предмета', () => {
     await user.type(screen.getByLabelText(/Recipient address/), PEER)
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    /* Предмет существует в одном экземпляре: отправленный не туда,
-       он не возвращается и не покупается заново. */
+    /* The item exists in one copy: sent to the wrong place, it does
+       not come back and cannot be bought again. */
     expect(await screen.findByText('The transfer cannot be undone')).toBeInTheDocument()
   })
 
-  it('отправка требует пароля и сообщает об успехе', async () => {
+  it('sending asks for the password and reports success', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -286,9 +283,10 @@ describe('NFT: передача предмета', () => {
     expect(await screen.findByText(/The transfer has been sent/i)).toBeInTheDocument()
   })
 
-  it('не даёт передать предмет, принадлежащий другому адресу', async () => {
-    /* Список мог устареть: предмет отдали с другого устройства.
-       Контракт отверг бы вызов и сам, но газ при этом списался бы. */
+  it('does not let an item owned by another address be transferred', async () => {
+    /* The list may be stale: the item was given away from another
+       device. The contract would reject the call itself, but gas
+       would still be spent. */
     const user = userEvent.setup()
 
     renderApp()
@@ -308,7 +306,7 @@ describe('NFT: передача предмета', () => {
   })
 })
 
-describe('NFT: передача в собственную коллекцию', () => {
+describe('NFT: transfer into its own collection', () => {
   beforeEach(() => {
     services.providerFactory.configure({
       balance: BALANCE,
@@ -319,11 +317,11 @@ describe('NFT: передача в собственную коллекцию', (
     })
   })
 
-  it('отвергается до подтверждения', async () => {
-    /* Предмет существует в одном экземпляре, а адрес контракта стоит
-       рядом — и в обозревателе, и в самой карточке. В отличие
-       от прочих замечаний это не повод задуматься, а отказ: законного
-       применения у такой операции нет. */
+  it('is rejected before confirmation', async () => {
+    /* The item exists in one copy, and the contract address sits
+       next to it — in the explorer and on the card itself. Unlike
+       other remarks this is not a prompt to think, it is a refusal:
+       the operation has no legitimate use. */
     const user = userEvent.setup()
 
     renderApp()
@@ -340,7 +338,7 @@ describe('NFT: передача в собственную коллекцию', (
     expect(screen.queryByRole('heading', { name: 'Confirm the transfer' })).not.toBeInTheDocument()
   })
 
-  it('обычный получатель проходит дальше', async () => {
+  it('an ordinary recipient goes further', async () => {
     const user = userEvent.setup()
 
     renderApp()

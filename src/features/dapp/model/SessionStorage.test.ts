@@ -7,11 +7,10 @@ import { SecureSessionStorage } from './SessionStorage'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-/** Запись сессии в том виде, в каком её пишет библиотека. */
 const SESSION_RECORD = {
   topic: 'a'.repeat(64),
-  /* Именно из-за этого поля пространство зашифровано: им шифруется
-     обмен с приложением через relay. */
+  /* This field is why the namespace is encrypted: it encrypts
+     exchange with the app through the relay. */
   symKey: 'b'.repeat(64),
   expiry: 1_800_000_000,
 }
@@ -29,48 +28,47 @@ beforeEach(async () => {
   storage = new SecureSessionStorage(secure, new NullLogger())
 })
 
-describe('Хранилище подключений: переживание перезагрузки', () => {
-  it('записанное читается обратно', async () => {
-    /* Замена собственного хранилища библиотеки обязана сохранять её
-       главное свойство: подключение переживает перезагрузку. */
+describe('Connection storage: surviving reload', () => {
+  it('reads back what was written', async () => {
+    /* Replacing the library's own store must keep its main property:
+       the connection survives reload. */
     await storage.setItem('wc@2:client:session', SESSION_RECORD)
 
     expect(await storage.getItem('wc@2:client:session')).toEqual(SESSION_RECORD)
   })
 
-  it('перечень ключей возвращается целиком', async () => {
-    await storage.setItem('первый', 1)
-    await storage.setItem('второй', 2)
+  it('returns the full key list', async () => {
+    await storage.setItem('first', 1)
+    await storage.setItem('second', 2)
 
-    expect((await storage.getKeys()).sort()).toEqual(['второй', 'первый'])
+    expect((await storage.getKeys()).sort()).toEqual(['first', 'second'])
   })
 
-  it('пары ключ-значение возвращаются вместе', async () => {
-    await storage.setItem('ключ', SESSION_RECORD)
+  it('returns key-value pairs together', async () => {
+    await storage.setItem('key', SESSION_RECORD)
 
-    expect(await storage.getEntries()).toEqual([['ключ', SESSION_RECORD]])
+    expect(await storage.getEntries()).toEqual([['key', SESSION_RECORD]])
   })
 
-  it('удалённое исчезает', async () => {
-    await storage.setItem('ключ', SESSION_RECORD)
-    await storage.removeItem('ключ')
+  it('removed items disappear', async () => {
+    await storage.setItem('key', SESSION_RECORD)
+    await storage.removeItem('key')
 
-    expect(await storage.getItem('ключ')).toBeUndefined()
+    expect(await storage.getItem('key')).toBeUndefined()
     expect(await storage.getKeys()).toEqual([])
   })
 
-  it('отсутствующее читается как `undefined`, а не как `null`', async () => {
-    /* Библиотека различает эти значения: `null` она считает записанным
-       значением и разбирает как состояние сессии. */
-    expect(await storage.getItem('никогда не записывалось')).toBeUndefined()
+  it('a missing item is read as `undefined`, not `null`', async () => {
+    /* The library distinguishes these: it treats `null` as a stored
+       value and parses it as session state. */
+    expect(await storage.getItem('never written')).toBeUndefined()
   })
 })
 
-describe('Хранилище подключений: секреты', () => {
-  it('ключ сессии в базе открытым текстом не лежит', async () => {
-    /* Получивший его читает переписку кошелька с приложением и может
-       выдать себя за кошелёк. В собственной базе библиотеки он лежит
-       открытым текстом. */
+describe('Connection storage: secrets', () => {
+  it('the session key does not sit in the database as plaintext', async () => {
+    /* Whoever has it reads wallet–app traffic and can impersonate
+       the wallet. In the library's own database it sits in plaintext. */
     await storage.setItem('wc@2:client:session', SESSION_RECORD)
 
     const raw = JSON.stringify(
@@ -81,9 +79,9 @@ describe('Хранилище подключений: секреты', () => {
     expect(raw).not.toContain(SESSION_RECORD.topic)
   })
 
-  it('удаление кошелька уносит подключения', async () => {
-    /* Останься они — новый кошелёк на том же устройстве унаследовал бы
-       чужие сессии. */
+  it('deleting the wallet takes connections with it', async () => {
+    /* If they stayed, a new wallet on the same device would inherit
+       foreign sessions. */
     await storage.setItem('wc@2:client:session', SESSION_RECORD)
 
     await secure.destroy()
@@ -93,48 +91,47 @@ describe('Хранилище подключений: секреты', () => {
   })
 })
 
-describe('Хранилище подключений: заблокированный кошелёк', () => {
-  it('чтение при блокировке отдаёт пусто, а не бросает исключение', async () => {
-    /* «Сейчас недоступно» честнее исключения: библиотека начнёт
-       с чистого состояния, а не сломается посреди работы. */
-    await storage.setItem('ключ', SESSION_RECORD)
+describe('Connection storage: locked wallet', () => {
+  it('a read while locked returns empty instead of throwing', async () => {
+    /* "Unavailable now" is more honest than an exception: the
+       library starts clean instead of breaking mid-work. */
+    await storage.setItem('key', SESSION_RECORD)
 
     secure.lock()
 
     expect(await storage.getKeys()).toEqual([])
-    expect(await storage.getItem('ключ')).toBeUndefined()
+    expect(await storage.getItem('key')).toBeUndefined()
     expect(await storage.getEntries()).toEqual([])
   })
 
-  it('запись при блокировке отказывает громко', async () => {
-    /* Молча потерянная запись означает подключение, которое
-       не переживёт перезагрузку, — ровно та неисправность, ради
-       которой это хранилище написано. */
+  it('a write while locked fails loudly', async () => {
+    /* A silently lost record means a connection that will not
+       survive reload — the fault this store exists to prevent. */
     secure.lock()
 
-    await expect(storage.setItem('ключ', SESSION_RECORD)).rejects.toThrow()
+    await expect(storage.setItem('key', SESSION_RECORD)).rejects.toThrow()
   })
 
-  it('после разблокировки записанное на месте', async () => {
-    await storage.setItem('ключ', SESSION_RECORD)
+  it('written data is still there after unlock', async () => {
+    await storage.setItem('key', SESSION_RECORD)
 
     secure.lock()
     await secure.unlock(PASSWORD)
 
-    expect(await storage.getItem('ключ')).toEqual(SESSION_RECORD)
+    expect(await storage.getItem('key')).toEqual(SESSION_RECORD)
   })
 })
 
-describe('Хранилище подключений: испорченная запись', () => {
-  it('нечитаемая запись не лишает работоспособности весь раздел', async () => {
-    /* Подключение будет установлено заново; отказ всего раздела
-       из-за одной записи — цена несоразмерная. */
-    await storage.setItem('целая', SESSION_RECORD)
-    await underlying.set(STORAGE_NAMESPACE.DappSessions, toStorageKey('битая'), 'не шифротекст')
+describe('Connection storage: corrupted record', () => {
+  it('an unreadable record does not take down the whole section', async () => {
+    /* The connection will be established again; failing the whole
+       section over one record is a disproportionate cost. */
+    await storage.setItem('intact', SESSION_RECORD)
+    await underlying.set(STORAGE_NAMESPACE.DappSessions, toStorageKey('broken'), 'not ciphertext')
 
     const entries = await storage.getEntries()
 
-    expect(await storage.getItem('битая')).toBeUndefined()
-    expect(entries).toEqual([['целая', SESSION_RECORD]])
+    expect(await storage.getItem('broken')).toBeUndefined()
+    expect(entries).toEqual([['intact', SESSION_RECORD]])
   })
 })

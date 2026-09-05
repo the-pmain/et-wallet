@@ -11,13 +11,13 @@ import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-/** Первый адрес тестовой фразы — им владеет кошелёк. */
+/** First address of the test phrase — the wallet owns it. */
 const OWNER = toAddress(TEST_MNEMONIC_ADDRESSES[0] as string)
 
-/** Посторонний адрес. Используется как получатель и как самозванец. */
+/** A foreign address. Used as a recipient and as an impersonator. */
 const OUTSIDER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
-/** Десять эфиров: хватает и на перевод, и на комиссию. */
+/** Ten ether: enough for a transfer and the fee. */
 const BALANCE = (10n ** 19n) as Wei
 
 let services: ITestAppServices
@@ -30,12 +30,10 @@ function renderApp() {
   )
 }
 
-/** Настраивает дублёр узла с заданными записями ENS. */
 function withEns(records: readonly IFakeEnsRecord[]): void {
   services.providerFactory.configure({ balance: BALANCE, ensRecords: records })
 }
 
-/** Открывает экран отправки. */
 async function openSend(): Promise<void> {
   const user = userEvent.setup()
 
@@ -44,7 +42,6 @@ async function openSend(): Promise<void> {
   await screen.findByRole('heading', { name: 'Send' })
 }
 
-/** Вводит получателя и дожидается окончания разбора. */
 async function typeRecipient(value: string): Promise<void> {
   const user = userEvent.setup()
 
@@ -63,10 +60,10 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('ENS: прямое разрешение в форме отправки', () => {
-  it('показывает адрес, в который разрешилось имя', async () => {
-    /* Имя удобно, но подписывается адрес. Пользователь обязан увидеть
-       его до того, как нажмёт «Далее». */
+describe('ENS: forward resolution on the send form', () => {
+  it('shows the address the name resolved to', async () => {
+    /* The name is convenient, but the address is signed. The user
+       must see it before they press Next. */
     withEns([{ name: 'shop.eth', address: OUTSIDER }])
 
     renderApp()
@@ -76,7 +73,7 @@ describe('ENS: прямое разрешение в форме отправки'
     expect(await screen.findByText(OUTSIDER)).toBeInTheDocument()
   })
 
-  it('разрешает имя, введённое в верхнем регистре', async () => {
+  it('resolves a name typed in uppercase', async () => {
     withEns([{ name: 'shop.eth', address: OUTSIDER }])
 
     renderApp()
@@ -86,7 +83,7 @@ describe('ENS: прямое разрешение в форме отправки'
     expect(await screen.findByText(OUTSIDER)).toBeInTheDocument()
   })
 
-  it('несуществующее имя не пускает дальше', async () => {
+  it('a name that does not exist does not go further', async () => {
     withEns([])
 
     renderApp()
@@ -97,12 +94,12 @@ describe('ENS: прямое разрешение в форме отправки'
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('имя с подменённой буквой отвергается с объяснением', async () => {
-    /* Кириллическая «а» неотличима от латинской на экране. Разрешив
-       такое имя, кошелёк отправил бы средства владельцу похожего
-       имени. Символ собирается из кода: литералом он был бы
-       непроверяем при чтении. */
-    const spoofed = `vit${String.fromCodePoint(0x0430)}lik.eth`
+  it('a name with a swapped letter is rejected with an explanation', async () => {
+    /* A Cyrillic a (U+0430) is indistinguishable from a Latin one on
+       screen. Resolving such a name would send funds to the owner of
+       a look-alike. The character is built from a code point: as a
+       literal it would be uncheckable when reading the test. */
+    const spoofed = `vit${'\u0430'}lik.eth`
 
     withEns([{ name: 'vitalik.eth', address: OUTSIDER }])
 
@@ -114,10 +111,10 @@ describe('ENS: прямое разрешение в форме отправки'
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('имя с эмодзи разрешается и помечается как нелатинское', async () => {
-    /* ENSIP-15 такое имя принимает, и кошелёк обязан его отправлять.
-       Но имя, записанное не латиницей, может выглядеть как чужое —
-       об этом сказано прямо, без запрета. */
+  it('a name with emoji resolves and is marked as non-Latin', async () => {
+    /* ENSIP-15 accepts such a name, and the wallet must send it.
+       But a name not written in Latin can look like someone else's —
+       that is said plainly, without a ban. */
     withEns([{ name: '\u{1F600}.eth', address: OUTSIDER }])
 
     renderApp()
@@ -128,9 +125,9 @@ describe('ENS: прямое разрешение в форме отправки'
     expect(screen.getByText(/The name is not written in Latin script/i)).toBeInTheDocument()
   })
 
-  it('латинское имя оговоркой о письменности не сопровождается', async () => {
-    /* Ложные тревоги учат не читать настоящие: оговорка появляется
-       только там, где для неё есть основание. */
+  it('a Latin name is not accompanied by a script caveat', async () => {
+    /* False alarms train people not to read real ones: the caveat
+       appears only where it has a reason. */
     withEns([{ name: 'shop.eth', address: OUTSIDER }])
 
     renderApp()
@@ -142,7 +139,7 @@ describe('ENS: прямое разрешение в форме отправки'
     expect(screen.queryByText(/The name is not written in Latin script/i)).not.toBeInTheDocument()
   })
 
-  it('на подтверждении имя показывается вместе с адресом, а не вместо него', async () => {
+  it('confirmation shows the name together with the address, not instead of it', async () => {
     const user = userEvent.setup()
 
     withEns([{ name: 'shop.eth', address: OUTSIDER }])
@@ -168,8 +165,8 @@ describe('ENS: прямое разрешение в форме отправки'
   })
 })
 
-describe('ENS: обратное разрешение', () => {
-  it('подписывает свой аккаунт именем вместо адреса', async () => {
+describe('ENS: reverse resolution', () => {
+  it('labels its own account with a name instead of the address', async () => {
     withEns([{ name: 'me.eth', address: OWNER, reverseFor: OWNER }])
 
     renderApp()
@@ -177,17 +174,18 @@ describe('ENS: обратное разрешение', () => {
     expect(await screen.findByText('me.eth')).toBeInTheDocument()
   })
 
-  it('не показывает имя, которое указывает на чужой адрес', async () => {
-    /* САМАЯ ВАЖНАЯ ПРОВЕРКА. Обратную запись задаёт владелец адреса,
-       и объявить себя `vitalik.eth` вправе кто угодно. Показав её
-       без сверки, кошелёк подписал бы подделку своим интерфейсом. */
+  it("does not show a name that points at someone else's address", async () => {
+    /* THE MOST IMPORTANT CHECK. The reverse record is set by the
+       address owner, and anyone may call themselves `vitalik.eth`.
+       Showing it without a check would endorse a fake with the
+       wallet UI. */
     withEns([{ name: 'vitalik.eth', address: OUTSIDER, reverseFor: OWNER }])
 
     renderApp()
     await screen.findByText('Account 1')
 
-    /* Ждём завершения загрузки данных аккаунта: имя, если бы оно
-       показывалось, появилось бы к этому моменту. */
+    /* Wait until account data has loaded: a name, if it were shown,
+       would have appeared by now. */
     await waitFor(() => {
       expect(services.session.getSnapshot().isEnsSupported).toBe(true)
     })
@@ -195,7 +193,7 @@ describe('ENS: обратное разрешение', () => {
     expect(screen.queryByText('vitalik.eth')).not.toBeInTheDocument()
   })
 
-  it('называет имя адреса, введённого в поле получателя', async () => {
+  it('names the address typed in the recipient field', async () => {
     withEns([{ name: 'shop.eth', address: OUTSIDER, reverseFor: OUTSIDER }])
 
     renderApp()
@@ -206,11 +204,11 @@ describe('ENS: обратное разрешение', () => {
   })
 })
 
-describe('ENS: другие сети', () => {
-  it('в сети без реестра имя не разрешается и это сказано прямо', async () => {
-    /* Разрешить имя из Polygon можно было бы, лишь открыв второе
-       соединение с узлом Ethereum — незаметно для владельца,
-       считающего, что он в другой сети. */
+describe('ENS: other networks', () => {
+  it('on a network without a registry the name is not resolved and that is said plainly', async () => {
+    /* Resolving a name from Polygon would mean opening a second
+       connection to an Ethereum node — unnoticed by an owner who
+       thinks they are on another network. */
     const user = userEvent.setup()
 
     withEns([{ name: 'shop.eth', address: OUTSIDER }])
@@ -225,8 +223,8 @@ describe('ENS: другие сети', () => {
     expect(await screen.findByText(/only in the Ethereum network/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
 
-    /* Адрес в той же сети принимается: ENS ограничивает разбор имён,
-       а не отправку. */
+    /* An address on the same network is accepted: ENS limits name
+       resolution, not sending. */
     await user.clear(screen.getByLabelText(/Recipient address/))
     await typeRecipient(OUTSIDER)
     await user.type(screen.getByLabelText(/Amount/), '1')

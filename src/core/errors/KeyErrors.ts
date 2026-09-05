@@ -1,13 +1,12 @@
 import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 
-/** Ошибки работы с ключами, адресами и путями деривации. */
-
 /**
- * Путь деривации не соответствует формату BIP-32.
+ * The derivation path does not match the BIP-32 format.
  *
- * Сообщение содержит сам путь: он не является секретом. Путь описывает
- * позицию ключа в дереве, но не даёт никакой информации о самом ключе.
+ * The message includes the path: it is not a secret. The path describes
+ * the key's position in the tree and gives no information about the
+ * key itself.
  */
 export class InvalidDerivationPathError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidDerivationPath
@@ -18,10 +17,10 @@ export class InvalidDerivationPathError extends AppError {
 }
 
 /**
- * Расширенный ключ не разбирается.
+ * An extended key does not parse.
  *
- * Сообщение НЕ содержит самого ключа: xprv является секретом, дающим доступ
- * ко всему поддереву. Даже частичное попадание его в журнал недопустимо.
+ * The message does NOT contain the key: an xprv is a secret that opens
+ * the whole subtree. Even a fragment of it in a log is forbidden.
  */
 export class InvalidExtendedKeyError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidExtendedKey
@@ -31,7 +30,6 @@ export class InvalidExtendedKeyError extends AppError {
   }
 }
 
-/** Строка не является адресом EVM. */
 export class InvalidAddressError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidAddress
 
@@ -41,15 +39,15 @@ export class InvalidAddressError extends AppError {
 }
 
 /**
- * Контрольная сумма адреса по EIP-55 не сходится.
+ * The EIP-55 address checksum does not match.
  *
- * Отдельная ошибка, а не «некорректный адрес», потому что означает другое:
- * набор символов правильный, но регистр букв им не соответствует. Практически
- * всегда это опечатка при ручном вводе либо повреждение при копировании.
+ * A separate error, not "invalid address", because it means something
+ * else: the character set is correct, but the letter case does not
+ * match. Almost always a typo on manual entry or damage on copy.
  *
- * Молча привести такой адрес к правильному регистру НЕЛЬЗЯ: в этом случае
- * EIP-55 перестаёт выполнять свою единственную задачу — ловить опечатки
- * до отправки средств на несуществующий адрес.
+ * Silently fixing the case of such an address is FORBIDDEN: EIP-55
+ * would then stop doing its only job — catching typos before funds
+ * are sent to a nonexistent address.
  */
 export class AddressChecksumMismatchError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AddressChecksumMismatch
@@ -62,7 +60,6 @@ export class AddressChecksumMismatchError extends AppError {
   }
 }
 
-/** Публичный ключ имеет недопустимую длину либо не лежит на кривой. */
 export class InvalidPublicKeyError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidPublicKey
 

@@ -10,72 +10,66 @@ import {
 import type { Address, HexString } from '@/core/types'
 
 /**
- * Кодирование вызовов ERC-20.
+ * ERC-20 call encoding.
  *
- * ЗДЕСЬ ТОЛЬКО ЗНАНИЕ СТАНДАРТА: селекторы функций и разбор их
- * аргументов. Правила кодирования — длина слова, выравнивание адреса,
- * чтение чисел и строк — живут в `core/abi` и общие для всех
- * контрактов.
+ * THIS MODULE HOLDS ONLY STANDARD KNOWLEDGE: function selectors and
+ * argument parsing. Encoding rules — word length, address padding,
+ * reading numbers and strings — live in `core/abi` and are shared
+ * by every contract.
  */
 
-/** Краткое имя для объявлений внутри этого модуля. */
 const selector = functionSelector
 
-/** `decimals()` — число десятичных знаков. */
 export const DECIMALS_SELECTOR = selector('decimals()')
 
-/** `symbol()` — краткое обозначение. */
 export const SYMBOL_SELECTOR = selector('symbol()')
 
-/** `name()` — полное имя. */
 export const NAME_SELECTOR = selector('name()')
 
-/** `balanceOf(address)` — баланс владельца. */
 export const BALANCE_OF_SELECTOR = selector('balanceOf(address)')
 
-/** `transfer(address,uint256)` — перевод токена. */
 export const TRANSFER_SELECTOR = selector('transfer(address,uint256)')
 
 /**
- * Кодирует вызов `transfer(address,uint256)`.
+ * Encodes a `transfer(address,uint256)` call.
  *
- * ЭТО МЕСТО, ГДЕ ОШИБКА СТОИТ СРЕДСТВ. Данные вызова — единственное,
- * что определяет получателя и сумму перевода токена: поле `to` самой
- * транзакции указывает на контракт, а не на человека. Ошибка
- * в кодировании отправит токены не туда, и вернуть их будет нельзя.
+ * THIS IS WHERE A MISTAKE COSTS FUNDS. Call data is the only thing
+ * that names the token recipient and amount: the transaction's own
+ * `to` points at the contract, not at a person. A encoding error
+ * sends tokens elsewhere, and they cannot be returned.
  *
- * КОДИРОВАНИЕ ВЫПОЛНЯЕТСЯ В ЯДРЕ, А НЕ В ИНТЕРФЕЙСЕ. Экран отправки
- * оперирует получателем и суммой; собирать из них байты вызова —
- * работа слоя, который знает стандарт.
+ * ENCODING IS DONE IN THE CORE, NOT IN THE UI. The send screen
+ * works with a recipient and an amount; assembling call bytes from
+ * them is the job of the layer that knows the standard.
  *
- * @throws RangeError если сумма отрицательна либо не помещается
- *         в `uint256`: молча обрезанное значение отправило бы совсем
- *         не ту сумму, которую подтвердил пользователь.
+ * @throws RangeError if the amount is negative or does not fit
+ *         in `uint256`: a silently truncated value would send
+ *         a completely different amount than the user confirmed.
  */
 export function encodeTransfer(to: Address, amount: bigint): HexString {
   return `0x${TRANSFER_SELECTOR}${encodeAddressWord(to)}${encodeUintWord(amount)}` as HexString
 }
 
 /**
- * Разбирает вызов `transfer(address,uint256)`.
+ * Parses a `transfer(address,uint256)` call.
  *
- * ЗАЧЕМ ЧИТАТЬ ТО, ЧТО САМИ СОБРАЛИ. Запись истории строится из данных
- * подписанной транзакции, а не из намерения, которое было до подписи.
- * Так в историю попадает ровно то, что ушло в сеть: если между формой
- * и подписью что-то разошлось, запись покажет действительное содержимое,
- * а не желаемое.
+ * WHY READ BACK WHAT WE ASSEMBLED. History is built from the signed
+ * transaction data, not from the intent that existed before the
+ * signature. That way history records exactly what went on-chain:
+ * if the form and the signature diverged, the record shows the
+ * actual contents, not the desired ones.
  *
- * @returns `null`, если данные не являются вызовом `transfer` нужной
- *          длины. Ошибка здесь неуместна: перевод токена — лишь один
- *          из возможных вызовов.
+ * @returns `null` if the data is not a `transfer` call of the
+ *          expected length. Throwing here is wrong: a token transfer
+ *          is only one of the possible calls.
  */
 export function decodeTransfer(
   data: HexString,
 ): { readonly to: Address; readonly amount: bigint } | null {
   const body = strip(data)
 
-  /* Селектор занимает четыре байта, аргументы — два слова. Более
-     длинные данные означают другой вызов с тем же началом. */
+  /* The selector is four bytes, the arguments two words. Longer
+     data means a different call that happens to start the same way. */
   if (body.length !== SELECTOR_LENGTH + WORD_LENGTH * 2) {
     return null
   }
@@ -84,9 +78,9 @@ export function decodeTransfer(
     return null
   }
 
-  /* Слово с ненулевыми старшими байтами адресом не является: выдать
-     его за получателя значило бы показать на экране подтверждения
-     того, кого в вызове нет. */
+  /* A word with non-zero high bytes is not an address: presenting
+     it as the recipient would show on the confirmation screen
+     someone who is not in the call. */
   const to = readAddressWord(body.slice(SELECTOR_LENGTH, SELECTOR_LENGTH + WORD_LENGTH))
 
   if (to === null) {
@@ -97,21 +91,21 @@ export function decodeTransfer(
 }
 
 /**
- * Читает строку из ответа контракта.
+ * Reads a string from a contract response.
  *
- * ПОДДЕРЖИВАЮТСЯ ДВА ВИДА ОТВЕТА, И ЭТО НЕ ИЗБЫТОЧНОСТЬ.
+ * TWO RESPONSE SHAPES ARE SUPPORTED, AND THAT IS NOT REDUNDANCY.
  *
- * Стандарт ERC-20 объявляет `symbol()` и `name()` возвращающими `string`,
- * то есть данные переменной длины: смещение, длина, содержимое. Но
- * значительная часть ранних токенов — MKR среди самых известных — была
- * выпущена до окончательной редакции стандарта и возвращает `bytes32`
- * с дополнением нулями справа.
+ * ERC-20 declares `symbol()` and `name()` as returning `string`,
+ * i.e. variable-length data: offset, length, contents. A large
+ * share of early tokens — MKR among the best known — shipped
+ * before the final standard and return `bytes32` right-padded
+ * with zeros.
  *
- * Декодер, понимающий только `string`, не добавит такие токены вовсе.
- * Различаются они по длине ответа: ровно одно слово означает `bytes32`,
- * два и более — строку переменной длины.
+ * A decoder that understands only `string` will not add those
+ * tokens at all. They are told apart by response length: exactly
+ * one word means `bytes32`, two or more — a variable-length string.
  *
- * @throws Error если ответ пуст либо не разбирается.
+ * @throws Error if the response is empty or cannot be parsed.
  */
 export function decodeString(data: HexString): string {
   const body = strip(data)
@@ -120,8 +114,8 @@ export function decodeString(data: HexString): string {
     throw new Error('the contract returned an empty response')
   }
 
-  /* Одно слово — это `bytes32`: значение лежит прямо в нём, дополненное
-     нулями справа до конца. */
+  /* One word is `bytes32`: the value sits in it, right-padded
+     with zeros to the end. */
   if (body.length <= WORD_LENGTH) {
     return decodeBytes32(body)
   }
@@ -130,11 +124,11 @@ export function decodeString(data: HexString): string {
 }
 
 /**
- * Разбирает строку переменной длины в кодировке ABI.
+ * Parses a variable-length ABI-encoded string.
  *
- * Первое слово — смещение до данных, второе по этому смещению — длина
- * в байтах, далее содержимое. Смещение читается, а не предполагается
- * равным 32: стандарт этого не гарантирует.
+ * The first word is the offset to the data; the word at that offset
+ * is the length in bytes, then the contents. The offset is read,
+ * not assumed to be 32: the standard does not guarantee that.
  */
 function decodeDynamicString(body: string): string {
   const offset = Number(BigInt(`0x${body.slice(0, WORD_LENGTH)}`)) * 2
@@ -151,13 +145,13 @@ function decodeDynamicString(body: string): string {
   return hexToUtf8(content)
 }
 
-/** Разбирает `bytes32`: содержимое до первого нулевого байта. */
+/** Parses `bytes32`: contents up to the first zero byte. */
 function decodeBytes32(body: string): string {
   const padded = body.padEnd(WORD_LENGTH, '0')
 
-  /* Нулевой байт может оказаться на нечётной позиции внутри символа —
-     тогда это часть значащего байта, а не признак конца. Поиск идёт
-     по парам символов. */
+  /* A zero byte can land on an odd position inside a character —
+     then it is part of a significant byte, not an end marker.
+     The search walks pairs of characters. */
   let end = padded.length
 
   for (let index = 0; index < padded.length; index += 2) {
@@ -170,7 +164,6 @@ function decodeBytes32(body: string): string {
   return hexToUtf8(padded.slice(0, end))
 }
 
-/** Переводит шестнадцатеричную строку в текст. */
 function hexToUtf8(hex: string): string {
   const bytes = new Uint8Array(hex.length / 2)
 

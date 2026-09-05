@@ -1,62 +1,57 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Порт, на котором `vite preview` отдаёт собранное приложение.
+ * Port where `vite preview` serves the built app.
  *
- * Отличается от порта `vite preview` по умолчанию (4173): проверки
- * должны запускаться и тогда, когда предпросмотр уже открыт вручную.
- * Совпадение портов превращало бы забытую вкладку в непонятный отказ
- * всего набора.
+ * Different from the default `vite preview` port (4173): the suite must
+ * still run when a preview tab is already open by hand. Sharing the port
+ * would turn a forgotten tab into an unexplained failure of the whole set.
  */
 const PORT = 4190
 
 /**
- * Настройка сквозных проверок.
+ * End-to-end check setup.
  *
- * ПРОВЕРЯЕТСЯ СОБРАННОЕ ПРИЛОЖЕНИЕ, А НЕ dev-СЕРВЕР. Это единственный
- * способ поймать целый класс дефектов, недоступный ни модульным
- * проверкам, ни jsdom:
+ * THE BUILT APP IS CHECKED, NOT THE DEV SERVER. That is the only way to
+ * catch a class of defects that unit tests and jsdom cannot see:
  *
- * - неверное отсечение неиспользуемого кода. Объявление
- *   `"sideEffects"` в `package.json` разрешает сборщику выбрасывать
- *   модули; ошибка здесь проявляется только в собранном виде;
- * - разбиение на чанки. Экран, чанк которого не загрузился, в тестах
- *   на jsdom выглядит исправным: там `import()` разрешается
- *   немедленно и локально;
- * - CSP. Политика внедряется только в production-сборку и действует
- *   только в настоящем браузере. Meta-тег в разметке ничего
- *   не доказывает — доказывает заблокированный браузером скрипт.
+ * - wrong unused-code stripping. `"sideEffects"` in `package.json` lets
+ *   the bundler drop modules; a mistake here shows up only in the build;
+ * - chunk splitting. A screen whose chunk failed to load looks fine in
+ *   jsdom: there `import()` resolves immediately and locally;
+ * - CSP. The policy is injected only into the production build and only
+ *   takes effect in a real browser. A meta tag in the markup proves
+ *   nothing — a script the browser blocked does.
  *
- * ЗАПУСКАЕТСЯ ОТДЕЛЬНОЙ КОМАНДОЙ, А НЕ В СОСТАВЕ `npm run verify`.
- * Сквозные проверки требуют сборки и загруженного браузера
- * (~115 МБ) — держать это в проверке, которая должна проходить
- * за минуту и без сети, нельзя.
+ * RUN AS A SEPARATE COMMAND, NOT INSIDE `npm run verify`. End-to-end
+ * checks need a build and a downloaded browser (~115 MB) — they cannot
+ * live in a check that must pass in a minute with no network.
  */
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
 
   /*
-    Число одновременных браузеров ограничено намеренно.
+    Concurrent browsers are capped on purpose.
 
-    Каждая проверка разворачивает кошелёк, а это два вывода ключа
-    по 600 000 итераций PBKDF2 — операция, дорогая ПО ЗАМЫСЛУ: она
-    и защищает от подбора пароля. Десяток таких проверок разом
-    упирается в процессор, и проверки начинают падать по времени
-    ожидания, не имея отношения к работе кошелька.
+    Each check unlocks the wallet — two key derivations of 600,000
+    PBKDF2 iterations, expensive BY DESIGN: that is what resists
+    password guessing. A dozen of those at once saturates the CPU,
+    and checks start failing on timeouts that have nothing to do
+    with the wallet.
   */
   workers: 2,
 
   /*
-    Ожидание длиннее принятого по умолчанию — по той же причине.
-    Пять секунд по умолчанию рассчитаны на отрисовку, а здесь между
-    нажатием и появлением экрана лежит вывод ключа.
+    The wait is longer than the default for the same reason.
+    Five seconds by default is for a paint; here key derivation
+    sits between the click and the screen.
   */
   expect: { timeout: 20_000 },
 
-  /* Повторов нет: перезапуск скрывает нестабильность вместо того,
-     чтобы её показать. Для кошелька плавающая проверка опаснее
-     падающей — она приучает не смотреть на результат. */
+  /* No retries: a rerun hides flakiness instead of showing it.
+     For a wallet a flaky check is worse than a failing one —
+     it trains people not to look at the result. */
   retries: 0,
 
   reporter: [['list']],
@@ -65,25 +60,25 @@ export default defineConfig({
     baseURL: `http://localhost:${String(PORT)}`,
 
     /*
-      Язык браузера закреплён.
+      Browser language is pinned.
 
-      Приложение выбирает язык по настройкам браузера, а у Chromium
-      по умолчанию английский. Без закрепления набор проверял бы
-      не кошелёк, а локаль машины: те же проверки на другой машине
-      искали бы другие подписи. Тот же приём применён в среде
-      модульных проверок — см. `src/test/setup.ts`.
+      The app picks its language from the browser, and Chromium
+      defaults to English. Without a pin the suite would test the
+      machine locale, not the wallet: the same checks on another
+      machine would look for different labels. The same pin is
+      used in the unit-test environment — see `src/test/setup.ts`.
     */
     locale: 'ru-RU',
-    /* След записывается только для упавшей проверки: он тяжёлый
-       и содержит разметку страницы целиком. */
+    /* A trace is kept only for a failed check: it is heavy and
+       holds the full page markup. */
     trace: 'retain-on-failure',
   },
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
   webServer: {
-    /* Сборка выполняется здесь же: проверять предыдущую сборку —
-       значит проверять не тот код, который сейчас правят. */
+    /* The build runs here: checking a previous build means
+       checking code that is not the one being edited. */
     command: `npm run build && npm run preview -- --port ${String(PORT)} --strictPort`,
     url: `http://localhost:${String(PORT)}`,
     reuseExistingServer: false,

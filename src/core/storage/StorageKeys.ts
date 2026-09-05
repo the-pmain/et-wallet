@@ -3,14 +3,14 @@ import { InvalidArgumentError } from '@/core/errors'
 import type { StorageKey } from './types'
 
 /**
- * Создаёт ключ хранилища.
+ * Creates a storage key.
  *
- * Единственный допустимый способ получить значение типа `StorageKey`.
- * Существование конструктора важнее его простоты: он делает список ключей
- * централизуемым. Строковые литералы, разбросанные по коду, неизбежно
- * приводят к коллизиям и к «потерянным» записям, которые никто не читает.
+ * The only allowed way to obtain a `StorageKey`. The constructor's
+ * existence matters more than its simplicity: it makes the key list
+ * centralizable. String literals scattered through the code inevitably
+ * lead to collisions and to "lost" records that nobody reads.
  *
- * @throws InvalidArgumentError если ключ пуст.
+ * @throws InvalidArgumentError if the key is empty.
  */
 export function toStorageKey(value: string): StorageKey {
   if (value.length === 0) {
@@ -21,132 +21,133 @@ export function toStorageKey(value: string): StorageKey {
 }
 
 /**
- * Ключи настроек приложения.
+ * Application settings keys.
  *
- * Пространство имён `Settings` хранит скалярные значения, не относящиеся
- * к какой-либо коллекции. Все такие ключи объявляются здесь.
+ * The `Settings` namespace stores scalar values that do not belong
+ * to any collection. All such keys are declared here.
  */
 export const SETTINGS_KEY = {
-  /** Идентификатор активной сети, десятичной строкой. */
+  /** Active network id, as a decimal string. */
   ActiveChainId: toStorageKey('network.activeChainId'),
 
   /**
-   * Согласие на обращение к стороннему источнику курсов.
+   * Consent to call a third-party price source.
    *
-   * Отсутствие ключа означает «не спрашивали» и равносильно отказу:
-   * курсы не запрашиваются, пока пользователь не разрешил явно.
-   * Запрос курса называет сервису адрес контракта, то есть сообщает
-   * состав портфеля, и такое решение принимает владелец средств,
-   * а не умолчание в коде.
+   * A missing key means "never asked" and is equivalent to refusal:
+   * prices are not requested until the user allows it explicitly.
+   * A price request names a contract address to the service, i.e.
+   * discloses the portfolio, and that decision belongs to the owner
+   * of the funds, not to a default in the code.
    */
   PricesEnabled: toStorageKey('prices.enabled'),
 
   /**
-   * Согласие на обращение к стороннему источнику симуляции.
+   * Consent to call a third-party simulation source.
    *
-   * ОТДЕЛЬНО ОТ СОГЛАСИЯ НА КУРСЫ, И ЭТО НЕ ФОРМАЛЬНОСТЬ. Курсам
-   * уходит состав портфеля — сведения о том, чем владелец уже владеет.
-   * Симуляции уходит НАМЕРЕНИЕ: адрес, получатель, сумма и данные
-   * вызова, причём до подписи, то есть включая транзакции, от которых
-   * владелец в итоге отказался. Согласие на первое не является
-   * согласием на второе.
+   * SEPARATE FROM PRICE CONSENT, AND THAT IS NOT FORMALITY. Prices
+   * receive the portfolio — what the owner already holds. Simulation
+   * receives INTENT: address, recipient, amount, and call data,
+   * before signing, including transactions the owner later declined.
+   * Consent to the first is not consent to the second.
    */
   SimulationSourceEnabled: toStorageKey('simulation.sourceEnabled'),
 
   /**
-   * Учётные данные Tenderly, введённые владельцем.
+   * Tenderly credentials entered by the owner.
    *
-   * ЛЕЖАТ В ЗАШИФРОВАННОМ ПРОСТРАНСТВЕ, потому что ключ доступа —
-   * это секрет: получивший его тратит чужую квоту и читает историю
-   * симуляций проекта.
+   * THEY LIVE IN THE ENCRYPTED NAMESPACE, because an access key is
+   * a secret: whoever has it spends someone else's quota and reads
+   * the project's simulation history.
    *
-   * КЛЮЧ КАЖДОГО ВЛАДЕЛЬЦА СВОЙ, А НЕ ОБЩИЙ НА СБОРКУ. Ключ, вшитый
-   * в сборку, достаётся любому, кто открыл кошелёк: он лежит в тексте
-   * программы. Тогда счёт был бы общим, а оператор видел бы сложенный
-   * поток намерений всех пользователей под одной учётной записью.
+   * EACH OWNER'S KEY IS THEIR OWN, NOT SHARED ACROSS THE BUILD. A
+   * key baked into the build belongs to anyone who opened the wallet:
+   * it sits in the program text. Then the account would be shared,
+   * and the operator would see the combined stream of every user's
+   * intents under one account.
    */
   TenderlyAccount: toStorageKey('simulation.tenderly.account'),
   TenderlyProject: toStorageKey('simulation.tenderly.project'),
   TenderlyAccessKey: toStorageKey('simulation.tenderly.accessKey'),
 
   /**
-   * Имя пользователя — подпись кошелька в интерфейсе.
+   * User name — the wallet's label in the UI.
    *
-   * ЭТО МЕТКА, А НЕ УЧЁТНАЯ ЗАПИСЬ: сервера, который сверял бы пару
-   * «имя — пароль», не существует. Хранится в защищённом пространстве,
-   * потому что связывает устройство с тем, как владелец себя называет,
-   * и лежать рядом с открытыми настройками не должно.
+   * THIS IS A LABEL, NOT AN ACCOUNT: there is no server that would
+   * check a name–password pair. Stored in the protected namespace
+   * because it ties the device to how the owner calls themselves,
+   * and it must not sit next to open settings.
    */
   UserName: toStorageKey('user.name'),
 
   /**
-   * Прежний ключ с адресом электронной почты.
+   * Former key that held an email address.
    *
-   * ОСТАВЛЕН РАДИ КОШЕЛЬКОВ, СОЗДАННЫХ ДО ЗАМЕНЫ ПОЧТЫ ИМЕНЕМ. Значение
-   * читается один раз — чтобы подставить его как имя, — и больше
-   * не записывается. Удалить ключ из кода значило бы, что у прежних
-   * кошельков подпись молча исчезнет.
+   * KEPT FOR WALLETS CREATED BEFORE EMAIL WAS REPLACED BY A NAME.
+   * The value is read once — to use it as a name — and is never
+   * written again. Removing the key from the code would silently
+   * drop the label on those older wallets.
    */
   UserEmail: toStorageKey('user.email'),
 
   /**
-   * Идентификатор строки в таблице `public.users`.
+   * Row id in the `public.users` table.
    *
-   * Нужен, чтобы после выхода из кабинета открыть запись
-   * `GET /v1/users/:id`, а не создавать её заново. Лежит
-   * в защищённом пространстве: без пароля от хранилища его
-   * не прочитать, а `localStorage` при выходе стирается.
+   * Needed so that after leaving the cabinet the record can be
+   * opened via `GET /v1/users/:id` instead of being created again.
+   * Lives in the protected namespace: without the storage password
+   * it cannot be read, and `localStorage` is wiped on logout.
    */
   RemoteUserId: toStorageKey('user.remoteId'),
 
   /**
-   * Поиск занятых адресов уже выполнялся.
+   * Occupied-address discovery has already run.
    *
-   * ЗАЧЕМ ПОМНИТЬ. Поиск сообщает оператору узла два десятка адресов
-   * разом и связывает их между собой — то, что кошелёк обычно старается
-   * не делать. Один раз это оправдано: без него восстановленный кошелёк
-   * молча теряет аккаунты. При каждом запуске — уже нет.
+   * WHY REMEMBER. Discovery tells the node operator about twenty
+   * addresses at once and links them together — something a wallet
+   * usually tries not to do. Once is justified: without it a restored
+   * wallet silently loses accounts. On every launch — no longer.
    */
   AccountsDiscovered: toStorageKey('accounts.discovered'),
 
-  /** Выбранный язык интерфейса. Секретом не является. */
+  /** Chosen UI language. Not a secret. */
   Language: toStorageKey('ui.language'),
 
-  /** Срок бездействия до автоблокировки в миллисекундах. */
+  /** Idle time before auto-lock, in milliseconds. */
   AutoLockTimeoutMs: toStorageKey('security.autoLockTimeoutMs'),
 
   /**
-   * Состояние ограничителя попыток ввода пароля.
+   * Password-attempt throttle state.
    *
-   * ЛЕЖИТ В НЕЗАШИФРОВАННЫХ НАСТРОЙКАХ ВЫНУЖДЕННО. Ограничитель обязан
-   * работать до разблокировки, то есть тогда, когда ключ дешифрования
-   * ещё не выведен и зашифрованное хранилище недоступно.
+   * LIVES IN UNENCRYPTED SETTINGS OUT OF NECESSITY. The throttle
+   * must work before unlock, i.e. when the decryption key is not
+   * yet derived and encrypted storage is unavailable.
    *
-   * Следствие названо прямо: тот, у кого есть доступ к диску, счётчик
-   * обнулит. Против него ограничитель и не рассчитан — от подбора
-   * по украденной копии хранилища защищает стойкость вывода ключа.
+   * The consequence is named outright: whoever has disk access can
+   * zero the counter. The throttle is not built against them —
+   * resistance of key derivation protects against guessing on a
+   * stolen storage copy.
    */
   UnlockThrottle: toStorageKey('security.unlockThrottle'),
 
   /**
-   * Требовать пароль перед подписью транзакции.
+   * Require a password before signing a transaction.
    *
-   * Отсутствие записи означает «включено»: защита, выключенная
-   * по умолчанию, защитой не является.
+   * A missing record means "on": protection that is off by default
+   * is not protection.
    */
   ConfirmBeforeSigning: toStorageKey('security.confirmBeforeSigning'),
 } as const
 
 /**
- * Ключи зашифрованного хранилища ключей.
+ * Encrypted key-vault keys.
  *
- * Объявлены здесь, а не в модуле, который их пишет, потому что читателей
- * больше одного: мнемоническую фразу записывает онбординг, а читает слой
- * сессии кошелька при выводе HD-дерева. Строковый литерал, продублированный
- * в двух местах, расходится при первом же переименовании, и кошелёк
- * перестаёт находить собственную фразу.
+ * Declared here, not in the module that writes them, because there
+ * is more than one reader: onboarding writes the mnemonic, and the
+ * wallet-session layer reads it when deriving the HD tree. A string
+ * literal duplicated in two places drifts on the first rename, and
+ * the wallet stops finding its own phrase.
  */
 export const VAULT_KEY = {
-  /** Мнемоническая фраза BIP-39 в виде строки. */
+  /** BIP-39 mnemonic as a string. */
   Mnemonic: toStorageKey('wallet.mnemonic'),
 } as const

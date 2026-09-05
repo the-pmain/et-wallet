@@ -1,40 +1,37 @@
 import type { Plugin } from 'vite'
 
 /**
- * Content-Security-Policy для production-сборки.
+ * Content-Security-Policy for the production build.
  *
- * Директивы намеренно узкие:
- * - `script-src 'self'`   — исполняется только код из бандла. Любой inline-скрипт,
- *                           внедрённый через XSS, будет заблокирован браузером.
- * - `object-src 'none'`   — запрет плагинов (Flash, PDF-embed и т. п.).
- * - `base-uri 'self'`     — защита от подмены базового URL (base-tag injection).
+ * Directives are intentionally narrow:
+ * - `script-src 'self'`   — only bundle code runs. Any inline script
+ *                           injected via XSS is blocked by the browser.
+ * - `object-src 'none'`   — no plugins (Flash, PDF-embed, and the like).
+ * - `base-uri 'self'`     — blocks base-URL swap (base-tag injection).
  *
- * `style-src` вынужденно содержит `'unsafe-inline'`: Radix UI и Tailwind-анимации
- * выставляют inline-стили через атрибут `style`. Это не даёт исполнения кода,
- * но при появлении CSS-инъекций стоит пересмотреть.
+ * `style-src` must include `'unsafe-inline'`: Radix UI and Tailwind
+ * animations set inline styles via the `style` attribute. That does
+ * not execute code, but CSS injection would need a revisit.
  *
- * `connect-src` ПО УМОЛЧАНИЮ РАЗРЕШАЕТ ЛЮБОЙ HTTPS, И ЭТО ОСОЗНАННЫЙ
- * ОБМЕН. Пользователь вправе указать собственный RPC-узел — адрес,
- * который на этапе сборки неизвестен. Перечень, составленный
- * из встроенных сетей, отменил бы эту возможность, а она и есть главная
- * защита приватности запросов: без своего узла оператор чужого видит
- * IP и все адреса владельца.
+ * `connect-src` ALLOWS ANY HTTPS BY DEFAULT, A DELIBERATE TRADE.
+ * The user may point at their own RPC node — an address unknown at
+ * build time. A list built from built-in networks would cancel that,
+ * and that is the main request-privacy defense: without their own
+ * node, the foreign operator sees the IP and every owner address.
  *
- * РАЗМЕЩАЮЩИЙ ВПРАВЕ РЕШИТЬ ИНАЧЕ. Переменная сборки
- * `VITE_CSP_CONNECT_SRC` задаёт перечень источников явно — например
- * для размещения, где своим узлом пользоваться не предполагают, и
- * запрет обращений к произвольным адресам ценнее. Выбор делает тот, кто
- * раздаёт сборку, потому что последствия несёт он.
+ * THE HOST MAY CHOOSE OTHERWISE. Build variable
+ * `VITE_CSP_CONNECT_SRC` sets the source list explicitly — e.g. for
+ * a host that does not expect a custom node, where blocking arbitrary
+ * destinations matters more. The one who serves the build chooses,
+ * because they bear the consequences.
  *
- * `https:` покрывает и `wss:`: по спецификации CSP схема `https`
- * соответствует защищённым веб-сокетам. Отдельная запись не нужна,
- * и её отсутствие не означает, что WalletConnect запрещён.
+ * `https:` also covers `wss:`: the CSP spec maps the `https` scheme
+ * to secure websockets. A separate entry is not needed, and its
+ * absence does not mean WalletConnect is banned.
  */
 
-/** Источники соединений по умолчанию. */
 const DEFAULT_CONNECT_SRC = "'self' https:"
 
-/** Собирает политику с заданными источниками соединений. */
 export function buildContentSecurityPolicy(connectSrc: string = DEFAULT_CONNECT_SRC): string {
   return [
     "default-src 'self'",
@@ -46,28 +43,28 @@ export function buildContentSecurityPolicy(connectSrc: string = DEFAULT_CONNECT_
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",
-    /* blob: — предпросмотр письма в iframe без srcDoc (Trusted Types). */
+    /* blob: — mail preview in an iframe without srcDoc (Trusted Types). */
     "frame-src blob:",
     /*
-    Воркеров у приложения нет. Разрешение `blob:` позволяло бы запустить
-    в воркере код, собранный из строки, — обход `script-src 'self'`,
-    ради которого политика и существует.
+    The app has no workers. Allowing `blob:` would let a worker run
+    code built from a string — a bypass of `script-src 'self'`, which
+    is why the policy exists.
   */
     "worker-src 'none'",
-    /* Приложение не встраивает чужие страницы. blob: нужен тому же
-     предпросмотру письма, что и frame-src. */
+    /* The app does not embed foreign pages. blob: is for the same
+     mail preview as frame-src. */
     "child-src blob:",
     "media-src 'none'",
     "manifest-src 'self'",
     /*
-    Trusted Types запрещают присваивание строк в места, ведущие
-    к исполнению кода: `innerHTML`, `src` скрипта, `eval`. Правило ESLint
-    против `innerHTML` работает на нашем коде; эта директива действует
-    и на зависимости, включая те, что появятся позже.
+    Trusted Types block assigning strings into sinks that execute
+    code: `innerHTML`, script `src`, `eval`. The ESLint rule against
+    `innerHTML` covers our code; this directive also covers
+    dependencies, including ones that arrive later.
 
-    Политика `dompurify` не объявлена намеренно: очистителя разметки
-    в приложении нет, и разрешать его заранее значило бы открывать путь,
-    которым никто не пользуется.
+    A `dompurify` policy is omitted on purpose: the app has no markup
+    sanitizer, and allowing one in advance would open a path nobody
+    uses.
   */
     "require-trusted-types-for 'script'",
     'upgrade-insecure-requests',
@@ -75,15 +72,15 @@ export function buildContentSecurityPolicy(connectSrc: string = DEFAULT_CONNECT_
 }
 
 /**
- * Внедряет meta-тег CSP в index.html только при production-сборке.
+ * Injects the CSP meta tag into index.html on production builds only.
  *
- * Почему только в production: dev-сервер Vite использует inline-скрипты и
- * WebSocket для HMR — строгая политика ломает разработку. Разделение по
- * командам позволяет держать боевую политику строгой без ущерба для DX.
+ * Why only production: Vite's dev server uses inline scripts and a
+ * WebSocket for HMR — a strict policy breaks development. Splitting
+ * by command keeps the production policy strict without hurting DX.
  *
- * ВАЖНО: meta-тег не поддерживает директивы `frame-ancestors` и `report-*`.
- * Защита от кликджекинга должна дублироваться HTTP-заголовками на стороне
- * хостинга (`Content-Security-Policy`, `X-Frame-Options: DENY`).
+ * IMPORTANT: the meta tag does not support `frame-ancestors` or
+ * `report-*`. Clickjacking defense must also come from host HTTP
+ * headers (`Content-Security-Policy`, `X-Frame-Options: DENY`).
  */
 export function cspPlugin(): Plugin {
   return {
@@ -92,9 +89,9 @@ export function cspPlugin(): Plugin {
     transformIndexHtml: {
       order: 'pre',
       handler() {
-        /* Пустое значение переменной означает «не задано», а не «запретить
-           всё»: пустой `connect-src` отрезал бы кошелёк от любых узлов,
-           и заметить это можно было бы только после размещения. */
+        /* An empty variable means "unset", not "forbid everything":
+           an empty `connect-src` would cut the wallet off every node,
+           and that would be noticed only after deploy. */
         const configured = process.env['VITE_CSP_CONNECT_SRC']?.trim()
         return [
           {

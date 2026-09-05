@@ -1,13 +1,13 @@
 import { hasAddressShape, toChecksumAddress } from '../lib/address.ts'
 
 /**
- * Снимок активов в колонке `assets`.
+ * Asset snapshot in the `assets` column.
  *
- * ЧИСЛА — СТРОКИ. `JSON.parse` теряет точность на wei.
+ * NUMBERS ARE STRINGS. `JSON.parse` loses precision on wei.
  *
- * ЗДЕСЬ ТОЛЬКО ОСТАТКИ. Курс и оценка в долларах считаются на клиенте
- * по живому источнику; в записи их нет, чтобы устаревшая сумма
- * не выдавалась за текущую.
+ * BALANCES ONLY. Price and dollar value are computed on the client
+ * from a live source; they are not stored, so a stale amount is not
+ * presented as current.
  */
 
 export const ASSET_STANDARD = {
@@ -24,28 +24,28 @@ const MAX_TOKENS = 64
 const SYMBOL_MAX = 32
 const NAME_MAX = 128
 
-/** Взаимозаменяемая позиция: нативная валюта или ERC-20. */
+/** Fungible holding: native currency or ERC-20. */
 export interface IAssetToken {
   readonly chainId: string
   readonly standard: AssetStandard
-  /** Адрес контракта. `null` у нативной валюты. */
+  /** Contract address. `null` for native currency. */
   readonly address: string | null
   readonly symbol: string
   readonly name: string
   readonly decimals: number
-  /** Остаток в минимальных единицах. */
+  /** Balance in smallest units. */
   readonly balance: string
   readonly isVerified: boolean
 }
 
-/** Витрина портфеля пользователя. */
+/** User portfolio showcase. */
 export interface IUserAssets {
   readonly quoteCurrency: 'USD'
   readonly updatedAt: string
   readonly tokens: readonly IAssetToken[]
 }
 
-/** Пустая витрина: активов нет, это не «ноль на счёте». */
+/** Empty showcase: no assets, not "zero on the account". */
 export function emptyAssets(): IUserAssets {
   return {
     quoteCurrency: 'USD',
@@ -55,11 +55,11 @@ export function emptyAssets(): IUserAssets {
 }
 
 /**
- * Стартовая витрина нового пользователя.
+ * Starting showcase for a new user.
  *
- * Одна позиция: нативный ETH в Ethereum, остаток `"0"`.
- * Остальные монеты в запись не кладутся — их добавляют позже.
- * Курса, оценки и суточной динамики в записи нет.
+ * One holding: native ETH on Ethereum, balance `"0"`.
+ * Other coins are not stored — they are added later.
+ * No price, valuation, or 24h change in the record.
  */
 export const STARTING_TOKENS: readonly IAssetToken[] = [
   holding('1', ASSET_STANDARD.Native, null, 'ETH', 'Ether', 18),
@@ -91,9 +91,9 @@ export function createStartingAssets(now: Date = new Date()): IUserAssets {
 }
 
 /**
- * Оставляет в витрине только хранимые поля.
+ * Keeps only stored fields in the showcase.
  *
- * `priceUsd`, `valueUsd`, `totalValueUsd`, `change24hPercent` отбрасываются.
+ * Drops `priceUsd`, `valueUsd`, `totalValueUsd`, `change24hPercent`.
  */
 export function sanitizeAssets(assets: IUserAssets): IUserAssets {
   return {
@@ -103,7 +103,7 @@ export function sanitizeAssets(assets: IUserAssets): IUserAssets {
   }
 }
 
-/** Остаток каждой позиции — `"0"`, даже если в запросе пришло другое. */
+/** Every holding balance is `"0"`, even if the request sent something else. */
 export function withZeroTokenBalances(assets: IUserAssets): IUserAssets {
   return sanitizeAssets({
     quoteCurrency: 'USD',
@@ -146,13 +146,13 @@ function holding(
 }
 
 /**
- * Разбирает колонку `assets`.
+ * Parses the `assets` column.
  *
- * Битая запись не роняет вход: отдаём пустую витрину, а не отказ.
- * Иначе один испорченный jsonb закрыл бы кабинет.
+ * A broken record does not fail login: we return an empty showcase,
+ * not a rejection. Otherwise one corrupt jsonb would lock the cabinet.
  *
- * Поля `totalValueUsd`, `priceUsd`, `valueUsd` в старых строках
- * игнорируются: оценка больше не хранится.
+ * `totalValueUsd`, `priceUsd`, `valueUsd` in old rows are ignored:
+ * valuation is no longer stored.
  */
 export function parseAssets(value: unknown): IUserAssets {
   const parsed = readAssets(value)
@@ -161,10 +161,10 @@ export function parseAssets(value: unknown): IUserAssets {
 }
 
 /**
- * Разбирает `assets` из тела запроса.
+ * Parses `assets` from the request body.
  *
- * Отсутствующее поле — `null`: вызывающий подставляет витрину по умолчанию.
- * Пришедший объект обязан быть пригоден целиком.
+ * A missing field is `null`: the caller supplies the default showcase.
+ * A present object must be valid as a whole.
  */
 export function readAssetsPayload(value: unknown): IUserAssets | null {
   if (value === undefined) {

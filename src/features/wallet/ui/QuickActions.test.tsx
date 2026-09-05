@@ -68,80 +68,11 @@ describe('QuickActions: exchange receive address', () => {
   })
 })
 
-describe('QuickActions: smart contract dialog', () => {
-  it('до нажатия окна нет', () => {
+describe('QuickActions: smart contract', () => {
+  it('keeps the smart-contract tile in place and disabled until the feature exists', () => {
     renderActions()
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('нажатие открывает окно с сообщением о включённом режиме', async () => {
-    const user = userEvent.setup()
-
-    renderActions()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-
-    const dialog = screen.getByRole('dialog')
-
-    expect(dialog).toBeInTheDocument()
-    expect(screen.getByText('Smart contract mode activated')).toBeInTheDocument()
-    expect(screen.getByText('Contract module is active')).toBeInTheDocument()
-  })
-
-  it('окно связано с заголовком для программ чтения экрана', async () => {
-    const user = userEvent.setup()
-
-    renderActions()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-
-    const dialog = screen.getByRole('dialog')
-    const labelId = dialog.getAttribute('aria-labelledby')
-
-    expect(labelId).not.toBeNull()
-    expect(document.getElementById(labelId as string)?.textContent).toBe(
-      'Smart contract mode activated',
-    )
-  })
-
-  it('закрывается кнопкой подтверждения', async () => {
-    const user = userEvent.setup()
-
-    renderActions()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-    await user.click(screen.getByRole('button', { name: 'Got it' }))
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('закрывается крестиком и открывается снова', async () => {
-    /* Закрытие обязано дойти до состояния снаружи: иначе окно, убранное
-       крестиком, осталось бы «открытым» в состоянии, и повторное
-       нажатие кнопки не показало бы ничего. */
-    const user = userEvent.setup()
-
-    renderActions()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-    await user.click(screen.getByRole('button', { name: 'Close' }))
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-  })
-
-  it('закрывается клавишей Escape', async () => {
-    const user = userEvent.setup()
-
-    renderActions()
-
-    await user.click(screen.getByRole('button', { name: /smart contract/iu }))
-    await user.keyboard('{Escape}')
-
+    expect(screen.getByRole('button', { name: /smart contract/iu })).toBeDisabled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

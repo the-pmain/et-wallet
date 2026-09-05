@@ -8,74 +8,71 @@ import {
 import type { Address, HexString } from '@/core/types'
 
 /**
- * Кодировка вызовов и событий, относящихся к разрешениям.
+ * Encoding of calls and events that belong to allowances.
  *
- * ЗНАЧЕНИЯ ВЫЧИСЛЯЮТСЯ ИЗ ПОДПИСЕЙ, а не вписываются константами.
- * Хэш события, скопированный из памяти, непроверяем при чтении кода:
- * ошибка в одном символе даёт пустой список разрешений без единого
- * сообщения об ошибке — то есть кошелёк молча сообщит владельцу,
- * что он никому ничего не разрешал.
+ * VALUES ARE COMPUTED FROM SIGNATURES, not pasted as constants.
+ * An event hash copied from memory is unverifiable when reading the
+ * code: one wrong character yields an empty allowance list with no
+ * error at all — the wallet silently tells the owner they have
+ * allowed nothing to anyone.
  */
 
 /**
- * `Approval(address,address,uint256)` — выдача разрешения ERC-20.
+ * `Approval(address,address,uint256)` — an ERC-20 allowance grant.
  *
- * Владелец и получатель разрешения индексированы, сумма лежит в данных.
- * ERC-721 использует событие с тем же именем, но у него индексирован
- * ещё и номер предмета — четыре темы вместо трёх. Разрешение на один
- * предмет здесь не рассматривается: оно исчезает при первой же передаче.
+ * Owner and spender are indexed; the amount sits in the data.
+ * ERC-721 uses an event of the same name, but also indexes the
+ * token id — four topics instead of three. A single-item allowance
+ * is not considered here: it vanishes on the first transfer.
  */
 export const APPROVAL_TOPIC = eventTopic('Approval(address,address,uint256)')
 
 /**
- * `ApprovalForAll(address,address,bool)` — разрешение на всю коллекцию.
+ * `ApprovalForAll(address,address,bool)` — an allowance on the whole collection.
  *
- * Самое опасное из существующих: одна подпись отдаёт распоряжение всеми
- * предметами коллекции, включая те, которых у владельца ещё нет.
+ * The most dangerous of the existing ones: one signature hands over
+ * every item in the collection, including those the owner does not
+ * yet have.
  */
 export const APPROVAL_FOR_ALL_TOPIC = eventTopic('ApprovalForAll(address,address,bool)')
 
-/** `allowance(address,address)` — действующее разрешение ERC-20. */
 export const ALLOWANCE_SELECTOR = functionSelector('allowance(address,address)')
 
-/** `isApprovedForAll(address,address)` — действует ли разрешение на коллекцию. */
 export const IS_APPROVED_FOR_ALL_SELECTOR = functionSelector('isApprovedForAll(address,address)')
 
-/** `approve(address,uint256)` — выдача и отзыв разрешения ERC-20. */
 export const APPROVE_SELECTOR = functionSelector('approve(address,uint256)')
 
-/** `setApprovalForAll(address,bool)` — выдача и отзыв разрешения на коллекцию. */
 export const SET_APPROVAL_FOR_ALL_SELECTOR = functionSelector('setApprovalForAll(address,bool)')
 
-/** Число тем у события `Approval` ERC-20: идентификатор плюс два адреса. */
+/** Topic count of an ERC-20 `Approval` event: id plus two addresses. */
 export const ERC20_APPROVAL_TOPIC_COUNT = 3
 
 /**
- * Кодирует чтение действующего разрешения.
+ * Encodes a read of the live allowance.
  *
- * Порядок аргументов задан стандартом: сначала владелец, затем тот,
- * кому разрешено. Перепутать их значит прочитать чужое разрешение
- * и показать владельцу, что он ничего не выдавал.
+ * Argument order is fixed by the standard: owner first, then the
+ * spender. Swapping them reads someone else's allowance and shows
+ * the owner they granted nothing.
  */
 export function encodeAllowance(selector: string, owner: Address, spender: Address): HexString {
   return encodeCallWithTwoAddresses(selector, owner, spender)
 }
 
 /**
- * Кодирует отзыв разрешения ERC-20.
+ * Encodes an ERC-20 allowance revoke.
  *
- * ОТЗЫВ — ЭТО ВЫДАЧА НУЛЯ. Отдельной функции «отозвать» в стандарте
- * нет: разрешение перезаписывается значением, и ноль означает
- * «распоряжаться нечем».
+ * A REVOKE IS A GRANT OF ZERO. The standard has no separate "revoke"
+ * function: the allowance is overwritten, and zero means "nothing
+ * to spend".
  */
 export function encodeRevokeAllowance(spender: Address): HexString {
   return `0x${APPROVE_SELECTOR}${encodeAddressWord(spender)}${encodeUintWord(0n)}` as HexString
 }
 
 /**
- * Кодирует отзыв разрешения на коллекцию.
+ * Encodes a collection-wide allowance revoke.
  *
- * Логическое значение занимает целое слово: ложь — слово из нулей.
+ * The boolean occupies a whole word: false is a word of zeros.
  */
 export function encodeRevokeApprovalForAll(operator: Address): HexString {
   return `0x${SET_APPROVAL_FOR_ALL_SELECTOR}${encodeAddressWord(operator)}${encodeUintWord(0n)}` as HexString

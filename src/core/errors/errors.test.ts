@@ -8,18 +8,19 @@ import { InsufficientFundsError, UserRejectedError } from './TransactionErrors'
 import { InvalidPasswordError, WalletLockedError } from './WalletErrors'
 
 /**
- * Этап 2 состоит из типов и интерфейсов, поэтому исполняемого кода в нём
- * почти нет. Исключение — иерархия ошибок. Проверяется именно она.
+ * Stage 2 is types and interfaces, so there is almost no executable
+ * code in it. The exception is the error hierarchy. That is what is
+ * tested.
  */
 
 describe('ERROR_CODE', () => {
-  it('не содержит повторяющихся значений', () => {
+  it('contains no duplicate values', () => {
     const values = Object.values(ERROR_CODE)
 
     expect(new Set(values).size).toBe(values.length)
   })
 
-  it('использует единый формат SCREAMING_SNAKE_CASE', () => {
+  it('uses a single SCREAMING_SNAKE_CASE format', () => {
     for (const value of Object.values(ERROR_CODE)) {
       expect(value).toMatch(/^[A-Z][A-Z0-9_]*$/)
     }
@@ -27,28 +28,28 @@ describe('ERROR_CODE', () => {
 })
 
 describe('AppError', () => {
-  it('распознаётся функцией isAppError', () => {
+  it('is recognised by isAppError', () => {
     expect(isAppError(new WalletLockedError('signTransaction'))).toBe(true)
   })
 
-  it('не распознаёт обычную ошибку как прикладную', () => {
-    expect(isAppError(new Error('обычная ошибка'))).toBe(false)
-    expect(isAppError('строка')).toBe(false)
+  it('does not treat an ordinary error as an application error', () => {
+    expect(isAppError(new Error('ordinary error'))).toBe(false)
+    expect(isAppError('string')).toBe(false)
     expect(isAppError(null)).toBe(false)
   })
 
-  it('остаётся экземпляром Error и пригоден для throw', () => {
+  it('remains an Error instance and can be thrown', () => {
     expect(() => {
       throw new InvalidPasswordError()
     }).toThrow(Error)
   })
 
-  it('сохраняет исходную ошибку в cause', () => {
-    const cause = new Error('низкоуровневый сбой')
+  it('keeps the original error in cause', () => {
+    const cause = new Error('low-level failure')
     class TestError extends AppError {
       readonly code = 'TEST'
       constructor() {
-        super('обёртка', { cause })
+        super('wrapper', { cause })
       }
     }
 
@@ -56,8 +57,8 @@ describe('AppError', () => {
   })
 })
 
-describe('коды конкретных ошибок', () => {
-  it('соответствуют реестру', () => {
+describe('codes of concrete errors', () => {
+  it('match the registry', () => {
     expect(new WalletLockedError('unlock').code).toBe(ERROR_CODE.WalletLocked)
     expect(new InvalidPasswordError().code).toBe(ERROR_CODE.InvalidPassword)
     expect(new NotImplementedError('Service.method').code).toBe(ERROR_CODE.NotImplemented)
@@ -65,7 +66,7 @@ describe('коды конкретных ошибок', () => {
 })
 
 describe('InvalidPasswordError', () => {
-  it('не раскрывает подробностей проверки', () => {
+  it('does not reveal check details', () => {
     const message = new InvalidPasswordError().message
 
     expect(message).toBe('Wrong password.')
@@ -73,7 +74,7 @@ describe('InvalidPasswordError', () => {
 })
 
 describe('ChainIdMismatchError', () => {
-  it('сохраняет оба идентификатора для разбора инцидента', () => {
+  it('keeps both identifiers for incident analysis', () => {
     const error = new ChainIdMismatchError(1n, 137n)
 
     expect(error.expected).toBe(1n)
@@ -84,7 +85,7 @@ describe('ChainIdMismatchError', () => {
 })
 
 describe('InsufficientFundsError', () => {
-  it('хранит суммы в bigint без потери точности', () => {
+  it('stores amounts as bigint without losing precision', () => {
     const required = 12345678901234567890n
     const error = new InsufficientFundsError(required, 0n)
 
@@ -94,7 +95,7 @@ describe('InsufficientFundsError', () => {
 })
 
 describe('RpcError', () => {
-  it('сохраняет числовой код JSON-RPC отдельно от текста', () => {
+  it('keeps the numeric JSON-RPC code separate from the text', () => {
     const error = new RpcError(-32000, 'execution reverted', { detail: 'x' })
 
     expect(error.rpcCode).toBe(-32000)
@@ -103,7 +104,7 @@ describe('RpcError', () => {
 })
 
 describe('UserRejectedError', () => {
-  it('объявляет код отказа EIP-1193', () => {
+  it('declares the EIP-1193 rejection code', () => {
     expect(UserRejectedError.EIP1193_CODE).toBe(4001)
   })
 })

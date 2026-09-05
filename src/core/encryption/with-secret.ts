@@ -1,25 +1,23 @@
 import type { ISecretBuffer } from './types'
 
 /**
- * Выполняет действие над секретом и затирает его в любом случае.
+ * Runs an action on a secret and wipes it afterwards, including on throw.
  *
- * ЗАЧЕМ ОТДЕЛЬНАЯ ФУНКЦИЯ ВМЕСТО `try/finally` НА МЕСТЕ. Мест, где
- * секрет создаётся и обязан быть затёрт, уже больше десятка: вывод
- * ключей, подпись, экспорт, импорт. Забытый `finally` не даёт ни ошибки
- * компиляции, ни падения теста — он оставляет ключ в памяти,
- * и обнаружить это можно только чтением кода. Функция превращает
- * правило в конструкцию: затирание выполняется потому, что иначе
- * до результата не добраться.
+ * WHY A HELPER INSTEAD OF INLINE `try/finally`. Secrets are created and
+ * must be wiped in more than a dozen places: key derivation, signing,
+ * export, import. A forgotten `finally` is neither a compile error nor a
+ * test failure — it leaves the key in memory, and the only way to notice
+ * is by reading the code. The helper turns the rule into a construct:
+ * wiping happens because otherwise the result is unreachable.
  *
- * ЗАТИРАНИЕ ВЫПОЛНЯЕТСЯ И ПРИ ИСКЛЮЧЕНИИ. Ошибка посреди работы
- * с ключом — обычное дело: узел не ответил, подпись не удалась.
- * Оставить секрет в памяти именно в этот момент означало бы, что
- * защита работает только когда всё идёт хорошо.
+ * WIPING RUNS ON EXCEPTION TOO. Failures mid-key-use are normal: the
+ * node did not answer, signing failed. Leaving the secret in memory
+ * then would mean the protection works only when everything goes well.
  *
- * ЧЕГО ЭТО НЕ ДЕЛАЕТ. Не защищает от того, что вызванный код сам
- * сохранит ссылку на буфер либо переведёт его в строку. Строку
- * в JavaScript затереть невозможно — она живёт до сборки мусора,
- * и это ограничение среды, а не упущение здесь.
+ * WHAT THIS DOES NOT DO. It does not stop the called code from keeping
+ * a reference to the buffer or turning it into a string. A JavaScript
+ * string cannot be wiped — it lives until garbage collection — and that
+ * is a runtime limit, not an omission here.
  */
 export async function withSecret<TSecret extends ISecretBuffer, TResult>(
   secret: TSecret,
@@ -33,12 +31,11 @@ export async function withSecret<TSecret extends ISecretBuffer, TResult>(
 }
 
 /**
- * Синхронный вариант.
+ * Synchronous variant.
  *
- * Отдельная функция, а не проверка типа результата: асинхронная работа,
- * случайно переданная сюда, была бы затёрта до своего завершения —
- * подпись получила бы уже обнулённый ключ. Разделение делает такую
- * ошибку ошибкой компиляции.
+ * A separate function, not a result-type check: async work accidentally
+ * passed here would be wiped before it finished — signing would get a
+ * zeroed key. The split makes that mistake a compile error.
  */
 export function withSecretSync<TSecret extends ISecretBuffer, TResult>(
   secret: TSecret,

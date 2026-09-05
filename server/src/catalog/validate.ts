@@ -12,16 +12,15 @@ import type {
 } from './types.ts'
 
 /**
- * Проверка каталога при загрузке.
+ * Catalog validation on load.
  *
- * СЕРВИС С ИСПОРЧЕННЫМ КАТАЛОГОМ ОБЯЗАН НЕ ЗАПУСТИТЬСЯ. Отдавать
- * адрес контракта, набранный с опечаткой, хуже, чем не отдавать
- * ничего: пользователь отправит деньги по этому адресу, и перевод
- * необратим. Отказ при старте виден сразу тому, кто разворачивает
- * сервис; ошибка в выдаче не видна никому, пока не станет поздно.
+ * A SERVICE WITH A CORRUPT CATALOG MUST NOT START. Serving a
+ * mistyped contract address is worse than serving nothing: the user
+ * will send money there, and the transfer is irreversible. A startup
+ * refusal is seen immediately by whoever deploys the service; an
+ * error in the response is seen by nobody until it is too late.
  */
 
-/** Предельные длины текстовых полей. */
 const LIMIT = {
   Name: 64,
   Symbol: 16,
@@ -30,14 +29,13 @@ const LIMIT = {
   Advisory: 300,
 } as const
 
-/** Наибольшее допустимое число знаков токена. */
 const MAX_DECIMALS = 36
 
 /**
- * Признаки ссылки в тексте.
+ * Link-like patterns in text.
  *
- * Проверяются не только полные адреса: `example.com` без схемы браузер
- * и пользователь всё равно прочитают как ссылку.
+ * Not only full URLs: `example.com` without a scheme is still read
+ * as a link by the browser and the user.
  */
 const LINK_PATTERNS: readonly RegExp[] = [
   /https?:\/\//iu,
@@ -45,105 +43,100 @@ const LINK_PATTERNS: readonly RegExp[] = [
   /[a-z0-9-]+\.(com|org|net|io|xyz|app|finance|money|link|ru)\b/iu,
 ]
 
-/** Отвергает текст, содержащий что-либо похожее на ссылку. */
+/** Rejects text that looks like a link. */
 function assertNoLinks(where: string, text: string): void {
   for (const pattern of LINK_PATTERNS) {
     if (pattern.test(text)) {
       throw new CatalogValidationError(
-        `${where}: текст содержит ссылку. Сообщение сервиса, показанное внутри кошелька, ` +
-          'выглядит как сообщение самого кошелька, и ссылка в нём ведёт куда угодно.',
+        `${where}: the text contains a link. A service message shown inside the wallet ` +
+          'looks like a message from the wallet itself, and the link can go anywhere.',
       )
     }
   }
 }
 
-/** Отвергает пустую строку и строку длиннее предела. */
 function assertText(where: string, value: string, limit: number): void {
   if (value.trim() === '') {
-    throw new CatalogValidationError(`${where}: пустое значение`)
+    throw new CatalogValidationError(`${where}: empty value`)
   }
 
   if (value.length > limit) {
     throw new CatalogValidationError(
-      `${where}: длина ${String(value.length)} превышает предел ${String(limit)}`,
+      `${where}: length ${String(value.length)} exceeds the limit ${String(limit)}`,
     )
   }
 }
 
-/** Отвергает адрес, не являющийся `https`. */
 function assertHttpsUrl(where: string, value: string): void {
   let parsed: URL
 
   try {
     parsed = new URL(value)
   } catch {
-    throw new CatalogValidationError(`${where}: адрес неразбираем: ${value}`)
+    throw new CatalogValidationError(`${where}: address is not parseable: ${value}`)
   }
 
   if (parsed.protocol !== 'https:') {
     throw new CatalogValidationError(
-      `${where}: разрешён только https, получено ${parsed.protocol}//. ` +
-        'Незашифрованное соединение позволяет подменить ответ узла по дороге.',
+      `${where}: only https is allowed, received ${parsed.protocol}//. ` +
+        'An unencrypted connection lets someone swap the node response in transit.',
     )
   }
 }
 
-/** Отвергает строку, не являющуюся моментом времени ISO 8601. */
 function assertTimestamp(where: string, value: string): number {
   const parsed = Date.parse(value)
 
   if (Number.isNaN(parsed)) {
-    throw new CatalogValidationError(`${where}: непонятный момент времени: ${value}`)
+    throw new CatalogValidationError(`${where}: unreadable timestamp: ${value}`)
   }
 
   return parsed
 }
 
-/** Проверяет каталог сетей и возвращает множество известных идентификаторов. */
 export function validateNetworks(networks: readonly INetworkEntry[]): ReadonlySet<bigint> {
   if (networks.length === 0) {
-    throw new CatalogValidationError('каталог сетей пуст')
+    throw new CatalogValidationError('network catalog is empty')
   }
 
   const known = new Set<bigint>()
 
   for (const network of networks) {
-    const where = `сеть ${network.name}`
+    const where = `network ${network.name}`
 
     if (network.chainId <= 0n) {
-      throw new CatalogValidationError(`${where}: идентификатор сети должен быть положительным`)
+      throw new CatalogValidationError(`${where}: the network identifier must be positive`)
     }
 
     if (known.has(network.chainId)) {
       throw new CatalogValidationError(
-        `${where}: идентификатор ${network.chainId.toString()} встречается дважды. ` +
-          'Две сети с одним идентификатором неразличимы для кошелька.',
+        `${where}: identifier ${network.chainId.toString()} appears twice. ` +
+          'Two networks with the same identifier are indistinguishable to the wallet.',
       )
     }
 
     known.add(network.chainId)
 
     assertText(where, network.name, LIMIT.Name)
-    assertText(`${where}: символ валюты`, network.nativeCurrency.symbol, LIMIT.Symbol)
-    assertText(`${where}: имя валюты`, network.nativeCurrency.name, LIMIT.Name)
+    assertText(`${where}: currency symbol`, network.nativeCurrency.symbol, LIMIT.Symbol)
+    assertText(`${where}: currency name`, network.nativeCurrency.name, LIMIT.Name)
 
     if (
       !Number.isInteger(network.nativeCurrency.decimals) ||
       network.nativeCurrency.decimals < 0 ||
       network.nativeCurrency.decimals > MAX_DECIMALS
     ) {
-      throw new CatalogValidationError(`${where}: недопустимое число знаков валюты`)
+      throw new CatalogValidationError(`${where}: invalid currency decimal count`)
     }
 
     for (const url of network.blockExplorerUrls) {
-      assertHttpsUrl(`${where}: обозреватель`, url)
+      assertHttpsUrl(`${where}: explorer`, url)
     }
   }
 
   return known
 }
 
-/** Проверяет каталог RPC-адресов. */
 export function validateRpcEndpoints(
   endpoints: readonly IRpcEntry[],
   knownChains: ReadonlySet<bigint>,
@@ -155,32 +148,31 @@ export function validateRpcEndpoints(
 
     if (!knownChains.has(endpoint.chainId)) {
       throw new CatalogValidationError(
-        `${where}: сеть ${endpoint.chainId.toString()} отсутствует в каталоге сетей`,
+        `${where}: network ${endpoint.chainId.toString()} is missing from the network catalog`,
       )
     }
 
     assertHttpsUrl(where, endpoint.url)
-    assertText(`${where}: оператор`, endpoint.operator, LIMIT.Name)
+    assertText(`${where}: operator`, endpoint.operator, LIMIT.Name)
 
     const key = `${endpoint.chainId.toString()}:${endpoint.url}`
 
     if (seen.has(key)) {
-      throw new CatalogValidationError(`${where}: адрес повторяется в той же сети`)
+      throw new CatalogValidationError(`${where}: the address is repeated on the same network`)
     }
 
     seen.add(key)
   }
 
-  /* Сеть без единого узла превращает переключение на неё в неработающий
-     кошелёк: обратиться будет некуда. */
+  /* A network with no node turns switching to it into a dead wallet:
+     there is nowhere to send requests. */
   for (const chainId of knownChains) {
     if (!endpoints.some((endpoint) => endpoint.chainId === chainId)) {
-      throw new CatalogValidationError(`сеть ${chainId.toString()} не имеет ни одного RPC-адреса`)
+      throw new CatalogValidationError(`network ${chainId.toString()} has no RPC address`)
     }
   }
 }
 
-/** Проверяет каталог токенов. */
 export function validateTokens(
   tokens: readonly ITokenEntry[],
   knownChains: ReadonlySet<bigint>,
@@ -188,107 +180,105 @@ export function validateTokens(
   const seen = new Set<string>()
 
   for (const entry of tokens) {
-    const where = `токен ${entry.symbol} (${entry.address})`
+    const where = `token ${entry.symbol} (${entry.address})`
 
     if (!knownChains.has(entry.chainId)) {
       throw new CatalogValidationError(
-        `${where}: сеть ${entry.chainId.toString()} отсутствует в каталоге сетей`,
+        `${where}: network ${entry.chainId.toString()} is missing from the network catalog`,
       )
     }
 
-    /* Контрольная сумма EIP-55 ловит опечатку в адресе при загрузке —
-       до того, как ошибочный адрес разойдётся по кошелькам. */
+    /* EIP-55 checksum catches an address typo on load — before a
+       wrong address reaches wallets. */
     if (!hasValidChecksum(entry.address)) {
       throw new CatalogValidationError(
-        `${where}: адрес записан без контрольной суммы EIP-55 либо с ошибкой в ней`,
+        `${where}: the address is missing an EIP-55 checksum or the checksum is wrong`,
       )
     }
 
     const key = `${entry.chainId.toString()}:${entry.address.toLowerCase()}`
 
     if (seen.has(key)) {
-      throw new CatalogValidationError(`${where}: адрес повторяется в той же сети`)
+      throw new CatalogValidationError(`${where}: the address is repeated on the same network`)
     }
 
     seen.add(key)
 
-    assertText(`${where}: символ`, entry.symbol, LIMIT.Symbol)
-    assertText(`${where}: имя`, entry.name, LIMIT.Name)
+    assertText(`${where}: symbol`, entry.symbol, LIMIT.Symbol)
+    assertText(`${where}: name`, entry.name, LIMIT.Name)
 
     if (!Number.isInteger(entry.decimals) || entry.decimals < 0 || entry.decimals > MAX_DECIMALS) {
-      throw new CatalogValidationError(`${where}: недопустимое число знаков`)
+      throw new CatalogValidationError(`${where}: invalid decimal count`)
     }
 
-    /* Запись без указания источника — это рекомендация без основания.
-       Отдавать её пользователю значит выдавать чужое доверие за своё. */
+    /* A record with no source is a recommendation with no basis.
+       Serving it would pass someone else's trust off as ours. */
     if (entry.provenance.length === 0) {
-      throw new CatalogValidationError(`${where}: не указан ни один источник подтверждения`)
+      throw new CatalogValidationError(`${where}: no confirmation source is given`)
     }
 
-    assertTimestamp(`${where}: дата сверки`, entry.verifiedAt)
+    assertTimestamp(`${where}: verification date`, entry.verifiedAt)
   }
 }
 
-/** Проверяет каталог уведомлений. */
 export function validateNotifications(notifications: readonly INotificationEntry[]): void {
   const seen = new Set<string>()
   const severities = new Set<string>(Object.values(NOTIFICATION_SEVERITY))
 
   for (const entry of notifications) {
-    const where = `уведомление ${entry.id}`
+    const where = `notification ${entry.id}`
 
     if (seen.has(entry.id)) {
       throw new CatalogValidationError(
-        `${where}: идентификатор повторяется. Клиент по нему помнит, что уже показано.`,
+        `${where}: the identifier is repeated. The client uses it to remember what was already shown.`,
       )
     }
 
     seen.add(entry.id)
 
     if (!severities.has(entry.severity)) {
-      throw new CatalogValidationError(`${where}: неизвестная важность ${entry.severity}`)
+      throw new CatalogValidationError(`${where}: unknown severity ${entry.severity}`)
     }
 
-    assertText(`${where}: заголовок`, entry.title, LIMIT.NotificationTitle)
-    assertText(`${where}: текст`, entry.body, LIMIT.NotificationBody)
+    assertText(`${where}: title`, entry.title, LIMIT.NotificationTitle)
+    assertText(`${where}: body`, entry.body, LIMIT.NotificationBody)
 
-    assertNoLinks(`${where}: заголовок`, entry.title)
-    assertNoLinks(`${where}: текст`, entry.body)
+    assertNoLinks(`${where}: title`, entry.title)
+    assertNoLinks(`${where}: body`, entry.body)
 
-    const published = assertTimestamp(`${where}: дата публикации`, entry.publishedAt)
+    const published = assertTimestamp(`${where}: publication date`, entry.publishedAt)
 
     if (entry.expiresAt !== null) {
-      const expires = assertTimestamp(`${where}: дата окончания`, entry.expiresAt)
+      const expires = assertTimestamp(`${where}: expiry date`, entry.expiresAt)
 
       if (expires <= published) {
         throw new CatalogValidationError(
-          `${where}: срок истекает раньше публикации — такое уведомление не будет показано никогда`,
+          `${where}: expiry is earlier than publication — this notification would never be shown`,
         )
       }
     }
   }
 }
 
-/** Проверяет сведения о выпусках. */
 export function validateReleases(releases: IReleaseCatalog): void {
   for (const [field, value] of [
     ['latest', releases.latest],
     ['minSupported', releases.minSupported],
   ] as const) {
     if (!isValidVersion(value)) {
-      throw new CatalogValidationError(`выпуски: поле ${field} имеет вид «${value}»`)
+      throw new CatalogValidationError(`releases: field ${field} looks like "${value}"`)
     }
   }
 
   if (compareVersions(releases.minSupported, releases.latest) > 0) {
     throw new CatalogValidationError(
-      'выпуски: минимально поддерживаемая версия выше последней — ' +
-        'при таком каталоге неподдерживаемыми окажутся все, включая свежие установки',
+      'releases: the minimum supported version is above the latest — ' +
+        'with that catalog everyone would be unsupported, including fresh installs',
     )
   }
 
   if (releases.advisory !== null) {
-    assertText('выпуски: пояснение', releases.advisory, LIMIT.Advisory)
-    assertNoLinks('выпуски: пояснение', releases.advisory)
+    assertText('releases: advisory', releases.advisory, LIMIT.Advisory)
+    assertNoLinks('releases: advisory', releases.advisory)
   }
 }

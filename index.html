@@ -1,12 +1,12 @@
 <!doctype html>
 <!--
-  ЯЗЫК СТРАНИЦЫ СОВПАДАЕТ С ЯЗЫКОМ ИНТЕРФЕЙСА.
+  PAGE LANGUAGE MATCHES THE INTERFACE LANGUAGE.
 
-  Стояло `ru`, тогда как весь интерфейс английский — это решение описано
-  в словаре: кошелёк говорит на языке стандартов, названий сетей и
-  сообщений узлов. Из-за расхождения экранный диктор читал английский
-  текст по русским правилам произношения, а браузер предлагал перевести
-  страницу, не нуждающуюся в переводе.
+  It used to be `ru` while the whole UI is English — that choice is
+  explained in the dictionary: the wallet speaks the language of
+  standards, network names, and node messages. The mismatch made a
+  screen reader speak English text by Russian pronunciation rules,
+  and the browser offered to translate a page that needs none.
 -->
 <html lang="en" class="dark">
   <head>
@@ -14,32 +14,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!--
-      Referrer-политика: не передавать URL приложения сторонним ресурсам.
-      Для кошелька это снижает утечку контекста (например, адреса в пути).
+      Referrer policy: do not send the app URL to third-party resources.
+      For a wallet that cuts context leaks (for example an address in the path).
     -->
     <meta name="referrer" content="no-referrer" />
 
     <!--
-      Приложение не должно индексироваться, обходиться по ссылкам
-      и кэшироваться поисковиками. Метатег видят роботы, которые
-      загрузили HTML; заголовок X-Robots-Tag и robots.txt закрывают
-      остальных.
+      The app must not be indexed, followed, or cached by search engines.
+      The meta tag is seen by robots that loaded the HTML; the
+      X-Robots-Tag header and robots.txt cover the rest.
     -->
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
 
     <!--
-      Значки подготовлены командой `npm run icons` из `public/icon.png`.
-      Исходный файл весит около 1.4 МБ и в качестве значка вкладки
-      непригоден: браузер скачивал бы его целиком ради 16 пикселей.
+      Icons are prepared by `npm run icons` from `public/icon.png`.
+      The source is about 1.4 MB and unfit as a tab icon: the browser
+      would download it whole for 16 pixels.
     -->
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
 
     <!--
-      Метаданные для вкладки, закладок и превью ссылок.
-      `noindex` выше сохранён: кошелёк не предназначен для поисковой
-      выдачи, но описание помогает при шаринге и в списке вкладок.
+      Metadata for the tab, bookmarks, and link previews.
+      `noindex` above is kept: the wallet is not meant for search
+      results, but the description helps when sharing and in the tab list.
     -->
     <title>ET WALLET — Non-Custodial Crypto Wallet | Your Keys, Your Crypto</title>
     <meta

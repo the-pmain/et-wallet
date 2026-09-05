@@ -3,77 +3,72 @@ import type { Address, ChainId, HexString } from '@/core/types'
 import type { IDappRequest, IDappSession } from './types'
 
 /**
- * Ответ на запрос приложения.
+ * Reply to an application request.
  *
- * ОТКАЗ — ПОЛНОЦЕННЫЙ ОТВЕТ, А НЕ МОЛЧАНИЕ. Приложение, не получившее
- * ответа, висит в ожидании и подталкивает пользователя нажать ещё раз;
- * второе нажатие приводит ко второй подписи.
+ * A REFUSAL IS A FULL REPLY, NOT SILENCE. An application that gets
+ * no reply hangs waiting and pushes the user to press again; a
+ * second press leads to a second signature.
  */
 export type DappResponse =
   | { readonly kind: 'approved'; readonly result: HexString }
   | { readonly kind: 'rejected'; readonly reason: string }
 
-/** События транспорта сессий. */
 export interface SessionTransportEventMap {
-  /** Приложение просит подключиться. */
   'session:proposal': {
     readonly id: string
     readonly dapp: IDappSession['dapp']
     readonly chainIds: readonly ChainId[]
   }
 
-  /** Подключение установлено. */
   'session:connected': { readonly session: IDappSession }
 
-  /** Подключение разорвано — своей стороной либо приложением. */
+  /** Connection broken — by our side or by the application. */
   'session:disconnected': { readonly sessionId: string }
 
-  /** Пришёл запрос, требующий решения пользователя. */
   'session:request': { readonly request: IDappRequest }
 }
 
 /**
- * Транспорт подключений к приложениям.
+ * Transport for connections to applications.
  *
- * ЗАЧЕМ ОТДЕЛЬНЫЙ ИНТЕРФЕЙС, ЕСЛИ РЕАЛИЗАЦИЯ ОДНА. Затем, что она
- * не одна по существу: у расширения появится встроенный провайдер
- * (EIP-1193), работающий без всякого relay, а логика показа
- * и подтверждения запроса при этом обязана остаться той же самой.
- * Плюс — вся эта логика проверяется тестами без сети и без ключа
- * стороннего сервиса.
+ * WHY A SEPARATE INTERFACE IF THERE IS ONLY ONE IMPLEMENTATION.
+ * Because it is not one in substance: the extension will gain a
+ * built-in provider (EIP-1193) that works without any relay, and
+ * the logic of showing and confirming a request must stay the same.
+ * Plus all of that logic is tested without a network and without a
+ * third-party service key.
  *
- * ТРАНСПОРТ НЕ ПРИНИМАЕТ РЕШЕНИЙ. Он доставляет запросы и отправляет
- * ответы. Что показать пользователю, чем это грозит и что считать
- * согласием — вне его ведения.
+ * THE TRANSPORT DOES NOT DECIDE. It delivers requests and sends
+ * replies. What to show the user, what it risks, and what counts as
+ * consent are outside its remit.
  */
 export interface ISessionTransport {
-  /** Устойчивый идентификатор. Попадает в журнал и в интерфейс. */
+  /** Stable identifier. Goes into the log and the UI. */
   readonly id: string
 
-  /** Имя для показа: пользователь вправе знать, через что он подключён. */
+  /** Display name: the user is entitled to know what they are connected through. */
   readonly name: string
 
   /**
-   * Готовит транспорт к работе.
+   * Prepares the transport for work.
    *
-   * @throws Error если транспорт не настроен — например, не задан ключ
-   *         доступа к relay.
+   * @throws Error if the transport is not configured — for example,
+   *         no relay access key is set.
    */
   init(): Promise<void>
 
   /**
-   * Подключается по приглашению приложения.
+   * Connects from an application invitation.
    *
-   * @param uri Строка приглашения, полученная из QR-кода либо
-   *        из буфера обмена.
+   * @param uri Invitation string from a QR code or the clipboard.
    */
   pair(uri: string): Promise<void>
 
   /**
-   * Отвечает на предложение подключения.
+   * Replies to a connection proposal.
    *
-   * @param addresses Адреса, выдаваемые приложению. Пустой список
-   *        означает отказ.
+   * @param addresses Addresses given to the application. An empty
+   *        list means refusal.
    */
   respondToProposal(
     proposalId: string,
@@ -83,36 +78,36 @@ export interface ISessionTransport {
     } | null,
   ): Promise<void>
 
-  /** Отвечает на запрос подписи. */
   respondToRequest(requestId: string, response: DappResponse): Promise<void>
 
   /**
-   * Сообщает подключённым приложениям о смене активной сети и аккаунта.
+   * Tells connected applications about a change of active network
+   * and account.
    *
-   * ЗАЧЕМ ЭТО ОБЯЗАТЕЛЬНО. Приложение запоминает сеть и адрес в момент
-   * подключения и считает их действующими, пока ему не сказали иное.
-   * Владелец переключил кошелёк на другую сеть — приложение об этом
-   * не знает и готовит операцию для прежней. В лучшем случае она
-   * отвергается узлом, в худшем — уходит не в ту цепь.
+   * WHY THIS IS MANDATORY. The application remembers the network
+   * and address at connection time and treats them as current until
+   * told otherwise. The owner switched the wallet to another
+   * network — the application does not know and prepares an
+   * operation for the former. At best the node rejects it, at worst
+   * it goes to the wrong chain.
    *
-   * ШИРОКОВЕЩАТЕЛЬНО ПО ВСЕМ ПОДКЛЮЧЕНИЯМ. Каждое приложение получает
-   * оба события; какое из них важно именно ему, решает оно само.
+   * BROADCAST TO EVERY CONNECTION. Each application gets both
+   * events; which of them matters to it is its own decision.
    *
-   * ОТКАЗ ОДНОГО ПОДКЛЮЧЕНИЯ НЕ ГУБИТ ОСТАЛЬНЫЕ. Приложение могло
-   * не одобрять сеть, на которую переключился кошелёк, и relay отвергнет
-   * такое событие; это не повод оставить прочие приложения
-   * в неведении.
+   * REFUSAL OF ONE CONNECTION DOES NOT KILL THE OTHERS. The
+   * application may not have approved the network the wallet
+   * switched to, and the relay will reject that event; that is no
+   * reason to leave the other applications uninformed.
    */
   notifyStateChange(chainId: ChainId, addresses: readonly Address[]): Promise<void>
 
-  /** Действующие подключения. */
   listSessions(): readonly IDappSession[]
 
   /**
-   * Разрывает подключение.
+   * Breaks a connection.
    *
-   * Приложение уведомляется: сессия, оборванная молча, оставляет его
-   * в уверенности, что доступ есть.
+   * The application is notified: a session cut off in silence
+   * leaves it sure that access remains.
    */
   disconnect(sessionId: string): Promise<void>
 
@@ -121,6 +116,5 @@ export interface ISessionTransport {
     listener: (payload: SessionTransportEventMap[TEvent]) => void,
   ): () => void
 
-  /** Закрывает соединения и освобождает ресурсы. */
   destroy(): Promise<void>
 }

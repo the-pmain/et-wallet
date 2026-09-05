@@ -22,14 +22,14 @@ interface TokenPriceChartProps {
 }
 
 /**
- * Линия курса раскрытого актива.
+ * Price line of the expanded asset.
  *
- * СВОЙ SVG, НЕ БИБЛИОТЕКА. Кольцо портфеля уже так устроено: чужой
- * пакет графиков весит больше, чем стоит одна линия.
+ * Own SVG, not a library. The portfolio ring is already built that
+ * way: a third-party chart package weighs more than one line is worth.
  *
- * ОСИ ОБЯЗАТЕЛЬНЫ. Линия без цены и времени — украшение: нельзя
- * понять, это минус десять центов или минус десять процентов.
- * Подписи стоят снаружи SVG, чтобы не сжиматься вместе с viewBox.
+ * Axes are required. A line without price and time is decoration —
+ * you cannot tell minus ten cents from minus ten percent. Labels sit
+ * outside the SVG so they do not shrink with the viewBox.
  */
 export function TokenPriceChart({
   symbol,

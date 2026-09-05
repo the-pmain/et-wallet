@@ -1,73 +1,74 @@
 import { areAddressesEqual, isBurnAddress } from '@/core/address'
 import type { Address } from '@/core/types'
 
-/** Разновидность замечания к получателю. */
+/** Kind of remark about the recipient. */
 export const RECIPIENT_RISK = {
-  /** Адрес сжигания: средства уйдут безвозвратно. */
+  /** Burn address: funds leave with no return. */
   BurnAddress: 'burn-address',
-  /** Получатель совпадает с отправителем. */
+  /** Recipient matches the sender. */
   SelfTransfer: 'self-transfer',
-  /** Адрес записан без контрольной суммы: опечатка не обнаруживается. */
+  /** Address written without a checksum: a typo is not detected. */
   NoChecksum: 'no-checksum',
   /**
-   * Получатель — контракт, а не обычный адрес.
+   * The recipient is a contract, not an ordinary address.
    *
-   * Нативная валюта, отправленная контракту, который её не принимает,
-   * теряется безвозвратно: вернуть её может только код самого
-   * контракта, а его может не оказаться. Самый частый случай —
-   * перевод монет на адрес токен-контракта.
+   * Native currency sent to a contract that does not accept it
+   * is lost for good: only the contract's own code can return it,
+   * and that code may not exist. The most common case is sending
+   * coins to a token-contract address.
    */
   ContractRecipient: 'contract-recipient',
 
   /**
-   * Получатель — контракт самого отправляемого актива.
+   * The recipient is the contract of the asset being sent.
    *
-   * САМАЯ ЧАСТАЯ БЕЗВОЗВРАТНАЯ ОШИБКА С ТОКЕНАМИ. Человек копирует
-   * адрес контракта — из обозревателя, из списка активов, из чужого
-   * сообщения — и вставляет его в поле получателя. Перевод проходит:
-   * контракт записывает токены на собственный адрес. Забрать их оттуда
-   * может только код контракта, а такого кода почти никогда нет.
+   * THE MOST COMMON IRREVERSIBLE TOKEN MISTAKE. A person copies
+   * the contract address — from an explorer, from the asset list,
+   * from someone else's message — and pastes it into the recipient
+   * field. The transfer succeeds: the contract credits tokens to
+   * its own address. Only the contract's code can take them back,
+   * and that code almost never exists.
    *
-   * ОТ `ContractRecipient` ОТЛИЧАЕТСЯ ОПРЕДЕЛЁННОСТЬЮ. «Получатель —
-   * контракт» иногда законно: биржи, мультиподписи и хранилища
-   * принимают переводы. Отправка актива в его собственный контракт
-   * законного применения не имеет.
+   * DIFFERS FROM `ContractRecipient` IN CERTAINTY. "The recipient
+   * is a contract" is sometimes legitimate: exchanges, multisigs,
+   * and vaults accept transfers. Sending an asset to its own
+   * contract has no legitimate use.
    */
   AssetContractRecipient: 'asset-contract-recipient',
 } as const
 
 export type RecipientRisk = (typeof RECIPIENT_RISK)[keyof typeof RECIPIENT_RISK]
 
-/** Что известно об отправляемом активе. */
 export interface IRecipientRiskOptions {
   /**
-   * Адрес контракта отправляемого токена либо коллекции.
+   * Contract address of the token or collection being sent.
    *
-   * `null` либо отсутствие означает перевод нативной валюты: у неё
-   * контракта нет, и проверять нечего.
+   * `null` or absence means a native-currency transfer: it has
+   * no contract, and there is nothing to check.
    */
   readonly assetContract?: Address | null
 }
 
 /**
- * Проверяет получателя перед отправкой.
+ * Checks the recipient before sending.
  *
- * ЭТО ПРЕДУПРЕЖДЕНИЯ, А НЕ ЗАПРЕТЫ. У каждого случая есть законное
- * применение: перевод самому себе между аккаунтами, сжигание токенов,
- * адрес, скопированный из источника без контрольной суммы. Запрет
- * лишил бы пользователя возможности сделать то, что он собирался,
- * а предупреждение даёт остановиться и подумать.
+ * THESE ARE WARNINGS, NOT BANS. Each case has a legitimate use:
+ * a transfer to oneself between accounts, burning tokens, an
+ * address copied from a source without a checksum. A ban would
+ * take away the ability to do what they intended; a warning
+ * lets them stop and think.
  *
- * ПОЧЕМУ ПРОВЕРОК ИМЕННО СТОЛЬКО. Каждая ловит ошибку, которую нельзя
- * исправить после отправки: перевод в блокчейне необратим. Проверки,
- * срабатывающие часто и без пользы, сюда не добавлены — ложная тревога
- * приучает не читать предупреждения, и настоящее останется незамеченным.
+ * WHY EXACTLY THESE CHECKS. Each catches a mistake that cannot
+ * be undone after the send: a transfer on the chain is final.
+ * Checks that fire often and without use are not added — a false
+ * alarm trains people not to read warnings, and a real one would
+ * go unnoticed.
  *
- * @param recipient Адрес В ТОМ ВИДЕ, В КАКОМ ЕГО ВВЁЛ ПОЛЬЗОВАТЕЛЬ.
- *        Нормализованное значение сюда передавать нельзя: `toAddress`
- *        приводит запись к контрольной сумме, и признак «введено без
- *        контрольной суммы» теряется до проверки — предупреждение
- *        не появится никогда.
+ * @param recipient The address AS THE USER TYPED IT.
+ *        A normalized value must not be passed here: `toAddress`
+ *        brings the writing to checksum form, and the "typed
+ *        without a checksum" mark is lost before the check —
+ *        the warning would never appear.
  */
 export function findRecipientRisks(
   recipient: string,
@@ -76,8 +77,8 @@ export function findRecipientRisks(
 ): readonly RecipientRisk[] {
   const risks: RecipientRisk[] = []
 
-  /* Проверка стоит первой: она означает заведомую потерю, а не повод
-     задуматься, и должна быть замечена раньше остальных. */
+  /* This check comes first: it means a certain loss, not a reason
+     to think, and must be noticed before the others. */
   if (
     options.assetContract !== undefined &&
     options.assetContract !== null &&
@@ -86,8 +87,8 @@ export function findRecipientRisks(
     risks.push(RECIPIENT_RISK.AssetContractRecipient)
   }
 
-  /* Сравнение адресов нечувствительно к регистру, поэтому необработанная
-     строка годится и для этих двух проверок. */
+  /* Address comparison is case-insensitive, so the raw string
+     works for these two checks as well. */
   if (isBurnAddress(recipient)) {
     risks.push(RECIPIENT_RISK.BurnAddress)
   }
@@ -104,24 +105,24 @@ export function findRecipientRisks(
 }
 
 /**
- * Определяет, является ли получатель контрактом.
+ * Whether the recipient is a contract.
  *
- * ЗАПРОС К УЗЛУ ОТДЕЛЁН ОТ ОСТАЛЬНЫХ ПРОВЕРОК СОЗНАТЕЛЬНО.
- * `findRecipientRisks` — чистая функция: она работает по введённой
- * строке и выполняется на каждое нажатие клавиши. Обращение к сети
- * внутри неё означало бы запрос на каждый набранный символ.
+ * THE NODE REQUEST IS SEPARATED FROM THE OTHER CHECKS ON PURPOSE.
+ * `findRecipientRisks` is a pure function: it works from the typed
+ * string and runs on every keystroke. Talking to the network
+ * inside it would mean a request on every typed character.
  *
- * ЧТО УЗНАЁТ ОПЕРАТОР УЗЛА. Адрес получателя — но он и так увидит его
- * через секунду при публикации транзакции. Дополнительной утечки здесь
- * нет.
+ * WHAT THE NODE OPERATOR LEARNS. The recipient address — but they
+ * will see it in a second when the transaction is published.
+ * There is no extra leak here.
  *
- * ОТКАЗ УЗЛА НЕ ОЗНАЧАЕТ «НЕ КОНТРАКТ». Возвращается `null`, и интерфейс
- * обязан сказать, что проверить не удалось. «Проверено, всё в порядке»
- * вместо «проверить не удалось» — это утверждение, которого никто
- * не делал.
+ * A NODE FAILURE DOES NOT MEAN "NOT A CONTRACT". `null` is
+ * returned, and the UI must say the check could not be done.
+ * "Checked, all is well" instead of "could not check" is a
+ * claim nobody made.
  *
- * @returns `true` — контракт, `false` — обычный адрес, `null` — узел
- *          не ответил.
+ * @returns `true` — a contract, `false` — an ordinary address,
+ *          `null` — the node did not answer.
  */
 export async function isContractAddress(
   address: Address,
@@ -130,8 +131,8 @@ export async function isContractAddress(
   try {
     const code = await provider.getCode(address)
 
-    /* Узлы возвращают `0x` для обычного адреса. Пустая строка
-       встречается у части реализаций и означает то же самое. */
+    /* Nodes return `0x` for an ordinary address. An empty string
+       appears in some implementations and means the same. */
     return code !== '0x' && code !== ''
   } catch {
     return null
@@ -139,16 +140,16 @@ export async function isContractAddress(
 }
 
 /**
- * Записан ли адрес с контрольной суммой EIP-55.
+ * Whether the address is written with an EIP-55 checksum.
  *
- * Контрольная сумма выражена регистром букв: адрес целиком в нижнем
- * либо целиком в верхнем регистре её не несёт. Такой адрес формально
- * корректен, но опечатка в нём не обнаруживается — а опечатка в адресе
- * означает потерю средств без возможности возврата.
+ * The checksum is expressed in letter case: an address entirely
+ * lowercase or entirely uppercase does not carry it. Such an
+ * address is formally valid, but a typo in it is not detected —
+ * and a typo in an address means lost funds with no return.
  *
- * Адрес без единой буквы (только цифры) невозможно отличить от адреса
- * с контрольной суммой, и он считается проверенным: требовать иного
- * значило бы предупреждать без причины.
+ * An address with no letters (digits only) cannot be told apart
+ * from a checksummed one, and is treated as checked: requiring
+ * otherwise would warn for no reason.
  */
 function hasChecksum(address: string): boolean {
   const body = address.slice(2)

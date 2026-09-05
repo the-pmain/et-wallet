@@ -13,7 +13,7 @@ const PASSWORD = 'Korova-7-Luna!'
 
 const BALANCE = 1_000_000_000_000_000_000n as Wei
 
-/** Третий адрес тестовой фразы: им «пользовались» до восстановления. */
+/** Third address of the test phrase: it was "used" before recovery. */
 const THIRD = toAddress(TEST_MNEMONIC_ADDRESSES[2] as string)
 
 let services: ITestAppServices
@@ -31,12 +31,12 @@ beforeEach(() => {
   services = createTestAppServices()
 })
 
-describe('Восстановление находит занятые адреса', () => {
-  it('аккаунт с балансом появляется сам', async () => {
-    /* САМЫЙ ОПАСНЫЙ ПЕРВЫЙ ЭКРАН. Адреса выводятся из фразы, но кошелёк
-       о них не знает, пока не выведет: человек, у которого было три
-       аккаунта, увидел бы один и разумно заключил, что средства
-       пропали. */
+describe('Recovery finds used addresses', () => {
+  it('an account with a balance appears on its own', async () => {
+    /* THE MOST DANGEROUS FIRST SCREEN. Addresses are derived from the
+       phrase, but the wallet does not know them until it derives them:
+       someone who had three accounts would see one and reasonably
+       conclude the funds were gone. */
     services.providerFactory.configure({
       balance: 0n as Wei,
       balancesByAddress: [{ address: THIRD, balance: BALANCE }],
@@ -60,9 +60,9 @@ describe('Восстановление находит занятые адрес�
     expect(addresses).toContain(THIRD.toLowerCase())
   })
 
-  it('пустой кошелёк лишних аккаунтов не получает', async () => {
-    /* Поиск ничего не нашёл — значит и добавлять нечего. Лишний
-       аккаунт сбивал бы с толку не меньше пропавшего. */
+  it('an empty wallet does not receive extra accounts', async () => {
+    /* Search found nothing, so nothing should be added. An extra
+       account would confuse as much as a missing one. */
     services.providerFactory.configure({ balance: 0n as Wei })
 
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
@@ -73,9 +73,9 @@ describe('Восстановление находит занятые адрес�
     expect(services.session.getSnapshot().accounts).toHaveLength(1)
   })
 
-  it('поиск повторяется по кнопке в настройках', async () => {
-    /* Первый поиск мог пройти при недоступном узле. Кнопка — способ
-       повторить, не пересоздавая кошелёк. */
+  it('search can be repeated from a button in settings', async () => {
+    /* The first search may have run while the node was down. The
+       button repeats it without recreating the wallet. */
     const user = userEvent.setup()
 
     services.providerFactory.configure({ balance: 0n as Wei })
@@ -96,10 +96,10 @@ describe('Восстановление находит занятые адрес�
     expect(await screen.findByText(/Found and added 1 account/i)).toBeInTheDocument()
   })
 
-  it('итог называет глубину поиска и его границы', async () => {
-    /* «Ничего не найдено» без глубины читается как «у вас больше ничего
-       нет» — утверждение, которого поиск не делает: адреса, где лежат
-       только токены, он не видит. */
+  it('the result names the search depth and its limits', async () => {
+    /* "Nothing found" without a depth reads as "you have nothing else"
+       — a claim the search does not make: addresses that hold only
+       tokens are invisible to it. */
     const user = userEvent.setup()
 
     services.providerFactory.configure({ balance: 0n as Wei })

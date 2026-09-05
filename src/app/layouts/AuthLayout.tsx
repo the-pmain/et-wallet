@@ -6,29 +6,30 @@ import { cn } from '@/shared/lib/utils'
 import { COINS, type ICoin } from './coins'
 
 /**
- * Оболочка экранов входа.
+ * Shell for sign-in screens.
  *
- * Общий живой фон для приветствия, создания, восстановления, разблокировки
- * и сброса. Вынесен в маршрут-лейаут, а не повторён в каждой странице:
- * пять копий разошлись бы, а при переходе между экранами фон перезапускал
- * бы анимацию с нуля — движение читалось бы как рывок.
+ * Shared live background for welcome, create, restore, unlock, and
+ * reset. Lifted into a route layout instead of being copied on every
+ * page: five copies would drift, and navigating between screens would
+ * restart the animation from zero — motion would read as a jump.
  *
- * ЗА ПАНЕЛЬЮ КОШЕЛЬКА ЭТОГО ФОНА НЕТ. Движение позади сумм и предупреждений
- * мешает читать и перетягивает внимание. Экраны входа — единственное место,
- * где на экране нет ни одной цифры, за которую пользователь отвечает
- * деньгами, и украшение уместно.
+ * THIS BACKGROUND IS NOT BEHIND THE WALLET PANEL. Motion behind
+ * amounts and warnings gets in the way of reading and steals
+ * attention. Sign-in screens are the only place with no figure the
+ * user is responsible for with money, and decoration is appropriate.
  */
 export function AuthLayout() {
   const location = useLocation()
   const navigationType = useNavigationType()
 
-  /* Направление перехода: «назад» выводит содержимое слева, «вперёд» —
-     справа. Совпадение направления анимации с направлением движения
-     по истории — то, что делает переход понятным, а не просто плавным.
+  /* Navigation direction: "back" brings content in from the left,
+     "forward" from the right. Matching animation direction to history
+     direction is what makes the transition understandable, not merely
+     smooth.
 
-     Сравнение через перечисление библиотеки, а не со строкой: строковый
-     литерал не проверяется компилятором, и опечатка обернулась бы
-     переходами, всегда идущими в одну сторону. */
+     Compared through the library enum, not a string: a string literal
+     is not checked by the compiler, and a typo would make every
+     transition go the same way. */
   const isBackwards = navigationType === NavigationType.Pop
 
   return (
@@ -36,10 +37,9 @@ export function AuthLayout() {
       <AuroraBackground />
 
       {/*
-        Ключ по адресу перезапускает анимацию при каждом переходе.
-        Фон при этом остаётся на месте: меняется только содержимое,
-        и смена читается как продолжение одного экрана, а не как
-        загрузка нового.
+        A key on the path restarts the animation on every navigation.
+        The background stays put: only the content changes, and the
+        change reads as a continuation of one screen, not a new load.
       */}
       <div
         key={location.pathname}
@@ -55,11 +55,12 @@ export function AuthLayout() {
 }
 
 /**
- * Живой фон: градиентные пятна, падающие монеты, сетка и виньетка.
+ * Live background: gradient blobs, falling coins, grid, and vignette.
  *
- * Разметка сознательно пустая: всё оформление живёт в CSS, а элементы
- * здесь — только слои. `aria-hidden` обязателен: экранному диктору
- * нечего сообщить о фоне, а лишние узлы засоряют навигацию.
+ * Markup is empty on purpose: all look lives in CSS, and the elements
+ * here are only layers. `aria-hidden` is required: a screen reader
+ * has nothing to say about a background, and extra nodes clutter
+ * navigation.
  */
 function AuroraBackground() {
   return (
@@ -77,21 +78,22 @@ function AuroraBackground() {
 }
 
 /**
- * Медленно падающие монеты.
+ * Slowly falling coins.
  *
- * ПОЧЕМУ CSS, А НЕ CANVAS. Холст требует непрерывного цикла на главном
- * потоке: пока открыт кошелёк, процессор занят перерисовкой украшения.
- * Здесь анимируется только `transform`, и браузер выполняет это
- * на видеокарте, не будя главный поток вовсе.
+ * WHY CSS, NOT CANVAS. A canvas needs a continuous loop on the main
+ * thread: while the wallet is open, the CPU is busy redrawing
+ * decoration. Here only `transform` is animated, and the browser
+ * does that on the GPU without waking the main thread at all.
  *
- * ПОЧЕМУ ПОЛОЖЕНИЯ ЗАДАНЫ СПИСКОМ, А НЕ СЛУЧАЙНЫ. `Math.random` дал бы
- * разную картину при каждом рендере: тесты стали бы недетерминированными,
- * а сама раскладка иногда сбивалась бы в кучу. Значения подобраны так,
- * чтобы монеты распределялись по ширине и не совпадали по фазе.
+ * WHY POSITIONS ARE A LIST, NOT RANDOM. `Math.random` would give a
+ * different picture on every render: tests would become
+ * non-deterministic, and the layout itself would sometimes pile up.
+ * Values are chosen so coins spread across the width and do not
+ * share a phase.
  *
- * Слой скрывается целиком при системной настройке уменьшенного движения —
- * см. `index.css`. Обычного отключения анимации здесь мало: монеты
- * замерли бы у нижнего края видимой грудой.
+ * The layer is hidden entirely under the reduced-motion setting —
+ * see `index.css`. Turning off animation alone is not enough: coins
+ * would freeze in a visible heap at the bottom edge.
  */
 function CoinRain() {
   return (
@@ -104,12 +106,12 @@ function CoinRain() {
 }
 
 /**
- * Стиль одной монеты.
+ * Style of one coin.
  *
- * Пользовательские свойства CSS не входят в `CSSProperties`, поэтому тип
- * расширен явно. Приведение к `any` решило бы ту же задачу, но заодно
- * отключило бы проверку остальных полей — а опечатка в `animationDuration`
- * не выдала бы себя ничем, кроме неподвижной монеты.
+ * CSS custom properties are not part of `CSSProperties`, so the type
+ * is extended explicitly. Casting to `any` would solve the same
+ * problem and also disable checking of the other fields — a typo in
+ * `animationDuration` would show as nothing but a motionless coin.
  */
 type CoinStyle = CSSProperties & {
   readonly '--coin-drift': string

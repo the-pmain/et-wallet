@@ -1,82 +1,83 @@
 import type { Brand } from '@/shared/types'
 
 /**
- * Ключ записи в хранилище.
+ * Storage record key.
  *
- * Брендирован, чтобы произвольная строка не попала в хранилище в качестве
- * ключа. Ключи объявляются централизованно: разбросанные по коду строковые
- * литералы неизбежно приводят к коллизиям и к «потерянным» записям,
- * которые никто не читает.
+ * Branded so an arbitrary string cannot enter storage as a key. Keys
+ * are declared centrally: string literals scattered through the code
+ * inevitably lead to collisions and to "lost" records that nobody
+ * reads.
  */
 export type StorageKey = Brand<string, 'StorageKey'>
 
 /**
- * Логическое пространство имён внутри хранилища.
+ * Logical namespace inside storage.
  *
- * В терминах IndexedDB — object store. Разделение обязательно: очистка
- * кэша балансов не должна затрагивать хранилище ключей, а транзакционная
- * запись в одно пространство не должна блокировать чтение из другого.
+ * In IndexedDB terms — an object store. The split is required:
+ * clearing the balance cache must not touch the key vault, and a
+ * transactional write in one namespace must not block a read from
+ * another.
  */
 export const STORAGE_NAMESPACE = {
-  /** Зашифрованное хранилище ключей. Самая критичная область. */
+  /** Encrypted key vault. The most critical area. */
   Vault: 'vault',
-  /** Метаданные аккаунтов. Секретов не содержит. */
+  /** Account metadata. Contains no secrets. */
   Accounts: 'accounts',
   /**
-   * Сети прежнего формата — открытым текстом.
+   * Networks of the old format — in the clear.
    *
-   * ОСТАВЛЕНО РАДИ ПЕРЕНОСА. Кошельки, созданные до шифрования сетей,
-   * хранят их здесь; репозиторий читает это пространство один раз
-   * и очищает. Писать сюда больше нельзя.
+   * KEPT FOR MIGRATION. Wallets created before networks were
+   * encrypted store them here; the repository reads this namespace
+   * once and clears it. Writing here is no longer allowed.
    */
   Networks: 'networks',
 
   /**
-   * Сети в зашифрованном виде.
+   * Networks in encrypted form.
    *
-   * ОТДЕЛЬНОЕ ПРОСТРАНСТВО, А НЕ ТО ЖЕ САМОЕ. Зашифрованное хранилище
-   * работает поверх той же базы, и, оставь мы одно имя, перенос читал бы
-   * собственные зашифрованные записи как записи прежнего формата
-   * и портил их. Разные имена делают это невозможным.
+   * A SEPARATE NAMESPACE, NOT THE SAME ONE. Encrypted storage sits
+   * on the same database, and if we kept one name, migration would
+   * read its own encrypted records as old-format records and corrupt
+   * them. Different names make that impossible.
    */
   NetworksEncrypted: 'networks-encrypted',
   /**
-   * RPC-адреса, добавленные пользователем.
+   * RPC addresses added by the user.
    *
-   * Отдельно от `Networks` не ради порядка. `NetworkRepository.findAll`
-   * читает все ключи своего пространства и разбирает каждый как
-   * конфигурацию сети: посторонняя запись рядом превратилась бы
-   * в повреждённую сеть в списке.
+   * Separate from `Networks` not for neatness. `NetworkRepository.findAll`
+   * reads every key in its namespace and parses each as a network
+   * config: a stray record next to them would become a corrupted
+   * network in the list.
    *
-   * Содержимое шифруется: адрес собственного узла обычно несёт ключ
-   * учётной записи у оператора.
+   * Contents are encrypted: an own-node URL usually carries an
+   * operator-account key.
    */
   RpcEndpoints: 'rpc-endpoints',
-  /** Отслеживаемые токены. */
+  /** Tracked tokens. */
   Tokens: 'tokens',
-  /** История транзакций. */
+  /** Transaction history. */
   Transactions: 'transactions',
-  /** Кэш балансов. Может быть очищен без потери данных. */
+  /** Balance cache. May be cleared without losing data. */
   BalanceCache: 'balance-cache',
 
   /**
-   * Подключения к приложениям (WalletConnect).
+   * Connections to apps (WalletConnect).
    *
-   * СОДЕРЖИТ СЕКРЕТЫ. Записи сессии несут симметричные ключи, которыми
-   * шифруется обмен с приложением через relay: получивший их читает
-   * переписку и может выдать себя за кошелёк. Поэтому пространство
-   * зашифрованное, а не открытое, — и поэтому удаление кошелька уносит
-   * подключения вместе с ним.
+   * CONTAINS SECRETS. Session records carry symmetric keys that
+   * encrypt exchange with the app through the relay: whoever has
+   * them reads the traffic and can impersonate the wallet. So the
+   * namespace is encrypted, not open — and deleting the wallet
+   * takes the connections with it.
    */
   DappSessions: 'dapp-sessions',
-  /** Настройки приложения. */
+  /** Application settings. */
   Settings: 'settings',
   /**
-   * Журнал выданных наружу секретов.
+   * Log of secrets given out.
    *
-   * Самих секретов не содержит — только вид экспорта, путь аккаунта
-   * и время. Нужен, чтобы обнаружить опасное сочетание выданных артефактов
-   * (см. `core/security`).
+   * Contains no secrets themselves — only the export kind, the
+   * account path, and the time. Needed to detect a dangerous
+   * combination of issued artifacts (see `core/security`).
    */
   ExportAudit: 'export-audit',
 } as const
@@ -84,11 +85,11 @@ export const STORAGE_NAMESPACE = {
 export type StorageNamespace = (typeof STORAGE_NAMESPACE)[keyof typeof STORAGE_NAMESPACE]
 
 /**
- * Операции чтения и записи в пределах одной транзакции.
+ * Read and write operations within one transaction.
  *
- * Отдельный интерфейс от {@link IStorageService} нужен, чтобы транзакционные
- * операции нельзя было вызвать вне транзакции, и наоборот — вложенная
- * транзакция была невозможна по типам.
+ * A separate interface from {@link IStorageService} so transactional
+ * operations cannot be called outside a transaction, and conversely
+ * a nested transaction is impossible by types.
  */
 export interface IStorageTransaction {
   get<TValue>(namespace: StorageNamespace, key: StorageKey): Promise<TValue | null>
@@ -99,65 +100,64 @@ export interface IStorageTransaction {
 }
 
 /**
- * Шаг миграции схемы хранилища.
+ * One storage-schema migration step.
  *
- * Миграции критичны для кошелька: пользователь обновляет приложение, имея
- * единственную копию ключей. Неудачная миграция без отката означает потерю
- * средств. Поэтому каждый шаг выполняется в транзакции, а сбой откатывает
- * её целиком.
+ * Migrations are critical for a wallet: the user updates the app
+ * holding a single copy of the keys. A failed migration without
+ * rollback means loss of funds. So each step runs in a transaction,
+ * and a failure rolls it back entirely.
  */
 export interface IStorageMigration {
-  /** Версия схемы, в которую переводит этот шаг. Начинается с 1. */
+  /** Schema version this step moves to. Starts at 1. */
   readonly version: number
 
-  /** Краткое описание изменения. Попадает в журнал при выполнении. */
+  /** Short description of the change. Lands in the log when it runs. */
   readonly description: string
 
   /**
-   * Выполняет преобразование данных.
+   * Transforms the data.
    *
-   * Реализация обязана быть идемпотентной: прерывание работы браузера
-   * посреди обновления не должно приводить к повторному применению
-   * необратимого изменения.
+   * The implementation must be idempotent: interrupting the browser
+   * mid-upgrade must not re-apply an irreversible change.
    */
   migrate(transaction: IStorageTransaction): Promise<void>
 }
 
 /**
- * Насколько надёжно хранилище удерживает данные.
+ * How reliably storage holds data.
  *
- * ЗАЧЕМ РАЗЛИЧАТЬ ТРИ СОСТОЯНИЯ, А НЕ ДВА. «Переживает перезагрузку»
- * и «браузер обещал не удалять» — разные утверждения, и для кошелька
- * разница денежная. Браузер вправе вытеснить данные сайта при нехватке
- * места, и для кошелька это потеря зашифрованной seed-фразы: без
- * записанной на бумаге копии средства пропадают безвозвратно.
+ * WHY THREE STATES, NOT TWO. "Survives a reload" and "the browser
+ * promised not to delete" are different statements, and for a wallet
+ * the difference is money. The browser may evict site data when
+ * space is short, and for a wallet that is loss of the encrypted
+ * seed phrase: without a paper copy the funds are gone for good.
  *
- * Владелец обязан знать, в каком из трёх состояний находится его
- * кошелёк, и решение о том, что с этим делать, принимает он.
+ * The owner must know which of the three states their wallet is in,
+ * and they decide what to do about it.
  */
 export const STORAGE_DURABILITY = {
-  /** Данные переживают перезагрузку, браузер обещал их не вытеснять. */
+  /** Data survives a reload; the browser promised not to evict it. */
   Persistent: 'persistent',
 
   /**
-   * Данные переживают перезагрузку, но браузер вправе их вытеснить.
+   * Data survives a reload, but the browser may evict it.
    *
-   * Обычное состояние до того, как пользователь достаточно поработал
-   * с сайтом: разрешение на постоянное хранение выдаётся не сразу,
-   * а в приватном окне не выдаётся вовсе.
+   * The usual state until the user has used the site enough:
+   * persistent-storage permission is not granted immediately, and
+   * in a private window it is not granted at all.
    */
   BestEffort: 'best-effort',
 
-  /** Данные не переживают перезагрузку вкладки. */
+  /** Data does not survive a tab reload. */
   Session: 'session',
 } as const
 
 export type StorageDurability = (typeof STORAGE_DURABILITY)[keyof typeof STORAGE_DURABILITY]
 
-/** Сведения о занятом объёме. Нужны для предупреждения о нехватке квоты. */
+/** Occupied-volume info. Needed to warn about a short quota. */
 export interface IStorageEstimate {
-  /** Использовано байт. */
+  /** Bytes used. */
   readonly usage: number
-  /** Доступно байт по квоте браузера. */
+  /** Bytes available under the browser quota. */
   readonly quota: number
 }

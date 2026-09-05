@@ -4,55 +4,53 @@ import { functionSelector } from '@/core/token'
 import { toChainId, type Address, type ChainId, type HexString } from '@/core/types'
 
 /**
- * Сеть, в которой живёт реестр ENS.
+ * Network the ENS registry lives on.
  *
- * ENS развёрнут в Ethereum. Имя, разрешённое здесь, действительно
- * и в других сетях — адресное пространство EVM общее, — но сам реестр
- * существует в одном экземпляре и в одной цепи.
+ * ENS is deployed on Ethereum. A name resolved here is valid on
+ * other networks too — the EVM address space is shared — but the
+ * registry itself exists in one instance and on one chain.
  */
 export const ENS_CHAIN_ID: ChainId = toChainId(1)
 
 /**
- * Адрес реестра ENS.
+ * ENS registry address.
  *
- * ЗАПИСАН В НИЖНЕМ РЕГИСТРЕ И ПРОПУЩЕН ЧЕРЕЗ `toAddress` НАМЕРЕННО.
- * Контрольная сумма EIP-55 вычисляется, а не переписывается: сорок
- * символов, скопированных из памяти вместе с регистром, непроверяемы
- * при чтении, а ошибка в регистре дала бы отказ `toAddress` вместо
- * работающего кошелька.
+ * WRITTEN IN LOWERCASE AND RUN THROUGH `toAddress` ON PURPOSE.
+ * The EIP-55 checksum is computed, not copied: forty characters
+ * pasted from memory together with their case are unverifiable
+ * when reading, and a case error would make `toAddress` fail
+ * instead of a working wallet.
  *
- * САМО ЗНАЧЕНИЕ ПРОВЕРЕНО ЖИВЫМ ЗАПРОСОМ, а не взято из памяти: вызов
- * `resolver(namehash('vitalik.eth'))` по этому адресу возвращает
- * действующий резолвер, а тот — адрес, который обратным разрешением
- * даёт то же имя. Неверный адрес реестра дал бы нули на первом же шаге.
- * Тест `EnsService.test.ts` повторяет эту цепочку на дублёре.
+ * THE VALUE ITSELF WAS CHECKED WITH A LIVE CALL, not taken from
+ * memory: `resolver(namehash('vitalik.eth'))` at this address
+ * returns a live resolver, and that resolver returns an address
+ * whose reverse lookup yields the same name. A wrong registry
+ * address would give zeros on the first step.
+ * `EnsService.test.ts` repeats this chain on a test double.
  */
 export const ENS_REGISTRY_ADDRESS: Address = toAddress('0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e')
 
-/** `resolver(bytes32)` — адрес резолвера узла. Метод реестра. */
 export const ENS_RESOLVER_SELECTOR = functionSelector('resolver(bytes32)')
 
-/** `addr(bytes32)` — адрес, на который указывает имя. Метод резолвера, EIP-137. */
 export const ENS_ADDR_SELECTOR = functionSelector('addr(bytes32)')
 
-/** `name(bytes32)` — имя, объявленное для адреса. Метод резолвера, EIP-181. */
 export const ENS_NAME_SELECTOR = functionSelector('name(bytes32)')
 
-/** Вызов с одним аргументом-узлом. */
 export function encodeNodeCall(selector: string, node: HexString): HexString {
   return `0x${selector}${node.slice(2)}` as HexString
 }
 
 /**
- * Читает адрес из ответа контракта.
+ * Reads an address from a contract response.
  *
- * НУЛЕВОЙ АДРЕС ВОЗВРАЩАЕТСЯ КАК `null`, И ЭТО ГЛАВНОЕ В ЭТОЙ ФУНКЦИИ.
- * Реестр отвечает нулём на любой незарегистрированный узел, а резолвер —
- * на отсутствующую запись. Приняв этот ноль за адрес получателя, кошелёк
- * отправил бы средства в сжигающий адрес, из которого их не достанет
- * никто. Отсутствие записи и адрес — разные утверждения.
+ * A ZERO ADDRESS IS RETURNED AS `null`, AND THAT IS THE POINT
+ * OF THIS FUNCTION. The registry answers with zero for any
+ * unregistered node, and the resolver — for a missing record.
+ * Taking that zero as the recipient would send funds to the
+ * burn address, from which nobody can recover them. Absence
+ * of a record and an address are different claims.
  *
- * @returns Адрес либо `null`, если ответ пуст, нулевой или короче слова.
+ * @returns The address, or `null` if the response is empty, zero, or shorter than a word.
  */
 export function decodeAddressWord(data: HexString): Address | null {
   const body = strip(data)
@@ -61,9 +59,9 @@ export function decodeAddressWord(data: HexString): Address | null {
     return null
   }
 
-  /* Выравнивание проверяет общий разбор: слово с ненулевыми старшими
-     байтами адресом не является. Прежде эта проверка стояла здесь
-     собственным выражением — третьей копией одного правила. */
+  /* Alignment is checked by the shared parser: a word with non-zero
+     high bytes is not an address. This used to be a local expression
+     here — a third copy of the same rule. */
   const address = readAddressWord(body.slice(0, WORD_LENGTH))
 
   if (address === null) {
@@ -80,13 +78,13 @@ export function decodeAddressWord(data: HexString): Address | null {
 }
 
 /**
- * Читает строку из ответа контракта.
+ * Reads a string from a contract response.
  *
- * Формат ABI для `string`: смещение, длина, содержимое. Разбор нарочно
- * строгий — ответ приходит от контракта, который мы не писали, и любое
- * несоответствие означает «прочитать не удалось», а не «имени нет».
+ * ABI format for `string`: offset, length, contents. Parsing is
+ * deliberately strict — the response comes from a contract we did
+ * not write, and any mismatch means "could not read", not "no name".
  *
- * @returns Строка либо `null`, если ответ пуст либо не разбирается.
+ * @returns The string, or `null` if the response is empty or cannot be parsed.
  */
 export function decodeStringResult(data: HexString): string | null {
   const body = data.startsWith('0x') ? data.slice(2) : data
@@ -122,9 +120,9 @@ export function decodeStringResult(data: HexString): string | null {
     )
   }
 
-  /* `fatal: true` — недопустимая последовательность UTF-8 приводит
-     к отказу, а не к символам замены. Имя, которое не является текстом,
-     показывать нельзя: именно так подделывают строки на экране. */
+  /* `fatal: true` — an invalid UTF-8 sequence fails instead of
+     becoming replacement characters. A name that is not text
+     must not be shown: that is how strings are forged on screen. */
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {

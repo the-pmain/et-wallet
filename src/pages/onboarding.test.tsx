@@ -22,13 +22,12 @@ let services: ITestAppServices
 let service: ITestAppServices['onboarding']
 
 /**
- * Разворачивает приложение с настоящим ядром.
+ * Renders the app against a real core.
  *
- * Шифрование подменено ускоренным: боевые 600 000 итераций PBKDF2
- * превратили бы каждый тест в полсекунды ожидания. Узлы сети подменены
- * дублёром: обращение к настоящему публичному RPC сделало бы тест
- * медленным и зависящим от чужой доступности. Всё остальное —
- * BIP-39, BIP-32, AES-GCM, хранилище — работает по-настоящему.
+ * Encryption is swapped for a fast stand-in: production PBKDF2 (600 000
+ * iterations) would add half a second to every test. Network nodes are
+ * stubbed so the suite does not wait on public RPC. Everything else —
+ * BIP-39, BIP-32, AES-GCM, storage — runs for real.
  */
 function renderApp() {
   return render(
@@ -46,44 +45,43 @@ beforeEach(() => {
   service = services.onboarding
 })
 
-describe('Экран приветствия', () => {
-  it('предлагает создание кошелька', async () => {
+describe('Welcome screen', () => {
+  it('offers wallet creation', async () => {
     renderApp()
 
     expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
   })
 
-  it('показывает вход по seed-фразе в соответствии с режимом', async () => {
+  it('shows seed-phrase import according to the mode', async () => {
     renderApp()
 
     await screen.findByRole('link', { name: /create a new wallet/i })
 
-    /* Временное послабление снимает вход по seed-фразе целиком.
-       Тест следует за флагом, а не закрепляет одно из двух состояний:
-       иначе возврат защиты обратно уронил бы набор. */
+    /* The temporary relaxation hides seed-phrase import entirely.
+       Follow the flag instead of pinning one of the two states:
+       restoring the protection would otherwise fail the suite. */
     const importLink = screen.queryByRole('link', { name: /import/i })
 
     expect(importLink === null).toBe(TEST_MODE.hideSeedImport)
   })
 
-  it('предупреждает о невозможности восстановления', async () => {
+  it('warns that recovery is impossible', async () => {
     renderApp()
 
     await screen.findByRole('link', { name: /create a new wallet/i })
 
-    /* Проверяется суть, а не формулировка. При снятом входе по фразе
-       предупреждение обязано стать ещё определённее: восстанавливать
-       кошелёк сейчас нечем вообще. */
+    /* Assert the meaning, not the wording. With seed import hidden the
+       warning must be even more definite: there is nothing to restore with. */
     expect(
       screen.getByText(
         TEST_MODE.hideSeedImport
-          ? /восстановить кошелёк.*нечем/i
+          ? /no way to restore the wallet/i
           : /is an attempt to steal your funds/i,
       ),
     ).toBeInTheDocument()
   })
 
-  it('не помечает пустые поля ошибкой при открытии', async () => {
+  it('does not mark empty fields as invalid on open', async () => {
     renderApp()
 
     const unlock = await screen.findByRole('button', { name: 'Unlock' })
@@ -95,14 +93,14 @@ describe('Экран приветствия', () => {
   })
 })
 
-describe('Вход в экран аккаунта', () => {
+describe('Directory account sign-in', () => {
   const originalFetch = globalThis.fetch
 
   afterEach(() => {
     globalThis.fetch = originalFetch
   })
 
-  it('после успешного POST /v1/users/auth открывает кабинет', async () => {
+  it('opens the cabinet after a successful POST /v1/users/auth', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -133,8 +131,7 @@ describe('Вход в экран аккаунта', () => {
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
     expect(screen.getAllByRole('link', { name: 'ET WALLET' }).length).toBeGreaterThan(0)
-    expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
-    expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
+    expect(screen.queryByText('james@example.com · Since Aug 2026')).not.toBeInTheDocument()
     expect(screen.queryByText('7')).not.toBeInTheDocument()
 
     await waitFor(() => {
@@ -170,7 +167,7 @@ describe('Вход в экран аккаунта', () => {
     expect(readLoginCredentials()).not.toHaveProperty('balance')
   })
 
-  it('при 401 не открывает кабинет', async () => {
+  it('does not open the cabinet on 401', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
@@ -190,7 +187,7 @@ describe('Вход в экран аккаунта', () => {
     expect(readLoginCredentials()).toBeNull()
   })
 
-  it('показывает ошибку, если почта составлена неверно', async () => {
+  it('shows an error when the email is malformed', async () => {
     const fetchMock = vi.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
@@ -215,7 +212,7 @@ describe('Вход в экран аккаунта', () => {
     ).toHaveLength(0)
   })
 
-  it('при сохранённых учётных данных входит сам', async () => {
+  it('signs in automatically when credentials are stored', async () => {
     writeLoginCredentials({ id: '7', email: 'james@example.com', theP: '123456' })
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -236,8 +233,7 @@ describe('Вход в экран аккаунта', () => {
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
     expect(screen.getByText('$3.00')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
-    expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
+    expect(screen.queryByText('james@example.com · Since Aug 2026')).not.toBeInTheDocument()
     expect(screen.queryByText('7')).not.toBeInTheDocument()
     expect(readLoginCredentials()).toEqual({
       id: '7',
@@ -246,7 +242,7 @@ describe('Вход в экран аккаунта', () => {
     })
   })
 
-  it('при отказе входа стирает сохранённые учётные данные', async () => {
+  it('clears stored credentials when sign-in is rejected', async () => {
     writeLoginCredentials({ id: '7', email: 'james@example.com', theP: 'wrong' })
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -261,7 +257,7 @@ describe('Вход в экран аккаунта', () => {
     expect(readLoginCredentials()).toBeNull()
   })
 
-  it('кнопка блокировки стирает etwallet.login-credentials', async () => {
+  it('the lock button clears etwallet.login-credentials', async () => {
     await service.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
     writeLoginCredentials({ id: '7', email: USERNAME, theP: PASSWORD })
 
@@ -288,7 +284,6 @@ describe('Вход в экран аккаунта', () => {
   })
 })
 
-/** Заполняет первый шаг создания кошелька: почту и пароль. */
 async function fillCreationForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(await screen.findByRole('link', { name: /create a new wallet/i }))
   await user.type(await screen.findByLabelText(/Email/i), USERNAME)
@@ -296,8 +291,8 @@ async function fillCreationForm(user: ReturnType<typeof userEvent.setup>): Promi
   await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
 }
 
-describe('Создание кошелька', () => {
-  it('пускает дальше с простым паролем', async () => {
+describe('Wallet creation', () => {
+  it('allows a simple password through', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -309,7 +304,7 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
   })
 
-  it('не пускает дальше при несовпадении паролей', async () => {
+  it('blocks when the passwords do not match', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -321,7 +316,7 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('не пускает дальше без почты', async () => {
+  it('blocks without an email', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -332,7 +327,7 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('не пускает дальше с непригодной почтой', async () => {
+  it('blocks an invalid email', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -350,7 +345,7 @@ describe('Создание кошелька', () => {
     expect(screen.getAllByText('Enter a valid email').length).toBeGreaterThan(0)
   })
 
-  it('просит почту, а не имя', async () => {
+  it('asks for email, not a name', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -361,15 +356,15 @@ describe('Создание кошелька', () => {
     expect(screen.getByText(/sign in with this email/i)).toBeInTheDocument()
   })
 
-  it('показывает фразу только после явного действия', async () => {
+  it('shows the phrase only after an explicit action', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await fillCreationForm(user)
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    /* Слова присутствуют в разметке, но скрыты до нажатия: случайный
-       взгляд через плечо не раскроет фразу. */
+    /* The words are in the markup but hidden until click, so a glance
+       over the shoulder does not reveal the phrase. */
     expect(screen.getByRole('button', { name: /Show the phrase/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /Show the phrase/i }))
@@ -377,18 +372,18 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: /Hide/i })).toBeInTheDocument()
   })
 
-  it('требует отметки о записи фразы', async () => {
+  it('requires acknowledgement that the phrase was written down', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await fillCreationForm(user)
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    /* Подпись кнопки зависит от режима: при снятой проверке она сразу
-       создаёт кошелёк, при включённой ведёт к вопросам о словах.
-       Отметка о записи фразы обязательна в обоих случаях. */
-    /* Обе метки взяты из словаря: прежде эта ветка не выполнялась
-       ни разу и хранила устаревшее русское название кнопки. */
+    /* The button label depends on the mode: with confirmation off it
+       creates the wallet at once; with it on it leads to the word quiz.
+       The write-down acknowledgement is required in both cases. */
+    /* Both labels come from the dictionary. This branch used to keep a
+       stale Russian button name because it never ran. */
     const submitName = APP_CONFIG.requiresSeedConfirmation ? 'Next' : 'Create wallet'
 
     expect(screen.getByRole('button', { name: submitName })).toBeDisabled()
@@ -398,7 +393,7 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: submitName })).toBeEnabled()
   })
 
-  it('предупреждает о необратимости потери фразы', async () => {
+  it('warns that losing the phrase is irreversible', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -408,9 +403,9 @@ describe('Создание кошелька', () => {
     expect(screen.getByText(/do not save the phrase in notes/i)).toBeInTheDocument()
   })
 
-  it('показывает фразу и при снятой проверке записи', async () => {
-    /* Послабление снимает вопросы о словах, но не показ фразы:
-       возможность её записать обязана остаться. */
+  it('still shows the phrase when confirmation is disabled', async () => {
+    /* The relaxation drops the word quiz, not the phrase itself:
+       the owner must still be able to write it down. */
     const user = userEvent.setup()
     renderApp()
 
@@ -420,22 +415,21 @@ describe('Создание кошелька', () => {
     expect(screen.getByRole('button', { name: /Show the phrase/i })).toBeInTheDocument()
   })
 
-  it('предупреждает о снятой проверке, когда она снята', async () => {
+  it('does not announce that confirmation is disabled', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await fillCreationForm(user)
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    /* Отдельного предупреждения о выключенной проверке нет: она
-       выключена постоянно, и сообщать об этом при каждом создании
-       кошелька — шум. */
+    /* There is no separate warning that confirmation is off: it is off
+       permanently, and announcing that on every creation is noise. */
     const notice = screen.queryByText(/confirmation .* disabled/i)
 
     expect(notice).toBeNull()
   })
 
-  it('создаёт кошелёк и подписывает его почтой', async () => {
+  it('creates a wallet and labels it with the email', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -444,25 +438,25 @@ describe('Создание кошелька', () => {
     await user.click(screen.getByRole('checkbox'))
 
     if (APP_CONFIG.requiresSeedConfirmation) {
-      /* Полный путь с вопросами о словах проверяется отдельным набором:
-         здесь важно только имя аккаунта после создания. */
+      /* The full word-quiz path is covered by a separate suite.
+         Here only the account label after creation matters. */
       return
     }
 
     await user.click(screen.getByRole('button', { name: 'Create wallet' }))
 
-    /* Вместо безликого «Аккаунт 1» в шапке стоит имя владельца. */
+    /* The header shows the owner's email, not a generic "Account 1". */
     expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 })
 
 /*
-  Экран импорта временно скрыт флагом послаблений. Набор следует
-  за флагом, а не удалён: возврат защиты обратно вернёт и эти проверки,
-  а не потребует восстанавливать их по памяти.
+  The import screen is temporarily hidden by the relaxation flag.
+  The suite follows the flag instead of being deleted: restoring the
+  protection brings these checks back without reconstructing them.
 */
-describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () => {
-  it('сообщает о недопустимом числе слов', async () => {
+describe.skipIf(TEST_MODE.hideSeedImport)('Wallet import', () => {
+  it('reports an invalid word count', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -472,7 +466,7 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     expect(await screen.findByText(/Allowed word counts: 12, 15, 18, 21, 24/i)).toBeInTheDocument()
   })
 
-  it('указывает позиции слов вне словаря', async () => {
+  it('points to words that are not in the dictionary', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -482,7 +476,7 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     expect(await screen.findByText(/check the words at positions: 12/i)).toBeInTheDocument()
   })
 
-  it('подтверждает корректность фразы', async () => {
+  it('confirms a valid phrase', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -492,7 +486,7 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     expect(await screen.findByText('The phrase is valid')).toBeInTheDocument()
   })
 
-  it('предупреждает о фишинге', async () => {
+  it('warns about phishing', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -501,10 +495,10 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     expect(await screen.findByText(/has the right to\s+ask for it/i)).toBeInTheDocument()
   })
 
-  it('предупреждает об общеизвестной тестовой фразе', async () => {
-    /* Человек, взявший фразу из статьи или примера, обязан узнать
-       об этом до того, как переведёт на её адрес средства: приватные
-       ключи такой фразы вычисляет любой желающий. */
+  it('warns about a well-known test phrase', async () => {
+    /* Anyone who took the phrase from an article or example must learn
+       that before sending funds to its address: anyone can compute
+       its private keys. */
     const user = userEvent.setup()
     renderApp()
 
@@ -514,9 +508,9 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     expect(await screen.findByText(/well-known test phrase/i)).toBeInTheDocument()
   })
 
-  it('предупреждение не мешает импортировать', async () => {
-    /* Импорт тестовой фразы — обычная работа разработчика. Запрет
-       вместо предупреждения был бы решением за владельца. */
+  it('the warning does not block import', async () => {
+    /* Importing a test phrase is ordinary developer work. A ban instead
+       of a warning would decide for the owner. */
     const user = userEvent.setup()
     renderApp()
 
@@ -530,7 +524,7 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     expect(screen.getByRole('button', { name: 'Import' })).toBeEnabled()
   })
 
-  it('импортирует кошелёк и переводит в разблокированное состояние', async () => {
+  it('imports a wallet and leaves it unlocked', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -541,16 +535,16 @@ describe.skipIf(TEST_MODE.hideSeedImport)('Импорт кошелька', () =>
     await user.type(screen.getByLabelText('Repeat the password'), PASSWORD)
     await user.click(screen.getByRole('button', { name: 'Import' }))
 
-    /* Признак разблокировки — появление панели кошелька с созданным
-       из seed-фразы аккаунтом в шапке. */
+    /* Unlock is confirmed by the wallet chrome showing the account
+       derived from the seed phrase. */
     expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 })
 
-describe('Скрытый вход по seed-фразе', () => {
-  it('маршрут импорта закрыт вместе с кнопкой', async () => {
-    /* Скрытая кнопка при открытом адресе означала бы, что путь всё ещё
-       доступен любому, кто наберёт его руками. */
+describe('Hidden seed-phrase import', () => {
+  it('the import route is closed together with the button', async () => {
+    /* Hiding the button while leaving the route open would still let
+       anyone reach import by typing the URL. */
     openPath('/import')
 
     renderApp()
@@ -564,31 +558,29 @@ describe('Скрытый вход по seed-фразе', () => {
   })
 })
 
-describe('Разблокировка', () => {
+describe('Unlock', () => {
   beforeEach(async () => {
     await service.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
     service.lock()
   })
 
-  /** Заполняет форму входа. */
   async function signIn(user: ReturnType<typeof userEvent.setup>, password: string): Promise<void> {
     await user.type(await screen.findByLabelText('Email'), USERNAME)
     await user.type(await screen.findByLabelText('Password'), password)
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
   }
 
-  it('открывается по верному паролю', async () => {
+  it('opens with the correct password', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await signIn(user, PASSWORD)
 
-    /* Признак разблокировки — появление панели кошелька, подписанной
-       именем владельца. */
+    /* Unlock is confirmed by the wallet chrome labeled with the owner. */
     expect(await screen.findByText(USERNAME)).toBeInTheDocument()
   })
 
-  it('вход требует почту и пароль', async () => {
+  it('sign-in requires email and password', async () => {
     renderApp()
 
     expect(await screen.findByLabelText('Email')).toBeInTheDocument()
@@ -596,7 +588,7 @@ describe('Разблокировка', () => {
     expect(screen.queryByLabelText(/^Name$/i)).not.toBeInTheDocument()
   })
 
-  it('сообщает об ошибке при неверном пароле', async () => {
+  it('reports an error on a wrong password', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -605,9 +597,9 @@ describe('Разблокировка', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/wrong password/i)
   })
 
-  it('не раскрывает, что именно не сошлось', async () => {
-    /* Отличие «неверный пароль» от «хранилище повреждено» — информация
-       для подбирающего, а не для владельца. */
+  it('does not reveal what failed', async () => {
+    /* Distinguishing "wrong password" from "storage is corrupted" helps
+       an attacker, not the owner. */
     const user = userEvent.setup()
     renderApp()
 
@@ -615,10 +607,10 @@ describe('Разблокировка', () => {
 
     const alert = await screen.findByRole('alert')
 
-    expect(alert.textContent).not.toMatch(/повреждено|контрольная сумма|тег/i)
+    expect(alert.textContent).not.toMatch(/corrupted|checksum|tag/i)
   })
 
-  it('ведёт на страницу сброса', async () => {
+  it('leads to the reset page', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -628,14 +620,14 @@ describe('Разблокировка', () => {
   })
 })
 
-describe('Забыли пароль', () => {
+describe('Forgot password', () => {
   beforeEach(async () => {
     await service.importWallet(TEST_MNEMONIC, PASSWORD)
     service.lock()
     openPath('/forgot-password')
   })
 
-  it('сразу сообщает, что восстановление невозможно', async () => {
+  it('says immediately that recovery is impossible', async () => {
     renderApp()
 
     expect(await screen.findByText(/It cannot be\s+restored/i)).toBeInTheDocument()
@@ -643,13 +635,13 @@ describe('Забыли пароль', () => {
     expect(await screen.findByText('Erase the wallet from this device')).toBeInTheDocument()
   })
 
-  it('предупреждает о безвозвратной потере средств', async () => {
+  it('warns that funds would be lost for good', async () => {
     renderApp()
 
     expect(await screen.findByText(/the\s+funds will be lost/i)).toBeInTheDocument()
   })
 
-  it('требует двух подтверждений', async () => {
+  it('requires two confirmations', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -659,8 +651,8 @@ describe('Забыли пароль', () => {
 
     await user.click(screen.getByRole('checkbox'))
 
-    /* Флажок отсекает случайное нажатие, ввод слова — механическое
-       проставление галочек не читая. */
+    /* The checkbox stops an accidental click; typing the word stops
+       ticking boxes without reading. */
     expect(resetButton).toBeDisabled()
 
     await user.type(screen.getByLabelText(/Type the word/i), 'ERASE')
@@ -668,13 +660,13 @@ describe('Забыли пароль', () => {
     expect(resetButton).toBeEnabled()
   })
 
-  it('не даёт ввести слово до отметки о наличии фразы', async () => {
+  it('does not allow typing the word before the phrase acknowledgement', async () => {
     renderApp()
 
     expect(await screen.findByLabelText(/Type the word/i)).toBeDisabled()
   })
 
-  it('стирает кошелёк и возвращает к приветствию', async () => {
+  it('erases the wallet and returns to the welcome screen', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -688,44 +680,43 @@ describe('Забыли пароль', () => {
   })
 })
 
-describe('Маршрутизация по состоянию', () => {
-  it('показывает приветствие для несозданного кошелька', async () => {
+describe('Routing by wallet state', () => {
+  it('shows the welcome screen when no wallet exists', async () => {
     renderApp()
 
     expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
   })
 
-  it('перенаправляет на разблокировку для созданного кошелька', async () => {
+  it('redirects a created wallet to unlock', async () => {
     await service.importWallet(TEST_MNEMONIC, PASSWORD)
     service.lock()
 
     renderApp()
 
-    /* Заблокированный кошелёк не должен показывать экран создания:
-       иначе пользователь создаст второй кошелёк поверх первого. */
+    /* A locked wallet must not show the creation screen: the user would
+       create a second wallet on top of the first. */
     expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 })
 
-describe('Боевые параметры шифрования', () => {
-  it('шифрование по умолчанию остаётся боевым', () => {
-    /* Ускоренное шифрование существует только в тестах. Проверка
-       фиксирует, что понижение стойкости не просочилось в значения
-       по умолчанию, которыми пользуется composition root. */
+describe('Production encryption parameters', () => {
+  it('default encryption stays at production strength', () => {
+    /* Fast encryption exists only in tests. This pins that the weaker
+       KDF did not leak into the defaults used by the composition root. */
     expect(new EncryptionService().createKdfParams().iterations).toBe(600_000)
   })
 })
 
-describe('Путь к другому кошельку', () => {
+describe('Path to another wallet', () => {
   beforeEach(async () => {
     await service.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
     service.lock()
   })
 
-  it('экран входа предлагает завести другой кошелёк', async () => {
-    /* Человек, который пароль помнит, но хочет другой кошелёк, за ссылку
-       «забыли пароль» не нажмёт — и решит, что кошелёк его никуда
-       не пускает. */
+  it('the sign-in screen offers creating another wallet', async () => {
+    /* Someone who remembers the password but wants another wallet will
+       not click "forgot password" — and will think the wallet leads
+       nowhere. */
     renderApp()
 
     expect(
@@ -735,7 +726,7 @@ describe('Путь к другому кошельку', () => {
     ).toBeInTheDocument()
   })
 
-  it('ведёт на экран стирания, который объясняет оба случая', async () => {
+  it('leads to the erase screen, which explains both cases', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -749,8 +740,8 @@ describe('Путь к другому кошельку', () => {
     expect(screen.getByText(/Another wallet is needed/i)).toBeInTheDocument()
   })
 
-  it('называет главное ограничение: кошелёк на устройстве один', async () => {
-    /* Иначе непонятно, почему нельзя просто создать второй. */
+  it('names the main constraint: one wallet per device', async () => {
+    /* Otherwise it is unclear why a second wallet cannot just be created. */
     const user = userEvent.setup()
 
     renderApp()

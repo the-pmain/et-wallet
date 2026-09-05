@@ -22,22 +22,21 @@ const TRANSPORT_ID = 'walletconnect'
 const TRANSPORT_NAME = 'WalletConnect'
 
 /**
- * Пространство имён CAIP-2 для сетей EVM.
+ * CAIP-2 namespace for EVM networks.
  *
- * Кошелёк работает только с ними: заявить поддержку другой цепи
- * значило бы пообещать подпись ключом, которого у нас нет.
+ * The wallet works only with these: claiming another chain would
+ * promise a signature with a key we do not have.
  */
 const EVM_NAMESPACE = 'eip155'
 
 /**
- * Методы, которые кошелёк умеет выполнять.
+ * Methods the wallet can perform.
  *
- * `eth_sign` В СПИСОК НЕ ВХОДИТ НАМЕРЕННО. Он подписывает произвольные
- * 32 байта без префикса, то есть позволяет приложению получить подпись
- * под хэшем транзакции, ничего не показав владельцу. Заявлять поддержку
- * метода, который мы отвергаем при исполнении, нельзя: приложение
- * построило бы на нём работу и получило отказ в самый неподходящий
- * момент.
+ * `eth_sign` IS OMITTED ON PURPOSE. It signs arbitrary 32 bytes
+ * without a prefix, so an app can obtain a signature under a
+ * transaction hash without showing the owner anything. Claiming a
+ * method we reject at execution would let the app build on it and
+ * get a refusal at the worst moment.
  */
 const SUPPORTED_METHODS: readonly string[] = [
   'personal_sign',
@@ -47,15 +46,12 @@ const SUPPORTED_METHODS: readonly string[] = [
   'eth_signTransaction',
 ]
 
-/** События, на которые кошелёк подписывает приложение. */
 const SUPPORTED_EVENTS: readonly string[] = ['accountsChanged', 'chainChanged']
 
-/** Настройки транспорта. */
 export interface IWalletConnectOptions {
-  /** Идентификатор проекта в Reown (WalletConnect Cloud). Без него relay не пускает. */
+  /** Reown (WalletConnect Cloud) project id. Without it the relay refuses. */
   readonly projectId: string
 
-  /** Сведения о кошельке, показываемые приложению. */
   readonly metadata: {
     readonly name: string
     readonly description: string
@@ -66,33 +62,32 @@ export interface IWalletConnectOptions {
   readonly logger: ILogger
 
   /**
-   * Хранилище состояния подключений.
+   * Connection-state storage.
    *
-   * Необязательно: без него библиотека берёт `localStorage`, и сессии
-   * не переживают перезагрузку — записать туда мы не можем, этот путь
-   * закрыт правилом линтера. Передаётся из состава приложения, чтобы
-   * транспорт не знал, чем именно шифруется хранимое.
+   * Optional: without it the library uses `localStorage`, and sessions
+   * do not survive reload — we cannot write there; the linter forbids
+   * that path. Passed from the app composition so the transport does
+   * not know how the stored data is encrypted.
    */
   readonly storage?: IKeyValueStorage
 }
 
 /**
- * Подключение к приложениям по WalletConnect v2.
+ * Connect to applications via WalletConnect v2.
  *
- * ЗАГРУЖАЕТСЯ ЛЕНИВО. Библиотека весит около трёх мегабайт
- * в распакованном виде; загружать её при старте значило бы заставить
- * экран ввода пароля ждать код, который может не понадобиться вовсе.
- * Импорт выполняется в `init`, то есть при первом обращении к разделу
- * подключений.
+ * LOADED LAZILY. The library is about three megabytes unpacked;
+ * loading it at start would make the password screen wait for code
+ * that may never be needed. The import happens in `init`, on the
+ * first visit to the connections section.
  *
- * ЧТО ВИДИТ RELAY-СЕРВЕР. Адрес кошелька, метаданные каждого
- * приложения и время каждого запроса. Это утечка уровня индексатора,
- * и поэтому подключения включаются явным действием пользователя,
- * а не сами по себе.
+ * WHAT THE RELAY SERVER SEES. The wallet address, each app's
+ * metadata, and the time of each request. That is indexer-level
+ * leakage, so connections start on an explicit user action, not
+ * by themselves.
  *
- * ТРАНСПОРТ НЕ ПРИНИМАЕТ РЕШЕНИЙ. Он превращает сообщения relay
- * в запросы понятного ядру вида и отправляет обратно то, что решил
- * пользователь. Оценка риска, показ и подтверждение живут выше.
+ * THE TRANSPORT DOES NOT DECIDE. It turns relay messages into
+ * core-shaped requests and sends back what the user decided.
+ * Risk scoring, display, and confirmation live above.
  */
 export class WalletConnectTransport implements ISessionTransport {
   readonly id = TRANSPORT_ID
@@ -102,8 +97,8 @@ export class WalletConnectTransport implements ISessionTransport {
   readonly #logger: ILogger
   readonly #events = new TransportEvents()
 
-  /* Тип клиента не импортируется на верхнем уровне: это втянуло бы
-     библиотеку в основной чанк и отменило ленивую загрузку. */
+  /* The client type is not imported at the top level: that would
+     pull the library into the main chunk and cancel lazy loading. */
   #client: WalletConnectClient | null = null
 
   constructor(options: IWalletConnectOptions) {
@@ -130,10 +125,10 @@ export class WalletConnectTransport implements ISessionTransport {
     const client = (await SignClient.init({
       projectId: this.#options.projectId,
       metadata: { ...this.#options.metadata, icons: [...this.#options.metadata.icons] },
-      /* БЕЗ ЭТОГО БИБЛИОТЕКА ПИШЕТ В `localStorage`. Он запрещён
-         правилом линтера и не шифруется: ключи сессии лежали бы там
-         открытым текстом. Отсутствие хранилища означало бы подключения,
-         живущие до первой перезагрузки. */
+      /* WITHOUT THIS THE LIBRARY WRITES TO `localStorage`. The linter
+         forbids it and it is not encrypted: session keys would sit
+         there in plaintext. No storage would mean connections that
+         live only until the first reload. */
       ...(storage === undefined ? {} : { storage }),
     })) as unknown as WalletConnectClient
 
@@ -158,8 +153,8 @@ export class WalletConnectTransport implements ISessionTransport {
     const id = Number(proposalId)
 
     if (approval === null) {
-      /* Отказ отправляется явно: приложение, не получившее ответа,
-         висит в ожидании и подталкивает пользователя нажать ещё раз. */
+      /* Rejection is sent explicitly: an app that gets no reply hangs
+         waiting and nudges the user to press again. */
       await client.reject({ id, reason: { code: 5000, message: 'Rejected by the user' } })
 
       return
@@ -194,8 +189,8 @@ export class WalletConnectTransport implements ISessionTransport {
           : {
               id: Number(rawId),
               jsonrpc: '2.0',
-              /* Код 4001 — отказ пользователя по EIP-1193. Приложения
-                 узнают его и не считают сбоем связи. */
+              /* Code 4001 is a user rejection per EIP-1193. Apps
+                 recognize it and do not treat it as a link failure. */
               error: { code: 4001, message: response.reason },
             },
     })
@@ -212,8 +207,8 @@ export class WalletConnectTransport implements ISessionTransport {
       try {
         await client.emit(emission)
       } catch (error) {
-        /* Отказ одного подключения не должен лишать уведомления
-           остальные: причина уходит в журнал, обход продолжается. */
+        /* Failure of one connection must not starve the others of
+           notification: the reason goes to the log, the loop continues. */
         this.#logger.warn('An application could not be notified of the state change', {
           topic: emission.topic,
           reason: error instanceof Error ? error.message : String(error),
@@ -247,14 +242,13 @@ export class WalletConnectTransport implements ISessionTransport {
   }
 
   async destroy(): Promise<void> {
-    /* Соединение с relay закрывается вместе с блокировкой кошелька:
-       открытый канал продолжал бы сообщать оператору, что владелец
-       за устройством. */
+    /* The relay connection closes with the wallet lock: an open
+       channel would keep telling the operator that the owner is
+       at the device. */
     await this.#client?.core.relayer.transportClose()
     this.#client = null
   }
 
-  /** Transferит события библиотеки в события транспорта. */
   #subscribe(client: WalletConnectClient): void {
     client.on('session_proposal', (event) => {
       this.#events.emit('session:proposal', {
@@ -275,8 +269,8 @@ export class WalletConnectTransport implements ISessionTransport {
       })
 
       if (request === null) {
-        /* Неизвестный метод отклоняется, а не пропускается: подписать
-           то, чего мы не разбираем, значит подписать вслепую. */
+        /* An unknown method is rejected, not skipped: signing what
+           we do not parse is signing blind. */
         void this.respondToRequest(`${event.topic}|${String(event.id)}`, {
           kind: 'rejected',
           reason: 'The method is not supported by this wallet',
@@ -303,11 +297,11 @@ export class WalletConnectTransport implements ISessionTransport {
 }
 
 /**
- * Минимальная форма клиента, которой пользуется транспорт.
+ * Minimal client shape the transport uses.
  *
- * Объявлена здесь, а не импортирована: импорт типа из библиотеки
- * потянул бы её в основной чанк и отменил ленивую загрузку. Набор
- * узкий — ровно то, что вызывается ниже.
+ * Declared here, not imported: importing the type from the library
+ * would pull it into the main chunk and cancel lazy loading. The
+ * set is narrow — exactly what is called below.
  */
 interface WalletConnectClient {
   readonly core: {
@@ -348,7 +342,6 @@ interface RawSession {
   >
 }
 
-/** Одно событие, готовое к отправке приложению. */
 export interface IStateChangeEmission {
   readonly topic: string
   readonly chainId: string
@@ -356,21 +349,21 @@ export interface IStateChangeEmission {
 }
 
 /**
- * Собирает события смены состояния для всех подходящих подключений.
+ * Build state-change events for every matching connection.
  *
- * ВЫНЕСЕНО ИЗ ТРАНСПОРТА РАДИ ПРОВЕРЯЕМОСТИ. Само соединение с relay
- * подставить нечем, а именно здесь легко ошибиться: формат CAIP,
- * шестнадцатеричный идентификатор сети, отбор по одобренным сетям.
- * Чистая функция проверяется без библиотеки.
+ * EXTRACTED FROM THE TRANSPORT FOR TESTABILITY. The relay connection
+ * itself cannot be stubbed, and this is where mistakes are easy:
+ * CAIP format, hex network id, filter by approved networks.
+ * A pure function is checked without the library.
  *
- * СОБЫТИЕ УХОДИТ ТОЛЬКО ОДОБРИВШИМ ЭТУ СЕТЬ. Приложению, не запрашивавшему
- * её, relay всё равно откажет, а перебор несогласованных сетей засоряет
- * журнал ложными отказами.
+ * THE EVENT GOES ONLY TO SESSIONS THAT APPROVED THIS NETWORK.
+ * Relay would reject an app that did not request it, and iterating
+ * mismatched networks fills the log with false refusals.
  *
- * НА КАЖДОЕ ПОДКЛЮЧЕНИЕ — ДВА СОБЫТИЯ. `chainChanged` несёт сеть
- * шестнадцатеричной строкой (формат EIP-1193), `accountsChanged` —
- * адреса в CAIP-10, том же, в каком они выданы при подключении. Голый
- * адрес часть приложений не принимает.
+ * TWO EVENTS PER CONNECTION. `chainChanged` carries the network as
+ * a hex string (EIP-1193); `accountsChanged` carries CAIP-10
+ * addresses, the same form issued at connect. A bare address is
+ * rejected by some apps.
  */
 export function buildStateChangeEmissions(
   sessions: readonly RawSession[],
@@ -423,11 +416,10 @@ interface RawRequest {
   }
 }
 
-/** Приводит метаданные приложения к виду, принятому в ядре. */
 function toMetadata(metadata: RawMetadata | undefined) {
   return {
-    /* Пустые значения не выдумываются: приложение, не назвавшее себя,
-       обязано выглядеть безымянным, а не приобретать чужое имя. */
+    /* Empty values are not invented: an app that did not name itself
+       must look nameless, not acquire someone else's name. */
     name: metadata?.name ?? '',
     url: metadata?.url ?? '',
     description: metadata?.description ?? null,
@@ -435,7 +427,6 @@ function toMetadata(metadata: RawMetadata | undefined) {
   }
 }
 
-/** Собирает сети, запрошенные приложением. */
 function readProposedChains(params: RawProposal['params']): readonly ChainId[] {
   const chains = [
     ...(params.requiredNamespaces?.[EVM_NAMESPACE]?.chains ?? []),
@@ -447,7 +438,6 @@ function readProposedChains(params: RawProposal['params']): readonly ChainId[] {
   return [...unique].map((chain) => parseCaip2(chain)).filter((chain) => chain !== null)
 }
 
-/** Transferит сессию библиотеки в сессию ядра. */
 function toDappSession(session: RawSession): IDappSession {
   const accounts = session.namespaces[EVM_NAMESPACE]?.accounts ?? []
   const addresses: Address[] = []
@@ -474,8 +464,8 @@ function toDappSession(session: RawSession): IDappSession {
         chainIds.push(chainId)
       }
     } catch {
-      /* Испорченная запись пропускается: одна нечитаемая строка
-         не должна лишать пользователя списка подключений целиком. */
+      /* A corrupted entry is skipped: one unreadable row must not
+         take away the whole connections list. */
     }
   }
 
@@ -485,13 +475,11 @@ function toDappSession(session: RawSession): IDappSession {
     chainIds,
     addresses,
     connectedAt: 0,
-    /* Библиотека отдаёт срок в секундах. */
+    /* The library reports expiry in seconds. */
     expiresAt: session.expiry * 1000,
   }
 }
 
-/** Результат подписи, ожидаемый приложением. */
 export type SignatureResult = HexString
 
-/** Заготовка запроса, пригодная для тестов транспорта. */
 export type { IDappRequest }

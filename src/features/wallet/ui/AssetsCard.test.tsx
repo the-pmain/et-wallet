@@ -28,7 +28,7 @@ beforeEach(async () => {
 })
 
 describe('AssetsCard', () => {
-  it('на главном экране показывает те же активы, что и раздел Assets', async () => {
+  it('shows the same assets on the home screen as the Assets section', async () => {
     renderApp()
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()

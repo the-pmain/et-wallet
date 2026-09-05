@@ -12,7 +12,7 @@ const PASSWORD = 'Korova-7-Luna!'
 
 const BALANCE = 1_000_000_000_000_000_000n as Wei
 
-/** Период фонового опроса баланса, заданный `BalanceService`. */
+/** Background balance-poll interval set by `BalanceService`. */
 const POLL_INTERVAL_MS = 30_000
 
 let services: ITestAppServices
@@ -25,7 +25,6 @@ function renderApp() {
   )
 }
 
-/** Двигает управляемые часы внутри акта React. */
 async function advance(ms: number): Promise<void> {
   await act(async () => {
     services.clock.advance(ms)
@@ -34,11 +33,10 @@ async function advance(ms: number): Promise<void> {
 }
 
 /**
- * Переключает состояние видимости вкладки.
+ * Toggles tab visibility.
  *
- * `document.visibilityState` доступно только для чтения, поэтому
- * подменяется свойство. Событие посылается вручную: jsdom сам его
- * не порождает.
+ * `document.visibilityState` is read-only, so the property is
+ * replaced. The event is dispatched by hand: jsdom does not fire it.
  */
 async function setVisibility(state: DocumentVisibilityState): Promise<void> {
   Object.defineProperty(document, 'visibilityState', {
@@ -61,8 +59,8 @@ beforeEach(async () => {
   await setVisibility('visible')
 })
 
-describe('Фоновый опрос баланса', () => {
-  it('идёт, пока вкладка на виду', async () => {
+describe('Background balance polling', () => {
+  it('runs while the tab is visible', async () => {
     renderApp()
     await screen.findByText('Account 1')
 
@@ -79,10 +77,10 @@ describe('Фоновый опрос баланса', () => {
     })
   })
 
-  it('останавливается, когда вкладка ушла из виду', async () => {
-    /* Опрос скрытой вкладки не только тратит лимиты узла: он продолжает
-       сообщать его оператору, что кошелёк с этим адресом открыт, пока
-       пользователь занят другим. */
+  it('stops when the tab is hidden', async () => {
+    /* Polling a hidden tab wastes node limits and also keeps telling
+       its operator that a wallet at this address is open while the
+       user is busy elsewhere. */
     renderApp()
     await screen.findByText('Account 1')
 
@@ -99,9 +97,9 @@ describe('Фоновый опрос баланса', () => {
     expect(services.session.getSnapshot().balance?.updatedAt).toBe(before)
   })
 
-  it('возврат на вкладку обновляет значение сразу', async () => {
-    /* Показанный баланс к моменту возврата заведомо устарел, и ждать
-       ещё период опроса незачем. */
+  it('returning to the tab refreshes the value immediately', async () => {
+    /* The shown balance is stale by the time the user returns, so
+       waiting another poll interval is pointless. */
     renderApp()
     await screen.findByText('Account 1')
 

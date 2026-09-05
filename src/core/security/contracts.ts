@@ -9,71 +9,70 @@ import type {
 } from './types'
 
 /**
- * Журнал выданных наружу секретов.
+ * Log of secrets released outside the wallet.
  *
- * Существует ради одного конкретного риска BIP-32: расширенный ПУБЛИЧНЫЙ
- * ключ родителя вместе с приватным ключом ЛЮБОГО его потомка позволяют
- * вычислить приватный ключ родителя, а значит все адреса аккаунта.
+ * Exists for one specific BIP-32 risk: a parent's extended PUBLIC key
+ * plus the private key of ANY of its children let an attacker compute
+ * the parent's private key, and thus every address of the account.
  *
- * По отдельности оба экспорта выглядят безобидно, и пользователь не имеет
- * никакой возможности заметить, что второй из них замкнул опасную пару.
- * Журнал делает это состояние наблюдаемым.
+ * Each export looks harmless on its own, and the user has no way to
+ * notice that the second one closed the dangerous pair. The log makes
+ * that state observable.
  *
- * Секретов не содержит: только вид экспорта, путь аккаунта и время.
+ * Holds no secrets: only the kind, the account path, and the time.
  */
 export interface IExportAuditLog {
-  /** Записывает факт выдачи секрета. */
   record(entry: IExportRecord): Promise<void>
 
-  /** История экспортов конкретного аккаунта, от новых к старым. */
+  /** Exports of one account, newest first. */
   listByScope(scope: ExportScope): Promise<readonly IExportRecord[]>
 
-  /** Выдавался ли из аккаунта секрет указанного вида. */
   hasExported(scope: ExportScope, kind: ExportKind): Promise<boolean>
 
   /**
-   * Очищает журнал аккаунта.
+   * Clears the account's log.
    *
-   * Вызывается только при сбросе кошелька. Очистка «чтобы убрать
-   * предупреждение» недопустима: выданный секрет остаётся выданным,
-   * а стирание записи лишь скрывает реальное состояние.
+   * Called only on wallet reset. Clearing "to dismiss a warning" is
+   * forbidden: a released secret stays released, and erasing the
+   * record only hides the real state.
    */
   clear(scope: ExportScope): Promise<void>
 }
 
 /**
- * Защитник операций экспорта.
+ * Guard for export operations.
  *
- * Порядок работы, обязательный для вызывающего кода:
+ * Required caller order:
  *
- * 1. `assess(request)` — получить оценку риска.
- * 2. Показать пользователю предупреждение, соответствующее уровню риска.
- * 3. `confirm(request, acknowledgedRisk)` — получить разрешение, передав
- *    уровень риска, который был показан.
- * 4. Передать разрешение в метод экспорта.
+ * 1. `assess(request)` — get the risk assessment.
+ * 2. Show the user a warning that matches the risk level.
+ * 3. `confirm(request, acknowledgedRisk)` — get a permit, passing the
+ *    risk level that was shown.
+ * 4. Hand the permit to the export method.
  *
- * Шаг 3 нельзя пропустить, а показанный уровень риска нельзя занизить:
- * если фактический риск выше подтверждённого, разрешение не выдаётся.
- * Это защищает от интерфейса, который показывает мягкое предупреждение
- * там, где требуется объяснение необратимых последствий.
+ * Step 3 cannot be skipped, and the shown level cannot be understated:
+ * if the actual risk is higher than the acknowledged one, no permit is
+ * issued. That blocks a UI that shows a soft warning where irreversible
+ * consequences must be explained.
  */
 export interface IExportGuard {
-  /** Оценивает риск, ничего не записывая и не разрешая. */
+  /** Assesses risk without writing or granting anything. */
   assess(request: IExportRequest): Promise<IExportRiskAssessment>
 
   /**
-   * Выдаёт одноразовое разрешение и записывает факт экспорта в журнал.
+   * Issues a one-shot permit and records the export in the log.
    *
-   * Запись выполняется в момент выдачи разрешения, а не после успешной
-   * выгрузки. Направление ошибки выбрано сознательно: лишняя запись
-   * приводит к более строгому предупреждению в будущем, пропущенная —
-   * к отсутствию предупреждения там, где оно необходимо.
+   * The write happens when the permit is issued, not after a successful
+   * dump. The error direction is deliberate: an extra record leads to a
+   * stricter warning later; a missed one leads to no warning where one
+   * is required.
    *
-   * @param acknowledgedRisk Уровень риска, показанный пользователю.
-   * @throws ExportNotPermittedError если фактический риск выше показанного.
+   * @param acknowledgedRisk Risk level shown to the user.
+   * @throws ExportNotPermittedError if the actual risk is higher than
+   *         the acknowledged one.
    */
   confirm(request: IExportRequest, acknowledgedRisk: ExportRisk): Promise<ExportPermit>
 
-  /** История экспортов аккаунта — для экрана безопасности. */
+  /** Account export history — for the security screen. */
   getHistory(scope: ExportScope): Promise<readonly IExportRecord[]>
 }

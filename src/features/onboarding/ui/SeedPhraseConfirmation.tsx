@@ -9,11 +9,11 @@ interface SeedPhraseConfirmationProps {
 }
 
 /**
- * Проверка того, что пользователь записал фразу.
+ * Checks that the user wrote the phrase down.
  *
- * Выбор из вариантов, а не свободный ввод: перепечатка трёх слов
- * с клавиатуры провоцирует копирование фразы через буфер обмена,
- * и проверка превращается в формальность.
+ * Multiple choice, not free typing: retyping three words from the
+ * keyboard invites copying the phrase through the clipboard, and
+ * the check becomes a formality.
  */
 export function SeedPhraseConfirmation({
   challenge,

@@ -15,32 +15,30 @@ import { Alert, AlertDescription, AlertTitle, Button, Card, CardContent } from '
 import { WebHidTransport } from '../model/WebHidTransport'
 
 /**
- * Сколько адресов показывать за раз.
+ * How many addresses to show at a time.
  *
- * Каждый требует отдельного обращения к устройству и занимает
- * заметное время. Пять покрывают обычный случай; остальные —
- * по нажатию.
+ * Each needs a separate device round-trip and takes noticeable
+ * time. Five covers the usual case; the rest come on demand.
  */
 const PAGE_SIZE = 5
 
-/** Адрес, прочитанный с устройства. */
 interface IDeviceAddress {
   readonly address: Address
   readonly path: DerivationPath
 }
 
 /**
- * Подключение аппаратного кошелька.
+ * Connect a hardware wallet.
  *
- * ЧТО СЮДА НЕ ПОПАДАЕТ. Ни ключа, ни seed-фразы: устройство отдаёт
- * только адреса. Добавленный аккаунт хранит адрес и путь, и без
- * устройства он не подпишет ничего — это его определяющее свойство,
- * а не ограничение реализации.
+ * WHAT DOES NOT LAND HERE. No key, no seed phrase: the device
+ * returns addresses only. The added account stores the address
+ * and path, and without the device it will sign nothing — that
+ * is its defining property, not an implementation limit.
  *
- * АДРЕСА ЧИТАЮТСЯ БЕЗ ПОДТВЕРЖДЕНИЯ НА ЭКРАНЕ УСТРОЙСТВА. Требовать
- * его на каждый из пяти адресов значило бы пять раз нажать кнопки
- * ради списка; подтверждение запрашивается тогда, когда адрес
- * принимают как свой, — при добавлении.
+ * ADDRESSES ARE READ WITHOUT CONFIRMATION ON THE DEVICE SCREEN.
+ * Asking for it on each of five addresses would mean five button
+ * presses just for a list; confirmation is requested when the
+ * address is accepted as theirs — on add.
  */
 export function HardwareAccountForm() {
   const session = useWallet()
@@ -51,7 +49,7 @@ export function HardwareAccountForm() {
   const [error, setError] = useState<string | null>(null)
   const [added, setAdded] = useState<string | null>(null)
 
-  /* Уже добавленные адреса: предлагать их повторно бессмысленно. */
+  /* Already-added addresses: offering them again is pointless. */
   const known = new Set(snapshot.accounts.map((account) => account.address.toLowerCase()))
 
   async function run(action: () => Promise<void>): Promise<void> {
@@ -61,8 +59,9 @@ export function HardwareAccountForm() {
     try {
       await action()
     } catch (caught) {
-      /* Отказ на устройстве и его поломка выглядят по-разному
-         и требуют разного. Причина показывается дословно. */
+      /* A refusal on the device and a device failure look
+         different and need different handling. The reason is
+         shown verbatim. */
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
       setBusy(false)
@@ -86,11 +85,11 @@ export function HardwareAccountForm() {
 
   function add(entry: IDeviceAddress): void {
     void run(async () => {
-      /* ПОДТВЕРЖДЕНИЕ НА ЭКРАНЕ УСТРОЙСТВА ОБЯЗАТЕЛЬНО. Адрес, показанный
-         этой страницей, мог быть подменён: страница загружается
-         с сервера, а экран устройства — нет. Сверка того, что человек
-         видит здесь, с тем, что показывает устройство, — единственное,
-         чего подменённая страница сделать не может. */
+      /* CONFIRMATION ON THE DEVICE SCREEN IS REQUIRED. The address
+         shown by this page could have been swapped: the page loads
+         from a server, the device screen does not. Matching what
+         the person sees here with what the device shows is the one
+         thing a swapped page cannot do. */
       const device = new LedgerDevice(await WebHidTransport.connect())
       const confirmed = await device.getAddress(entry.path, true)
 

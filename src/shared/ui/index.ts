@@ -18,6 +18,7 @@ export {
 export { Input } from './input'
 export { Label } from './label'
 export { LegalPageLayout, LegalSection } from './legal-page-layout'
+export { CABINET_SHEET, PAGE_COLUMN } from './page-column'
 export { PasswordInput, type PasswordInputProps } from './password-input'
 export { Select, type ISelectOption, type SelectProps } from './select'
 export { Separator, type SeparatorProps } from './separator'

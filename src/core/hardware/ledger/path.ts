@@ -4,29 +4,30 @@ import type { DerivationPath } from '@/core/types'
 import { HardwareDeviceError } from './errors'
 
 /**
- * Наибольшее число уровней пути.
+ * Greatest number of path levels.
  *
- * Ограничение устройства: длина пути передаётся одним байтом, а сам
- * путь занимает четыре байта на уровень и обязан помещаться в команду
- * вместе с остальными данными. Десять уровней покрывают все стандарты
- * с большим запасом: BIP-44 использует пять.
+ * A device limit: path length is sent as one byte, and the path
+ * itself takes four bytes per level and must fit in the command
+ * together with the rest of the data. Ten levels cover every
+ * standard with room to spare: BIP-44 uses five.
  */
 const MAX_DEPTH = 10
 
-/** Наибольшее значение уровня без признака закалки. */
+/** Greatest level value without the hardened flag. */
 const MAX_INDEX = HARDENED_OFFSET - 1
 
 /**
- * Переводит путь деривации в вид, понятный устройству.
+ * Encodes a derivation path in the form the device understands.
  *
- * ФОРМАТ. Один байт числа уровней, затем каждый уровень четырьмя
- * байтами со старшего конца. Закалённый уровень отличается старшим
- * установленным битом — тем же признаком, что и в BIP-32.
+ * FORMAT. One byte for the number of levels, then each level as four
+ * big-endian bytes. A hardened level is marked by the high bit set —
+ * the same flag as in BIP-32.
  *
- * РАЗБОР СТРОГИЙ. Путь определяет, каким ключом устройство подпишет
- * транзакцию. Ошибка здесь означает подпись не тем ключом, то есть
- * отправку не с того адреса, и обнаружится она уже в цепи. Поэтому
- * любое отклонение — отказ, а не попытка додумать.
+ * PARSING IS STRICT. The path decides which key the device will sign
+ * with. An error here means a signature with the wrong key, i.e.
+ * sending from the wrong address, and it will only be noticed on
+ * chain. Therefore any deviation is a refusal, not an attempt to
+ * guess.
  */
 export function encodeDerivationPath(path: DerivationPath): Uint8Array {
   const levels = parseLevels(path)
@@ -46,7 +47,6 @@ export function encodeDerivationPath(path: DerivationPath): Uint8Array {
   return encoded
 }
 
-/** Разбирает путь на числовые уровни. */
 function parseLevels(path: DerivationPath): readonly number[] {
   const parts = path.split('/')
 
@@ -67,9 +67,9 @@ function parseLevel(level: string, path: DerivationPath): number {
   const isHardened = level.endsWith("'") || level.endsWith('h')
   const digits = isHardened ? level.slice(0, -1) : level
 
-  /* Проверка строкой, а не через `Number`: тот принимает
-     шестнадцатеричную запись, знаки и пробелы, и «0x10» превратилось бы
-     в шестнадцатый аккаунт вместо отказа. */
+  /* Check as a string, not via `Number`: that accepts hex, signs,
+     and spaces, and "0x10" would become the sixteenth account
+     instead of a refusal. */
   if (!/^\d+$/u.test(digits)) {
     throw new HardwareDeviceError(`the derivation path contains a malformed level: ${path}`)
   }

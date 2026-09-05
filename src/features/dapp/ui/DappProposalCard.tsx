@@ -14,14 +14,15 @@ interface DappProposalCardProps {
 }
 
 /**
- * Предложение подключения от приложения.
+ * Connection proposal from an application.
  *
- * ПЕРЕЧИСЛЕНО, ЧТО ПРИЛОЖЕНИЕ ПОЛУЧИТ И ЧЕГО НЕ ПОЛУЧИТ. Согласие,
- * данное на общее «подключиться», согласием не является: человек
- * не может принять решение о том, чего ему не назвали.
+ * WHAT THE APP WILL AND WILL NOT GET IS LISTED. Consent given to a
+ * generic "connect" is not consent: a person cannot decide about
+ * what they were not told.
  *
- * ПОДКЛЮЧЕНИЕ НЕ ДАЁТ ПРАВА ПОДПИСЫВАТЬ БЕЗ СПРОСА. Это главное, что
- * пользователь должен понять: каждая подпись будет спрошена отдельно.
+ * CONNECTING DOES NOT GRANT UNSIGNED SIGNING. That is the main
+ * thing the user must understand: every signature will be asked
+ * separately.
  */
 export function DappProposalCard({
   proposal,
@@ -83,10 +84,10 @@ export function DappProposalCard({
             Reject
           </Button>
 
-          {/* Подпись отличается от кнопки формы нового подключения:
-              две кнопки «Подключить» на одном экране означают, что
-              вспомогательные технологии их не различают, а глаз
-              выбирает не ту. */}
+          {/* The label differs from the new-connection form button:
+              two "Connect" buttons on one screen mean assistive
+              tech cannot tell them apart, and the eye picks the
+              wrong one. */}
           <Button className="flex-1" disabled={isBusy} onClick={onApprove}>
             Allow the connection
           </Button>

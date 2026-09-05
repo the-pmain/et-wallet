@@ -1,6 +1,5 @@
 import type { ILogger, LogContext, LogLevel } from '@/core'
 
-/** Запись, зафиксированная логгером. */
 export interface ILogRecord {
   readonly level: LogLevel
   readonly scope: string
@@ -9,11 +8,11 @@ export interface ILogRecord {
 }
 
 /**
- * Логгер, накапливающий записи вместо вывода.
+ * Logger that accumulates records instead of printing.
  *
- * Не просто заглушка: собранные записи позволяют проверить, что в журнал
- * не попали секреты. Такая проверка обязана появиться в тестах модулей,
- * работающих с ключами.
+ * Not just a stub: the collected records let a test prove that
+ * secrets did not reach the log. That check must exist in tests
+ * of modules that handle keys.
  */
 export class NullLogger implements ILogger {
   readonly records: ILogRecord[] = []
@@ -43,8 +42,8 @@ export class NullLogger implements ILogger {
   child(scope: string): ILogger {
     const child = new NullLogger(`${this.#scope}.${scope}`)
 
-    /* Общий массив записей: тест проверяет журнал целиком,
-       не собирая его по дочерним логгерам. */
+    /* Shared record array: the test inspects the whole log,
+       not by collecting children. */
     Object.defineProperty(child, 'records', { value: this.records })
 
     return child

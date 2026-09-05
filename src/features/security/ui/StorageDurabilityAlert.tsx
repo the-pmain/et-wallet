@@ -7,40 +7,40 @@ interface StorageDurabilityAlertProps {
   readonly durability: StorageDurability | null
 
   /**
-   * Показывать ли сообщение при полностью надёжном хранилище.
+   * Whether to show a message when storage is fully durable.
    *
-   * По умолчанию нет: сообщать «всё в порядке» на каждом экране —
-   * способ приучить не читать сообщения. На экране резервной копии
-   * оно уместно: там владелец как раз решает, достаточно ли защищён
-   * его кошелёк.
+   * Default no: saying "all is well" on every screen trains people
+   * not to read messages. On the backup screen it belongs: that is
+   * where the owner decides whether the wallet is protected enough.
    */
   readonly showWhenPersistent?: boolean
 }
 
 /**
- * Сообщение о том, насколько надёжно хранятся данные кошелька.
+ * How reliably the wallet data is stored.
  *
- * ЗАЧЕМ ЭТО ВООБЩЕ ПОКАЗЫВАТЬ. Браузер вправе вытеснить данные сайта
- * при нехватке места. Для обычного сайта это потеря кэша, для кошелька —
- * потеря зашифрованной seed-фразы, то есть средств, если фраза
- * не записана на бумаге. Владелец не может принять решение о том,
- * что с этим делать, если не знает о риске.
+ * WHY SHOW THIS AT ALL. The browser may evict site data when space
+ * is short. For an ordinary site that is a lost cache; for a wallet
+ * it is a lost encrypted seed phrase — i.e. funds, if the phrase
+ * is not on paper. The owner cannot decide what to do without
+ * knowing the risk.
  *
- * ТРИ СОСТОЯНИЯ РАЗЛИЧАЮТСЯ, ПОТОМУ ЧТО ТРЕБУЮТ РАЗНОГО. «Браузер
- * обещал не удалять», «данные сохраняются, но обещания нет» и «данные
- * исчезнут при закрытии вкладки» — три разных положения, и сведение их
- * к одному предупреждению либо пугает без нужды, либо молчит там,
- * где молчать нельзя.
+ * THREE STATES ARE DISTINGUISHED BECAUSE THEY NEED DIFFERENT THINGS.
+ * "The browser promised not to delete", "data persists but there is
+ * no promise", and "data dies when the tab closes" are three
+ * positions, and collapsing them into one warning either scares
+ * without cause or stays silent where silence is not allowed.
  *
- * ВО ВСЕХ СЛУЧАЯХ ВЫВОД ОДИН: записанная на бумаге seed-фраза остаётся
- * единственной защитой, не зависящей от браузера. Об этом и говорится.
+ * IN EVERY CASE THE CONCLUSION IS THE SAME: a seed phrase written
+ * on paper remains the only protection that does not depend on the
+ * browser. That is what is said.
  */
 export function StorageDurabilityAlert({
   durability,
   showWhenPersistent = false,
 }: StorageDurabilityAlertProps) {
-  /* Состояние ещё не прочитано. Показывать предупреждение до ответа
-     значит пугать владельца тем, чего может не быть. */
+  /* State has not been read yet. Showing a warning before the
+     answer would scare the owner with something that may not exist. */
   if (durability === null) {
     return null
   }

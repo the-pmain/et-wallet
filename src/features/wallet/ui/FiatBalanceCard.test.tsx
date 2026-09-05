@@ -20,7 +20,7 @@ function renderCard(amountUsd: number | null) {
 }
 
 describe('FiatBalanceCard', () => {
-  it('показывает доллары крупным числом, а не сырую строку и не ETH', () => {
+  it('shows dollars as a large figure, not a raw string and not ETH', () => {
     renderCard(350)
 
     expect(screen.getByText('$350.00')).toBeInTheDocument()
@@ -29,7 +29,7 @@ describe('FiatBalanceCard', () => {
     expect(screen.queryByText(/buy ethereum/iu)).not.toBeInTheDocument()
   })
 
-  it('нулевой баланс рисует как деньги, а не как 0 ETH', () => {
+  it('renders a zero balance as money, not as 0 ETH', () => {
     renderCard(0)
 
     expect(screen.getByText('$0.00')).toBeInTheDocument()
@@ -37,7 +37,24 @@ describe('FiatBalanceCard', () => {
     expect(screen.queryByText(/^0$/u)).not.toBeInTheDocument()
   })
 
-  it('переключает показ в евро и фунты, не меняя сами деньги', async () => {
+  it('holds the amount-row height while the spinner runs', () => {
+    render(
+      <I18nProvider>
+        <DisplayCurrencyProvider>
+          <FiatBalanceCard amountUsd={null} isRefreshing rates={RATES} />
+        </DisplayCurrencyProvider>
+      </I18nProvider>,
+    )
+
+    expect(screen.getByText('Estimating the value…')).toBeInTheDocument()
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument()
+    expect(screen.getByText('Estimating the value…').parentElement).toHaveClass(
+      'min-h-10',
+      'sm:min-h-12',
+    )
+  })
+
+  it('switches the display to euros and pounds without changing the money', async () => {
     const user = userEvent.setup()
 
     renderCard(100)

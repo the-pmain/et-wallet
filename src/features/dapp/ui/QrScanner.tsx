@@ -6,71 +6,66 @@ import { Alert, AlertDescription, AlertTitle, Button } from '@/shared/ui'
 import { isPairingUri } from '../lib/pairing-uri'
 
 /**
- * Как часто разбирается кадр.
+ * How often a frame is decoded.
  *
- * Разбор кадра занимает единицы миллисекунд, но выполняется в основном
- * потоке. Четыре раза в секунду достаточно, чтобы навести камеру
- * без ощущения задержки, и не заставляет телефон греться.
+ * Decode takes a few milliseconds but runs on the main thread.
+ * Four times a second is enough to aim the camera without lag and
+ * does not heat the phone.
  */
 const FRAME_INTERVAL_MS = 250
 
 /**
- * Разбирает изображение и возвращает прочитанный текст.
+ * Decode an image and return the read text.
  *
- * Вынесен в свойство ради проверок: подключить камеру в тестовой среде
- * нечем, а поведение при удачном и неудачном чтении проверить
- * обязательно.
+ * Lifted into a prop for tests: there is no camera in the test
+ * environment, and success and failure paths must still be checked.
  */
 export type QrDecoder = (image: ImageData) => string | null
 
 interface QrScannerProps {
-  /** Прочитанная ссылка подключения. Вызывается один раз. */
   readonly onScanned: (uri: string) => void
 
-  /** Пользователь закрыл видоискатель. */
   readonly onCancel: () => void
 
-  /** Разбор кадра. По умолчанию загружается отдельным модулем. */
   readonly decode?: QrDecoder
 }
 
 /**
- * Что мешает читать штрих-код.
+ * What prevents reading the barcode.
  *
- * Отсутствия камеры здесь нет: это свойство среды, известное до
- * первой отрисовки, а не событие. Держать его в состоянии значило бы
- * отрисовать видоискатель и тут же заменить его сообщением.
+ * Missing camera is not here: that is an environment fact known
+ * before the first paint, not an event. Holding it in state would
+ * render the viewfinder and immediately replace it with a message.
  */
 type ScannerFault = 'denied' | 'not-a-link'
 
 /**
- * Видоискатель для ссылки подключения.
+ * Viewfinder for a pairing URI.
  *
- * КАМЕРА ВЫКЛЮЧАЕТСЯ ПРИ ЗАКРЫТИИ И ПОСЛЕ УДАЧНОГО ЧТЕНИЯ. Оставленный
- * включённым поток — это живая картинка комнаты, идущая в открытой
- * вкладке; браузер показывает значок записи, но полагаться на то, что
- * его заметят, нельзя.
+ * THE CAMERA TURNS OFF ON CLOSE AND AFTER A SUCCESSFUL READ. A stream
+ * left on is a live picture of the room in an open tab; the browser
+ * shows a recording icon, but counting on it being noticed is not
+ * allowed.
  *
- * КАДРЫ НИКУДА НЕ УХОДЯТ. Разбор выполняется здесь же, в странице;
- * ни один кадр не передаётся ни на какой сервер. Это сказано
- * пользователю прямо: разрешение на камеру дают неохотно и правильно
- * делают.
+ * FRAMES GO NOWHERE. Decode runs here, in the page; no frame is sent
+ * to any server. That is said to the user plainly: camera permission
+ * is given reluctantly, and rightly so.
  *
- * ПРОЧИТАННОЕ ПРОВЕРЯЕТСЯ ДО ПЕРЕДАЧИ ДАЛЬШЕ. Штрих-код может
- * содержать что угодно; посторонний текст называется посторонним,
- * а не игнорируется молча — молчащая камера неотличима от сломанной.
+ * WHAT WAS READ IS CHECKED BEFORE IT IS PASSED ON. A barcode can
+ * hold anything; foreign text is named foreign, not ignored silently
+ * — a silent camera is indistinguishable from a broken one.
  */
 export function QrScanner({ onScanned, onCancel, decode }: QrScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [fault, setFault] = useState<ScannerFault | null>(null)
 
-  /* Доступность камеры известна сразу и не меняется за время жизни
-     видоискателя. */
+  /* Camera availability is known immediately and does not change
+     during the viewfinder's life. */
   const hasCamera = navigator.mediaDevices !== undefined
 
-  /* Повторный вызов обработчика после первого удачного чтения
-     запустил бы подключение дважды. */
+  /* Calling the handler again after the first successful read
+     would start the connection twice. */
   const isDoneRef = useRef(false)
 
   const stopCamera = useCallback(() => {
@@ -95,14 +90,15 @@ export function QrScanner({ onScanned, onCancel, decode }: QrScannerProps) {
       let stream: MediaStream
 
       try {
-        /* Задняя камера: штрих-код показывают на другом экране, и
-           передняя направлена не туда. Требование мягкое — на
-           устройстве с одной камерой возьмётся она. */
+        /* Rear camera: the barcode is shown on another screen, and
+           the front one points the wrong way. The request is soft —
+           a device with one camera will use that one. */
         stream = await media.getUserMedia({ video: { facingMode: 'environment' } })
       } catch {
-        /* Отказ в разрешении и отсутствие камеры внешне неразличимы,
-           и оба означают одно: читать нечем. Различать их догадками
-           значило бы иногда сообщать неверное. */
+        /* Permission denial and a missing camera look the same, and
+           both mean one thing: there is nothing to read with.
+           Guessing between them would sometimes report the wrong
+           cause. */
         if (!cancelled) {
           setFault('denied')
         }
@@ -125,8 +121,8 @@ export function QrScanner({ onScanned, onCancel, decode }: QrScannerProps) {
       if (video !== null) {
         video.srcObject = stream
         await video.play().catch(() => {
-          /* Отказ автозапуска не мешает разбору: кадры доступны и
-             без показа. Молча продолжаем. */
+          /* Autoplay refusal does not block decode: frames are
+             available without display. Continue silently. */
         })
       }
 
@@ -184,9 +180,10 @@ export function QrScanner({ onScanned, onCancel, decode }: QrScannerProps) {
       ) : (
         <>
           <div className="relative overflow-hidden rounded-xl border bg-black">
-            {/* Звук не запрашивается и не нужен: у видоискателя одна
-                задача. `muted` обязателен — без него браузер не даёт
-                воспроизвести поток без действия пользователя. */}
+            {/* Audio is not requested and not needed: the viewfinder
+                has one job. `muted` is required — without it the
+                browser will not play the stream without a user
+                gesture. */}
             <video
               ref={videoRef}
               className="aspect-square w-full object-cover"
@@ -221,19 +218,19 @@ export function QrScanner({ onScanned, onCancel, decode }: QrScannerProps) {
 }
 
 /**
- * Готовит разбор кадра.
+ * Prepare frame decode.
  *
- * БИБЛИОТЕКА ЗАГРУЖАЕТСЯ ТОЛЬКО ЗДЕСЬ. Она нужна одному экрану
- * из десятка, и её присутствие в основном наборе замедлило бы вход
- * в кошелёк всем, включая тех, кто подключений не использует.
+ * THE LIBRARY LOADS ONLY HERE. It is needed on one screen of ten,
+ * and having it in the main bundle would slow wallet entry for
+ * everyone, including people who never use connections.
  */
 async function createFrameReader(
   decode: QrDecoder | undefined,
 ): Promise<(video: HTMLVideoElement) => string | null> {
   const decoder = decode ?? (await loadDecoder())
 
-  /* Полотно создаётся один раз: пересоздание на каждый кадр выделяло бы
-     несколько мегабайт в секунду. */
+  /* The canvas is created once: recreating it every frame would
+     allocate several megabytes a second. */
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d', { willReadFrequently: true })
 
@@ -250,7 +247,6 @@ async function createFrameReader(
   }
 }
 
-/** Загружает разбор штрих-кода отдельным модулем. */
 async function loadDecoder(): Promise<QrDecoder> {
   const { default: jsQR } = await import('jsqr')
 

@@ -22,31 +22,27 @@ interface TransferRowProps {
   readonly network: INetworkConfig | null
 
   /**
-   * Начинает замену зависшей отправки.
+   * Starts replacing a stuck outgoing transfer.
    *
-   * Необязателен: строка используется и там, где заменять нечем, —
-   * например в списке чужих переводов.
+   * Optional: the row is also used where there is nothing to replace,
+   * for example in a list of someone else's transfers.
    */
   readonly onReplace?: ((hash: TxHash, kind: ReplacementKind) => void) | undefined
 }
 
 /**
- * Строка списка переводов.
+ * Transfer list row.
  *
- * ВЫНЕСЕНА ИЗ СПИСКА РАДИ МЕМОИЗАЦИИ. Запись перевода неизменяема
- * и приходит из снимка сессии, который заменяется целиком: при обновлении
- * баланса или курса ссылки на прежние записи сохраняются, и сравнение
- * по ссылке отсекает перерисовку всех строк, кроме изменившихся.
- * Разбор суммы и форматирование времени при этом не выполняются заново.
+ * Extracted for memoization. A transfer record is immutable and comes
+ * from a session snapshot that is replaced as a whole: when balance or
+ * rate updates, pointers to unchanged records stay, so reference
+ * equality skips re-rendering those rows (amount parse and timestamp
+ * format included). Default compare is enough: both props live in the
+ * snapshot and the session will not swap them for value-equal copies.
  *
- * СРАВНЕНИЕ ПО УМОЛЧАНИЮ ДОСТАТОЧНО: обе опоры — объекты, живущие
- * в снимке, и подменять их на равные по значению копии сессия
- * не станет.
- *
- * ВЫСОТА СТРОКИ ФИКСИРОВАНА. Виртуализация считает положение окна
- * умножением на высоту строки, и содержимое переменной высоты сдвигало бы
- * список при прокрутке. Отсюда `h-16` и усечение длинных значений вместо
- * переноса.
+ * Row height is fixed. Virtualization places the window by multiplying
+ * row height; variable content would shift the list while scrolling.
+ * Hence `h-16` and truncation instead of wrap.
  */
 export const TransferRow = memo(function TransferRow({
   record,
@@ -90,31 +86,30 @@ export const TransferRow = memo(function TransferRow({
           <StatusBadge record={record} />
 
           {amount.isRaw ? (
-            /* Число знаков контракта неизвестно, поэтому показаны
-               необработанные единицы. Без пометки пользователь прочитал
-               бы их как обычную сумму и ошибся на порядки. */
+            /* Contract decimals are unknown, so raw units are shown.
+               Without the badge the user would read them as a normal
+               amount and be off by orders of magnitude. */
             <Badge variant="outline">contract units</Badge>
           ) : null}
         </span>
       </span>
 
-      {/* ПРЕДЕЛЬНОЕ ЧИСЛО НЕ ДОЛЖНО РАСПИРАТЬ СТРОКУ. Целая часть суммы
-          ничем не ограничена, а высота строки здесь фиксирована ради
-          виртуализации: перенести число, как на главном экране, нельзя.
-          Поэтому колонка сжимается и число обрезается многоточием —
-          обрезка ВИДНА, и прочесть начало числа как всю сумму нельзя. */}
+      {/* An unbounded integer must not blow the fixed-height row.
+          Wrap is not an option here (virtualization). The column
+          shrinks and the figure ellipsizes — the cut is visible, so
+          the start cannot be read as the whole amount. */}
       <span className="flex min-w-0 flex-col items-end gap-0.5">
-        {/* Полное число уходит в подсказку. Обозначение туда НЕ идёт:
-            его задаёт автор контракта, а атрибут минует обезвреживание,
-            которым занят `UntrustedText`. */}
+        {/* Full figure goes in `title`. The ticker does not: the
+            contract author sets it, and the attribute bypasses the
+            sanitizing that `UntrustedText` does. */}
         <span className="max-w-full truncate text-sm font-medium tabular-nums" title={amount.text}>
           {isOutgoing ? '−' : '+'}
           {amount.text} <UntrustedText value={amount.unit} />
         </span>
 
-        {/* У зависшей отправки действия важнее ссылки: обозреватель
-            покажет ровно то же ожидание, а исправить положение можно
-            только заменой. У остальных записей всё наоборот. */}
+        {/* On a stuck send, replace actions beat the explorer link:
+            the explorer only shows the same wait. Other rows invert
+            that priority. */}
         {canReplace ? (
           <span className="flex items-center gap-2">
             <RowAction
@@ -145,14 +140,12 @@ export const TransferRow = memo(function TransferRow({
 })
 
 /**
- * Действие в строке списка.
+ * Action inside a list row.
  *
- * ОБЫЧНАЯ КНОПКА, А НЕ ССЫЛКА: замена меняет состояние кошелька,
- * никуда не ведёт и должна отзываться на пробел так же, как на Enter.
- *
- * ПОЯСНЕНИЕ ДАЁТСЯ В `title`, потому что в строке фиксированной высоты
- * места под текст нет, а «ускорить» и «отменить» — не синонимы: первое
- * доводит перевод до конца, второе пытается его не допустить.
+ * A real button, not a link: replace mutates wallet state, goes
+ * nowhere, and must answer Space the same as Enter. The hint lives in
+ * `title` because a fixed-height row has no room, and Speed up vs
+ * Cancel are not synonyms.
  */
 function RowAction({
   label,
@@ -176,20 +169,14 @@ function RowAction({
 }
 
 /**
- * Пометка состояния перевода.
+ * Transfer status mark.
  *
- * ЧЕТЫРЕ СОСТОЯНИЯ РАЗЛИЧАЮТСЯ, ПОТОМУ ЧТО ОЗНАЧАЮТ РАЗНОЕ.
- * Прежде все собственные отправки помечались одинаково — «ждёт
- * подтверждения», — и оставались такими навсегда, потому что следить
- * за ними было некому. Пользователь не мог узнать, дошёл перевод или
- * нет, из самого кошелька.
- *
- * ОТКАТ ВЫДЕЛЕН ОТДЕЛЬНО И ОКРАШЕН КАК ОШИБКА. Транзакция попала
- * в блок, газ списан, а операция не выполнена: показать её наравне
- * с состоявшейся значит сообщить о переводе, которого не было.
- *
- * ПОДТВЕРЖДЁННЫЕ ЗАПИСИ ПОМЕТКИ НЕ ПОЛУЧАЮТ. Пометка на каждой строке
- * перестаёт читаться; выделяется то, что требует внимания.
+ * States stay distinct because they mean different things. Own sends
+ * used to share one "awaiting confirmation" forever — nothing watched
+ * them. Revert is separate and error-colored: the tx landed, gas was
+ * spent, the operation did not run; treating it as success reports a
+ * transfer that never happened. Confirmed rows get no badge so only
+ * what needs attention stands out.
  */
 function StatusBadge({ record }: { readonly record: ITransferRecord }) {
   if (record.status === TRANSACTION_STATUS.Pending) {

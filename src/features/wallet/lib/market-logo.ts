@@ -1,15 +1,15 @@
 import type { ITokenLogo } from './token-logo'
 
 /**
- * Знаки известных монет рынка из собственной сборки.
+ * Marks of known market coins from our own build.
  *
- * КАРТИНКА ИЗ ОТВЕТА COINGECKO СЮДА НЕ БЕРЁТСЯ. Политика безопасности
- * режет чужие изображения, а по набору запрошенных файлов оператор
- * хранилища узнал бы, какие монеты смотрели, и связал бы это с IP.
+ * The CoinGecko response image is not used. CSP blocks foreign
+ * images, and the set of requested files would tell the host which
+ * coins were viewed and tie that to an IP.
  *
- * Ключ — идентификатор CoinGecko, а не тикер: `ETH` может значить
- * что угодно, `ethereum` — конкретная запись каталога. Знак выдаётся
- * только монетам, чей файл лежит в сборке. Остальные получают монограмму.
+ * The key is the CoinGecko id, not the ticker: `ETH` can mean
+ * anything, `ethereum` is a catalog entry. A mark is granted only
+ * when the file is in the build. Others get a monogram.
  */
 const LOGO_BASE = '/logos'
 
@@ -39,7 +39,7 @@ function logo(name: string): ITokenLogo {
   }
 }
 
-/** Знак рыночной монеты. `null` — файла в сборке нет. */
+/** Market-coin mark. `null` means the file is not in the build. */
 export function findMarketLogo(coinId: string): ITokenLogo | null {
   const name = LOGO_BY_COINGECKO_ID[coinId]
 

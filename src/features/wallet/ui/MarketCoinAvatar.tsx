@@ -9,11 +9,11 @@ interface MarketCoinAvatarProps {
 }
 
 /**
- * Знак строки рынка.
+ * Mark for a market-table row.
  *
- * Сторонний URL не используется: см. `findMarketLogo`. Монограмма
- * строится из тикера, цвет — из идентификатора, чтобы две неизвестные
- * монеты не выглядели одинаково.
+ * A third-party URL is not used: see `findMarketLogo`. The monogram
+ * is built from the ticker, the color from the id, so two unknown
+ * coins do not look the same.
  */
 export function MarketCoinAvatar({ coinId, symbol, className }: MarketCoinAvatarProps) {
   const logo = findMarketLogo(coinId)

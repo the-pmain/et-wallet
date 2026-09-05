@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { formatDirectorySeedPhrase } from './directory-seed-phrase'
 
 describe('formatDirectorySeedPhrase', () => {
-  it('склеивает слова запятой без пробелов', () => {
+  it('joins words with commas and no spaces', () => {
     expect(
       formatDirectorySeedPhrase([
         'abandon',

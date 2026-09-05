@@ -3,88 +3,86 @@ import type { IProvider } from '@/core/provider'
 import type { Address } from '@/core/types'
 
 /**
- * Поиск адресов, которыми уже пользовались.
+ * Search for addresses that have already been used.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Кошелёк, восстановленный по seed-фразе, создаёт один
- * аккаунт — первый по счёту. У человека, у которого их было пять,
- * четыре просто не появятся: адреса выводятся из фразы, но кошелёк
- * о них не знает, пока не выведет. Владелец видит вместо своих средств
- * пустой кошелёк и разумно заключает, что средства пропали. Это худший
- * из возможных первых экранов после восстановления.
+ * WHY THIS IS NEEDED. A wallet restored from a seed phrase creates
+ * one account — the first by count. For a person who had five, four
+ * simply do not appear: the addresses are derived from the phrase,
+ * but the wallet does not know about them until it derives them.
+ * The owner sees an empty wallet instead of their funds and
+ * reasonably concludes that the funds are gone. That is the worst
+ * possible first screen after restore.
  *
- * КАК ОПРЕДЕЛЯЕТСЯ «ПОЛЬЗОВАЛИСЬ». Двумя признаками, и оба нужны:
+ * HOW "USED" IS DEFINED. By two signs, and both are needed:
  *
- * - число отправленных транзакций больше нуля — с адреса что-то
- *   отправляли;
- * - баланс больше нуля — на адресе что-то лежит.
+ * - sent-transaction count greater than zero — something was sent
+ *   from the address;
+ * - balance greater than zero — something sits on the address.
  *
- * Ни один по отдельности не достаточен: адрес, на который только
- * присылали, имеет нулевой счётчик, а адрес, с которого всё вывели,
- * имеет нулевой баланс.
+ * Neither alone is enough: an address that only received has a
+ * zero count, and an address that was emptied has a zero balance.
  *
- * ЧЕГО ЭТОТ ПОИСК НЕ НАХОДИТ. Адрес, где нет ни отправок, ни нативной
- * валюты, но лежат токены либо предметы. Чтобы увидеть их, пришлось бы
- * опрашивать каждый контракт по каждому адресу — десятки запросов
- * на адрес вместо двух. Ограничение названо прямо в интерфейсе: молчать
- * о нём значило бы снова обещать полноту, которой нет.
+ * WHAT THIS SEARCH DOES NOT FIND. An address with no sends and no
+ * native currency, but with tokens or items. Seeing those would
+ * mean querying every contract for every address — tens of requests
+ * per address instead of two. The limit is named in the UI: staying
+ * silent about it would again promise completeness that is not
+ * there.
  *
- * ПРОМЕЖУТОК В ДВАДЦАТЬ АДРЕСОВ — это правило BIP-44, а не догадка.
- * Кошельки пропускают адреса при создании, поэтому поиск не
- * останавливается на первом пустом: он продолжается, пока подряд
- * не встретится двадцать неиспользованных.
+ * A GAP OF TWENTY ADDRESSES is the BIP-44 rule, not a guess.
+ * Wallets skip addresses at creation, so the search does not stop
+ * at the first empty one: it continues until twenty unused
+ * addresses appear in a row.
  *
- * ЦЕНА ПРИВАТНОСТИ. Поиск сообщает оператору узла два десятка адресов
- * разом и связывает их между собой. Это ровно то, что кошелёк обычно
- * старается не делать, и потому поиск не идёт сам по себе при каждом
- * запуске: он выполняется один раз после восстановления либо по прямой
- * просьбе владельца.
+ * PRIVACY COST. The search tells the node operator two dozen
+ * addresses at once and ties them together. That is exactly what
+ * the wallet usually tries not to do, so the search does not run
+ * by itself on every launch: it runs once after restore or on the
+ * owner's direct request.
  */
 
-/** Промежуток пустых адресов, после которого поиск прекращается. */
+/** Empty-address gap after which the search stops. */
 export const DEFAULT_GAP_LIMIT = 20
 
 /**
- * Предел числа проверяемых адресов.
+ * Cap on the number of addresses checked.
  *
- * Защита от бесконечного обхода, если узел ошибочно сообщает активность
- * по любому адресу. Двести — заведомо больше, чем бывает у человека,
- * и всё ещё конечно.
+ * Protection against an infinite walk if the node wrongly reports
+ * activity on every address. Two hundred is far more than a person
+ * typically has, and still finite.
  */
 export const MAX_SCANNED_ADDRESSES = 200
 
-/** Настройки поиска. */
 export interface IDiscoveryOptions {
   readonly gapLimit?: number
   readonly maxScanned?: number
 }
 
-/** Итог поиска. */
 export interface IDiscoveryResult {
-  /** Индексы адресов, которыми пользовались. Всегда по возрастанию. */
+  /** Indexes of addresses that were used. Always ascending. */
   readonly usedIndexes: readonly number[]
 
-  /** Сколько адресов проверено. Нужно, чтобы честно назвать глубину. */
+  /** How many addresses were checked. Needed to name the depth honestly. */
   readonly scanned: number
 
   /**
-   * Поиск прекращён из-за предела, а не из-за промежутка.
+   * Search stopped because of the cap, not the gap.
    *
-   * Значит, дальше могли остаться занятые адреса, и говорить
-   * «это все ваши аккаунты» нельзя.
+   * Means used addresses may remain further on, and saying "these
+   * are all your accounts" is not allowed.
    */
   readonly stoppedByLimit: boolean
 }
 
-/** Как получить адрес по порядковому номеру. */
 export type AddressAt = (addressIndex: number) => Address
 
 /**
- * Ищет адреса, которыми пользовались.
+ * Finds addresses that have been used.
  *
- * ОТКАЗ УЗЛА ПРЕРЫВАЕТ ПОИСК, А НЕ ПРОПУСКАЕТ АДРЕС. Пропуск означал бы,
- * что занятый адрес молча не попал в результат — то самое, против чего
- * весь этот поиск и написан. Найденное до отказа возвращается: оно
- * проверено.
+ * A NODE REFUSAL STOPS THE SEARCH, IT DOES NOT SKIP THE ADDRESS.
+ * Skipping would mean a used address silently missed the result —
+ * exactly what this search is written against. What was found
+ * before the refusal is returned: it has been checked.
  */
 export async function discoverUsedAccounts(
   provider: IProvider,
@@ -130,10 +128,10 @@ export async function discoverUsedAccounts(
 }
 
 /**
- * Пользовались ли адресом.
+ * Whether the address has been used.
  *
- * Оба запроса уходят разом: они независимы, а последовательные удвоили
- * бы время поиска на медленном узле.
+ * Both requests go out together: they are independent, and running
+ * them in sequence would double search time on a slow node.
  */
 async function hasActivity(provider: IProvider, address: Address): Promise<boolean> {
   const [nonce, balance] = await Promise.all([

@@ -1,15 +1,13 @@
 import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 
-/** Ошибки шифрования, источника случайности и постоянного хранилища. */
-
 /**
- * Криптостойкая случайность недоступна либо неисправна.
+ * Cryptographically secure randomness is unavailable or broken.
  *
- * Фатальное состояние. Приложение обязано остановиться, а не переходить
- * на запасной генератор: кошелёк без криптостойкой случайности не может
- * безопасно создать ни один ключ, а ключи, выведенные из слабого источника,
- * вычисляются злоумышленником напрямую.
+ * A fatal state. The app must stop, not fall back to a spare
+ * generator: a wallet without CSPRNG cannot safely create any key,
+ * and keys derived from a weak source are computed by an attacker
+ * directly.
  */
 export class RandomnessUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.RandomnessUnavailable
@@ -20,11 +18,12 @@ export class RandomnessUnavailableError extends AppError {
 }
 
 /**
- * Расшифровать данные не удалось.
+ * Data could not be decrypted.
  *
- * Причина не детализируется намеренно. AES-GCM не различает «неверный ключ»
- * и «повреждённые данные» — в обоих случаях не сходится тег аутентификации.
- * Попытка домыслить причину дала бы подбирающему пароль лишний сигнал.
+ * The reason is deliberately not detailed. AES-GCM does not distinguish
+ * "wrong key" from "corrupted data" — in both cases the authentication
+ * tag fails. Guessing a reason would give a password-guesser extra
+ * signal.
  */
 export class DecryptionFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.DecryptionFailed
@@ -34,7 +33,6 @@ export class DecryptionFailedError extends AppError {
   }
 }
 
-/** Структура зашифрованного хранилища нарушена. */
 export class VaultCorruptedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.VaultCorrupted
 
@@ -44,12 +42,11 @@ export class VaultCorruptedError extends AppError {
 }
 
 /**
- * Версия формата хранилища новее поддерживаемой.
+ * The vault format version is newer than this build supports.
  *
- * Возникает при откате приложения на предыдущую версию. Обработка обязана
- * останавливать работу, а НЕ пытаться прочитать данные «как получится»:
- * попытка интерпретировать неизвестный формат способна привести к перезаписи
- * хранилища и безвозвратной потере ключей.
+ * Arises when the app is rolled back. Handling must stop work, NOT try
+ * to read the data "as best we can": interpreting an unknown format
+ * can rewrite the vault and lose keys irreversibly.
  */
 export class UnsupportedVaultVersionError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.UnsupportedVaultVersion
@@ -61,7 +58,6 @@ export class UnsupportedVaultVersionError extends AppError {
   }
 }
 
-/** Обращение к содержимому буфера, который уже был затёрт. */
 export class SecretBufferWipedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.SecretBufferWiped
 
@@ -70,7 +66,6 @@ export class SecretBufferWipedError extends AppError {
   }
 }
 
-/** Хранилище недоступно: приватный режим браузера, отказ в квоте, отключённый IndexedDB. */
 export class StorageUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.StorageUnavailable
 
@@ -79,7 +74,6 @@ export class StorageUnavailableError extends AppError {
   }
 }
 
-/** Запись в хранилище не выполнена. */
 export class StorageWriteFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.StorageWriteFailed
 
@@ -88,7 +82,6 @@ export class StorageWriteFailedError extends AppError {
   }
 }
 
-/** Чтение из хранилища не выполнено. */
 export class StorageReadFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.StorageReadFailed
 
@@ -97,7 +90,6 @@ export class StorageReadFailedError extends AppError {
   }
 }
 
-/** Миграция схемы хранилища завершилась ошибкой. */
 export class MigrationFailedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.MigrationFailed
 

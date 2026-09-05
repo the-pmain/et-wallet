@@ -10,9 +10,9 @@ const MISSING_ZONE_WARNING =
   'Cloudflare Email Sending is configured, but the MAIL_FROM domain has no zone. Using in-memory mail until the zone is available.'
 
 /**
- * Ящик менеджера писем.
+ * Mail-manager inbox.
  *
- * Источник — Cloudflare (activity log + KV). Supabase для писем не используется.
+ * Source is Cloudflare (activity log + KV). Supabase is not used for mail.
  */
 export async function createEmailsStore(
   config: IServerConfig,

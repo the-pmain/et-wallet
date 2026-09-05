@@ -58,7 +58,7 @@ function quotes(entries: readonly { chainId: bigint; address: string | null; pri
 }
 
 describe('mapRemoteAssets', () => {
-  it('переносит каждую строку витрины в баланс списка', () => {
+  it('maps each showcase row into a list balance', () => {
     const mapped = mapRemoteAssets(
       assets([
         token({
@@ -89,7 +89,7 @@ describe('mapRemoteAssets', () => {
     expect(mapped.tokens[1]?.balance).toBe(2500000000n)
   })
 
-  it('сохраняет порядок строк и не схлопывает одинаковые символы разных сетей', () => {
+  it('keeps row order and does not collapse same symbols on different chains', () => {
     const mapped = mapRemoteAssets(
       assets([
         token(),
@@ -111,7 +111,7 @@ describe('mapRemoteAssets', () => {
     ])
   })
 
-  it('кладёт переданные курсы в сводку', () => {
+  it('puts the given quotes into the summary', () => {
     const mapped = mapRemoteAssets(
       assets([token()]),
       quotes([{ chainId: 1n, address: USDC, price: 1 }]),
@@ -122,21 +122,21 @@ describe('mapRemoteAssets', () => {
     expect(position?.value).toBe(2500)
   })
 
-  it('без курсов не подставляет нулевую оценку', () => {
+  it('does not invent a zero valuation without quotes', () => {
     const mapped = mapRemoteAssets(assets([token()]))
 
     expect(mapped.portfolio.positions[0]?.value).toBeNull()
     expect(mapped.portfolio.totalValue).toBe(0)
   })
 
-  it('пустую витрину оставляет пустым списком, а не нативной валютой', () => {
+  it('leaves an empty showcase as an empty list, not native currency', () => {
     const mapped = mapRemoteAssets(EMPTY_REMOTE_ASSETS)
 
     expect(mapped.tokens).toEqual([])
     expect(mapped.portfolio.positions).toEqual([])
   })
 
-  it('битую строку пропускает, остальные оставляет', () => {
+  it('skips a broken row and keeps the rest', () => {
     const mapped = mapRemoteAssets(
       assets([
         token({ chainId: '0' }),

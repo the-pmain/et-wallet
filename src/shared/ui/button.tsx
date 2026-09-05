@@ -9,13 +9,13 @@ import { buttonVariants } from './button-variants'
 export type ButtonProps = ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     /**
-     * Отрисовать стили кнопки на дочернем элементе вместо `<button>`.
-     * Нужно, когда семантически требуется ссылка, а визуально — кнопка.
+     * Render button styles on the child instead of a `<button>`.
+     * Needed when the semantics require a link and the look requires
+     * a button.
      */
     asChild?: boolean
   }
 
-/** Базовая кнопка shadcn/ui (стиль new-york). */
 export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
   const Component = asChild ? Slot : 'button'
 

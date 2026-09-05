@@ -19,7 +19,7 @@ interface SimulationSettingsProps {
   readonly isConfigured: boolean
   readonly isEnabled: boolean
 
-  /** Имя источника, который спрашивается первым. `null` — только узел. */
+  /** Name of the source asked first. `null` means the node only. */
   readonly activeSourceName: string | null
 
   readonly onSave: (credentials: ITenderlyCredentials) => Promise<void>
@@ -29,18 +29,17 @@ interface SimulationSettingsProps {
 }
 
 /**
- * Сторонний источник проверки транзакций.
+ * Third-party transaction-check source.
  *
- * ДВА РЕШЕНИЯ РАЗВЕДЕНЫ, И ЭТО НЕ ЛИШНИЙ ШАГ. Ввод ключа означает
- * «у меня есть учётная запись», включение — «спрашивайте их о каждой
- * моей транзакции». Объединить их значило бы получить второе согласие
- * под видом первого: человек, вводящий ключ, решает задачу настройки,
- * а не задачу раскрытия своих намерений.
+ * Two decisions are kept apart, and that is not an extra step.
+ * Entering a key means "I have an account"; enabling means "ask them
+ * about every transaction of mine". Merging them would take the
+ * second consent under the guise of the first: a person typing a key
+ * is solving setup, not disclosure of intent.
  *
- * КЛЮЧ НЕ ПОКАЗЫВАЕТСЯ ПОСЛЕ СОХРАНЕНИЯ. Поле остаётся пустым, а факт
- * наличия данных сообщается словами. Выводить сохранённый секрет
- * обратно на экран незачем: проверить его глазами всё равно нельзя,
- * а подсмотреть через плечо — можно.
+ * The key is not shown after save. The field stays empty; presence
+ * is stated in words. Putting a stored secret back on screen cannot
+ * be verified by eye and can be shoulder-surfed.
  */
 export function SimulationSettings({
   isConfigured,
@@ -111,10 +110,9 @@ export function SimulationSettings({
 
             {isEnabled ? null : (
               <>
-                {/* ПЕРЕЧИСЛЕНО ИМЕННО ТО, ЧТО УЙДЁТ, И ТО, ЧТО НЕ УЙДЁТ.
-                    Согласие, данное на общее «улучшение проверки»,
-                    согласием не является: человек не может принять
-                    решение о том, чего ему не назвали. */}
+                {/* Exactly what leaves and what does not. Consent to a
+                    vague "better checks" is not consent: a person
+                    cannot decide about what they were not told. */}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="flex flex-col gap-2 rounded-xl border border-risk-medium/40 bg-risk-medium/5 p-3 text-xs">
                     <p className="flex items-center gap-1.5 font-medium">
@@ -205,8 +203,8 @@ export function SimulationSettings({
 
             <div className="flex flex-col gap-2">
               <Label htmlFor={keyId}>Access key</Label>
-              {/* Тип `password`: ключ не должен оставаться на экране
-                  открытым текстом дольше, чем его вводят. */}
+              {/* `password` type: the key must not sit on screen in
+                  clear text longer than it takes to type it. */}
               <Input
                 id={keyId}
                 type="password"
@@ -236,8 +234,8 @@ export function SimulationSettings({
                     accessKey: accessKey.trim(),
                   })
 
-                  /* Поля очищаются сразу: ключ не должен пережить
-                     сохранение ни на экране, ни в состоянии компонента. */
+                  /* Fields are cleared at once: the key must not
+                     survive save on screen or in component state. */
                   setAccount('')
                   setProject('')
                   setAccessKey('')

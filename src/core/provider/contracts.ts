@@ -14,167 +14,168 @@ import type {
 } from './types'
 
 /**
- * Транспорт к узлу блокчейна.
+ * Transport to a blockchain node.
  *
- * Отличие от `INetworkConfig`: конфигурация — это данные (chainId, имя,
- * список RPC), а провайдер — живое соединение с конкретным узлом,
- * обладающее состоянием и подлежащее уничтожению.
+ * Distinct from `INetworkConfig`: config is data (chainId, name, RPC
+ * list), a provider is a live connection to a specific node, with
+ * state, and it must be destroyed.
  *
- * Одной сети соответствует один активный провайдер, но он пересоздаётся
- * при недоступности узла и переключении на резервный адрес. Поэтому
- * провайдер не хранится в конфигурации и не сериализуется.
+ * One network has one active provider, but it is rebuilt when the
+ * node is unreachable and when switching to a backup. So the provider
+ * is not stored in config and is not serialized.
  *
- * Абстракция намеренно не упоминает ethers: замена библиотеки не должна
- * затрагивать домен.
+ * The abstraction deliberately does not mention ethers: replacing the
+ * library must not touch the domain.
  *
- * ТРЕБОВАНИЕ БЕЗОПАСНОСТИ для реализации: при установлении соединения
- * запросить `eth_chainId` и сверить с ожидаемым. Несовпадение —
- * `ChainIdMismatchError` и немедленный разрыв. Продолжение работы
- * с узлом, обслуживающим другую сеть, ведёт к подписи, пригодной
- * для повторного проигрывания.
+ * SECURITY REQUIREMENT for an implementation: on connect, request
+ * `eth_chainId` and compare it with the expected value. A mismatch
+ * is `ChainIdMismatchError` and an immediate disconnect. Continuing
+ * with a node that serves another network leads to a signature valid
+ * for replay.
  */
 export interface IProvider extends IEventSource<ProviderEventMap> {
-  /** Сеть, к которой относится соединение. */
+  /** Network the connection belongs to. */
   readonly chainId: ChainId
 
-  /** Адрес узла, с которым установлено соединение. */
+  /** Node URL the connection is established with. */
   readonly rpcUrl: string
 
-  /** Активен ли транспорт. После `destroy` — `false`. */
+  /** Whether the transport is active. `false` after `destroy`. */
   readonly isActive: boolean
 
   /**
-   * Произвольный вызов JSON-RPC.
+   * Arbitrary JSON-RPC call.
    *
-   * Аварийный выход для методов, не покрытых типизированными обёртками ниже.
-   * Результат не типизирован — вызывающий обязан его провалидировать.
+   * Escape hatch for methods not covered by the typed wrappers below.
+   * The result is untyped — the caller must validate it.
    */
   request<TResult>(request: IRpcRequest): Promise<TResult>
 
   /**
-   * Идентификатор сети по данным узла.
+   * Network id as reported by the node.
    *
-   * Отдельный метод от свойства `chainId`: свойство хранит ОЖИДАЕМОЕ
-   * значение из конфигурации, метод спрашивает узел заново. Расхождение
-   * означает, что узел сменил обслуживаемую сеть после подключения —
-   * работу с ним следует прекратить.
+   * A separate method from the `chainId` property: the property holds
+   * the EXPECTED value from config, the method asks the node again.
+   * A mismatch means the node switched networks after connect —
+   * work with it must stop.
    */
   getChainId(): Promise<ChainId>
 
-  /** Номер последнего блока. */
+  /** Latest block number. */
   getBlockNumber(): Promise<bigint>
 
-  /** Баланс нативной валюты. */
+  /** Native-currency balance. */
   getBalance(address: Address, blockTag?: BlockTag): Promise<Wei>
 
   /**
-   * Число отправленных с адреса транзакций.
+   * Number of transactions sent from the address.
    *
-   * Низкоуровневый вызов с явным указанием блока. Для формирования новой
-   * транзакции используйте {@link IProvider.getNonce}.
+   * Low-level call with an explicit block. To form a new transaction
+   * use {@link IProvider.getNonce}.
    */
   getTransactionCount(address: Address, blockTag?: BlockTag): Promise<number>
 
   /**
-   * Следующий nonce для НОВОЙ транзакции.
+   * Next nonce for a NEW transaction.
    *
-   * Всегда учитывает транзакции в мемпуле. Отдельный метод существует
-   * именно ради этого: `getTransactionCount` с тегом по умолчанию вернёт
-   * значение без учёта ожидающих транзакций, и новая транзакция заменит
-   * собой ожидающую вместо постановки в очередь. Ошибка молчаливая
-   * и обнаруживается только по пропавшему переводу.
+   * Always accounts for mempool transactions. The separate method
+   * exists for exactly that: `getTransactionCount` with the default
+   * tag returns a value that ignores pending transactions, and a new
+   * transaction would replace the pending one instead of queuing.
+   * The bug is silent and is only noticed when a transfer disappears.
    */
   getNonce(address: Address): Promise<number>
 
-  /** Вызов контракта без изменения состояния. */
+  /** Contract call without changing state. */
   call(request: ICallRequest, blockTag?: BlockTag): Promise<HexString>
 
   /**
-   * Байт-код по адресу.
+   * Bytecode at an address.
    *
-   * Пустое значение (`0x`) означает обычный адрес, непустое — контракт.
-   * Различие существенно для перевода: нативная валюта, отправленная
-   * на контракт, который её не принимает, теряется безвозвратно —
-   * вернуть её может только код самого контракта, а его может
-   * не оказаться.
+   * Empty (`0x`) means an ordinary address, non-empty means a contract.
+   * The distinction matters for a transfer: native currency sent to a
+   * contract that does not accept it is lost forever — only the
+   * contract's own code can return it, and that code may not exist.
    */
   getCode(address: Address, blockTag?: BlockTag): Promise<HexString>
 
   /**
-   * Оценка лимита газа.
+   * Gas-limit estimate.
    *
-   * @throws GasEstimationFailedError если вызов завершится откатом.
-   *         Назначать лимит произвольно в этой ситуации нельзя: газ будет
-   *         списан, а операция не выполнится.
+   * @throws GasEstimationFailedError if the call would revert.
+   *         Assigning an arbitrary limit in that situation is not
+   *         allowed: gas would be spent and the operation would not run.
    */
   estimateGas(request: IGasEstimateRequest): Promise<bigint>
 
-  /** Текущие параметры стоимости газа. */
+  /** Current gas-price parameters. */
   getFeeData(): Promise<IFeeData>
 
   /**
-   * Публикует подписанную транзакцию.
+   * Publishes a signed transaction.
    *
-   * Принимает уже подписанные байты. Провайдер не имеет доступа к ключам
-   * и не участвует в подписи — это граница между транспортом и хранилищем
-   * секретов.
+   * Accepts already-signed bytes. The provider has no access to keys
+   * and does not take part in signing — that is the boundary between
+   * transport and secret storage.
    */
   sendRawTransaction(signedTransaction: HexString): Promise<TxHash>
 
-  /** Квитанция транзакции. `null`, если она ещё не включена в блок. */
+  /** Transaction receipt. `null` if it is not yet included in a block. */
   getTransactionReceipt(hash: TxHash): Promise<ITransactionReceipt | null>
 
-  /** Выборка логов по фильтру. */
+  /** Log query by filter. */
   getLogs(filter: ILogFilter): Promise<readonly ILogEntry[]>
 
   /**
-   * Закрывает соединение и освобождает ресурсы.
+   * Closes the connection and releases resources.
    *
-   * Обязателен к вызову при смене сети и при уничтожении ядра: незакрытые
-   * подписки на новые блоки продолжают опрашивать узел и удерживают ссылки
-   * на обработчики.
+   * Required on network change and when the core is destroyed:
+   * unclosed new-block subscriptions keep polling the node and hold
+   * references to handlers.
    */
   destroy(): void
 }
 
 /**
- * Создание провайдеров.
+ * Creating providers.
  *
- * Внедряется в сервисы вместо конкретных провайдеров. Это позволяет:
- * - пересоздать транспорт при отказе узла, не трогая потребителей;
- * - подставить фиктивный транспорт в тестах;
- * - реализовать переключение между RPC-адресами в одном месте.
+ * Injected into services instead of concrete providers. That allows:
+ * - rebuilding transport on node failure without touching consumers;
+ * - substituting a fake transport in tests;
+ * - implementing RPC-address switching in one place.
  */
 export interface IProviderFactory {
   /**
-   * Создаёт провайдер для сети.
+   * Creates a provider for a network.
    *
-   * Реализация перебирает `rpcUrls` в порядке приоритета и возвращает
-   * соединение с первым откликнувшимся узлом, прошедшим сверку chainId.
+   * The implementation walks `rpcUrls` in priority order and returns
+   * a connection to the first node that answered and passed chainId
+   * verification.
    *
-   * @throws ProviderUnavailableError если ни один узел не отвечает.
-   * @throws ChainIdMismatchError если отвечающий узел обслуживает
-   *         другую сеть и запасных адресов не осталось.
+   * @throws ProviderUnavailableError if no node answers.
+   * @throws ChainIdMismatchError if the answering node serves another
+   *         network and no backups remain.
    */
   create(network: INetworkConfig): Promise<IProvider>
 }
 
 /**
- * Выдача готового соединения потребителям.
+ * Handing a ready connection to consumers.
  *
- * Отличие от `IProviderFactory`: фабрика ВСЕГДА создаёт новое соединение,
- * резолвер отдаёт существующее и создаёт только при отсутствии.
+ * Distinct from `IProviderFactory`: the factory ALWAYS creates a new
+ * connection, the resolver returns an existing one and creates only
+ * when none exists.
  *
- * Разделение нужно, чтобы прикладные сервисы (балансы, транзакции)
- * зависели от узкого контракта «дай соединение», а не от конкретного
- * кэша. Сервис, которому передали фабрику, открывал бы новое соединение
- * на каждый запрос баланса.
+ * The split exists so application services (balances, transactions)
+ * depend on a narrow "give me a connection" contract, not on a
+ * specific cache. A service that received a factory would open a new
+ * connection on every balance request.
  */
 export interface IProviderResolver {
   /**
-   * Соединение с сетью.
+   * Connection to a network.
    *
-   * @throws ProviderUnavailableError если ни один узел не доступен.
+   * @throws ProviderUnavailableError if no node is available.
    */
   get(network: INetworkConfig): Promise<IProvider>
 }

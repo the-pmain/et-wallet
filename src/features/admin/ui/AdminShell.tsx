@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import { cn } from '@/shared/lib/utils'
-import { Button } from '@/shared/ui'
+import { Button, PAGE_COLUMN } from '@/shared/ui'
 
 import { ADMIN_ROLE, type AdminRole } from '../model/admin-role'
 import { AdminSendingsLiveProvider } from '../model/admin-sendings-live'
@@ -29,9 +29,7 @@ const TABS = [
   },
 ] as const
 
-/**
- * Оболочка кабинета: шапка и вкладки остаются при переходе к профилю.
- */
+/** Cabinet shell: header and tabs stay when opening a profile. */
 export function AdminShell({ children, role, pin, onLock }: AdminShellProps) {
   const location = useLocation()
   const isSuper = role === ADMIN_ROLE.Super
@@ -40,7 +38,7 @@ export function AdminShell({ children, role, pin, onLock }: AdminShellProps) {
   const frame = (
     <div className="min-h-svh bg-background">
       <header className="sticky top-0 z-10 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
+        <div className={cn(PAGE_COLUMN, 'flex h-14 items-center justify-between gap-4')}>
           <div className="flex min-w-0 items-center gap-4">
             <p
               className={cn(
@@ -87,7 +85,7 @@ export function AdminShell({ children, role, pin, onLock }: AdminShellProps) {
           </Button>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className={cn(PAGE_COLUMN, 'py-6')}>{children}</main>
       {isSuper ? <AdminPendingSendingToasts /> : null}
     </div>
   )

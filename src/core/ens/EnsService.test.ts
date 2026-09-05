@@ -12,18 +12,18 @@ import { EnsService } from './EnsService'
 const OWNER = toAddress('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
 const OTHER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
-/** Сеть по идентификатору. Берётся из встроенного списка, а не сочиняется. */
+/** Network by identifier. Taken from the built-in list, not invented. */
 function networkOf(chainId: ChainId): INetworkConfig {
   const found = BUILT_IN_NETWORKS.find((network) => network.chainId === chainId)
 
   if (found === undefined) {
-    throw new Error(`Встроенной сети ${chainId.toString()} нет.`)
+    throw new Error(`Built-in network ${chainId.toString()} is missing.`)
   }
 
   return found
 }
 
-/** Служба сетей-дублёр: отдаёт заданную активную сеть. */
+/** Network-service stand-in: returns the given active network. */
 function fakeNetworks(active: INetworkConfig): INetworkService {
   return {
     getActive: () => active,
@@ -34,15 +34,16 @@ function fakeNetworks(active: INetworkConfig): INetworkService {
 let factory: FakeProviderFactory
 let clock: FakeClock
 
-/** Собирает сервис поверх дублёра с заданными записями ENS. */
+/** Builds the service over a stand-in with the given ENS records. */
 function createService(records: readonly IFakeEnsRecord[], chainId = BUILT_IN_CHAIN_ID.Ethereum) {
   factory = new FakeProviderFactory()
   factory.configure({ ensRecords: records })
 
   const network = networkOf(chainId)
 
-  /* Резолвер провайдеров создаёт соединение один раз и переиспользует:
-     иначе счётчик обращений к узлу считал бы не запросы, а соединения. */
+  /* The provider resolver creates a connection once and reuses it:
+     otherwise the node-access counter would count connections, not
+     requests. */
   let provider: IProvider | null = null
 
   const resolver: IProviderResolver = {
@@ -65,22 +66,22 @@ beforeEach(() => {
   clock = new FakeClock(1_700_000_000_000)
 })
 
-describe('EnsService: поддерживаемые сети', () => {
-  it('работает в Ethereum', () => {
+describe('EnsService: supported networks', () => {
+  it('works on Ethereum', () => {
     expect(createService([]).isSupported(BUILT_IN_CHAIN_ID.Ethereum)).toBe(true)
   })
 
   it.each([BUILT_IN_CHAIN_ID.Polygon, BUILT_IN_CHAIN_ID.Base, BUILT_IN_CHAIN_ID.Arbitrum])(
-    'не работает в сети %s',
+    'does not work on network %s',
     (chainId) => {
       expect(createService([]).isSupported(chainId)).toBe(false)
     },
   )
 
-  it('в другой сети имя не разрешается вовсе', async () => {
-    /* Открывать второе соединение с узлом Ethereum значило бы сообщить
-       постороннему оператору, что и с какого адреса ищет пользователь,
-       находящийся, как он считает, в другой сети. */
+  it('on another network a name is not resolved at all', async () => {
+    /* Opening a second connection to an Ethereum node would tell a
+       third-party operator what the user is looking up and from which
+       address, while they believe they are on another network. */
     const service = createService(
       [{ name: 'vitalik.eth', address: OWNER }],
       BUILT_IN_CHAIN_ID.Polygon,
@@ -90,8 +91,8 @@ describe('EnsService: поддерживаемые сети', () => {
   })
 })
 
-describe('EnsService: прямое разрешение', () => {
-  it('разрешает имя в адрес', async () => {
+describe('EnsService: forward resolution', () => {
+  it('resolves a name to an address', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await expect(service.resolveName('vitalik.eth')).resolves.toEqual({
@@ -102,29 +103,29 @@ describe('EnsService: прямое разрешение', () => {
     })
   })
 
-  it('снимает регистр перед хэшированием', async () => {
+  it('strips case before hashing', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await expect(service.resolveName('Vitalik.ETH')).resolves.toMatchObject({ address: OWNER })
   })
 
-  it('незарегистрированное имя даёт null', async () => {
+  it('an unregistered name yields null', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await expect(service.resolveName('nobody.eth')).resolves.toBeNull()
   })
 
-  it('запись с нулевым адресом даёт null, а не адрес сжигания', async () => {
-    /* Приняв ноль за получателя, кошелёк отправил бы средства туда,
-       откуда их не достанет никто. */
+  it('a record with a zero address yields null, not the burn address', async () => {
+    /* Taking zero as the recipient, the wallet would send funds where
+       no one can retrieve them. */
     const service = createService([{ name: 'empty.eth', address: null }])
 
     await expect(service.resolveName('empty.eth')).resolves.toBeNull()
   })
 
-  it('имя, не прошедшее нормализацию, даёт null без запроса к узлу', async () => {
-    /* Смешение письменностей отвергается ещё до обращения к сети:
-       спрашивать узел про заведомо непригодное имя незачем. */
+  it('a name that fails normalisation yields null without a node request', async () => {
+    /* Mixed scripts are rejected before talking to the network:
+       there is no point asking the node about a name that is unfit. */
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await expect(
@@ -133,8 +134,8 @@ describe('EnsService: прямое разрешение', () => {
     expect(factory.createdCount).toBe(0)
   })
 
-  it('разрешает имя с эмодзи', async () => {
-    /* Полная нормализация ENSIP-15: имя законно и обязано работать. */
+  it('resolves a name with an emoji', async () => {
+    /* Full ENSIP-15 normalisation: the name is lawful and must work. */
     const service = createService([{ name: '\u{1F600}.eth', address: OWNER }])
 
     await expect(service.resolveName('\u{1F600}.eth')).resolves.toMatchObject({
@@ -145,35 +146,36 @@ describe('EnsService: прямое разрешение', () => {
   })
 })
 
-describe('EnsService: обратное разрешение', () => {
-  it('возвращает имя, подтверждённое прямым разрешением', async () => {
+describe('EnsService: reverse resolution', () => {
+  it('returns a name confirmed by forward resolution', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER, reverseFor: OWNER }])
 
     await expect(service.lookupAddress(OWNER)).resolves.toMatchObject({ name: 'vitalik.eth' })
   })
 
-  it('отвергает имя, указывающее на другой адрес', async () => {
-    /* САМАЯ ВАЖНАЯ ПРОВЕРКА МОДУЛЯ. Обратную запись задаёт владелец
-       адреса, и объявить себя `vitalik.eth` вправе кто угодно. Показав
-       её без сверки, кошелёк подписал бы подделку своим интерфейсом. */
+  it('rejects a name that points to another address', async () => {
+    /* THE MOST IMPORTANT CHECK IN THE MODULE. The reverse record is
+       set by the address owner, and anyone may call themselves
+       `vitalik.eth`. Showing it without a check would stamp a fake
+       with the wallet's own interface. */
     const service = createService([{ name: 'vitalik.eth', address: OWNER, reverseFor: OTHER }])
 
     await expect(service.lookupAddress(OTHER)).resolves.toBeNull()
   })
 
-  it('отвергает имя, у которого нет прямой записи', async () => {
+  it('rejects a name that has no forward record', async () => {
     const service = createService([{ name: 'vitalik.eth', address: null, reverseFor: OTHER }])
 
     await expect(service.lookupAddress(OTHER)).resolves.toBeNull()
   })
 
-  it('адрес без обратной записи даёт null', async () => {
+  it('an address with no reverse record yields null', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await expect(service.lookupAddress(OWNER)).resolves.toBeNull()
   })
 
-  it('не зависит от регистра адреса', async () => {
+  it('does not depend on address case', async () => {
     const service = createService([
       { name: 'vitalik.eth', address: OWNER, reverseFor: OWNER.toLowerCase() },
     ])
@@ -182,8 +184,8 @@ describe('EnsService: обратное разрешение', () => {
   })
 })
 
-describe('EnsService: кэш', () => {
-  it('повторный запрос не создаёт нового соединения', async () => {
+describe('EnsService: cache', () => {
+  it('a repeat request does not create a new connection', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await service.resolveName('vitalik.eth')
@@ -194,9 +196,9 @@ describe('EnsService: кэш', () => {
     expect(factory.createdCount).toBe(afterFirst)
   })
 
-  it('запоминает отсутствие записи', async () => {
-    /* Поле ввода обращается к сервису на каждое нажатие клавиши,
-       и недописанное имя — самый частый запрос. */
+  it('remembers the absence of a record', async () => {
+    /* The input field talks to the service on every keystroke, and
+       an unfinished name is the most common request. */
     const service = createService([])
 
     await expect(service.resolveName('nobody.eth')).resolves.toBeNull()
@@ -205,7 +207,7 @@ describe('EnsService: кэш', () => {
     expect(factory.createdCount).toBe(1)
   })
 
-  it('устаревшая запись перечитывается', async () => {
+  it('a stale record is read again', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await service.resolveName('vitalik.eth')
@@ -216,7 +218,7 @@ describe('EnsService: кэш', () => {
     await expect(service.resolveName('vitalik.eth')).resolves.toMatchObject({ address: OTHER })
   })
 
-  it('сброс кэша заставляет спросить узел заново', async () => {
+  it('clearing the cache forces a fresh node request', async () => {
     const service = createService([{ name: 'vitalik.eth', address: OWNER }])
 
     await service.resolveName('vitalik.eth')

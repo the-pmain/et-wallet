@@ -1,23 +1,25 @@
 /**
- * Приглушённый фон рабочих экранов кошелька.
+ * Subdued background for the wallet's working screens.
  *
- * ЧЕМ ОТЛИЧАЕТСЯ ОТ ФОНА ЭКРАНОВ ВХОДА. Тремя вещами, и все три —
- * ради читаемости, а не ради экономии:
+ * HOW IT DIFFERS FROM THE SIGN-IN BACKGROUND. Three things, and all
+ * three are for readability, not for thrift:
  *
- * 1. Непрозрачность втрое ниже. Цвет присутствует, но не соперничает
- *    с суммами и предупреждениями за внимание.
- * 2. Движение вчетверо медленнее — период полторы минуты. Такое
- *    смещение замечается, только если смотреть на пустое место
- *    специально.
- * 3. Падающих монет нет. Движущийся объект позади цифры — самое
- *    отвлекающее, что можно поставить на экран, где эту цифру читают.
+ * 1. Opacity is a third as high. Colour is present but does not
+ *    compete with amounts and warnings for attention.
+ * 2. Motion is four times slower — a period of about a minute and a
+ *    half. That shift is noticed only if you look at empty space
+ *    on purpose.
+ * 3. No falling coins. A moving object behind a figure is the most
+ *    distracting thing you can put on a screen where that figure
+ *    is being read.
  *
- * ПОЧЕМУ ЭТО ВООБЩЕ ЗДЕСЬ. Отказ от фона целиком дал другую крайность:
- * рабочий экран выглядел чёрным полотном. Между «мешает читать»
- * и «выглядит незаконченным» есть середина, и она — приглушённый фон.
+ * WHY THIS IS HERE AT ALL. Dropping the background entirely produced
+ * the other extreme: the working screen looked like a black sheet.
+ * Between "gets in the way of reading" and "looks unfinished" there
+ * is a middle, and that is the subdued background.
  *
- * `aria-hidden` обязателен: экранному диктору нечего сообщить о фоне,
- * а лишние узлы засоряют навигацию по странице.
+ * `aria-hidden` is required: a screen reader has nothing to say
+ * about a background, and extra nodes clutter page navigation.
  */
 export function AmbientBackground() {
   return (

@@ -11,14 +11,14 @@ import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-/** Два эфира. */
+/** Two ether. */
 const BALANCE = 2_000_000_000_000_000_000n as Wei
 
 const ETHEREUM = toChainId(1n)
 
 const USDC = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-/** Котировка эфира: цена и суточный рост. */
+/** Ether quote: price and daily change. */
 const ETH_QUOTE: IPriceQuote = {
   price: 2000,
   change24hPercent: 10,
@@ -41,7 +41,6 @@ function renderApp() {
   )
 }
 
-/** Открывает портфель с главного экрана. */
 async function openPortfolio(): Promise<void> {
   const user = userEvent.setup()
 
@@ -50,7 +49,6 @@ async function openPortfolio(): Promise<void> {
   await screen.findByRole('heading', { name: 'Portfolio', level: 1 })
 }
 
-/** Даёт согласие на обращение к источнику курсов. */
 async function enablePrices(): Promise<void> {
   const user = userEvent.setup()
 
@@ -58,7 +56,7 @@ async function enablePrices(): Promise<void> {
   await screen.findByText('Allocation')
 }
 
-/** Котировки только по нативной валюте. */
+/** Quotes for the native currency only. */
 function nativeOnly(): ReadonlyMap<string, IPriceQuote> {
   return new Map([[priceRefKey({ chainId: ETHEREUM, address: null }), ETH_QUOTE]])
 }
@@ -72,26 +70,27 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Портфель: согласие на источник курсов', () => {
-  it('без согласия стоимость не показывается', async () => {
+describe('Portfolio: consent to the price source', () => {
+  it('without consent the value is not shown', async () => {
     renderApp()
     await openPortfolio()
 
     expect(screen.getByText('Portfolio value is turned off')).toBeInTheDocument()
   })
 
-  it('без согласия источник курсов не опрашивается ни разу', async () => {
-    /* Запрос курса называет сервису адрес контракта, то есть сообщает
-       состав портфеля. До согласия такого запроса быть не может. */
+  it('without consent the price source is never queried', async () => {
+    /* A rate request tells the service the contract address, that is
+       the portfolio composition. Before consent that request must not
+       exist. */
     renderApp()
     await openPortfolio()
 
     expect(services.priceProvider.callCount).toBe(0)
   })
 
-  it('перечисляет, что именно узнает сервис', async () => {
-    /* Согласие, данное на общее «улучшение работы», согласием
-       не является: человек не может решить о том, чего ему не назвали. */
+  it('lists exactly what the service will learn', async () => {
+    /* Consent given for a vague "better experience" is not consent:
+       a person cannot decide about what they were not told. */
     renderApp()
     await openPortfolio()
 
@@ -99,24 +98,24 @@ describe('Портфель: согласие на источник курсов'
     expect(screen.getByText(/IP address/i)).toBeInTheDocument()
   })
 
-  it('называет, что адрес кошелька не передаётся', async () => {
+  it('names that the wallet address is not sent', async () => {
     renderApp()
     await openPortfolio()
 
     expect(screen.getByText(/your wallet address — it is never sent/i)).toBeInTheDocument()
   })
 
-  it('после согласия появляется стоимость', async () => {
+  it('the value appears after consent', async () => {
     renderApp()
     await openPortfolio()
     await enablePrices()
 
-    /* Два эфира по 2000 — четыре тысячи. Величина встречается трижды:
-       общая стоимость, доля в распределении и строка актива. */
+    /* Two ether at 2000 is four thousand. The figure appears three
+       times: the total, the allocation share, and the asset row. */
     expect(screen.getAllByText(/\$4,000\.00/u).length).toBeGreaterThan(0)
   })
 
-  it('согласие переживает перезапуск сессии', async () => {
+  it('consent survives a session restart', async () => {
     renderApp()
     await openPortfolio()
     await enablePrices()
@@ -130,45 +129,44 @@ describe('Портфель: согласие на источник курсов'
   })
 })
 
-describe('Портфель: стоимость и изменение', () => {
+describe('Portfolio: value and change', () => {
   beforeEach(async () => {
     renderApp()
     await openPortfolio()
     await enablePrices()
   })
 
-  it('показывает суточное изменение в процентах', () => {
-    /* Показывается и по портфелю целиком, и в строке актива. */
+  it('shows the daily change as a percent', () => {
+    /* Shown both for the whole portfolio and on the asset row. */
     expect(screen.getAllByText('+10.00 %').length).toBeGreaterThan(0)
   })
 
-  it('оговаривает, что изменение посчитано по курсам, а не по составу', () => {
-    /* Покупка актива увеличивает стоимость портфеля, но это не рост
-       курса, и приписывать его пользователю как доход нельзя. */
+  it('notes that the change is computed from rates, not from holdings', () => {
+    /* Buying an asset raises portfolio value, but that is not a
+       price rise, and it must not be credited as income. */
     expect(screen.getByText(/with an unchanged composition/i)).toBeInTheDocument()
   })
 
-  it('показывает вчерашнюю оценку', () => {
-    /* Четыре тысячи при росте на 10 % означают вчерашние 3636,36. */
+  it('shows the previous-day valuation', () => {
+    /* Four thousand after a 10% rise means yesterday was 3636.36. */
     expect(screen.getByText(/\$3,636\.36/u)).toBeInTheDocument()
   })
 })
 
-describe('Портфель: распределение', () => {
-  it('рисует диаграмму с текстовым описанием', async () => {
+describe('Portfolio: allocation', () => {
+  it('draws a chart with a text description', async () => {
     renderApp()
     await openPortfolio()
     await enablePrices()
 
-    /* Диаграмма без текстового описания недоступна тому, кто слушает
-       страницу, а не смотрит на неё. */
+    /* A chart without a text description is unavailable to someone
+       who listens to the page instead of looking at it. */
     expect(screen.getByRole('img', { name: /ETH 100/u })).toBeInTheDocument()
   })
 
-  it('дублирует диаграмму списком с числами', async () => {
-    /* Разница между 18 % и 22 % на кольце неразличима, а цвет как
-       единственный признак недоступен людям с нарушением
-       цветовосприятия. */
+  it('duplicates the chart with a numbered list', async () => {
+    /* 18% vs 22% is invisible on the ring, and color as the only
+       cue is unavailable to people with impaired color vision. */
     renderApp()
     await openPortfolio()
     await enablePrices()
@@ -179,22 +177,22 @@ describe('Портфель: распределение', () => {
   })
 })
 
-describe('Портфель: неизвестное не подменяется нулём', () => {
+describe('Portfolio: unknown is not replaced with zero', () => {
   beforeEach(() => {
-    /* Токен добавлен, но его курс источнику неизвестен. */
+    /* The token is added, but the source does not know its rate. */
     services.priceProvider.configure({ quotes: nativeOnly() })
   })
 
-  it('позиция без курса не входит в стоимость, но остаётся в списке', async () => {
+  it('a position without a rate is left out of the total but stays in the list', async () => {
     renderApp()
     await openPortfolio()
     await enablePrices()
 
-    /* Нативная валюта одна, стоимость только по ней. */
+    /* There is one native currency; the total is only from it. */
     expect(screen.getAllByText(/\$4,000\.00/u).length).toBeGreaterThan(0)
   })
 
-  it('сообщает о позициях, не вошедших в оценку', async () => {
+  it('reports positions that were left out of the valuation', async () => {
     services.priceProvider.configure({ quotes: new Map() })
 
     renderApp()
@@ -210,10 +208,10 @@ describe('Портфель: неизвестное не подменяется �
     expect(screen.getByText(/does not mean they are worthless/i)).toBeInTheDocument()
   })
 
-  it('не обвиняет источник, когда портфель просто ничего не стоил', async () => {
-    /* Курс известен, но вчерашняя стоимость нулевая, и процент
-       не определён. Текст «источник не сообщил изменение» приписал бы
-       сервису то, чего он не делал. */
+  it('does not blame the source when the portfolio simply had no value', async () => {
+    /* The rate is known, but yesterday's value is zero, so the
+       percent is undefined. "The source did not report a change"
+       would credit the service with something it did not do. */
     services.providerFactory.configure({ balance: 0n as Wei })
     services.priceProvider.configure({ quotes: nativeOnly() })
 
@@ -230,9 +228,9 @@ describe('Портфель: неизвестное не подменяется �
     expect(screen.queryByText(/the source reported none/i)).not.toBeInTheDocument()
   })
 
-  it('без единого курса показывает прочерк, а не нулевую стоимость', async () => {
-    /* «$0.00» здесь сообщил бы владельцу, что его активы ничего
-       не стоят, тогда как кошелёк не получил ни одного курса. */
+  it('with no rates at all shows a dash, not a zero total', async () => {
+    /* "$0.00" here would tell the owner their assets are
+       worthless, when the wallet received no rates. */
     services.priceProvider.configure({ quotes: new Map() })
 
     renderApp()
@@ -249,9 +247,9 @@ describe('Портфель: неизвестное не подменяется �
   })
 })
 
-describe('Портфель: отказ источника', () => {
-  it('не выдаёт отказ за нулевую стоимость', async () => {
-    services.priceProvider.configure({ failure: 'Слишком много запросов' })
+describe('Portfolio: source failure', () => {
+  it('does not present a failure as a zero total', async () => {
+    services.priceProvider.configure({ failure: 'Too many requests' })
 
     renderApp()
     await openPortfolio()
@@ -267,8 +265,8 @@ describe('Портфель: отказ источника', () => {
   })
 })
 
-describe('Портфель: статистика', () => {
-  it('оговаривает, что оценка не участвует в формировании транзакции', async () => {
+describe('Portfolio: stats', () => {
+  it('notes that the valuation is not used to build a transaction', async () => {
     renderApp()
     await openPortfolio()
     await enablePrices()
@@ -276,20 +274,20 @@ describe('Портфель: статистика', () => {
     expect(screen.getByText(/counted\s+in the minimal units of the network/i)).toBeInTheDocument()
   })
 
-  it('называет источник курсов', async () => {
-    /* Пользователь вправе знать, кому уходят его запросы. */
+  it('names the price source', async () => {
+    /* The user has a right to know who receives their requests. */
     renderApp()
     await openPortfolio()
     await enablePrices()
 
-    expect(screen.getByText(/Дублёр курсов/u)).toBeInTheDocument()
+    expect(screen.getByText(/Price double/u)).toBeInTheDocument()
   })
 })
 
-describe('Портфель: вход с главного экрана', () => {
-  it('ссылка ведёт на портфель', async () => {
-    /* Портфель не попал в нижнюю панель: пять пунктов — предел
-       для окна шириной 360 пикселей. */
+describe('Portfolio: entry from the home screen', () => {
+  it('the link goes to the portfolio', async () => {
+    /* Portfolio is not in the bottom bar: five items is the limit
+       for a 360-pixel window. */
     renderApp()
     await screen.findByText('Account 1')
 
@@ -299,7 +297,7 @@ describe('Портфель: вход с главного экрана', () => {
     )
   })
 
-  it('USDC не оказывается в оценке, если его курс неизвестен', async () => {
+  it('USDC is not in the valuation if its rate is unknown', async () => {
     services.priceProvider.configure({
       quotes: new Map([
         [priceRefKey({ chainId: ETHEREUM, address: null }), ETH_QUOTE],
@@ -311,8 +309,8 @@ describe('Портфель: вход с главного экрана', () => {
     await openPortfolio()
     await enablePrices()
 
-    /* USDC в кошелёк не добавлен: котировка есть, а позиции нет —
-       и в списке её быть не должно. */
+    /* USDC was not added to the wallet: there is a quote but no
+       position, and it must not appear in the list. */
     expect(screen.queryByText('USDC')).not.toBeInTheDocument()
   })
 })

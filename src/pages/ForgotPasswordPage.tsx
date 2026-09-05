@@ -19,29 +19,26 @@ import {
   Label,
 } from '@/shared/ui'
 
-/** Слово, которое пользователь обязан ввести для подтверждения. */
 const CONFIRMATION_WORD = 'ERASE'
 
 /**
- * Экран «Забыли пароль».
+ * The "Forgot password" screen.
  *
- * НАЗВАНИЕ ВВОДИТ В ЗАБЛУЖДЕНИЕ, и первое, что делает эта страница, —
- * это заблуждение снимает.
+ * THE TITLE MISLEADS, and the first thing this page does is undo that.
  *
- * В некастодиальном кошельке пароля для восстановления не существует.
- * Он никуда не отправляется и нигде не хранится: из него выводится ключ
- * шифрования, и без пароля зашифрованное хранилище не открыть никому,
- * включая разработчиков.
+ * A non-custodial wallet has no recovery password. It is never sent
+ * anywhere and never stored: the encryption key is derived from it, and
+ * without the password nobody can open the vault, developers included.
  *
- * Единственный доступный путь — стереть кошелёк с устройства и создать
- * его заново из seed-фразы. Пользователь без записанной фразы потеряет
- * средства безвозвратно, и страница обязана сказать это прямо, а не
- * спрятать в мелком шрифте под кнопкой.
+ * The only path is to erase the wallet from the device and recreate it
+ * from the seed phrase. A user without a written phrase loses the funds
+ * for good, and the page must say so plainly, not hide it in small type
+ * under the button.
  *
- * ПОЧЕМУ ДВА ПОДТВЕРЖДЕНИЯ. Флажок отсекает случайное нажатие,
- * ввод слова — механическое проставление галочек не читая. Операция
- * необратима и не требует пароля (в этом весь смысл экрана), поэтому
- * единственная защита от ошибки — заставить остановиться.
+ * WHY TWO CONFIRMATIONS. The checkbox stops an accidental click; typing
+ * the word stops ticking boxes without reading. The operation is
+ * irreversible and does not ask for a password (that is the point), so
+ * the only protection against a mistake is to force a pause.
  */
 export function ForgotPasswordPage() {
   const onboarding = useOnboarding()
@@ -98,10 +95,10 @@ export function ForgotPasswordPage() {
             </AlertDescription>
           </Alert>
 
-          {/* ЭКРАН ОТВЕЧАЕТ НА ДВА РАЗНЫХ ВОПРОСА, и оба надо назвать.
-              Прежде он говорил только о забытом пароле, и человек,
-              который пароль помнит, но хочет другой кошелёк, не понимал,
-              туда ли попал. */}
+          {/* THE SCREEN ANSWERS TWO DIFFERENT QUESTIONS, and both must
+              be named. It used to talk only about a forgotten password,
+              so someone who remembered the password but wanted another
+              wallet did not know they were in the right place. */}
           <div className="flex flex-col gap-3">
             <p className="text-sm font-medium">Why people come here</p>
             <ul className="flex flex-col gap-2 text-sm text-muted-foreground">

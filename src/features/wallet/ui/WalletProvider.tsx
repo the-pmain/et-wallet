@@ -11,17 +11,16 @@ interface WalletProviderProps {
 }
 
 /**
- * Провайдер сессии кошелька.
+ * Wallet session provider.
  *
- * СЕССИЯ ОТКРЫВАЕТСЯ И ЗАКРЫВАЕТСЯ ПО СОСТОЯНИЮ БЛОКИРОВКИ, а не по
- * монтированию экрана. Привязка к экрану означала бы, что уход со страницы
- * кошелька затирает корневой ключ и возвращает его при возврате — лишняя
- * работа с секретом и лишние обращения к хранилищу. Привязка к блокировке
- * совпадает с настоящим временем жизни секрета.
+ * The session opens and closes with lock state, not with screen
+ * mount. Binding it to the screen would wipe the root key on leaving
+ * the wallet page and restore it on return — extra secret work and
+ * extra storage hits. Binding it to lock matches the secret's real
+ * lifetime.
  *
- * Закрытие выполняется и при размонтировании: вкладка может быть закрыта
- * без блокировки, и оставшиеся таймеры опроса продолжали бы обращаться
- * к узлу.
+ * Close also runs on unmount: the tab can be closed without locking,
+ * and leftover poll timers would keep hitting the node.
  */
 export function WalletProvider({ children, session }: WalletProviderProps) {
   const onboardingState = useOnboardingState()
@@ -42,14 +41,15 @@ export function WalletProvider({ children, session }: WalletProviderProps) {
   }, [isUnlocked, session])
 
   /**
-   * Останавливает фоновый опрос, пока вкладка не на виду.
+   * Stops background polling while the tab is hidden.
    *
-   * ЭТО НЕ ТОЛЬКО ЭКОНОМИЯ. Опрос скрытой вкладки продолжает сообщать
-   * оператору узла, что кошелёк с этим адресом открыт, пока пользователь
-   * занят другим. Обновлять при этом нечего: экрана никто не видит.
+   * This is not only about saving quota. Polling a hidden tab keeps
+   * telling the node operator that a wallet with this address is open
+   * while the user is busy elsewhere. There is nothing to refresh: no
+   * one sees the screen.
    *
-   * Слежение живёт здесь, а не в сессии: `document` — часть DOM,
-   * а сессия обязана работать и там, где документа нет.
+   * The listener lives here, not in the session: `document` is DOM,
+   * and the session must run where there is no document.
    */
   useEffect(() => {
     const apply = () => {
@@ -62,8 +62,8 @@ export function WalletProvider({ children, session }: WalletProviderProps) {
     return () => {
       document.removeEventListener('visibilitychange', apply)
 
-      /* Опрос возвращается во включённое состояние: следующий владелец
-         этой сессии не обязан знать, что предыдущий экран его выключил. */
+      /* Polling is turned back on: the next owner of this session
+         should not have to know the previous screen turned it off. */
       session.setBackgroundRefreshEnabled(true)
     }
   }, [session])

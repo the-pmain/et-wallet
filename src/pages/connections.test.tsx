@@ -40,12 +40,12 @@ function renderApp() {
 }
 
 /**
- * Открывает экран подключений и дожидается готовности транспорта.
+ * Opens the connections screen and waits until the transport is ready.
  *
- * ОЖИДАНИЕ ОБЯЗАТЕЛЬНО. Подписка на события создаётся внутри `init`,
- * то есть асинхронно. Событие, посланное до этого момента, теряется —
- * и тест падает не потому, что экран сломан, а потому, что опередил
- * подписку.
+ * THE WAIT IS REQUIRED. The event subscription is created inside
+ * `init`, asynchronously. An event sent before that is lost — and
+ * the test fails not because the screen is broken, but because it
+ * raced the subscription.
  */
 async function openConnections(): Promise<void> {
   await screen.findByText('Account 1')
@@ -58,12 +58,12 @@ async function openConnections(): Promise<void> {
   })
 }
 
-/** Запрос на подпись сообщения. */
+/** A message-signature request. */
 function messageRequest(address: Address = OWNER): IDappRequest {
   return {
     id: 'req-1',
     sessionId: 'session-1',
-    dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
+    dapp: { name: 'Example', url: 'https://example.com', description: null, iconUrl: null },
     chainId: ETHEREUM,
     payload: {
       kind: DAPP_REQUEST_KIND.SignMessage,
@@ -73,12 +73,12 @@ function messageRequest(address: Address = OWNER): IDappRequest {
   }
 }
 
-/** Запрос на подпись разрешения с неограниченной суммой. */
+/** A request to sign an unlimited approval. */
 function unlimitedPermitRequest(): IDappRequest {
   return {
     id: 'req-2',
     sessionId: 'session-1',
-    dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
+    dapp: { name: 'Example', url: 'https://example.com', description: null, iconUrl: null },
     chainId: ETHEREUM,
     payload: {
       kind: DAPP_REQUEST_KIND.SignTypedData,
@@ -101,24 +101,24 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Подключения: экран', () => {
-  it('открывается и сообщает об отсутствии подключений', async () => {
+describe('Connections: screen', () => {
+  it('opens and reports that there are no connections', async () => {
     renderApp()
     await openConnections()
 
     expect(screen.getByText('No connections')).toBeInTheDocument()
   })
 
-  it('называет, что видит сервер WalletConnect', async () => {
-    /* Relay видит адреса и время каждого запроса — утечка уровня
-       индексатора, и умалчивать о ней нельзя. */
+  it('names what the WalletConnect server can see', async () => {
+    /* The relay sees addresses and the time of every request — an
+       indexer-level leak, and it cannot be left unspoken. */
     renderApp()
     await openConnections()
 
     expect(screen.getByText(/sees the addresses of your accounts/i)).toBeInTheDocument()
   })
 
-  it('предупреждает не вставлять ссылки из писем', async () => {
+  it('warns not to paste links from email', async () => {
     renderApp()
     await openConnections()
 
@@ -126,8 +126,8 @@ describe('Подключения: экран', () => {
   })
 })
 
-describe('Подключения: предложение', () => {
-  it('показывает предложение с перечнем прав', async () => {
+describe('Connections: proposal', () => {
+  it('shows a proposal with the list of permissions', async () => {
     renderApp()
     await openConnections()
 
@@ -137,7 +137,7 @@ describe('Подключения: предложение', () => {
     expect(screen.getByText(/the seed phrase or the private keys/i)).toBeInTheDocument()
   })
 
-  it('предупреждает, что имя приложения непроверяемо', async () => {
+  it('warns that the app name cannot be verified', async () => {
     renderApp()
     await openConnections()
 
@@ -146,7 +146,7 @@ describe('Подключения: предложение', () => {
     expect(await screen.findByText(/Anyone can claim to be a/i)).toBeInTheDocument()
   })
 
-  it('подключает по согласию', async () => {
+  it('connects after consent', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -161,7 +161,7 @@ describe('Подключения: предложение', () => {
     expect(services.dappTransport.lastApprovedAddresses()).toContain(OWNER)
   })
 
-  it('отказ отправляется приложению', async () => {
+  it('a refusal is sent to the app', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -176,9 +176,9 @@ describe('Подключения: предложение', () => {
   })
 })
 
-describe('Подключения: запрос подписи', () => {
-  it('показывает текст сообщения, а не хэш', async () => {
-    /* Хэш не говорит пользователю ничего, и он подтверждает вслепую. */
+describe('Connections: signature request', () => {
+  it('shows the message text, not a hash', async () => {
+    /* A hash tells the user nothing, and they would confirm blind. */
     renderApp()
     await openConnections()
 
@@ -187,7 +187,7 @@ describe('Подключения: запрос подписи', () => {
     expect(await screen.findByText('Sign in to the application')).toBeInTheDocument()
   })
 
-  it('предупреждает о разрешении на токены', async () => {
+  it('warns about a token approval', async () => {
     renderApp()
     await openConnections()
 
@@ -198,9 +198,9 @@ describe('Подключения: запрос подписи', () => {
     ).toBeInTheDocument()
   })
 
-  it('предупреждает о неограниченной сумме', async () => {
-    /* Именно так отдают доступ ко всем токенам, не увидев ни списания,
-       ни комиссии. */
+  it('warns about an unlimited amount', async () => {
+    /* That is how access to every token is given without seeing a
+       debit or a fee. */
     renderApp()
     await openConnections()
 
@@ -209,7 +209,7 @@ describe('Подключения: запрос подписи', () => {
     expect(await screen.findByText('The approved amount is unlimited')).toBeInTheDocument()
   })
 
-  it('оговаривает, что подпись не отзывается', async () => {
+  it('notes that a signature cannot be revoked', async () => {
     renderApp()
     await openConnections()
 
@@ -218,10 +218,10 @@ describe('Подключения: запрос подписи', () => {
     expect(await screen.findByText(/A signature cannot be revoked/i)).toBeInTheDocument()
   })
 
-  it('подписывает после подтверждения и пароля', async () => {
-    /* Пароль спрашивается по той же настройке, что и при отправке
-       из кошелька: удалённый запрос не может быть защищён слабее
-       собственного действия владельца. */
+  it('signs after confirmation and password', async () => {
+    /* The password is asked under the same setting as a send from
+       the wallet: a remote request must not be weaker than the
+       owner's own action. */
     const user = userEvent.setup()
 
     renderApp()
@@ -243,9 +243,9 @@ describe('Подключения: запрос подписи', () => {
     expect(response?.kind === 'approved' ? response.result : '').toMatch(/^0x[0-9a-f]+$/i)
   })
 
-  it('без пароля подпись не выполняется', async () => {
-    /* Приложение, дождавшееся разблокировки кошелька, не должно
-       получать подпись одним нажатием. */
+  it('without the password the signature is not made', async () => {
+    /* An app that waited for the wallet to unlock must not get a
+       signature with one tap. */
     const user = userEvent.setup()
 
     renderApp()
@@ -258,7 +258,7 @@ describe('Подключения: запрос подписи', () => {
     expect(services.dappTransport.responses).toHaveLength(0)
   })
 
-  it('неверный пароль подпись не выдаёт', async () => {
+  it('a wrong password does not produce a signature', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -274,7 +274,7 @@ describe('Подключения: запрос подписи', () => {
     expect(services.dappTransport.responses).toHaveLength(0)
   })
 
-  it('отклоняет по отказу и не подписывает', async () => {
+  it('rejects on refuse and does not sign', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -288,9 +288,9 @@ describe('Подключения: запрос подписи', () => {
     })
   })
 
-  it('запрос от чужого адреса отклоняется без вопроса', async () => {
-    /* Подписать чужим адресом всё равно нечем, а лишний экран приучает
-       нажимать «подтвердить», не читая. */
+  it('a request from a foreign address is rejected without a prompt', async () => {
+    /* There is nothing to sign with for a foreign address, and an
+       extra screen trains people to tap Confirm without reading. */
     renderApp()
     await openConnections()
 
@@ -304,8 +304,8 @@ describe('Подключения: запрос подписи', () => {
   })
 })
 
-describe('Подключения: отключение сессий', () => {
-  it('показывает действующее подключение и разрывает его', async () => {
+describe('Connections: disconnecting sessions', () => {
+  it('shows a live connection and disconnects it', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -330,13 +330,13 @@ describe('Подключения: отключение сессий', () => {
   })
 })
 
-describe('Подключения: развёртывание контракта', () => {
-  /** Запрос без получателя: так приложение просит развернуть контракт. */
+describe('Connections: contract deployment', () => {
+  /** A request with no recipient: that is how an app asks to deploy a contract. */
   function deploymentRequest(): IDappRequest {
     return {
       id: 'req-3',
       sessionId: 'session-1',
-      dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
+      dapp: { name: 'Example', url: 'https://example.com', description: null, iconUrl: null },
       chainId: ETHEREUM,
       payload: {
         kind: DAPP_REQUEST_KIND.SendTransaction,
@@ -351,7 +351,7 @@ describe('Подключения: развёртывание контракта'
     }
   }
 
-  it('предупреждает, что запрос создаёт контракт', async () => {
+  it('warns that the request creates a contract', async () => {
     renderApp()
     await openConnections()
 
@@ -360,11 +360,11 @@ describe('Подключения: развёртывание контракта'
     expect(await screen.findByText('A contract is being deployed')).toBeInTheDocument()
   })
 
-  it('подписывается развёртывание, а не перевод самому себе', async () => {
-    /* Прежде получатель подменялся адресом отправителя: пользователь
-       одобрял создание контракта, а подписывал перевод себе с байт-кодом
-       в данных вызова — газ списывался, одобренная операция
-       не выполнялась. */
+  it('a deployment is signed, not a transfer to self', async () => {
+    /* The recipient used to be replaced with the sender: the user
+       approved creating a contract and signed a transfer to self with
+       bytecode in the call data — gas was spent, the approved
+       operation never ran. */
     const user = userEvent.setup()
 
     renderApp()
@@ -379,9 +379,9 @@ describe('Подключения: развёртывание контракта'
       expect(services.dappTransport.responses).toHaveLength(1)
     })
 
-    /* Транзакция без получателя сериализуется с пустым полем `to`.
-       Разобрать её обратно можно из хранилища: запись отправки
-       сохраняет то, что ушло в сеть. */
+    /* A transaction with no recipient serializes with an empty `to`.
+       It can be decoded again from storage: the send record keeps
+       what went on-chain. */
     const saved = await new TransactionRepository(services.secureStorage).findByAddress(
       OWNER,
       ETHEREUM,

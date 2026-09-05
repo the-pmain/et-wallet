@@ -14,24 +14,25 @@ import { mapProviderError } from './error-mapping'
 const CHAIN_ID = toChainId(1n)
 
 /**
- * Проверки отображения ошибок узла в ошибки предметной области.
+ * Checks that node errors map to domain errors.
  *
- * ЗАЧЕМ ОТДЕЛЬНЫЙ НАБОР. От этого отображения зависит поведение, которое
- * само по себе выглядит не связанным с ошибками: `FailoverProvider`
- * перебирает резервные адреса ровно тогда, когда получает
- * `ProviderUnavailableError`. Ошибка классификации здесь беззвучно
- * отключает резерв целиком — что и случилось с ответом HTTP 500.
+ * WHY A SEPARATE SUITE. Failover behavior depends on this mapping in a
+ * way that does not look like an error concern: `FailoverProvider`
+ * rotates backups exactly when it receives `ProviderUnavailableError`.
+ * A misclassification here silently disables failover entirely — which
+ * is what happened with an HTTP 500 response.
  *
- * Ошибки строятся `makeError` из самой ethers, а не вручную: подделка
- * несла бы риск разойтись с библиотекой и подтверждать несуществующее.
+ * Errors are built with ethers' own `makeError`, not by hand: a fake
+ * would risk drifting from the library and asserting something that
+ * does not exist.
  */
 describe('mapProviderError', () => {
-  it('считает ответ HTTP без тела JSON-RPC отказом узла, а не его ответом', () => {
-    /* Ровно то, что приходило при отказе узла на выборке журналов:
-       ethers помечает такое кодом SERVER_ERROR, тела JSON-RPC нет. */
-    /* Хвостовой пробел — не описка: ethers склеивает код состояния
-       с пояснением, и при пустом пояснении он остаётся. Измерено на
-       живом узле, куда экран истории вывел `server response 500 `. */
+  it('treats an HTTP response with no JSON-RPC body as a node failure, not a node answer', () => {
+    /* Exactly what arrived when a node refused a log query: ethers
+       marks that as SERVER_ERROR and there is no JSON-RPC body. */
+    /* The trailing space is not a typo: ethers concatenates the status
+       with a reason, and an empty reason leaves it. Measured on a live
+       node; the history screen showed `server response 500 `. */
     const error = makeError('server response 500 ', 'SERVER_ERROR', {
       request: 'https://node.example',
     })
@@ -40,16 +41,17 @@ describe('mapProviderError', () => {
 
     expect(mapped).toBeInstanceOf(ProviderUnavailableError)
 
-    /* И сообщает о случившемся, а не об исчерпанном списке адресов:
-       эта ошибка доходит до экрана истории дословно. */
+    /* And it names what happened, not an exhausted address list:
+       this message reaches the history screen verbatim. */
     expect(mapped.message).toBe('server response 500')
   })
 
-  it('не подменяет ответ узла отказом, когда тело JSON-RPC есть', () => {
-    /* Узел вправе ответить ошибкой JSON-RPC и с кодом HTTP, отличным
-       от 200. Это его ответ, и код узла должен дойти без искажения:
-       иначе `-32005` («превышен лимит») превратился бы в «узел
-       недоступен», и резерв перебирал бы адреса вместо ожидания. */
+  it('does not replace a node answer with a failure when a JSON-RPC body is present', () => {
+    /* A node may answer with a JSON-RPC error and a non-200 HTTP
+       status. That is its answer, and the node code must pass through
+       unaltered: otherwise `-32005` ("rate limited") would become
+       "node unavailable", and failover would rotate addresses instead
+       of waiting. */
     const error = makeError('server response 429', 'SERVER_ERROR', {
       request: 'https://node.example',
       info: { error: { code: -32005, message: 'limit exceeded' } },
@@ -61,7 +63,7 @@ describe('mapProviderError', () => {
     expect((mapped as RpcError).rpcCode).toBe(-32005)
   })
 
-  it('оставляет прочие ошибки библиотеки ошибкой RPC с запасным кодом', () => {
+  it('keeps other library errors as an RPC error with the fallback code', () => {
     const error = makeError('something went wrong', 'UNKNOWN_ERROR', {})
 
     const mapped = mapProviderError(error, CHAIN_ID)
@@ -70,7 +72,7 @@ describe('mapProviderError', () => {
     expect((mapped as RpcError).rpcCode).toBe(-32603)
   })
 
-  it('считает отказ сети и истечение времени отказом узла', () => {
+  it('treats a network failure and a timeout as a node failure', () => {
     const network = makeError('offline', 'NETWORK_ERROR', { event: 'disconnect' })
     const timeout = makeError('too slow', 'TIMEOUT', {
       operation: 'eth_getLogs',
@@ -81,9 +83,10 @@ describe('mapProviderError', () => {
     expect(mapProviderError(timeout, CHAIN_ID)).toBeInstanceOf(ProviderUnavailableError)
   })
 
-  it('не превращает откат вызова в отказ узла', () => {
-    /* Обратная сторона правки: откат — это ответ по существу, и второй
-       узел ответит то же самое. Перебирать адреса на нём нельзя. */
+  it('does not turn a call revert into a node failure', () => {
+    /* The other side of the fix: a revert is an answer on the merits,
+       and a second node would say the same. Addresses must not rotate
+       on it. */
     const error = makeError('reverted', 'CALL_EXCEPTION', {
       action: 'call',
       data: null,
@@ -96,7 +99,7 @@ describe('mapProviderError', () => {
     expect(mapProviderError(error, CHAIN_ID)).toBeInstanceOf(GasEstimationFailedError)
   })
 
-  it('не превращает нехватку средств в отказ узла', () => {
+  it('does not turn insufficient funds into a node failure', () => {
     const error = makeError('no funds', 'INSUFFICIENT_FUNDS', { transaction: {} })
 
     expect(mapProviderError(error, CHAIN_ID)).toBeInstanceOf(InsufficientFundsError)

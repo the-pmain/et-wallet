@@ -1,11 +1,11 @@
 import { STORAGE_NAMESPACE, toStorageKey, type ISecureStorage, type ILogger } from '@/core'
 
 /**
- * Хранилище, каким его ожидает библиотека WalletConnect.
+ * Storage as the WalletConnect library expects it.
  *
- * Описано у нас, а не взято из пакета: тянуть зависимость ради пяти
- * сигнатур незачем, а зависимость в кошельке — это ещё один путь
- * к секретам.
+ * Declared here, not taken from the package: a dependency for five
+ * signatures is not worth it, and a dependency in a wallet is
+ * another path to secrets.
  */
 export interface IKeyValueStorage {
   getKeys(): Promise<string[]>
@@ -16,39 +16,40 @@ export interface IKeyValueStorage {
 }
 
 /**
- * Хранилище подключений поверх зашифрованного.
+ * Connection storage on top of the encrypted store.
  *
- * ЗАЧЕМ ОНО. Не затем, зачем предполагалось. Установленная версия
- * библиотеки заводит собственную базу IndexedDB и переносит в неё
- * прежние записи из `localStorage`; сессии, вопреки записи в списке
- * долга, перезагрузку переживают. Проверено чтением поставляемого
- * пакета, а не по памяти.
+ * WHY IT EXISTS. Not for the reason first assumed. The installed
+ * library version opens its own IndexedDB and migrates old
+ * `localStorage` rows into it; sessions survive reload, contrary
+ * to the debt list. Verified by reading the shipped package, not
+ * from memory.
  *
- * Настоящих же неисправностей три, и все три эта замена устраняет.
+ * There are three real faults, and this replacement fixes all three.
  *
- * ПЕРВАЯ: ЗАПИСИ ЛЕЖАТ ОТКРЫТЫМ ТЕКСТОМ. Они содержат симметричные
- * ключи, которыми шифруется обмен с приложением через relay.
- * Получивший их читает переписку кошелька с приложением и может выдать
- * себя за кошелёк. Здесь они читаются только при снятой блокировке.
+ * FIRST: RECORDS SIT IN PLAINTEXT. They hold the symmetric keys
+ * that encrypt exchange with the app through the relay. Whoever
+ * has them reads wallet–app traffic and can impersonate the wallet.
+ * Here they are read only while unlocked.
  *
- * ВТОРАЯ: ОНИ ПЕРЕЖИВАЮТ УДАЛЕНИЕ КОШЕЛЬКА. База принадлежит
- * библиотеке, наше удаление её не касается, и новый кошелёк на том же
- * устройстве наследовал бы чужие подключения. Здесь они исчезают
- * вместе с кошельком, потому что лежат в его хранилище.
+ * SECOND: THEY SURVIVE WALLET DELETION. The database belongs to
+ * the library, our wipe does not touch it, and a new wallet on
+ * the same device would inherit foreign connections. Here they
+ * vanish with the wallet because they live in its store.
  *
- * ТРЕТЬЯ: ОНИ ВНЕ НАШЕГО УЧЁТА. Смена пароля перешифровывает всё, что
- * принадлежит кошельку; чужая база остаётся как была.
+ * THIRD: THEY ARE OUTSIDE OUR BOOKS. A password change re-encrypts
+ * everything that belongs to the wallet; a foreign database stays
+ * as it was.
  *
- * ЦЕНА ЗАМЕНЫ НАЗВАНА ПРЯМО: подключения теперь доступны только при
- * снятой блокировке. Для раздела, который и работает лишь в открытом
- * кошельке, это ничего не меняет, но при автоблокировке во время
- * работы запись отказывает — см. долг.
+ * THE COST IS STATED PLAINLY: connections are now available only
+ * while unlocked. For a section that already works only in an open
+ * wallet that changes nothing, but an autolock mid-work makes
+ * writes fail — see the debt.
  *
- * ЗАБЛОКИРОВАННОЕ ХРАНИЛИЩЕ НЕ ЗАМАЛЧИВАЕТСЯ ПРИ ЗАПИСИ И ЗАМАЛЧИВАЕТСЯ
- * ПРИ ЧТЕНИИ. Отказ записи означает потерю сессии — о нём библиотека
- * обязана узнать. Отказ чтения при блокировке означает лишь «сейчас
- * недоступно», и пустой ответ здесь честнее исключения: библиотека
- * начнёт с чистого состояния, а не сломается.
+ * A LOCKED STORE IS NOT SILENCED ON WRITE AND IS SILENCED ON READ.
+ * A write failure means a lost session — the library must learn.
+ * A read failure while locked only means "unavailable now", and
+ * an empty reply is more honest than an exception: the library
+ * starts clean instead of breaking.
  */
 export class SecureSessionStorage implements IKeyValueStorage {
   readonly #storage: ISecureStorage
@@ -73,9 +74,9 @@ export class SecureSessionStorage implements IKeyValueStorage {
     for (const key of await this.getKeys()) {
       const value = await this.getItem<TValue>(key)
 
-      /* Ключ без значения пропускается, а не отдаётся с `undefined`:
-         библиотека ожидает пары, и пара с пустым значением ломает
-         её разбор состояния. */
+      /* A key without a value is skipped, not returned as `undefined`:
+         the library expects pairs, and a pair with an empty value
+         breaks its state parse. */
       if (value !== undefined) {
         entries.push([key, value])
       }
@@ -95,12 +96,12 @@ export class SecureSessionStorage implements IKeyValueStorage {
         toStorageKey(key),
       )
 
-      /* Отсутствие записи библиотека ожидает как `undefined`,
-         а хранилище отдаёт `null`. */
+      /* The library expects a missing record as `undefined`;
+         the store returns `null`. */
       return value ?? undefined
     } catch (error) {
-      /* Испорченная запись не должна лишать работоспособности весь
-         раздел: подключение будет установлено заново. */
+      /* A corrupted record must not take down the whole section:
+         the connection will be established again. */
       this.#logger.warn('A connection record could not be read', {
         reason: error instanceof Error ? error.message : String(error),
       })
@@ -110,9 +111,9 @@ export class SecureSessionStorage implements IKeyValueStorage {
   }
 
   async setItem<TValue = unknown>(key: string, value: TValue): Promise<void> {
-    /* Исключение наружу: молча потерянная запись означает подключение,
-       которое не переживёт перезагрузку, — ровно та неисправность,
-       ради которой это хранилище и написано. */
+    /* Exception outward: a silently lost record means a connection
+       that will not survive reload — the fault this store exists
+       to prevent. */
     await this.#storage.set(STORAGE_NAMESPACE.DappSessions, toStorageKey(key), value)
   }
 

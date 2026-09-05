@@ -23,7 +23,6 @@ import {
   Skeleton,
 } from '@/shared/ui'
 
-/** Что происходит с отзывом прямо сейчас. */
 interface IRevokeState {
   readonly record: IApprovalRecord
   readonly prepared: IPreparedTransfer | null
@@ -32,21 +31,22 @@ interface IRevokeState {
 }
 
 /**
- * Разрешения, выданные активным аккаунтом.
+ * Approvals granted by the active account.
  *
- * ЗАЧЕМ ЭТОТ ЭКРАН СУЩЕСТВУЕТ. Средства сегодня уводят не кражей ключа,
- * а забытым разрешением: человек однажды разрешил контракту распоряжаться
- * токенами без ограничения суммы, а через год этот контракт оказался
- * взломан либо изначально принадлежал мошеннику. Ключ при этом цел,
- * кошелёк «не взломан», а средств нет. Без такого экрана владелец
- * не может ни узнать о выданном, ни забрать его обратно.
+ * WHY THIS SCREEN EXISTS. Funds today leave through a forgotten
+ * approval, not a stolen key: someone once let a contract spend tokens
+ * without a cap, and a year later that contract was hacked or was
+ * fraudulent from the start. The key is intact, the wallet is "not
+ * hacked", and the funds are gone. Without this screen the owner
+ * cannot see what was granted or take it back.
  *
- * СПИСОК СТРОИТСЯ В ДВА ШАГА. Журнал даёт выдачи, контракт отвечает,
- * действует ли разрешение сейчас. Список по одним журналам пугал бы
- * владельца тем, чего давно нет, и обесценил бы настоящие находки.
+ * THE LIST IS BUILT IN TWO STEPS. Logs give grants; the contract says
+ * whether the approval is still live. A list from logs alone would
+ * scare the owner with grants that are long gone and devalue real
+ * findings.
  *
- * ПОИСК ЗАПУСКАЕТ ВЛАДЕЛЕЦ, ОТКРЫВАЯ РАЗДЕЛ: это десятки обращений
- * к узлу и подробный след активности у его оператора.
+ * THE OWNER STARTS THE SEARCH BY OPENING THE SECTION: it is dozens of
+ * node calls and a detailed activity trail at the operator.
  */
 export function ApprovalsPage() {
   const session = useWallet()
@@ -62,7 +62,7 @@ export function ApprovalsPage() {
   const [isConfirming, setConfirming] = useState(false)
   const [sentHash, setSentHash] = useState<TxHash | null>(null)
 
-  /* Для какой пары «аккаунт и сеть» поиск уже запускали. */
+  /* Which account+network pair already started a search. */
   const requestedFor = useRef<string | null>(null)
   const scope = `${network?.chainId.toString() ?? ''}:${account?.id ?? ''}`
 
@@ -118,8 +118,8 @@ export function ApprovalsPage() {
         setRevoke(null)
         setSentHash(hash)
 
-        /* Список перезапрашивается: пока транзакция не в блоке,
-           разрешение ещё действует, и показывать его снятым нельзя. */
+        /* The list is fetched again: until the tx is in a block the
+           approval is still live, and it must not be shown as revoked. */
         void session.loadApprovals()
       },
       (error: unknown) => {
@@ -171,7 +171,7 @@ export function ApprovalsPage() {
               <ArrowLeft className="size-4" aria-hidden />
             </Link>
           </Button>
-          <h1 className="text-lg font-semibold">Approvals</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Approvals</h1>
         </div>
 
         <Button
@@ -271,18 +271,20 @@ export function ApprovalsPage() {
       </Card>
 
       {/*
-        ВЕС ПРЕДУПРЕЖДЕНИЯ ЗАВИСИТ ОТ ТОГО, ЕСТЬ ЛИ О ЧЁМ ПРЕДУПРЕЖДАТЬ.
+        THE WEIGHT OF THE WARNING DEPENDS ON WHETHER THERE IS SOMETHING
+        TO WARN ABOUT.
 
-        Текст один и тот же, но положение разное. Когда одобрения есть,
-        опасность существует прямо сейчас, и предупреждение обязано
-        выглядеть предупреждением. Когда список пуст, взять нечего —
-        и тот же оранжевый блок сообщал бы о риске там, где риска нет.
-        Ложные тревоги приучают не читать настоящие, а одобрения —
-        самый частый способ потерять средства при целом ключе, и здесь
-        такая привычка обходится дороже всего.
+        The text is the same; the placement is not. When approvals
+        exist, the danger is live now, and the warning must look like
+        a warning. When the list is empty there is nothing to take —
+        and the same orange block would report risk where there is
+        none. False alarms train people not to read real ones, and
+        approvals are the most common way to lose funds with an
+        intact key, so that habit costs the most here.
 
-        Именно поэтому текст НЕ убран из пустого состояния: узнать, чем
-        грозит одобрение, полезнее до того, как оно выдано.
+        That is why the text is NOT removed from the empty state:
+        learning what an approval can do is more useful before one
+        is granted.
       */}
       {items !== null && items.length > 0 ? (
         <Alert variant="warning">
@@ -300,24 +302,25 @@ export function ApprovalsPage() {
 }
 
 /**
- * Чем грозит одобрение.
+ * What an approval can do.
  *
- * Вынесен в постоянную, потому что показывается в двух видах —
- * предупреждением и пояснением, — а расхождение двух копий одного
- * текста заметили бы не раньше, чем кто-нибудь прочёл бы обе.
+ * Kept in one constant because it is shown in two forms — a warning
+ * and a footnote — and a drift between two copies would be noticed
+ * only after someone read both.
  */
 const APPROVAL_RISK_TEXT =
   'An approval lets a contract take your tokens without a new signature. It does not expire on its own: until you revoke it, it keeps working long after the application is no longer needed. Revoking is an ordinary transaction and costs a fee.'
 
 /**
- * Строка списка разрешений.
+ * A row in the approvals list.
  *
- * НЕОГРАНИЧЕННОЕ РАЗРЕШЕНИЕ ВЫДЕЛЕНО КАК ОПАСНОСТЬ, а не помечено
- * нейтрально: разница между «разрешено 50 USDC» и «разрешено всё»
- * и есть разница между потерей пятидесяти долларов и потерей баланса.
+ * AN UNLIMITED APPROVAL IS MARKED AS DANGER, not labeled neutrally:
+ * the difference between "50 USDC allowed" and "everything allowed"
+ * is the difference between losing fifty dollars and losing the
+ * balance.
  *
- * АДРЕС ПОЛУЧАТЕЛЯ РАЗРЕШЕНИЯ ПОКАЗЫВАЕТСЯ ВСЕГДА. Имя контракта
- * кошельку неизвестно, и назвать его «биржей» было бы выдумкой.
+ * THE SPENDER ADDRESS IS ALWAYS SHOWN. The wallet does not know the
+ * contract's name, and calling it "an exchange" would be invention.
  */
 function ApprovalRow({
   record,
@@ -377,7 +380,6 @@ function ApprovalRow({
   )
 }
 
-/** Подтверждение отзыва. */
 function RevokeScreen({
   state,
   isConfirming,
@@ -399,7 +401,7 @@ function RevokeScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold">Revoke the approval</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Revoke the approval</h1>
 
       <Card>
         <CardContent className="flex flex-col gap-3">

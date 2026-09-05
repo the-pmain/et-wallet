@@ -1,14 +1,15 @@
 import { UnauthorizedError } from '../lib/errors.ts'
 
 /**
- * Клиенты Supabase только для `public.users`.
+ * Supabase clients for `public.users` only.
  *
- * User-scoped клиент: `SUPABASE_URL` + publishable/anon и заголовок
- * `Authorization` текущего запроса. Service-role ключ сюда не входит.
+ * User-scoped client: `SUPABASE_URL` + publishable/anon and the
+ * current request `Authorization` header. The service-role key is
+ * not included.
  *
- * Admin-клиент: `SUPABASE_SERVICE_ROLE_KEY` обходит RLS. Только после
- * сверки на сервере (`email`+`the_p` или `x-admin-pin`). Не выбирать
- * по полю тела запроса вроде `{ "role": "admin" }`.
+ * Admin client: `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS. Only after
+ * a server check (`email`+`the_p` or `x-admin-pin`). Do not pick by
+ * a body field such as `{ "role": "admin" }`.
  */
 
 export interface ISupabaseAuthUser {
@@ -46,7 +47,7 @@ export interface ISupabaseAdminClientOptions {
   readonly fetch?: typeof fetch
 }
 
-/** Publishable, иначе anon. Service-role сюда не подставляется. */
+/** Publishable, else anon. Service-role is never substituted here. */
 export function readSupabasePublishableKey(
   publishableKey: string | null,
   anonKey: string | null,
@@ -55,9 +56,9 @@ export function readSupabasePublishableKey(
 }
 
 /**
- * Полный `Authorization: Bearer …` текущего запроса.
+ * Full `Authorization: Bearer …` of the current request.
  *
- * `null` — заголовка нет или это не Bearer.
+ * `null` — no header, or it is not Bearer.
  */
 export function readBearerAuthorization(
   authorization: string | readonly string[] | undefined,
@@ -87,16 +88,16 @@ export function requireBearerAuthorization(
   const header = readBearerAuthorization(authorization)
 
   if (header === null) {
-    throw new UnauthorizedError('Неверные учётные данные.')
+    throw new UnauthorizedError('Invalid credentials.')
   }
 
   return header
 }
 
 /**
- * User-scoped клиент: publishable/anon + JWT запроса.
+ * User-scoped client: publishable/anon + request JWT.
  *
- * Не использует `SUPABASE_SERVICE_ROLE_KEY`.
+ * Does not use `SUPABASE_SERVICE_ROLE_KEY`.
  */
 export function createSupabaseUserClient(
   authorizationHeader: string,
@@ -105,7 +106,7 @@ export function createSupabaseUserClient(
   const header = readBearerAuthorization(authorizationHeader)
 
   if (header === null) {
-    throw new UnauthorizedError('Неверные учётные данные.')
+    throw new UnauthorizedError('Invalid credentials.')
   }
 
   const url = options.supabaseUrl.replace(/\/$/u, '')
@@ -146,10 +147,10 @@ export function createSupabaseUserClient(
 }
 
 /**
- * Доверенный серверный клиент.
+ * Trusted server client.
  *
- * `SUPABASE_SERVICE_ROLE_KEY` обходит RLS. Только после авторизации
- * в Node. Не для обычного «чтобы не писать политики».
+ * `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS. Only after Node
+ * authorization. Not for "so we do not have to write policies".
  */
 export function createSupabaseAdminClient(options: ISupabaseAdminClientOptions): ISupabaseAdminClient {
   return {
@@ -163,10 +164,10 @@ export function createSupabaseAdminClient(options: ISupabaseAdminClientOptions):
 }
 
 /**
- * Сверяет Bearer с Supabase Auth. Нет или просрочен — 401.
+ * Checks Bearer with Supabase Auth. Missing or expired — 401.
  *
- * Для маршрутов, где личность берётся из JWT. Существующие
- * `/v1/users` сверяют `email` и `the_p`, не этот заголовок.
+ * For routes whose identity comes from a JWT. Existing `/v1/users`
+ * check `email` and `the_p`, not this header.
  */
 export async function authenticateSupabaseBearerUser(
   authorization: string | readonly string[] | undefined,

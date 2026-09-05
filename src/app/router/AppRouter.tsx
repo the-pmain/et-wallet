@@ -2,9 +2,9 @@ import { Suspense } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 
 import { ONBOARDING_STATE, useDirectorySession, useOnboardingState } from '@/features/onboarding'
-/* Экраны входа импортируются модулями, а не через `@/pages`: сборный
-   файл статически тянет за собой все страницы сразу и обесценил бы
-   отложенную загрузку остальных. */
+/* Auth screens are imported as modules, not through `@/pages`: the
+   barrel statically pulls every page and would defeat lazy loading
+   of the rest. */
 import { AdminPage } from '@/pages/AdminPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
@@ -40,12 +40,11 @@ import {
 import { ROUTE } from './routes'
 
 /**
- * Экран, соответствующий состоянию кошелька.
+ * Screen that matches wallet state.
  *
- * Маршрутизация по состоянию, а не по свободному выбору пользователя:
- * заблокированный кошелёк не должен показывать экран создания, иначе
- * пользователь создаст второй кошелёк поверх первого и решит, что
- * средства пропали.
+ * Routing by state, not by free user choice: a locked wallet must not
+ * show the create screen, or the user will create a second wallet on
+ * top of the first and conclude the funds are gone.
  */
 function StateGate() {
   const state = useOnboardingState()
@@ -79,15 +78,15 @@ function StateGate() {
 }
 
 /**
- * Пропуск к экранам кошелька.
+ * Gate to wallet screens.
  *
- * Прямой переход по адресу `/wallet/settings` при заблокированном кошельке
- * обязан приводить к экрану пароля, а не к пустой оболочке: иначе
- * пользователь увидит части интерфейса, доступ к которым не подтверждал.
+ * A direct visit to `/wallet/settings` while locked must land on the
+ * password screen, not an empty shell: otherwise the user would see
+ * parts of the interface they have not confirmed access to.
  *
- * ПРОВЕРКА СОСТОЯНИЯ ВЫПОЛНЯЕТСЯ ДО ЗАГРУЗКИ ЧАНКА. Она живёт в обычном,
- * не отложенном модуле: страж, который сам грузится по сети, оставлял бы
- * промежуток, когда решение о доступе ещё не принято.
+ * THE STATE CHECK RUNS BEFORE THE CHUNK LOADS. It lives in an ordinary,
+ * non-lazy module: a guard that itself loads over the network would
+ * leave a gap while the access decision is still pending.
  */
 function UnlockedOnly() {
   const state = useOnboardingState()
@@ -112,7 +111,7 @@ function UnlockedOnly() {
   return <AppShell />
 }
 
-/** Заглушка на время чтения хранилища и загрузки чанка экрана. */
+/** Placeholder while storage is read and a screen chunk loads. */
 function LoadingScreen() {
   return (
     <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
@@ -122,11 +121,11 @@ function LoadingScreen() {
 }
 
 /**
- * Заглушка внутри оболочки кошелька.
+ * Placeholder inside the wallet shell.
  *
- * Отличается от полноэкранной: шапка и панель навигации уже отрисованы
- * и остаются на месте. Подмена их полноэкранной заставкой при каждом
- * переходе читалась бы как перезагрузка приложения.
+ * Distinct from the full-screen one: header and nav are already drawn
+ * and stay put. Replacing them with a full-screen splash on every
+ * navigation would read as an app reload.
  */
 function SectionFallback() {
   return (
@@ -139,26 +138,26 @@ function SectionFallback() {
 }
 
 /**
- * Маршрутизация приложения.
+ * App routing.
  *
- * ИСПОЛЬЗУЕТСЯ `BrowserRouter`. Страницы живут по обычным путям
- * (`/wallet`, `/admin`), а не в хэше. Неизвестный путь без `/v1`
- * отдаёт `index.html` — иначе обновление `/wallet/settings`
- * упиралось бы в 404.
+ * USES `BrowserRouter`. Pages live at ordinary paths (`/wallet`,
+ * `/admin`), not in the hash. An unknown path without `/v1` serves
+ * `index.html` — otherwise a refresh of `/wallet/settings` would
+ * hit a 404.
  *
- * ЭКРАНЫ КОШЕЛЬКА ВЛОЖЕНЫ В ОБЩИЙ МАРШРУТ-ЛЕЙАУТ. Шапка и панель навигации
- * остаются смонтированными при переходах: пересоздание их на каждом экране
- * дало бы мерцание и потерю положения прокрутки.
+ * WALLET SCREENS ARE NESTED IN A SHARED ROUTE LAYOUT. Header and nav
+ * stay mounted across navigations: recreating them on every screen
+ * would flicker and lose scroll position.
  *
- * ЭКРАНЫ ЗАГРУЖАЮТСЯ ПО ТРЕБОВАНИЮ, кроме приветствия, разблокировки
- * и восстановления доступа — см. `lazy-pages.ts`.
+ * SCREENS LOAD ON DEMAND, except welcome, unlock, and password
+ * recovery — see `lazy-pages.ts`.
  */
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Экраны входа делят живой фон через общий маршрут-лейаут:
-            иначе он перезапускал бы анимацию при каждом переходе. */}
+        {/* Auth screens share the live background through a route layout:
+            otherwise it would restart the animation on every navigation. */}
         <Route element={<AuthLayout />}>
           <Route path={ROUTE.Welcome} element={<StateGate />} />
           <Route
@@ -169,9 +168,9 @@ export function AppRouter() {
               </Suspense>
             }
           />
-          {/* ВРЕМЕННОЕ ПОСЛАБЛЕНИЕ. Маршрут закрыт вместе с кнопкой:
-              скрытая кнопка при открытом адресе означала бы, что путь
-              всё ещё доступен любому, кто наберёт его руками. */}
+          {/* TEMPORARY RELAXATION. The route is closed with the button:
+              a hidden button with an open address would mean the path
+              is still available to anyone who types it. */}
           {TEST_MODE.hideSeedImport ? null : (
             <Route
               path={ROUTE.Import}
@@ -217,8 +216,8 @@ export function AppRouter() {
           </Route>
         </Route>
 
-        {/* Этюды темы главного экрана. Без оболочки и без стража:
-            сравнение вида не должно требовать пароля. */}
+        {/* Home-screen theme studies. No shell and no guard:
+            comparing looks must not require a password. */}
         <Route
           path={ROUTE.Variant1}
           element={
@@ -245,9 +244,8 @@ export function AppRouter() {
         />
 
         <Route path={ROUTE.Dashboard} element={<UnlockedOnly />}>
-          {/* Одна граница ожидания на все разделы: она лежит внутри
-              оболочки, поэтому шапка и навигация при переходе остаются
-              на месте. */}
+          {/* One suspense boundary for every section: it sits inside
+              the shell, so header and nav stay put on navigation. */}
           <Route
             element={
               <Suspense fallback={<SectionFallback />}>

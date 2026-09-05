@@ -3,25 +3,21 @@ import { Link } from 'react-router'
 
 import { useDisplayedAssets } from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
-import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState } from '@/shared/ui'
+import { cn } from '@/shared/lib/utils'
+import { Button, CABINET_SHEET, Card, CardContent, CardHeader, CardTitle, EmptyState } from '@/shared/ui'
 
 import { useWalletSnapshot } from '../model/wallet-context'
 import { TokenList } from './TokenList'
 
 /**
- * Витрина активов на главном экране.
+ * Asset showcase on the home screen.
  *
- * ТЕ ЖЕ ДАННЫЕ, ЧТО НА ЭКРАНЕ АКТИВОВ. Карточка не ходит за отдельным
- * списком: после входа витрина лежит в записи пользователя, без записи —
- * в снимке сессии. Два разных источника на соседних экранах показали бы
- * разные деньги.
+ * Same data as the assets screen. After login the showcase lives in the
+ * user record; without a record it uses the session snapshot. Two
+ * sources on neighboring screens would show different money.
  *
- * УДАЛЕНИЯ ЗДЕСЬ НЕТ. Это обзор, а не управление списком: править
- * отслеживаемые контракты можно на экране активов.
- *
- * СТОИТ ТАМ ЖЕ, ГДЕ ТАБЛИЦА КУРСОВ: отдельной карточкой под балансом.
- * Курсы — публичный каталог без адресов владельца; эта карточка —
- * его токены.
+ * No deletion here — this is an overview. Tracked contracts are edited
+ * on the assets screen.
  */
 export function AssetsCard() {
   const snapshot = useWalletSnapshot()
@@ -33,9 +29,9 @@ export function AssetsCard() {
   const { t } = useTranslation()
 
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">
+    <Card className={cn('min-w-0 overflow-hidden', CABINET_SHEET)}>
+      <CardHeader className="max-lg:border-b max-lg:border-border max-lg:px-1 max-lg:pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground max-lg:text-sm max-lg:font-semibold max-lg:text-foreground">
           {t('dashboard.assets')}
         </CardTitle>
       </CardHeader>
@@ -60,7 +56,7 @@ export function AssetsCard() {
         )}
 
         <div className="px-4 pb-4 sm:px-6">
-          <Button asChild variant="ghost" size="sm" className="w-full">
+          <Button asChild variant="ghost" size="sm" className="w-full max-lg:font-semibold max-lg:text-primary-emphasis">
             <Link to="/wallet/assets">
               {t('dashboard.allAssets')}
               <ArrowRight className="size-4" aria-hidden />

@@ -22,7 +22,7 @@ import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-/** 1.5 нативной валюты в минимальных единицах. */
+/** 1.5 of the native currency in its smallest units. */
 const BALANCE = 1_500_000_000_000_000_000n as Wei
 
 let services: ITestAppServices
@@ -36,10 +36,11 @@ function renderApp() {
 }
 
 /**
- * Дожидается появления панели.
+ * Waits until the dashboard chrome appears.
  *
- * Признак — имя активного аккаунта в шапке оболочки: оно появляется
- * только после того, как сессия открыта и аккаунт выведен из seed-фразы.
+ * The signal is the active account name in the shell header: it shows
+ * only after the session is open and the account is derived from the
+ * seed phrase.
  */
 async function findDashboard(): Promise<HTMLElement> {
   return await screen.findByText('Account 1')
@@ -53,8 +54,8 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Панель: баланс', () => {
-  it('показывает баланс нативной валюты активной сети', async () => {
+describe('Dashboard: balance', () => {
+  it('shows the native-currency balance of the active network', async () => {
     renderApp()
     await findDashboard()
 
@@ -63,20 +64,20 @@ describe('Панель: баланс', () => {
     expect(screen.queryByRole('button', { name: 'Mirror' })).not.toBeInTheDocument()
   })
 
-  it('называет, что показан баланс нативной валюты, и ведёт в портфель', async () => {
+  it('names that the native-currency balance is shown and links to portfolio', async () => {
     renderApp()
     await findDashboard()
 
-    /* Прежняя оговорка «балансы ERC-20 не отслеживаются» устарела:
-       токены отслеживаются. Предупреждение о несуществующем
-       ограничении приучает не читать остальные. */
+    /* The old caveat "ERC-20 balances are not tracked" is obsolete:
+       tokens are tracked. A warning about a limit that does not exist
+       trains people not to read the others. */
     expect(
       await screen.findByText(/The native currency of the network is sent here/i),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /portfolio/i })).toBeInTheDocument()
   })
 
-  it('не подменяет недоступный баланс нулём', async () => {
+  it('does not replace an unavailable balance with zero', async () => {
     services.providerFactory.configure({ unavailable: true })
 
     renderApp()
@@ -87,8 +88,8 @@ describe('Панель: баланс', () => {
   })
 })
 
-describe('Панель: шапка', () => {
-  it('показывает адрес активного аккаунта усечённым', async () => {
+describe('Dashboard: header', () => {
+  it('shows the active account address shortened', async () => {
     renderApp()
     await findDashboard()
 
@@ -98,16 +99,17 @@ describe('Панель: шапка', () => {
     expect(screen.getByText(shortened)).toBeInTheDocument()
   })
 
-  it('показывает отпечаток адреса', async () => {
+  it('shows the address fingerprint', async () => {
     renderApp()
     await findDashboard()
 
-    /* Отпечаток зависит от всех символов адреса: подменённый адрес меняет
-       картинку целиком, и это заметно без вчитывания. */
+    /* The fingerprint depends on every character of the address: a
+       swapped address changes the picture entirely, which is visible
+       without reading the hex. */
     expect(screen.getByRole('img', { name: 'Address fingerprint' })).toBeInTheDocument()
   })
 
-  it('называет активную сеть у суммы', async () => {
+  it('names the active network next to the amount', async () => {
     renderApp()
     await findDashboard()
 
@@ -115,8 +117,8 @@ describe('Панель: шапка', () => {
   })
 })
 
-describe('Панель: операции', () => {
-  it('объясняет пустую историю вместо молчаливого пропуска', async () => {
+describe('Dashboard: activity', () => {
+  it('explains an empty history instead of skipping it silently', async () => {
     renderApp()
     await findDashboard()
 
@@ -124,14 +126,14 @@ describe('Панель: операции', () => {
     expect(screen.getByText(/the limits of the\s+source/i)).toBeInTheDocument()
   })
 
-  it('ведёт на весь список операций', async () => {
+  it('links to the full activity list', async () => {
     renderApp()
     await findDashboard()
 
     expect(screen.getByRole('link', { name: /all activity/i })).toBeInTheDocument()
   })
 
-  it('ставит витрину активов и таблицу курсов перед недавними операциями', async () => {
+  it('places the assets showcase and the rates table before recent activity', async () => {
     renderApp()
     await findDashboard()
 
@@ -144,7 +146,7 @@ describe('Панель: операции', () => {
     expect(screen.getByRole('heading', { name: 'Cryptocurrency Prices' })).toBeInTheDocument()
   })
 
-  it('по нажатию актива на главной показывает сведения', async () => {
+  it('shows asset details after a tap on the home screen', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -158,25 +160,25 @@ describe('Панель: операции', () => {
   })
 })
 
-describe('Панель: быстрые действия', () => {
-  it('ведёт на экран отправки', async () => {
+describe('Dashboard: quick actions', () => {
+  it('links to the send screen', async () => {
     renderApp()
     await findDashboard()
 
     expect(screen.getByRole('link', { name: /send/i })).toHaveAttribute('href', '/wallet/send')
   })
 
-  it('называет, что отправляется нативная валюта, а не токены', async () => {
+  it('names that native currency is sent, not tokens', async () => {
     renderApp()
     await findDashboard()
 
-    /* При переводе ERC-20 получатель лежит в данных вызова, а не в поле
-       получателя транзакции: сводить обе операции к одной форме значило бы
-       показать пользователю не то, что он подписывает. */
+    /* On an ERC-20 transfer the recipient lives in the call data, not
+       in the transaction `to` field: collapsing both into one form
+       would show the user something other than what they sign. */
     expect(screen.getByText(/The native currency of the network is sent here/i)).toBeInTheDocument()
   })
 
-  it('показывает полный адрес для получения, а не усечённый', async () => {
+  it('shows the full receive address, not a shortened one', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -184,13 +186,13 @@ describe('Панель: быстрые действия', () => {
 
     await user.click(screen.getByRole('button', { name: /Receive/i }))
 
-    /* Усечённый адрес невозможно сверить посимвольно, а именно сверка
-       защищает от подмены буфера обмена. */
+    /* A shortened address cannot be checked character by character,
+       and that check is what protects against clipboard swap. */
     expect(screen.getByText(TEST_MNEMONIC_ADDRESSES[0] as string)).toBeInTheDocument()
     expect(screen.getByText(/Check the address\s+character by character/i)).toBeInTheDocument()
   })
 
-  it('блокирует кошелёк и возвращает экран ввода пароля', async () => {
+  it('locks the wallet and returns to the password screen', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -203,23 +205,23 @@ describe('Панель: быстрые действия', () => {
 })
 
 /**
- * Переход между экранами должен быть заметен не только глазами.
+ * Moving between screens must be noticeable to more than the eyes.
  *
- * Без перевода фокуса нажатие пункта панели подменяло содержимое,
- * фокус оставался на ссылке, и тому, кто страницу слушает, ничего
- * не объявлялось: переход существовал только для зрячих.
+ * Without a focus move, tapping a nav item swapped the content while
+ * focus stayed on the link, and a listener heard nothing: the
+ * transition existed only for sighted users.
  */
-describe('Панель: переход между экранами', () => {
-  it('не отнимает фокус при открытии приложения', async () => {
+describe('Dashboard: moving between screens', () => {
+  it('does not steal focus when the app opens', async () => {
     renderApp()
     await findDashboard()
 
-    /* Человек ещё никуда не переходил. Перехваченный фокус сбил бы
-       того, кто уже начал обход клавишей. */
+    /* The person has not navigated yet. Hijacking focus would throw
+       off someone already tabbing through the page. */
     expect(document.activeElement).not.toBe(document.querySelector('main'))
   })
 
-  it('переводит фокус в содержимое после перехода', async () => {
+  it('moves focus into the content after navigation', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -228,14 +230,14 @@ describe('Панель: переход между экранами', () => {
     await user.click(screen.getByRole('link', { name: 'Assets' }))
     await screen.findByRole('heading', { level: 1, name: 'Assets' })
 
-    /* Фокус на области содержимого, а не на заголовке: заголовок есть
-       не у всех экранов, а область есть всегда, и программа чтения
-       начинает читать её сверху. */
+    /* Focus the content region, not the heading: not every screen has
+       a heading, the region always exists, and a screen reader starts
+       reading it from the top. */
     expect(document.activeElement).toBe(document.querySelector('main'))
   })
 })
 
-describe('Панель: кабинет справочника', () => {
+describe('Dashboard: directory cabinet', () => {
   const originalFetch = globalThis.fetch
 
   afterEach(() => {
@@ -243,10 +245,10 @@ describe('Панель: кабинет справочника', () => {
     localStorage.clear()
   })
 
-  it('после создания и после входа показывает фиат, а не эфир', async () => {
-    /* Тонкий fetch: без каталога рынка. Общая заглушка гидратирует
-       монеты, и на панели появляется ETH — как раз то, чего здесь
-       быть не должно. */
+  it('shows fiat, not ether, after both creation and sign-in', async () => {
+    /* Thin fetch: no market catalog. The shared stub hydrates coins,
+       and ETH appears on the dashboard — exactly what must not happen
+       here. */
     globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input instanceof Request ? input.url : input)
       const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
@@ -287,7 +289,7 @@ describe('Панель: кабинет справочника', () => {
     expect((await screen.findAllByText('Account 1')).length).toBeGreaterThan(0)
   })
 
-  it('переводит фиатный баланс в евро по курсу источника', async () => {
+  it('converts the fiat balance to euros at the source rate', async () => {
     const user = userEvent.setup()
 
     globalThis.fetch = mockDirectoryAndPriceFetch({
@@ -323,7 +325,7 @@ describe('Панель: кабинет справочника', () => {
     expect(await screen.findByText(eurAmount)).toBeInTheDocument()
   })
 
-  it('на главном экране показывает токены из users.assets', async () => {
+  it('shows tokens from users.assets on the home screen', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'james@example.com',
@@ -384,7 +386,7 @@ describe('Панель: кабинет справочника', () => {
     ).toBe(true)
   })
 
-  it('на главной после входа показывает sendings из GET /v1/users/:id/sendings', async () => {
+  it('shows sendings from GET /v1/users/:id/sendings on the home screen after sign-in', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     globalThis.fetch = mockDirectoryAndPriceFetch(

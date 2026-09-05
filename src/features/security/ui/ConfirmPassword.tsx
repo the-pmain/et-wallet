@@ -4,34 +4,32 @@ import { useId, useState, type FormEvent } from 'react'
 import { Alert, AlertDescription, Button, Input, Label } from '@/shared/ui'
 
 interface ConfirmPasswordProps {
-  /** Что именно подтверждается. Показывается пользователю. */
+  /** What is being confirmed. Shown to the user. */
   readonly action: string
 
-  /** Проверка пароля. Возвращает `true`, если пароль верен. */
   readonly onVerify: (password: string) => Promise<boolean>
 
-  /** Вызывается после успешной проверки. */
   readonly onConfirmed: () => void
 
   readonly onCancel: () => void
 }
 
 /**
- * Повторный ввод пароля перед рискованным действием.
+ * Re-enter the password before a risky action.
  *
- * ОТ ЧЕГО ЭТО ЗАЩИЩАЕТ. От того, кто получил доступ к уже
- * разблокированному кошельку: к оставленному без присмотра устройству,
- * к чужой сессии в общем компьютере, к расширению, дождавшемуся
- * разблокировки. Пароль здесь — не второй фактор, а подтверждение
- * присутствия владельца в момент действия.
+ * WHAT THIS PROTECTS AGAINST. Someone who already has an unlocked
+ * wallet: an unattended device, a shared-computer session, an
+ * extension that waited for unlock. The password is not a second
+ * factor — it confirms the owner is present at the moment of the
+ * action.
  *
- * ПАРОЛЬ НЕ СОХРАНЯЕТСЯ И НЕ ПЕРЕДАЁТСЯ ДАЛЬШЕ. Он уходит в проверку
- * и удаляется из состояния сразу же. Затереть строку в JavaScript
- * невозможно — она живёт до сборки мусора, — но лишняя ссылка
- * из дерева React убирается.
+ * THE PASSWORD IS NOT SAVED AND NOT PASSED ON. It goes into the
+ * check and is removed from state immediately. A JavaScript string
+ * cannot be wiped — it lives until garbage collection — but the
+ * extra React-tree reference is dropped.
  *
- * СООБЩЕНИЕ ОБ ОШИБКЕ НЕ РАЗЛИЧАЕТ ПРИЧИН. «Неверный пароль»
- * и «хранилище повреждено» — сведения для подбирающего.
+ * THE ERROR MESSAGE DOES NOT DISTINGUISH CAUSES. "Wrong password"
+ * and "storage is damaged" are information for someone guessing.
  */
 export function ConfirmPassword({ action, onVerify, onConfirmed, onCancel }: ConfirmPasswordProps) {
   const passwordId = useId()
@@ -48,8 +46,8 @@ export function ConfirmPassword({ action, onVerify, onConfirmed, onCancel }: Con
     try {
       const isValid = await onVerify(password)
 
-      /* Пароль удаляется независимо от исхода: при отказе он тем более
-         не должен оставаться в дереве компонентов. */
+      /* The password is cleared regardless of outcome: on a refusal
+         it especially must not stay in the component tree. */
       setPassword('')
 
       if (isValid) {

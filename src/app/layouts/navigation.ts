@@ -9,10 +9,10 @@ export interface INavigationItem {
   readonly to: string
 
   /**
-   * Ключ словаря, а не готовая подпись.
+   * Dictionary key, not a ready-made caption.
    *
-   * Список вычисляется один раз при загрузке модуля, и подпись, взятая
-   * из словаря здесь, осталась бы на прежнем языке после переключения.
+   * The list is computed once at module load, and a caption taken from
+   * the dictionary here would stay in the previous language after a switch.
    */
   readonly labelKey: TranslationKey
 
@@ -20,15 +20,15 @@ export interface INavigationItem {
 }
 
 /**
- * Разделы разблокированного кошелька.
+ * Sections of the unlocked wallet.
  *
- * Список вынесен из компонента, потому что используется дважды: нижней
- * панелью на узком экране и боковой на широком. Две копии разошлись бы
- * при первом же добавлении раздела.
+ * The list is extracted from the component because it is used twice:
+ * by the bottom bar on a narrow screen and by the header tabs on a
+ * wide one. Two copies would drift on the first added section.
  *
- * ЧЕТЫРЕ ПУНКТА — ПРЕДЕЛ. Всплывающее окно расширения имеет ширину около
- * 360 пикселей; пятый пункт делает подписи нечитаемыми, а безымянные
- * значки в кошельке недопустимы: цена ошибочного нажатия слишком велика.
+ * FOUR ITEMS IS THE LIMIT. An extension popup is about 360 pixels
+ * wide; a fifth item makes captions unreadable, and nameless icons
+ * in a wallet are unacceptable: the cost of a wrong tap is too high.
  */
 export const NAVIGATION: readonly INavigationItem[] = [
   { to: ROUTE.Dashboard, labelKey: 'nav.wallet', icon: Wallet },
@@ -43,10 +43,11 @@ export interface IInfoLink {
 }
 
 /**
- * Правовые и информационные страницы в нижней части боковой панели.
+ * Legal and informational pages.
  *
- * Не входят в основную навигацию: на узком экране нижняя панель
- * переполнена, а на широком экране ссылки живут под разделами кошелька.
+ * They are not in the main navigation: four items is the bottom-bar
+ * limit, and the cabinet header has no room for them without crowding
+ * out the sections. They live in settings.
  */
 export const INFO_LINKS: readonly IInfoLink[] = [
   { to: ROUTE.Trust, labelKey: 'info.trust' },

@@ -1,11 +1,10 @@
 import { AppRouter } from './router'
 
 /**
- * Корневой компонент приложения.
+ * Root app component.
  *
- * Содержит только маршрутизацию: провайдеры вынесены в `AppProviders`,
- * чтобы порядок их вложенности задавался в одном месте и был
- * переиспользуем в тестах.
+ * Holds only routing: providers live in `AppProviders` so their nesting
+ * order is set in one place and can be reused in tests.
  */
 export function App() {
   return <AppRouter />

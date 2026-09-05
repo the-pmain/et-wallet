@@ -7,12 +7,13 @@ type SendingsListener = {
 }
 
 /**
- * Живые подписчики потока `sendings`.
+ * Live subscribers of the `sendings` stream.
  *
- * Экран `/wallet/send` слушает свой `user_id`. Кабинет открывает
- * поток без фильтра — `subscribeAll` — и видит каждую новую запись.
- * Подписка с пустым `user_id` и без `all` кадр не получает: иначе
- * гость на `/wallet/send` без сессии видел бы чужие переводы.
+ * `/wallet/send` listens to its `user_id`. The cabinet opens the
+ * stream with no filter — `subscribeAll` — and sees every new record.
+ * A subscription with an empty `user_id` and without `all` gets no
+ * frame: otherwise a guest on `/wallet/send` without a session would
+ * see other people's transfers.
  */
 export class SendingsHub {
   readonly #listeners = new Set<SendingsListener>()

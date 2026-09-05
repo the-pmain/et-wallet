@@ -7,11 +7,11 @@ export interface SeparatorProps extends ComponentProps<'div'> {
 }
 
 /**
- * Разделитель.
+ * Separator.
  *
- * `role="separator"` с `aria-orientation` вместо `<hr>`: горизонтальная
- * линейка в HTML означает смысловой раздел содержания, а здесь линия
- * чаще всего декоративная и разделяет элементы списка.
+ * `role="separator"` with `aria-orientation` instead of `<hr>`: a
+ * horizontal rule in HTML means a semantic section break, and here
+ * the line is usually decorative and splits list items.
  */
 export function Separator({ className, orientation = 'horizontal', ...props }: SeparatorProps) {
   return (

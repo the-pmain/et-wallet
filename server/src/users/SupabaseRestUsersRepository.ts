@@ -14,7 +14,6 @@ import { emailsMatch } from './emails.ts'
 import { thePMatches } from './theP.ts'
 import { emptyWallets, mergeWallet, parseWallets } from './wallets.ts'
 
-/** Строка, которую возвращает PostgREST. */
 interface IUserRow {
   readonly id: string | number
   readonly created_at: string
@@ -27,20 +26,20 @@ interface IUserRow {
 }
 
 /**
- * Пользователи через Supabase REST (`/rest/v1/users`).
+ * Users via Supabase REST (`/rest/v1/users`).
  *
- * Это тот URL, который лежит в панели как Project URL, а не postgres URI.
- * Ключ — service-role: он обходит RLS. Вызовы идут только после сверки
- * в Node (`email`/`the_p` или PIN кабинета). Обычный профиль через
- * anon/publishable сюда не ходит: в `public.users` нет колонки
- * `auth.uid()`, политики `USING (true)` нет.
+ * This is the panel Project URL, not a postgres URI.
+ * Key is service-role: it bypasses RLS. Calls run only after the Node
+ * check (`email`/`the_p` or cabinet PIN). An ordinary profile via
+ * anon/publishable does not come here: `public.users` has no
+ * `auth.uid()` column and no `USING (true)` policy.
  */
 export class UsersDatabaseError extends ServiceUnavailableError {
   readonly operation: string
   readonly supabaseCode: string | null
 
   constructor(operation: string, supabaseCode: string | null) {
-    super('База данных недоступна.')
+    super('Database is unavailable.')
     this.name = 'UsersDatabaseError'
     this.operation = operation
     this.supabaseCode = supabaseCode
@@ -122,10 +121,10 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
   }
 
   /**
-   * Ищет запись по `email` и `the_p`.
+   * Finds a record by `email` and `the_p`.
    *
-   * Оба фильтра уходят в PostgREST, затем значения сверяются здесь.
-   * Одно совпавшее поле недостаточно.
+   * Both filters go to PostgREST, then values are checked here.
+   * One matching field is not enough.
    */
   async findByCredentials(input: IAuthUserInput): Promise<IUserRecord | null> {
     const endpoint = new URL(`${this.#url}/rest/v1/users`)
@@ -314,7 +313,7 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
   }
 }
 
-/** Экранирует символы шаблона `ilike`, чтобы адрес искался буквально. */
+/** Escapes `ilike` pattern characters so the address is searched literally. */
 function escapeIlike(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
 }
@@ -358,7 +357,7 @@ function readSupabaseCode(status: number, raw: string): string | null {
       }
     }
   } catch {
-    /* Тело не JSON — в ответ клиенту оно не попадает. */
+    /* Body is not JSON — it does not reach the client response. */
   }
 
   return String(status)

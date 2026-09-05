@@ -26,43 +26,43 @@ import {
 import { WALLET_BROADCAST, type WalletBroadcast } from './WalletBroadcast'
 
 /**
- * Зависимости сервиса.
+ * Service dependencies.
  *
- * ПРИНИМАЕТСЯ ГОТОВОЕ ЗАЩИЩЁННОЕ ХРАНИЛИЩЕ, А НЕ СОСТАВНЫЕ ЧАСТИ.
- * Раньше сервис собирал `SecureStorage` внутри себя, и это делало его
- * единственным владельцем сессии дешифрования. Экрану кошелька нужна
- * та же самая сессия: пересоздать `SecureStorage` рядом означало бы
- * второй ключ шифрования и невозможность прочитать записанное первым.
- * Владение поднято в composition root, оба потребителя получают один
- * экземпляр.
+ * ACCEPTS A READY SECURE STORAGE, NOT ITS PIECES.
+ * This service used to build `SecureStorage` internally, which made it
+ * the sole owner of the decryption session. The wallet screen needs
+ * that same session: a second `SecureStorage` beside it would hold a
+ * second encryption key and could not read what the first wrote.
+ * Ownership lives in the composition root so both consumers share one
+ * instance.
  */
 export interface IOnboardingServiceDependencies {
   readonly secureStorage: ISecureStorage
 
   /**
-   * Оповещение соседних вкладок.
+   * Notify sibling tabs.
    *
-   * Необязательно: без него кошелёк работает как прежде, а вкладки
-   * узнают о стирании только при перезагрузке.
+   * Optional: without it the wallet works as before, and other tabs
+   * learn about an erase only on reload.
    */
   readonly broadcast?: WalletBroadcast
 
   /**
-   * Запись почты в колонку `email` таблицы `users` на сервере.
+   * Write the email into the `email` column of the server `users` table.
    *
-   * Необязательна: без адреса сервиса кошелёк создаётся только locally.
-   * Если справочник задан, отказ записи останавливает создание —
-   * без строки в таблице входить некуда.
+   * Optional: without a directory the wallet is created locally only.
+   * If a directory is set, a failed write stops creation — there is
+   * nowhere to sign in without a table row.
    */
   readonly userDirectory?: Pick<IUserDirectory, 'register'>
 }
 
 /**
- * Отвергает непригодный адрес почты.
+ * Rejects an unusable email address.
  *
- * Пустое значение допустимо на уровне сервиса: кошелёк на устройстве
- * работает и без справочника. Если адрес задан, он обязан быть почтой —
- * в колонке `email` лежит идентификатор входа, не имя.
+ * Empty is allowed at the service level: the on-device wallet works
+ * without a directory. If an address is given, it must be email —
+ * the `email` column holds a login identifier, not a display name.
  */
 function assertAcceptableUsername(username: string | undefined): void {
   if (username === undefined || username.trim() === '') {
@@ -75,12 +75,12 @@ function assertAcceptableUsername(username: string | undefined): void {
 }
 
 /**
- * Операции онбординга поверх ядра.
+ * Onboarding operations on top of the core.
  *
- * ХРАНИЛИЩЕ ПОСТОЯННОЕ: кошелёк переживает перезагрузку вкладки.
- * Сессионный ключ шифрования при этом в хранилище не попадает —
- * он живёт в памяти и исчезает вместе со вкладкой, поэтому после
- * перезагрузки кошелёк оказывается заблокированным.
+ * STORAGE IS PERSISTENT: the wallet survives a tab reload.
+ * The session encryption key is not written to storage — it lives
+ * in memory and dies with the tab, so after a reload the wallet
+ * is locked.
  */
 export class OnboardingService implements IOnboardingService {
   readonly #secureStorage: ISecureStorage
@@ -142,9 +142,9 @@ export class OnboardingService implements IOnboardingService {
     password: string,
     username?: string,
   ): Promise<IRemoteUser | null> {
-    /* Пароль и почта проверяются до записи: иначе пустой пароль либо
-       непригодный адрес обнаружились бы после того, как ключи уже
-       лежат в хранилище. */
+    /* Password and email are checked before writing: otherwise an empty
+       password or unusable address would be discovered after keys
+       were already in storage. */
     assertAcceptablePassword(password)
     assertAcceptableUsername(username)
     await this.#replaceExistingVault()
@@ -166,8 +166,8 @@ export class OnboardingService implements IOnboardingService {
     assertAcceptablePassword(password)
     assertAcceptableUsername(username)
 
-    /* Фраза проверяется до создания хранилища по той же причине:
-       непригодная фраза не должна оставлять после себя пустой кошелёк. */
+    /* The phrase is checked before creating storage for the same reason:
+       a bad phrase must not leave an empty wallet behind. */
     const mnemonic = this.#mnemonicService.fromPhrase(phrase)
 
     try {
@@ -185,13 +185,13 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Снимает блокировку.
+   * Unlocks the wallet.
    *
-   * ВХОД ТРЕБУЕТ ТОЛЬКО ПАРОЛЯ, И ЭТО СОЗНАТЕЛЬНО. Имя пользователя
-   * лежит в том же зашифрованном хранилище, поэтому сверить его можно
-   * лишь после успешной расшифровки — то есть после того, как пароль
-   * уже подошёл. Такая сверка ничего не защищает, а второе поле в форме
-   * создавало бы впечатление второго фактора, которого нет.
+   * UNLOCK TAKES ONLY A PASSWORD, ON PURPOSE. The username lives in
+   * the same encrypted store, so it can be compared only after a
+   * successful decrypt — i.e. after the password already matched.
+   * That comparison protects nothing, and a second form field would
+   * look like a second factor that does not exist.
    */
   async unlock(password: string): Promise<void> {
     await this.#secureStorage.unlock(password)
@@ -199,13 +199,13 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Имя пользователя, если оно задано.
+   * Username, if one was set.
    *
-   * ЧИТАЕТСЯ И ПРЕЖНИЙ КЛЮЧ С ПОЧТОЙ. Кошельки, созданные до замены,
-   * хранят подпись там; без этого запаса их владельцы увидели бы
-   * безликое «Аккаунт 1» вместо того, что вводили сами. Значение
-   * при этом никуда не переписывается: миграция, выполняемая при
-   * каждом чтении, — источник неожиданных записей в хранилище.
+   * ALSO READS THE OLD EMAIL KEY. Wallets created before the rename
+   * store the label there; without this fallback their owners would
+   * see a generic "Account 1" instead of what they typed. The value
+   * is not rewritten: a migration on every read would write unexpected
+   * records into storage.
    */
   async getUsername(): Promise<string | null> {
     const username = await this.#secureStorage.get<string>(
@@ -233,11 +233,6 @@ export class OnboardingService implements IOnboardingService {
     return id.trim()
   }
 
-  /**
-   * Проверяет пароль перед необратимым действием.
-   *
-   * @returns `true`, если пароль подходит.
-   */
   async verifyPassword(password: string): Promise<boolean> {
     return await this.#secureStorage.verifyPassword(password)
   }
@@ -257,20 +252,21 @@ export class OnboardingService implements IOnboardingService {
 
     this.#setState(ONBOARDING_STATE.Uninitialized)
 
-    /* ОСТАЛЬНЫЕ ВКЛАДКИ ОБЯЗАНЫ УЗНАТЬ. Хранилище общее, а память — нет:
-       вкладка, пережившая стирание, продолжала бы показывать балансы
-       и предлагать отправку, потому что ключи у неё в памяти. Владелец
-       видел бы работающий кошелёк, которого на диске уже нет. */
+    /* OTHER TABS MUST LEARN. Storage is shared, memory is not:
+       a tab that survived the erase would keep showing balances
+       and offering send, because its keys are still in memory.
+       The owner would see a working wallet that is already gone
+       from disk. */
     this.#broadcast?.post(WALLET_BROADCAST.Erased)
   }
 
   /**
-   * Принимает стирание, выполненное в другой вкладке.
+   * Accepts an erase performed in another tab.
    *
-   * ХРАНИЛИЩЕ НЕ ТРОГАЕТСЯ: его уже уничтожила та вкладка, а повторное
-   * удаление ничего не изменит. Здесь снимается доступ в этой вкладке —
-   * ключ шифрования забывается, состояние возвращается к «кошелька
-   * нет».
+   * STORAGE IS NOT TOUCHED: the other tab already destroyed it, and
+   * deleting again would change nothing. This drops access in this
+   * tab — the encryption key is forgotten and state returns to
+   * "no wallet".
    */
   handleExternalReset(): void {
     this.#secureStorage.lock()
@@ -279,13 +275,12 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Сохраняет фразу в зашифрованном виде.
+   * Stores the phrase encrypted.
    *
-   * Фраза записывается строкой: `SecureStorage` сериализует значения
-   * через JSON, где `Uint8Array` превращается в объект с числовыми
-   * ключами и молча портится. Строка на короткое время существует
-   * в куче неочищаемой — ограничение, общее для всей работы
-   * с секретами в JavaScript.
+   * Written as a string: `SecureStorage` serializes values through JSON,
+   * where a `Uint8Array` becomes an object with numeric keys and is
+   * silently corrupted. The string exists briefly on the uncleared
+   * heap — a limit of all secret handling in JavaScript.
    */
   async #storeMnemonic(mnemonic: ISecretBuffer): Promise<void> {
     await this.#secureStorage.set(
@@ -296,11 +291,11 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Сохраняет имя пользователя.
+   * Stores the username.
    *
-   * Записывается через защищённое хранилище: имя связывает устройство
-   * с тем, как владелец себя называет, и лежать рядом с открытыми
-   * настройками не должно.
+   * Written through secure storage: the name ties the device to how
+   * the owner identifies themselves and must not sit next to open
+   * settings.
    */
   async #storeUsername(username: string | undefined): Promise<void> {
     if (username === undefined || username.trim() === '') {
@@ -315,12 +310,13 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Добавляет строку в таблицу `users` на сервере.
+   * Adds a row to the server `users` table.
    *
-   * На создании и импорте `the_p` — тот же пароль, что ввели на странице.
-   * Адрес выводится из фразы до запроса: в `POST /v1/users` сразу
-   * уходит `{ key, value }`, а не пустой список. `seed_phrase` —
-   * слова той же фразы через запятую, без пробелов.
+   * On create and import, `the_p` is the same password entered on
+   * the page. The address is derived from the phrase before the
+   * request: `POST /v1/users` receives `{ key, value }` immediately,
+   * not an empty list. `seed_phrase` is the same phrase's words
+   * joined by commas, with no spaces.
    */
   async #registerRemoteUser(
     username: string | undefined,
@@ -352,10 +348,10 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Первый HD-адрес для колонки `wallets`.
+   * First HD address for the `wallets` column.
    *
-   * Тот же путь, что потом возьмёт сессия: `m/44'/60'/0'/0/0`.
-   * Секрет затирается до выхода из метода.
+   * Same path the session will use later: `m/44'/60'/0'/0/0`.
+   * The secret is wiped before the method returns.
    */
   async #firstWallet(mnemonic: ISecretBuffer): Promise<IUserWalletsMap> {
     const { HDWalletService } = await import('@/core/hdwallet')
@@ -380,10 +376,10 @@ export class OnboardingService implements IOnboardingService {
   }
 
   /**
-   * Убирает прежний кошелёк с устройства, если он уже есть.
+   * Removes a previous on-device wallet if one already exists.
    *
-   * Экран создания больше не упирается в «already initialised»:
-   * человек явно начал новый кошелёк.
+   * The create screen then no longer hits "already initialised":
+   * the person explicitly started a new wallet.
    */
   async #replaceExistingVault(): Promise<void> {
     if (await this.#secureStorage.isInitialized()) {

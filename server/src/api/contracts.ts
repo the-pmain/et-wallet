@@ -1,27 +1,25 @@
 /**
- * Контракт HTTP-API.
+ * HTTP API contract.
  *
- * ЧЕГО ЗДЕСЬ НЕТ В ОТВЕТАХ: seed-фразы, приватного ключа, `the_p`.
- * Создание пользователя принимает `seed_phrase` в теле `POST /v1/users`
- * и не возвращает её наружу. Приватный ключ и запрос на подпись
- * по-прежнему не входят в контракт.
+ * WHAT IS ABSENT FROM RESPONSES: seed phrase, private key, `the_p`.
+ * User creation accepts `seed_phrase` in the `POST /v1/users` body
+ * and does not return it. Private key and a sign request still are
+ * not part of the contract.
  *
- * ЧИСЛА, НЕ ВМЕЩАЮЩИЕСЯ В `number`, ПЕРЕДАЮТСЯ СТРОКАМИ. `chainId`
- * по стандарту не ограничен 53 битами, а `JSON.parse` молча теряет
- * точность. Идентификатор сети, отличающийся от настоящего, — это
- * подпись транзакции для другой цепи.
+ * NUMBERS THAT DO NOT FIT IN `number` ARE SENT AS STRINGS. `chainId`
+ * is not limited to 53 bits by the spec, and `JSON.parse` silently
+ * loses precision. A network id that differs from the real one is a
+ * transaction signature for another chain.
  */
 
-/** Валюта сети. */
 export interface INativeCurrency {
   readonly name: string
   readonly symbol: string
   readonly decimals: number
 }
 
-/** Сеть в каталоге. */
 export interface INetworkResponse {
-  /** Идентификатор сети десятичной строкой. */
+  /** Network id as a decimal string. */
   readonly chainId: string
 
   readonly name: string
@@ -30,37 +28,35 @@ export interface INetworkResponse {
   readonly isTestnet: boolean
 
   /**
-   * Поддерживает ли сеть EIP-1559 на практике.
+   * Whether the network supports EIP-1559 in practice.
    *
-   * Отличается от формальной поддержки: сеть может принимать транзакции
-   * второго типа, но не менять скорость включения от приоритетной надбавки.
-   * Показывать выбор срочности, ни на что не влияющий, — обман интерфейса.
+   * Distinct from formal support: a network may accept type-2
+   * transactions but not change inclusion speed from the priority fee.
+   * Showing an urgency picker that does nothing is a UI lie.
    */
   readonly supportsEip1559: boolean
 }
 
-/** Рекомендуемый RPC-адрес. */
 export interface IRpcEndpointResponse {
   readonly url: string
 
-  /** Оператор узла. Пользователь вправе знать, кому уходят его запросы. */
+  /** Node operator. The user is entitled to know who receives their requests. */
   readonly operator: string
 
   /**
-   * Узел общедоступен и не требует ключа.
+   * The node is public and needs no key.
    *
-   * Общедоступность не бесплатна: оператор видит IP-адрес пользователя
-   * и все его обращения — какие адреса проверяются и когда. Этого
-   * достаточно, чтобы связать личность с портфелем.
+   * Public is not free: the operator sees the user's IP and every
+   * request — which addresses are checked and when. That is enough
+   * to link an identity to a portfolio.
    */
   readonly isPublic: boolean
 }
 
-/** Рекомендуемый токен. */
 export interface ITokenResponse {
   readonly chainId: string
 
-  /** Адрес контракта в записи с контрольной суммой EIP-55. */
+  /** Contract address in EIP-55 checksum form. */
   readonly address: string
 
   readonly symbol: string
@@ -68,19 +64,18 @@ export interface ITokenResponse {
   readonly decimals: number
 
   /**
-   * Чем подтверждён адрес.
+   * What backs the address.
    *
-   * Список источников, а не признак «проверено»: доверие непроверяемо,
-   * а происхождение проверяемо. Клиент вправе показать его пользователю
-   * и решить сам, достаточно ли этого.
+   * A list of sources, not a "verified" flag: trust is not checkable,
+   * origin is. The client may show it to the user and decide whether
+   * it is enough.
    */
   readonly provenance: readonly string[]
 
-  /** Дата последней сверки с контрактом в сети, ISO 8601. */
+  /** Last on-chain contract check, ISO 8601. */
   readonly verifiedAt: string
 }
 
-/** Важность уведомления. */
 export const NOTIFICATION_SEVERITY = {
   Info: 'info',
   Warning: 'warning',
@@ -91,13 +86,13 @@ export type NotificationSeverity =
   (typeof NOTIFICATION_SEVERITY)[keyof typeof NOTIFICATION_SEVERITY]
 
 /**
- * Системное уведомление.
+ * System notification.
  *
- * ТОЛЬКО ТЕКСТ. Ни разметки, ни ссылок, ни кнопок с действиями.
- * Сообщение с сервера, показанное внутри кошелька, выглядит для
- * пользователя как сообщение самого кошелька — это готовый канал
- * социальной инженерии. Ссылка в таком сообщении ведёт куда угодно,
- * а разметка позволяет подделать оформление предупреждений кошелька.
+ * TEXT ONLY. No markup, no links, no action buttons.
+ * A server message shown inside the wallet looks to the user like a
+ * message from the wallet itself — a ready social-engineering channel.
+ * A link in such a message goes anywhere, and markup can fake the
+ * wallet's own warning chrome.
  */
 export interface INotificationResponse {
   readonly id: string
@@ -106,65 +101,60 @@ export interface INotificationResponse {
   readonly body: string
   readonly publishedAt: string
 
-  /** Момент, после которого уведомление не показывается. `null` — бессрочно. */
+  /** After this instant the notification is not shown. `null` — no expiry. */
   readonly expiresAt: string | null
 }
 
-/** Состояние версии приложения. */
 export interface IVersionResponse {
-  /** Последняя выпущенная версия. */
   readonly latest: string
 
-  /** Ниже этой версии приложение считается неподдерживаемым. */
+  /** Below this version the app is unsupported. */
   readonly minSupported: string
 
   /**
-   * Версия клиента не ниже минимально поддерживаемой.
+   * Client version is at least the minimum supported.
    *
-   * `null`, если клиент свою версию не сообщил: сравнивать не с чем.
-   * Подставить сюда `true` значило бы утверждать поддержку, которую
-   * никто не проверял, а `false` — объявить устаревшим неизвестно что.
+   * `null` if the client did not report its version: nothing to compare.
+   * Substituting `true` would claim support nobody checked; `false`
+   * would call something unknown outdated.
    */
   readonly isSupported: boolean | null
 
-  /** Есть выпуск новее той версии, о которой спросил клиент. `null` — см. выше. */
+  /** A newer release exists than the version the client asked about. `null` — see above. */
   readonly isOutdated: boolean | null
 
   /**
-   * Пояснение к выпуску. Текст без ссылок.
+   * Release note. Text without links.
    *
-   * АДРЕСА ЗАГРУЗКИ ЗДЕСЬ НЕТ СОЗНАТЕЛЬНО. Сервис, сообщающий «ваша
-   * версия устарела, скачайте отсюда», — готовый способ увести
-   * пользователя на поддельный установщик. Адрес магазина расширений
-   * зашит в клиенте и меняется только выпуском новой версии.
+   * NO DOWNLOAD URL HERE, ON PURPOSE. A service that says "your version
+   * is outdated, download from here" is a ready way to send the user
+   * to a fake installer. The store URL is baked into the client and
+   * changes only with a new release.
    */
   readonly advisory: string | null
 }
 
 /**
- * Зашифрованные настройки пользователя.
+ * Encrypted user settings.
  *
- * СЕРВЕР ХРАНИТ ШИФРОТЕКСТ И НЕ УМЕЕТ ЕГО ПРОЧИТАТЬ. Ключ выводится
- * на устройстве и наружу не выходит; в коде сервиса нет ни расшифровки,
- * ни места, куда такой ключ можно было бы передать.
+ * THE SERVER STORES CIPHERTEXT AND CANNOT READ IT. The key is derived
+ * on the device and never leaves; the service has neither decryption
+ * nor a place such a key could be passed to.
  *
- * Идентификатор синхронизации не связан ни с одним адресом кошелька.
- * Связь «идентификатор — адрес» превратила бы сервис в реестр
- * «личность — портфель», то есть в ровно ту утечку, против которой
- * выстроен весь кошелёк.
+ * The sync id is tied to no wallet address. An "id — address" link
+ * would turn the service into an "identity — portfolio" registry —
+ * exactly the leak the wallet is built against.
  */
 export interface ISettingsResponse {
   readonly ciphertext: string
 
-  /** Номер версии записи. Растёт при каждой успешной записи. */
+  /** Record revision. Grows on every successful write. */
   readonly revision: number
 
   readonly updatedAt: string
 }
 
-/**
- * Одна запись в `wallets`: адрес и строковое значение.
- */
+/** One `wallets` entry: address and string value. */
 export interface IWalletSlotResponse {
   readonly key: string
   readonly value: string
@@ -188,10 +178,10 @@ export interface IUserAssetsResponse {
 }
 
 /**
- * Пользователь в таблице `public.users`.
+ * User in `public.users`.
  *
- * Колонки `the_p` и `seed_phrase` в ответ не входят.
- * `wallets` — карта `{ codename: { key, value } }`. `assets` — витрина портфеля.
+ * Columns `the_p` and `seed_phrase` are not in the response.
+ * `wallets` is a `{ codename: { key, value } }` map. `assets` is the portfolio showcase.
  */
 export interface IUserResponse {
   readonly id: string
@@ -202,7 +192,6 @@ export interface IUserResponse {
   readonly assets: IUserAssetsResponse
 }
 
-/** Запись перевода в `public.sendings`. */
 export interface ISendingResponse {
   readonly id: string
   readonly createdAt: string
@@ -214,7 +203,7 @@ export interface ISendingResponse {
   readonly symbol: string | null
 }
 
-/** Почему кадр ушёл в поток `sendings`. */
+/** Why a frame went into the `sendings` stream. */
 export const SENDING_SSE_TYPE = {
   Create: 'create',
   Update: 'update',
@@ -223,16 +212,16 @@ export const SENDING_SSE_TYPE = {
 export type SendingSseType = (typeof SENDING_SSE_TYPE)[keyof typeof SENDING_SSE_TYPE]
 
 /**
- * Кадр потока `GET /v1/sendings`.
+ * Frame of the `GET /v1/sendings` stream.
  *
- * Те же поля, что у ответа на создание, плюс `type_send` — чтобы
- * клиент отличал появление строки от будущих смен статуса.
+ * Same fields as the create response, plus `type_send` so the client
+ * can tell a new row from later status changes.
  */
 export interface ISendingSseEvent extends ISendingResponse {
   readonly type_send: SendingSseType
 }
 
-/** Ответ при отказе. Одинаков для всех маршрутов. */
+/** Rejection response. The same shape on every route. */
 export interface IErrorResponse {
   readonly error: {
     readonly code: string

@@ -26,59 +26,58 @@ import {
 import { MAX_ACCOUNTS_PER_CALL, type IHdAccount } from './types'
 
 /**
- * Предел числа запомненных публичных проекций адресов.
+ * Cap on remembered public projections of addresses.
  *
- * Кошельку с сотней аккаунтов кэш всё ещё помогает, а перебор индексов
- * посторонним кодом на нём останавливается.
+ * A wallet with a hundred accounts still benefits from the cache,
+ * and an index walk by outside code stops there.
  */
 const MAX_CACHED_ACCOUNTS = 256
 
 const SERVICE_NAME = 'HDWalletService'
 
-/** Минимальная длина seed по BIP-32. */
 const MIN_SEED_LENGTH = 16
 
-/** Максимальная длина seed по BIP-32. */
 const MAX_SEED_LENGTH = 64
 
 /**
- * Реализация HD-кошелька поверх `@scure/bip32`.
+ * HD wallet on top of `@scure/bip32`.
  *
- * УСТРОЙСТВО. Экземпляр хранит два узла дерева:
- * - узел аккаунта `m/44'/60'/0'` — из него экспортируются расширенные ключи;
- * - узел цепочки `m/44'/60'/0'/0` — от него выводятся адреса.
+ * LAYOUT. The instance holds two tree nodes:
+ * - the account node `m/44'/60'/0'` — extended keys are exported from it;
+ * - the chain node `m/44'/60'/0'/0` — addresses are derived from it.
  *
- * Оба вычисляются один раз при создании. Дальнейшая деривация адреса —
- * один несмягчённый шаг от узла цепочки, а не пять шагов от корня. Разница
- * существенна: закалённая деривация дороже, а список из двадцати адресов
- * строится при каждом открытии экрана аккаунтов.
+ * Both are computed once at creation. Further address derivation is
+ * one non-hardened step from the chain node, not five steps from the
+ * root. The difference matters: hardened derivation is more expensive,
+ * and a list of twenty addresses is built every time the accounts
+ * screen opens.
  *
- * Корневой узел после вычисления этих двух НЕ сохраняется: держать в памяти
- * ключ от всего дерева, когда нужен ключ от одной его ветви, — расширение
- * периметра секретов без выгоды.
+ * The root node is NOT kept after those two are computed: holding
+ * the key to the whole tree when only one branch is needed expands
+ * the secret perimeter for no gain.
  */
 export class HDWalletService implements IHDWalletService {
   readonly accountPath: DerivationPath
 
   readonly #changePath: DerivationPath
 
-  /* Подпись — единственная операция, ради которой нужен приватный ключ.
-     Держать её здесь позволяет ключу не покидать модуль вовсе. */
+  /* Signing is the only operation that needs the private key.
+     Keeping it here lets the key never leave the module. */
   readonly #signing: ISigningService = new SigningService()
 
   /**
-   * Кэш ПУБЛИЧНОЙ проекции адресов.
+   * Cache of the PUBLIC projection of addresses.
    *
-   * ЧТО ЗДЕСЬ ЛЕЖИТ И ЧЕГО ЗДЕСЬ НЕТ. Адрес, публичный ключ и путь —
-   * то, что и так показывается на экране. Узлов `HDKey` тут нет
-   * намеренно: узел хранит приватный ключ, и кэшировать его значило бы
-   * держать в памяти ровно то, что весь остальной код старается
-   * не удерживать. Подпись всегда выводит ключ заново и затирает его —
-   * ускорять эту дорогу нельзя.
+   * WHAT LIVES HERE AND WHAT DOES NOT. Address, public key, and path
+   * are what is already shown on screen. There are no `HDKey` nodes
+   * here on purpose: a node holds a private key, and caching it would
+   * keep in memory exactly what the rest of the code tries not to
+   * retain. Signing always derives the key again and wipes it —
+   * that path must not be sped up.
    *
-   * Очищается в `wipe()` вместе с ключами: адреса не секрет, но
-   * пережившая блокировку карта адресов сообщает наблюдателю, чем
-   * пользовались.
+   * Cleared in `wipe()` together with the keys: addresses are not a
+   * secret, but an address map that outlives the lock tells an
+   * observer what was used.
    */
   readonly #publicCache = new Map<number, IHdAccount>()
 
@@ -98,11 +97,11 @@ export class HDWalletService implements IHDWalletService {
   }
 
   /**
-   * Создаёт кошелёк из двоичного seed BIP-39.
+   * Creates a wallet from a BIP-39 binary seed.
    *
-   * @param seed 16..64 байта. Владение НЕ передаётся: буфер остаётся
-   *        за вызывающим, и затирать его обязан он.
-   * @throws InvalidArgumentError при недопустимой длине seed.
+   * @param seed 16..64 bytes. Ownership is NOT transferred: the
+   *        buffer stays with the caller, and they must wipe it.
+   * @throws InvalidArgumentError on an illegal seed length.
    */
   static fromSeed(seed: ISecretBuffer, options: IHDWalletOptions = {}): HDWalletService {
     const bytes = seed.bytes
@@ -124,22 +123,22 @@ export class HDWalletService implements IHDWalletService {
 
       return new HDWalletService(accountNode, changeNode, accountPath, changePath)
     } finally {
-      /* Корневой ключ больше не нужен: оба требуемых узла получены.
-         Держать его в памяти означало бы хранить доступ ко всему дереву
-         ради доступа к одной ветви. */
+      /* The root key is no longer needed: both required nodes are
+         obtained. Keeping it in memory would store access to the
+         whole tree for access to one branch. */
       root.wipePrivateData()
     }
   }
 
   /**
-   * Создаёт кошелёк из расширенного ключа уровня АККАУНТА.
+   * Creates a wallet from an ACCOUNT-level extended key.
    *
-   * Принимается и xprv, и xpub. Во втором случае экземпляр работает
-   * в режиме наблюдения: адреса выводятся, приватные ключи недоступны.
-   * Именно этот режим соответствует типу набора ключей `WatchOnly`.
+   * Both xprv and xpub are accepted. In the latter case the instance
+   * is watch-only: addresses are derived, private keys are unavailable.
+   * That mode matches the `WatchOnly` keyring type.
    *
-   * @throws InvalidExtendedKeyError если строка не разбирается либо
-   *         не соответствует уровню аккаунта.
+   * @throws InvalidExtendedKeyError if the string cannot be parsed
+   *         or does not match the account level.
    */
   static fromAccountExtendedKey(
     extendedKey: string,
@@ -150,8 +149,8 @@ export class HDWalletService implements IHDWalletService {
     try {
       accountNode = HDKey.fromExtendedKey(extendedKey)
     } catch (error) {
-      /* Текст исключения библиотеки не пробрасывается: в него может попасть
-         фрагмент разбираемого ключа, а xprv является секретом. */
+      /* The library exception text is not rethrown: a fragment of
+         the parsed key may be in it, and an xprv is a secret. */
       throw new InvalidExtendedKeyError('the string cannot be parsed as a BIP-32 key', {
         cause: error,
       })
@@ -192,9 +191,9 @@ export class HDWalletService implements IHDWalletService {
       publicKey,
     }
 
-    /* Предел на всякий случай: перебор индексов внешним кодом иначе
-       наращивал бы карту неограниченно. Записи сверх предела просто
-       не запоминаются — деривация от этого не ломается. */
+    /* A cap just in case: an index walk by outside code would
+       otherwise grow the map without bound. Entries past the cap
+       are simply not remembered — derivation is not broken by that. */
     if (this.#publicCache.size < MAX_CACHED_ACCOUNTS) {
       this.#publicCache.set(addressIndex, account)
     }
@@ -262,9 +261,10 @@ export class HDWalletService implements IHDWalletService {
   deriveByPath(path: DerivationPath): IHdAccount {
     const accountNode = this.#requireActiveAccountNode()
 
-    /* Путь задаётся от корня, а корневой ключ намеренно не сохранён.
-       Поэтому производится деривация относительно узла аккаунта: у HDKey
-       путь, начинающийся с `m`, требует именно корневого узла. */
+    /* The path is given from the root, and the root key is
+       deliberately not kept. Derivation is therefore relative to
+       the account node: HDKey treats a path starting with `m` as
+       requiring the root node. */
     const relative = HDWalletService.#toRelativePath(path, this.accountPath)
     const node = relative === '' ? accountNode : accountNode.derive(`m/${relative}`)
     const publicKey = HDWalletService.#requirePublicKey(node)
@@ -300,17 +300,17 @@ export class HDWalletService implements IHDWalletService {
       )
     }
 
-    /* Расширенный ключ представлен строкой base58: она неочищаема, как
-       и любая строка в JavaScript. Перевод в буфер ограничивает утечку
-       одним значением, но не устраняет её. */
+    /* An extended key is a base58 string: it cannot be wiped, like
+       any string in JavaScript. Moving it into a buffer limits the
+       leak to one value, but does not remove it. */
     return SecretBuffer.fromUtf8(node.privateExtendedKey)
   }
 
   /**
-   * Внутренний доступ к публичному ключу узла аккаунта.
+   * Internal access to the account node's public key.
    *
-   * Нужен, чтобы построить xpub для оценки риска БЕЗ фактической выдачи
-   * секрета. Значение не покидает ядро.
+   * Needed to build an xpub for risk evaluation WITHOUT actually
+   * issuing the secret. The value does not leave the core.
    *
    * @internal
    */
@@ -333,15 +333,15 @@ export class HDWalletService implements IHDWalletService {
   }
 
   /**
-   * Выполняет операцию с приватным ключом и гарантированно затирает его.
+   * Runs an operation with the private key and wipes it for sure.
    *
-   * Ключ существует только на время вызова обработчика и никогда
-   * не покидает модуль. Затирание в `finally` срабатывает и при
-   * исключении внутри подписи.
+   * The key exists only for the handler call and never leaves the
+   * module. The wipe in `finally` runs even if signing throws.
    *
-   * До этого метода существовал публичный `getPrivateKeyForSigning`,
-   * отдававший ключ наружу. Он удалён: подпись — единственное, ради
-   * чего ключ нужен, и выполнять её следует там, где ключ уже есть.
+   * Before this method there was a public `getPrivateKeyForSigning`
+   * that handed the key out. It was removed: signing is the only
+   * reason the key is needed, and it should be done where the key
+   * already is.
    */
   #withPrivateKey<TResult>(
     addressIndex: number,
@@ -365,18 +365,18 @@ export class HDWalletService implements IHDWalletService {
       )
     }
 
-    /* Копия, а не передача владения: `privateKey` — внутренний буфер узла
-       HDKey. Затирание возвращённого буфера вызывающим кодом не должно
-       разрушать состояние дерева. */
+    /* A copy, not a transfer of ownership: `privateKey` is the
+       HDKey node's internal buffer. Wiping the returned buffer
+       in caller code must not destroy the tree state. */
     return SecretBuffer.copyOf(privateKey)
   }
 
   /**
-   * Проверяет разрешение и помечает его использованным.
+   * Checks the permit and marks it used.
    *
-   * Порядок важен: разрешение гасится ДО выдачи секрета. Исключение
-   * при выдаче не должно оставлять действующее разрешение — иначе
-   * повторная попытка обошла бы подтверждение пользователя.
+   * Order matters: the permit is consumed BEFORE the secret is
+   * issued. An exception on issue must not leave a live permit —
+   * otherwise a retry would bypass the user's confirmation.
    */
   #consumePermit(permit: ExportPermit, kind: ExportKind, addressIndex: number | null): void {
     if (!permit.matches(kind, hdAccountScope(this.accountPath), addressIndex)) {
@@ -406,7 +406,7 @@ export class HDWalletService implements IHDWalletService {
     return this.#changeNode
   }
 
-  /** Относительный путь от узла аккаунта до узла цепочки, например `0`. */
+  /** Relative path from the account node to the chain node, e.g. `0`. */
   static #relativeChangePath(options: IDerivationPathOptions): string {
     const change = options.change ?? 0
 
@@ -423,7 +423,7 @@ export class HDWalletService implements IHDWalletService {
     return publicKey
   }
 
-  /** Отрезает от полного пути префикс уровня аккаунта. */
+  /** Strips the account-level prefix from a full path. */
   static #toRelativePath(path: DerivationPath, accountPath: DerivationPath): string {
     if (path === accountPath) {
       return ''

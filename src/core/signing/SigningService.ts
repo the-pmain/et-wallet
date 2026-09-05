@@ -27,7 +27,7 @@ import {
   toEthersDomain,
 } from './typed-data'
 
-/** Числовые коды типов транзакций из EIP-2718. */
+/** Numeric transaction-type codes from EIP-2718. */
 const ETHERS_TRANSACTION_TYPE: Readonly<Record<string, number>> = {
   [TRANSACTION_TYPE.Legacy]: 0,
   [TRANSACTION_TYPE.Eip2930]: 1,
@@ -35,18 +35,17 @@ const ETHERS_TRANSACTION_TYPE: Readonly<Record<string, number>> = {
 }
 
 /**
- * Подпись транзакций и сообщений.
+ * Signing of transactions and messages.
  *
- * СЕРИАЛИЗАЦИЯ ВЫПОЛНЯЕТСЯ ethers, а не собственным кодом. RLP,
- * конверты типизированных транзакций EIP-2718, кодирование структур
- * EIP-712 — всё это подробные спецификации, ошибка в которых даёт
- * подпись под данными, отличными от показанных пользователю.
- * Собственная реализация здесь была бы худшим решением из возможных.
+ * SERIALISATION IS DONE BY ethers, not homemade code. RLP, EIP-2718
+ * typed-transaction envelopes, EIP-712 structure encoding — these are
+ * detailed specs, and a mistake in them yields a signature over data
+ * other than what the user was shown. A homemade implementation here
+ * would be the worst possible choice.
  *
- * ЭЛЛИПТИЧЕСКАЯ КРИВАЯ — `SigningKey` из ethers, использующий
- * `@noble/curves`. Это та же библиотека, что применяется в модуле
- * адресов: две независимые реализации secp256k1 в одном приложении
- * недопустимы.
+ * THE ELLIPTIC CURVE is ethers `SigningKey`, which uses
+ * `@noble/curves`. That is the same library the address module uses:
+ * two independent secp256k1 implementations in one app are forbidden.
  */
 export class SigningService implements ISigningService {
   signTransaction(
@@ -57,10 +56,10 @@ export class SigningService implements ISigningService {
 
     const signingKey = SigningService.#createSigningKey(privateKey)
 
-    /* Адрес выводится из ключа и сверяется с полем `from`. Без этой
-       проверки транзакция будет корректной, но подписанной чужим
-       ключом — средства уйдут не с того аккаунта, который показан
-       пользователю, и отменить это невозможно. */
+    /* The address is derived from the key and checked against `from`.
+       Without this check the transaction would be valid but signed
+       with the wrong key — funds would leave an account other than
+       the one shown to the user, and that cannot be undone. */
     SigningService.#assertKeyMatchesSender(signingKey, transaction.from)
 
     const unsigned = toEthersTransaction(transaction)
@@ -82,8 +81,8 @@ export class SigningService implements ISigningService {
   }
 
   signTypedData(data: ITypedData, privateKey: ISecretBuffer, expectedChainId: ChainId): HexString {
-    /* Сверка сети выполняется ДО создания ключа: непригодная структура
-       не должна доходить до криптографии вообще. */
+    /* The network is checked BEFORE the key is created: an unfit
+       structure must not reach cryptography at all. */
     assertTypedDataMatchesChain(data, expectedChainId)
 
     const signingKey = SigningService.#createSigningKey(privateKey)
@@ -115,16 +114,16 @@ export class SigningService implements ISigningService {
   }
 
   /**
-   * Проверяет транзакцию до подписи.
+   * Validates a transaction before signing.
    *
-   * Отказ здесь всегда предпочтительнее подписи: подписанная транзакция
-   * необратима, а отказ пользователь исправит.
+   * A refusal here is always preferable to a signature: a signed
+   * transaction is irreversible, and the user can fix a refusal.
    */
   static #assertSignableTransaction(transaction: ISignableTransaction): void {
-    /* САМАЯ ВАЖНАЯ ПРОВЕРКА МОДУЛЯ. Транзакция без chainId — это
-       формат до EIP-155, подпись под которым действительна во всех
-       EVM-сетях одновременно. Перевод, подписанный в тестовой сети,
-       повторяется злоумышленником в основной с теми же параметрами. */
+    /* THE MOST IMPORTANT CHECK IN THE MODULE. A transaction without
+       chainId is the pre-EIP-155 format, whose signature is valid on
+       every EVM network at once. A transfer signed on a testnet is
+       replayed by an attacker on mainnet with the same parameters. */
     if (transaction.chainId <= 0n) {
       throw new InvalidArgumentError(
         'transaction.chainId',
@@ -148,12 +147,12 @@ export class SigningService implements ISigningService {
   }
 
   /**
-   * Проверяет соответствие полей комиссии типу транзакции.
+   * Checks that fee fields match the transaction type.
    *
-   * Смешение полей означает, что вызывающий код не определился с типом.
-   * Молча выбрать за него нельзя: узел отвергнет транзакцию с неверным
-   * набором полей уже после подписи, а пользователь увидит непонятный
-   * отказ вместо внятного сообщения.
+   * Mixed fields mean the caller has not decided the type. Silently
+   * choosing for them is forbidden: the node would reject a
+   * transaction with the wrong field set after signing, and the user
+   * would see an opaque refusal instead of a clear message.
    */
   static #assertFeeFieldsMatchType(transaction: ISignableTransaction): void {
     if (transaction.type === TRANSACTION_TYPE.Eip1559) {
@@ -165,9 +164,9 @@ export class SigningService implements ISigningService {
       }
 
       if (transaction.maxPriorityFeePerGas > transaction.maxFeePerGas) {
-        /* Приоритетная надбавка не может превышать общий предел:
-           узел отвергнет такую транзакцию, а пользователь уже
-           подтвердил бы комиссию, которой не существует. */
+        /* The priority tip cannot exceed the overall cap: the node
+           would reject the transaction, and the user would already
+           have confirmed a fee that does not exist. */
         throw new InvalidArgumentError(
           'transaction.maxPriorityFeePerGas',
           'the priority fee cannot exceed maxFeePerGas',
@@ -186,10 +185,11 @@ export class SigningService implements ISigningService {
   }
 
   /**
-   * Сверяет адрес ключа с отправителем транзакции.
+   * Checks the key address against the transaction sender.
    *
-   * @throws InvalidArgumentError при расхождении. Сообщение не содержит
-   *         ни ключа, ни его производных, кроме публичного адреса.
+   * @throws InvalidArgumentError on a mismatch. The message contains
+   *         neither the key nor its derivatives except the public
+   *         address.
    */
   static #assertKeyMatchesSender(signingKey: SigningKey, from: Address): void {
     const derived = publicKeyToAddress(SigningService.#hexToBytes(signingKey.publicKey))
@@ -203,11 +203,11 @@ export class SigningService implements ISigningService {
   }
 
   /**
-   * Создаёт ключ подписи из буфера.
+   * Creates a signing key from a buffer.
    *
-   * Диапазон проверяется до передачи в ethers: значение вне 1..n-1
-   * не задаёт точку на кривой, и понятная ошибка лучше внутренней
-   * ошибки библиотеки.
+   * The range is checked before handing to ethers: a value outside
+   * 1..n-1 does not define a curve point, and a clear error is better
+   * than an internal library error.
    */
   static #createSigningKey(privateKey: ISecretBuffer): SigningKey {
     const bytes = privateKey.bytes
@@ -230,12 +230,12 @@ export class SigningService implements ISigningService {
 }
 
 /**
- * Собирает транзакцию ethers из доменной структуры.
+ * Builds an ethers transaction from the domain structure.
  *
- * ВЫНЕСЕНА ИЗ КЛАССА, потому что тем же преобразованием пользуется
- * подпись на аппаратном устройстве: ей нужны те же самые байты,
- * которые уходят в подпись здесь. Два преобразования означали бы два
- * представления об одной транзакции, и разойтись они могли бы молча.
+ * LIFTED OUT OF THE CLASS because hardware signing uses the same
+ * conversion: it needs the same bytes that go into the signature
+ * here. Two conversions would mean two views of one transaction, and
+ * they could diverge silently.
  */
 export function toEthersTransaction(transaction: ISignableTransaction): Transaction {
   const type = ETHERS_TRANSACTION_TYPE[transaction.type]

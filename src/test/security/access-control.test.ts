@@ -31,19 +31,18 @@ const BALANCE = (10n ** 19n) as Wei
 
 let services: ITestAppServices
 
-/** Открывает разблокированную сессию с готовым аккаунтом. */
+/** Opens an unlocked session with a ready account. */
 async function openSession(): Promise<void> {
   services.providerFactory.configure({ balance: BALANCE })
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
   await services.session.open()
 }
 
-/** Идентификатор первого аккаунта кошелька. */
 function firstAccountId(): AccountId {
   const account = services.session.getSnapshot().accounts[0]
 
   if (account === undefined) {
-    throw new Error('Аккаунт не создан.')
+    throw new Error('Account is not created.')
   }
 
   return account.id
@@ -53,8 +52,8 @@ beforeEach(() => {
   services = createTestAppServices()
 })
 
-describe('Заблокированный кошелёк не выполняет операций', () => {
-  it('сессия закрывается и очищает снимок', async () => {
+describe('A locked wallet performs no operations', () => {
+  it('closes the session and clears the snapshot', async () => {
     await openSession()
 
     expect(services.session.getSnapshot().accounts).not.toHaveLength(0)
@@ -65,21 +64,21 @@ describe('Заблокированный кошелёк не выполняет 
     expect(services.session.getSnapshot().activeAccount).toBeNull()
   })
 
-  it('резервное копирование недоступно после закрытия', async () => {
-    /* Экран экспорта, оставшийся работоспособным после автоблокировки,
-       обесценил бы саму автоблокировку. */
+  it('backup is unavailable after close', async () => {
+    /* An export screen that still worked after autolock would
+       make autolock worthless. */
     await openSession()
     await services.session.close()
 
     expect(() => services.session.getBackup()).toThrow()
   })
 
-  it('подготовка перевода после закрытия отказывает', async () => {
+  it('preparing a transfer after close refuses', async () => {
     await openSession()
     const chainId = services.session.getSnapshot().activeNetwork?.chainId
 
     if (chainId === undefined) {
-      throw new Error('Сеть не выбрана.')
+      throw new Error('Network is not selected.')
     }
 
     await services.session.close()
@@ -94,7 +93,7 @@ describe('Заблокированный кошелёк не выполняет 
     ).rejects.toThrow()
   })
 
-  it('повторная блокировка не ломает состояние', async () => {
+  it('locking again does not break state', async () => {
     await openSession()
     await services.session.close()
 
@@ -102,8 +101,8 @@ describe('Заблокированный кошелёк не выполняет 
   })
 })
 
-describe('Выдача секретов требует пароля даже при снятой блокировке', () => {
-  it('seed-фраза не выдаётся по неверному паролю', async () => {
+describe('Releasing secrets requires a password even when unlocked', () => {
+  it('does not release the seed phrase for a wrong password', async () => {
     await openSession()
 
     await expect(
@@ -111,7 +110,7 @@ describe('Выдача секретов требует пароля даже п�
     ).rejects.toThrow(InvalidPasswordError)
   })
 
-  it('приватный ключ не выдаётся по неверному паролю', async () => {
+  it('does not release a private key for a wrong password', async () => {
     await openSession()
 
     await expect(
@@ -121,9 +120,9 @@ describe('Выдача секретов требует пароля даже п�
     ).rejects.toThrow(InvalidPasswordError)
   })
 
-  it('заниженный уровень риска не даёт выдачи', async () => {
-    /* Интерфейс, показавший мягкое предупреждение там, где нужно
-       объяснение необратимых последствий, разрешения не получит. */
+  it('an understated risk level does not grant a release', async () => {
+    /* A UI that showed a soft warning where irreversible
+       consequences must be explained will not get a permit. */
     await openSession()
 
     await expect(
@@ -131,9 +130,10 @@ describe('Выдача секретов требует пароля даже п�
     ).rejects.toThrow(ExportNotPermittedError)
   })
 
-  it('неверный пароль не оставляет следа в журнале экспортов', async () => {
-    /* Журнал, полный несостоявшихся выгрузок, завышал бы оценку риска
-       последующих операций — то есть учил бы не читать предупреждения. */
+  it('a wrong password leaves no trace in the export log', async () => {
+    /* A log full of failed exports would inflate the risk of
+       later operations — that is, train people not to read
+       warnings. */
     await openSession()
 
     await expect(
@@ -147,10 +147,9 @@ describe('Выдача секретов требует пароля даже п�
   })
 })
 
-describe('Разрешение на экспорт одноразово и привязано к операции', () => {
-  /* Путь строится конструктором, а не приведением типом: приведение
-     обошло бы проверку формата, ради которой брендированный тип
-     и существует. */
+describe('An export permit is one-shot and bound to the operation', () => {
+  /* The path is built by the constructor, not by a type cast: a
+     cast would skip the format check the branded type exists for. */
   const ACCOUNT_SCOPE = hdAccountScope(toDerivationPath("m/44'/60'/0'"))
 
   let guard: ExportGuard
@@ -162,7 +161,7 @@ describe('Разрешение на экспорт одноразово и пр�
     )
   })
 
-  it('разрешение не подходит к другому виду секрета', async () => {
+  it('a permit does not match a different secret kind', async () => {
     const permit = await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, ACCOUNT_SCOPE),
       EXPORT_RISK.Elevated,
@@ -171,7 +170,7 @@ describe('Разрешение на экспорт одноразово и пр�
     expect(permit.matches(EXPORT_KIND.Xprv, ACCOUNT_SCOPE, null)).toBe(false)
   })
 
-  it('разрешение не подходит к другому адресу', async () => {
+  it('a permit does not match a different address', async () => {
     const permit = await guard.confirm(
       privateKeyExportRequest(ACCOUNT_SCOPE, 0),
       EXPORT_RISK.Elevated,
@@ -180,9 +179,9 @@ describe('Разрешение на экспорт одноразово и пр�
     expect(permit.matches(EXPORT_KIND.PrivateKey, ACCOUNT_SCOPE, 1)).toBe(false)
   })
 
-  it('использованное разрешение больше не подходит ни к чему', async () => {
-    /* Иначе одно подтверждение пользователя открывало бы неограниченное
-       число выгрузок. */
+  it('a consumed permit matches nothing', async () => {
+    /* Otherwise one user confirmation would unlock unlimited
+       exports. */
     const request = privateKeyExportRequest(ACCOUNT_SCOPE, 0)
     const permit = await guard.confirm(request, EXPORT_RISK.Elevated)
 
@@ -193,16 +192,16 @@ describe('Разрешение на экспорт одноразово и пр�
     expect(permit.matches(EXPORT_KIND.PrivateKey, request.scope, 0)).toBe(false)
   })
 
-  it('разрешение не раскрывает состояния при сериализации', () => {
-    /* Само по себе оно безопасно и может попадать в журнал, но только
-       в том виде, в каком задумано. */
+  it('a permit does not reveal state when serialized', () => {
+    /* On its own it is safe and may reach a log, but only in
+       the form it was designed for. */
     expect(JSON.stringify(guard)).not.toContain('secret')
   })
 
-  it('область seed-фразы отличается от области аккаунта', async () => {
-    /* Фраза выводит все аккаунты, включая ещё не созданные: записав её
-       выдачу под путём одного аккаунта, журнал утверждал бы, что риск
-       ограничен этим аккаунтом. */
+  it('the seed-phrase scope differs from an account scope', async () => {
+    /* The phrase derives every account, including ones not yet
+       created: logging its release under one account path would
+       claim the risk is limited to that account. */
     const assessment = await guard.assess(accountExportRequest(EXPORT_KIND.Mnemonic, WALLET_SCOPE))
 
     expect(assessment.request.scope).toBe(WALLET_SCOPE)

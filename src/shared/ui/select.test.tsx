@@ -24,7 +24,7 @@ function BoundSelect() {
 }
 
 describe('Select', () => {
-  it('открывает список приложения, а не системный select', async () => {
+  it('opens the app list, not a native select', async () => {
     const user = userEvent.setup()
 
     render(<BoundSelect />)
@@ -43,7 +43,7 @@ describe('Select', () => {
     expect(screen.getByLabelText('status')).toHaveTextContent('failure')
   })
 
-  it('закрывается по Escape', async () => {
+  it('closes on Escape', async () => {
     const user = userEvent.setup()
 
     render(<BoundSelect />)
@@ -55,7 +55,7 @@ describe('Select', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
-  it('выбирает пункт стрелками и Enter', async () => {
+  it('selects an option with arrows and Enter', async () => {
     const user = userEvent.setup()
 
     render(<BoundSelect />)

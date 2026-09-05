@@ -4,87 +4,89 @@ import type { ExportRisk, IExportRiskAssessment } from '@/core/security'
 import type { AccountId } from '@/core/types'
 
 /**
- * Проверка мнемонической фразы перед импортом.
+ * Check of a mnemonic phrase before import.
  *
- * ЧТО ПРОВЕРЯЕТСЯ И ЧТО НЕТ. Проверяется, что фраза действительна:
- * допустимая длина, все слова из словаря, контрольная сумма сходится, —
- * и что её энтропия не является тривиальной. Не проверяется и не может
- * быть проверено, что фраза принадлежит пользователю: кошелёк восстановит
- * любую действительную фразу, включая чужую и включая подсунутую.
+ * WHAT IS CHECKED AND WHAT IS NOT. The phrase is checked for
+ * validity: allowed length, every word in the wordlist, checksum
+ * matches — and that its entropy is not trivial. It is not checked,
+ * and cannot be checked, that the phrase belongs to the user: the
+ * wallet will restore any valid phrase, including someone else's
+ * and including one that was planted.
  *
- * РАСШИРЯЕТ РЕЗУЛЬТАТ ВАЛИДАЦИИ, А НЕ ПОВТОРЯЕТ ЕГО. Позиции неизвестных
- * слов, число слов и машиночитаемая причина отказа уже описаны в
- * {@link IMnemonicValidationResult}; вторая структура с теми же полями
- * разошлась бы с первой при ближайшем изменении.
+ * EXTENDS THE VALIDATION RESULT, DOES NOT REPEAT IT. Positions of
+ * unknown words, word count, and the machine-readable refusal
+ * reason are already described in {@link IMnemonicValidationResult};
+ * a second structure with the same fields would drift from the first
+ * at the next change.
  */
 export interface IMnemonicCheck extends IMnemonicValidationResult {
   /**
-   * Энтропия фразы состоит из одинаковых байтов.
+   * The phrase entropy consists of identical bytes.
    *
-   * Признак общеизвестного тестового набора вроде `abandon … about`.
-   * Средства на адресах такой фразы не принадлежат никому: её приватные
-   * ключи вычисляет любой желающий.
+   * A marker of a well-known test set such as `abandon … about`.
+   * Funds on the addresses of such a phrase belong to no one: anyone
+   * can compute its private keys.
    *
-   * Не является причиной отказа: импорт тестовой фразы — обычная работа
-   * разработчика. Интерфейс обязан показать предупреждение, а решение
-   * оставить владельцу.
+   * Not a reason to refuse: importing a test phrase is ordinary
+   * developer work. The UI must show a warning and leave the
+   * decision to the owner.
    */
   readonly isGuessable: boolean
 }
 
 /**
- * Резервное копирование секретов кошелька.
+ * Backup of wallet secrets.
  *
- * ЭТОТ ИНТЕРФЕЙС — САМАЯ ОПАСНАЯ ЧАСТЬ КОШЕЛЬКА. Всё остальное построено
- * на том, что секреты не покидают зашифрованного хранилища; здесь они
- * покидают его по требованию. Шифрование, автоблокировка и редакция
- * журналов обходятся одним успешным вызовом отсюда.
+ * THIS INTERFACE IS THE MOST DANGEROUS PART OF THE WALLET. Everything
+ * else is built on secrets never leaving encrypted storage; here they
+ * leave it on request. Encryption, auto-lock, and log redaction are
+ * bypassed by one successful call from here.
  *
- * ОТСЮДА ТРИ ПРАВИЛА, ОБЯЗАТЕЛЬНЫЕ ДЛЯ КАЖДОГО МЕТОДА ВЫДАЧИ:
+ * HENCE THREE RULES, MANDATORY FOR EVERY REVEAL METHOD:
  *
- * 1. Пароль проверяется заново, даже если кошелёк разблокирован.
- *    Снятая блокировка означает, что пароль вводили когда-то, а не что
- *    за устройством сейчас владелец.
- * 2. Требуется разрешение `ExportGuard`, выданное под показанный
- *    пользователю уровень риска. Занизить предупреждение нельзя:
- *    разрешение не выдастся.
- * 3. Секрет возвращается буфером, который вызывающий обязан затереть.
- *    Строку в JavaScript затереть невозможно — она живёт до сборки
- *    мусора, — поэтому наружу отдаётся именно буфер.
+ * 1. The password is checked again even if the wallet is unlocked.
+ *    An unlocked lock means the password was entered at some point,
+ *    not that the owner is at the device now.
+ * 2. An `ExportGuard` permit is required, issued for the risk level
+ *    shown to the user. The warning cannot be understated: the
+ *    permit will not be issued.
+ * 3. The secret is returned as a buffer the caller must wipe. A
+ *    JavaScript string cannot be wiped — it lives until garbage
+ *    collection — so a buffer is what goes out.
  *
- * ЧЕГО ЗДЕСЬ НЕТ И ПОЧЕМУ. Импорта кошелька: он создаёт кошелёк, а
- * создание кошелька выполняется онбордингом. Второй путь создания означал
- * бы второе место, где решается, что делать с уже существующим кошельком, —
- * и второй способ затереть его поверх.
+ * WHAT IS NOT HERE AND WHY. Wallet import: it creates a wallet, and
+ * wallet creation is done by onboarding. A second creation path would
+ * be a second place that decides what to do with an already existing
+ * wallet — and a second way to overwrite it.
  */
 export interface IBackupManager {
   /**
-   * Оценивает риск выдачи мнемонической фразы.
+   * Assesses the risk of revealing the mnemonic phrase.
    *
-   * Вызывается до показа предупреждения: интерфейс обязан показать текст,
-   * соответствующий возвращённому уровню, иначе разрешение не выдастся.
+   * Called before the warning is shown: the UI must show text that
+   * matches the returned level, or the permit will not be issued.
    */
   assessMnemonicExport(): Promise<IExportRiskAssessment>
 
   /**
-   * Выдаёт мнемоническую фразу.
+   * Reveals the mnemonic phrase.
    *
-   * @param password Пароль кошелька. Проверяется заново.
-   * @param acknowledgedRisk Уровень риска, показанный пользователю.
+   * @param password Wallet password. Checked again.
+   * @param acknowledgedRisk Risk level shown to the user.
    * @throws InvalidPasswordError, ExportNotPermittedError,
    *         WalletNotInitializedError
    */
   exportMnemonic(password: string, acknowledgedRisk: ExportRisk): Promise<ISecretBuffer>
 
   /**
-   * Оценивает риск выдачи приватного ключа конкретного аккаунта.
+   * Assesses the risk of revealing a specific account's private key.
    *
    * @throws AccountNotFoundError
    */
   assessPrivateKeyExport(id: AccountId): Promise<IExportRiskAssessment>
 
   /**
-   * Выдаёт приватный ключ аккаунта.
+   * Reveals an account private key.
    *
    * @throws InvalidPasswordError, ExportNotPermittedError,
    *         AccountNotFoundError
@@ -96,22 +98,23 @@ export interface IBackupManager {
   ): Promise<ISecretBuffer>
 
   /**
-   * Сверяет переписанную фразу с хранимой, не показывая хранимую.
+   * Checks a rewritten phrase against the stored one without showing
+   * the stored one.
    *
-   * Отвечает одним битом: указание на отличающееся слово помогло бы
-   * не только владельцу. Пароль обязателен — без него метод
-   * превращается в оракул для перебора чужих догадок.
+   * Answers with a single bit: pointing at the differing word would
+   * help more than the owner. The password is required — without it
+   * the method becomes an oracle for guessing someone else's phrase.
    *
    * @throws InvalidPasswordError, WalletNotInitializedError
    */
   verifyMnemonicBackup(phrase: string, password: string): Promise<boolean>
 
   /**
-   * Проверяет фразу перед импортом.
+   * Checks a phrase before import.
    *
-   * Не бросает исключений: форма ввода вызывает эту проверку на каждое
-   * нажатие клавиши, и исключение на недописанной фразе означало бы
-   * ошибку в консоли на каждую букву.
+   * Does not throw: the input form calls this on every keystroke, and
+   * an exception on an unfinished phrase would mean a console error
+   * on every letter.
    */
   checkMnemonic(phrase: string): IMnemonicCheck
 }

@@ -8,29 +8,27 @@ interface PreflightNoticeProps {
 }
 
 /**
- * Итог прогона вызова на узле до подписи.
+ * Result of a node trial run before signing.
  *
- * ПОКАЗЫВАЕТСЯ ВСЕГДА, ВКЛЮЧАЯ УСПЕХ. Соблазн молчать при удачном
- * исходе велик — меньше шума на экране, — но тогда отсутствие блока
- * означало бы сразу две разные вещи: «проверено» и «проверить
- * не удалось». Владелец средств обязан различать их, потому что
- * во втором случае он подписывает вслепую.
+ * Always shown, including success. The temptation to stay quiet on
+ * a pass is strong — less noise — but then a missing block would
+ * mean both "checked" and "could not check". The owner must tell
+ * them apart: the second case is signing blind.
  *
- * УСПЕХ НЕ ОБЕЩАЕТ ВЫПОЛНЕНИЯ. Проверка говорит о состоянии цепи
- * на момент вызова: разрешение может быть отозвано, а средства
- * потрачены другой транзакцией до включения этой в блок. Написать
- * «транзакция пройдёт» значило бы дать обещание, которого кошелёк
- * выполнить не может.
+ * Success does not promise execution. The check is the chain state
+ * at call time: an approval may be revoked, funds spent by another
+ * tx, before this one lands. "The transaction will go through"
+ * would be a promise the wallet cannot keep.
  *
- * ОТКАЗ НЕ ЗАПРЕЩАЕТ ОТПРАВКУ. Узел мог отвечать по устаревшему
- * состоянию, а владелец — знать о встречной транзакции, которая всё
- * исправит. Решение остаётся за ним; дело кошелька — назвать причину
- * словами контракта, а не общим «не получилось».
+ * A refusal does not block send. The node may have answered from
+ * stale state, and the owner may know about a counter-tx that
+ * fixes it. The decision stays theirs; the wallet's job is to name
+ * the reason in the contract's words, not a generic "it failed".
  */
 export function PreflightNotice({ preflight }: PreflightNoticeProps) {
-  /* НЕЙТРАЛЬНОЕ ОФОРМЛЕНИЕ УСПЕХА, А НЕ «ЗЕЛЁНОЕ». Галка на зелёном
-     фоне читается как обещание, что перевод состоится, тогда как
-     проверен лишь текущий блок. */
+  /* Neutral success styling, not "green". A check on green reads
+     as a promise the transfer will land, while only the current
+     block was checked. */
   if (preflight.outcome === PREFLIGHT_OUTCOME.Passed) {
     return (
       <Alert>
@@ -81,10 +79,10 @@ export function PreflightNotice({ preflight }: PreflightNoticeProps) {
           </>
         )}
 
-        {/* Причина приходит от контракта и показывается дословно.
-            Пересказ своими словами убрал бы единственную зацепку:
-            «недостаточно разрешения» и «получатель в чёрном списке»
-            требуют разных действий. */}
+        {/* The reason comes from the contract and is shown verbatim.
+            A paraphrase would drop the only hook: "insufficient
+            allowance" and "recipient is blacklisted" need different
+            actions. */}
         {preflight.reason === null ? null : <> The contract said: "{preflight.reason}".</>}
       </AlertDescription>
     </Alert>

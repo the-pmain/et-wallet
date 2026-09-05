@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { copyWithAutoClear } from './clipboard'
 
-/** Буфер обмена-дублёр с управляемым содержимым. */
 function createClipboard(initial = '') {
   let content = initial
 
@@ -19,7 +18,6 @@ function createClipboard(initial = '') {
   }
 }
 
-/** Планировщик, запускаемый вручную. */
 function createScheduler() {
   let pending: (() => void) | null = null
 
@@ -41,7 +39,7 @@ function createScheduler() {
 }
 
 describe('copyWithAutoClear', () => {
-  it('копирует значение в буфер', async () => {
+  it('copies the value to the clipboard', async () => {
     const clipboard = createClipboard()
     const scheduler = createScheduler()
 
@@ -50,7 +48,7 @@ describe('copyWithAutoClear', () => {
     expect(clipboard.content).toBe('0xabc')
   })
 
-  it('очищает буфер по истечении срока', async () => {
+  it('clears the clipboard after the delay', async () => {
     const clipboard = createClipboard()
     const scheduler = createScheduler()
 
@@ -61,24 +59,24 @@ describe('copyWithAutoClear', () => {
     })
   })
 
-  it('не трогает буфер, если пользователь скопировал что-то ещё', async () => {
-    /* Стереть чужое содержимое значило бы уничтожить данные, к которым
-       кошелёк отношения не имеет. */
+  it('leaves the clipboard alone if the user copied something else', async () => {
+    /* Wiping someone else's content would destroy data the wallet
+       has no claim on. */
     const clipboard = createClipboard()
     const scheduler = createScheduler()
 
     await copyWithAutoClear('0xabc', { clipboard, schedule: scheduler.schedule })
-    await clipboard.writeText('чужой текст')
+    await clipboard.writeText('foreign text')
 
     scheduler.run()
     await vi.waitFor(() => {
       expect(clipboard.readText).toHaveBeenCalled()
     })
 
-    expect(clipboard.content).toBe('чужой текст')
+    expect(clipboard.content).toBe('foreign text')
   })
 
-  it('отмена снимает запланированную очистку', async () => {
+  it('cancel drops the scheduled clear', async () => {
     const clipboard = createClipboard()
     const scheduler = createScheduler()
 
@@ -93,10 +91,10 @@ describe('copyWithAutoClear', () => {
     expect(clipboard.content).toBe('0xabc')
   })
 
-  it('запрет на чтение буфера не роняет экран', async () => {
+  it('a clipboard read denial does not take down the screen', async () => {
     const clipboard = {
       writeText: vi.fn(() => Promise.resolve()),
-      readText: vi.fn(() => Promise.reject(new Error('Чтение запрещено'))),
+      readText: vi.fn(() => Promise.reject(new Error('Reading is forbidden'))),
     }
     const scheduler = createScheduler()
 

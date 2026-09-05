@@ -2,11 +2,11 @@ import { APP_CONFIG } from '@/shared/config'
 import { LegalPageLayout, LegalSection } from '@/shared/ui/legal-page-layout'
 
 /**
- * Политика конфиденциальности.
+ * Privacy policy.
  *
- * Описывает, какие данные могут покинуть устройство, а какие — нет.
- * Для некастодиального кошелька это важнее перечня «что мы собираем»:
- * ключи и seed-фраза намеренно никуда не отправляются.
+ * Describes which data may leave the device and which may not. For a
+ * non-custodial wallet that matters more than a "what we collect" list:
+ * keys and the seed phrase are deliberately never sent anywhere.
  */
 export function PrivacyPage() {
   return (

@@ -21,12 +21,10 @@ const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
 const LATEST_BLOCK = 20_000n
 
-/** Слово в 32 байта из числа. */
 function word(value: bigint): string {
   return value.toString(16).padStart(64, '0')
 }
 
-/** Журнальная запись с заданными темами и данными. */
 function log(params: {
   topics: readonly string[]
   data?: string
@@ -44,7 +42,7 @@ function log(params: {
   }
 }
 
-/** Провайдер-дублёр, отдающий заранее заданные журналы. */
+/** A provider stand-in that returns pre-set logs. */
 class StubProvider implements IProvider {
   readonly chainId = CHAIN_ID
   readonly rpcUrl = 'https://stub.example'
@@ -63,8 +61,8 @@ class StubProvider implements IProvider {
       return Promise.reject(new Error('the range is too wide'))
     }
 
-    /* Дублёр повторяет поведение узла: возвращает только те записи,
-       чьи темы совпадают с фильтром по каждой заданной позиции. */
+    /* The stand-in repeats node behaviour: it returns only entries
+       whose topics match the filter at each given position. */
     const topics = filter.topics ?? []
 
     return Promise.resolve(
@@ -81,7 +79,7 @@ class StubProvider implements IProvider {
   }
 
   request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getChainId(): Promise<ChainId> {
@@ -89,7 +87,7 @@ class StubProvider implements IProvider {
   }
 
   getBalance(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getTransactionCount(): Promise<number> {
@@ -104,7 +102,7 @@ class StubProvider implements IProvider {
     return Promise.resolve('0x' as HexString)
   }
 
-  /** Байт-код по адресу. Обычный адрес: проверок контракта в этих тестах нет. */
+  /** Bytecode at the address. An ordinary address: these tests do not check for a contract. */
   getCode(): Promise<HexString> {
     return Promise.resolve('0x' as HexString)
   }
@@ -113,11 +111,11 @@ class StubProvider implements IProvider {
   }
 
   getFeeData(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   sendRawTransaction(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getTransactionReceipt(): Promise<null> {
@@ -125,7 +123,7 @@ class StubProvider implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -143,33 +141,32 @@ beforeEach(() => {
   source = new LogScanHistoryProvider()
 })
 
-describe('LogScanHistoryProvider: ограничения', () => {
-  it('честно сообщает, что нативные переводы недоступны', async () => {
+describe('LogScanHistoryProvider: limits', () => {
+  it('honestly reports that native transfers are unavailable', async () => {
     const page = await source.fetch(query, node)
 
-    /* Перевод нативной валюты не порождает события и в журналах
-       отсутствует физически. Умолчать об этом значит утверждать,
-       что таких переводов не было. */
+    /* A native transfer emits no event and is physically absent from
+       the logs. Staying silent would claim that no such transfers
+       happened. */
     expect(page.limits.nativeTransfersUnavailable).toBe(true)
   })
 
-  it('сообщает глубину просмотренного окна', async () => {
+  it('reports the depth of the scanned window', async () => {
     expect((await source.fetch(query, node)).limits.scannedBlocks).toBe(10_000)
   })
 
-  it('запрашивает окно от текущего блока назад', async () => {
+  it('requests a window backward from the current block', async () => {
     await source.fetch(query, node)
 
     expect(node.requestedFilters[0]?.toBlock).toBe(LATEST_BLOCK)
     expect(node.requestedFilters[0]?.fromBlock).toBe(LATEST_BLOCK - 9_999n)
   })
 
-  it('окно содержит ровно объявленное число блоков', async () => {
-    /* Вычитание всей глубины давало окно на блок шире объявленного,
-       и узлы с пределом ровно в десять тысяч отвечали отказом
-       «диапазон слишком широк». Проверено живьём: узел Polygon
-       отвергал именно наш запрос, хотя его предел совпадал с нашей
-       глубиной. */
+  it('the window contains exactly the declared number of blocks', async () => {
+    /* Subtracting the full depth made the window one block wider
+       than declared, and nodes with a limit of exactly ten thousand
+       answered "range too wide". Checked live: a Polygon node
+       rejected our request even though its limit matched our depth. */
     await source.fetch(query, node)
 
     const filter = node.requestedFilters[0]
@@ -178,7 +175,7 @@ describe('LogScanHistoryProvider: ограничения', () => {
     expect(width).toBe(10_000n)
   })
 
-  it('не уходит ниже нулевого блока в молодой сети', async () => {
+  it('does not go below the zero block on a young network', async () => {
     const shallow = new LogScanHistoryProvider({ scanBlocks: 100_000 })
 
     await shallow.fetch(query, node)
@@ -197,35 +194,35 @@ describe('LogScanHistoryProvider: ERC-20', () => {
     ]
   })
 
-  it('распознаёт перевод токена', async () => {
+  it('recognises a token transfer', async () => {
     const [transfer] = (await source.fetch(query, node)).transfers
 
     expect(transfer?.kind).toBe(TRANSFER_KIND.Erc20)
     expect(transfer?.value).toBe(1_500_000n)
   })
 
-  it('определяет направление относительно владельца', async () => {
+  it('sets the direction relative to the owner', async () => {
     const [transfer] = (await source.fetch(query, node)).transfers
 
     expect(transfer?.direction).toBe(TRANSFER_DIRECTION.Outgoing)
   })
 
-  it('не выдумывает число знаков токена', async () => {
+  it('does not invent the token decimals', async () => {
     const [transfer] = (await source.fetch(query, node)).transfers
 
-    /* Журнал числа знаков не содержит. Подстановка привычных
-       восемнадцати исказила бы сумму на порядки. */
+    /* The log does not contain decimals. Filling in the familiar
+       eighteen would distort the amount by orders of magnitude. */
     expect(transfer?.asset.decimals).toBeNull()
     expect(transfer?.asset.symbol).toBeNull()
   })
 
-  it('запоминает адрес контракта', async () => {
+  it('remembers the contract address', async () => {
     expect((await source.fetch(query, node)).transfers[0]?.asset.contract).toBe(TOKEN)
   })
 })
 
 describe('LogScanHistoryProvider: ERC-721', () => {
-  it('отличает ERC-721 от ERC-20 по числу тем', async () => {
+  it('distinguishes ERC-721 from ERC-20 by the topic count', async () => {
     node.logs = [
       log({
         topics: [TRANSFER_TOPIC, addressToTopic(PEER), addressToTopic(OWNER), `0x${word(42n)}`],
@@ -234,14 +231,14 @@ describe('LogScanHistoryProvider: ERC-721', () => {
 
     const [transfer] = (await source.fetch(query, node)).transfers
 
-    /* Единственный признак: у ERC-721 идентификатор предмета
-       индексирован и занимает четвёртую тему. */
+    /* The only signal: for ERC-721 the item id is indexed and
+       occupies the fourth topic. */
     expect(transfer?.kind).toBe(TRANSFER_KIND.Erc721)
     expect(transfer?.tokenId).toBe(42n)
     expect(transfer?.value).toBe(1n)
   })
 
-  it('определяет входящее направление', async () => {
+  it('sets the incoming direction', async () => {
     node.logs = [
       log({
         topics: [TRANSFER_TOPIC, addressToTopic(PEER), addressToTopic(OWNER), `0x${word(7n)}`],
@@ -255,7 +252,7 @@ describe('LogScanHistoryProvider: ERC-721', () => {
 })
 
 describe('LogScanHistoryProvider: ERC-1155', () => {
-  it('разбирает перевод одного предмета', async () => {
+  it('parses a single-item transfer', async () => {
     node.logs = [
       log({
         topics: [
@@ -275,9 +272,9 @@ describe('LogScanHistoryProvider: ERC-1155', () => {
     expect(transfer?.value).toBe(3n)
   })
 
-  it('разбирает набор предметов в одном событии', async () => {
-    /* Кодировка ABI: два смещения, длина первого массива, его элементы,
-       длина второго массива, его элементы. */
+  it('parses a set of items in one event', async () => {
+    /* ABI encoding: two offsets, length of the first array, its
+       items, length of the second array, its items. */
     const data = `0x${word(64n)}${word(160n)}${word(2n)}${word(11n)}${word(12n)}${word(2n)}${word(1n)}${word(2n)}`
 
     node.logs = [
@@ -299,7 +296,7 @@ describe('LogScanHistoryProvider: ERC-1155', () => {
     expect(transfers.map((item) => item.value)).toEqual([1n, 2n])
   })
 
-  it('даёт разным предметам одного события разные идентификаторы', async () => {
+  it('gives different items of one event different identifiers', async () => {
     const data = `0x${word(64n)}${word(160n)}${word(2n)}${word(11n)}${word(12n)}${word(2n)}${word(1n)}${word(2n)}`
 
     node.logs = [
@@ -316,14 +313,15 @@ describe('LogScanHistoryProvider: ERC-1155', () => {
 
     const { transfers } = await source.fetch(query, node)
 
-    /* Ключом служит хэш плюс номер лога плюс номер внутри события:
-       одного хэша мало, иначе набор схлопнулся бы в одну запись. */
+    /* The key is the hash plus the log index plus the index inside
+       the event: the hash alone is not enough, or the set would
+       collapse into one record. */
     expect(new Set(transfers.map((item) => item.id)).size).toBe(2)
   })
 })
 
-describe('LogScanHistoryProvider: устойчивость', () => {
-  it('отбрасывает записи, отменённые реорганизацией цепи', async () => {
+describe('LogScanHistoryProvider: resilience', () => {
+  it('drops records cancelled by a chain reorganisation', async () => {
     node.logs = [
       log({
         topics: [TRANSFER_TOPIC, addressToTopic(OWNER), addressToTopic(PEER)],
@@ -335,24 +333,24 @@ describe('LogScanHistoryProvider: устойчивость', () => {
     expect((await source.fetch(query, node)).transfers).toHaveLength(0)
   })
 
-  it('сообщает об отказе, а не выдаёт его за пустую историю', async () => {
+  it('reports a refusal instead of treating it as empty history', async () => {
     node.failGetLogs = true
 
-    /* Публичные узлы отвергают выборку журналов без указания контракта —
-       именно такую, какая нужна для поиска всех токенов сразу. Проглотив
-       отказ, кошелёк утверждал бы, что операций не было. */
+    /* Public nodes reject a log query with no contract — exactly the
+       query needed to find every token at once. Swallowing the
+       refusal, the wallet would claim that no operations happened. */
     await expect(source.fetch(query, node)).rejects.toThrow(/the range is too wide/)
   })
 
-  it('доводит причину отказа дословно', async () => {
+  it('forwards the refusal reason verbatim', async () => {
     node.failGetLogs = true
 
-    /* Обобщённое «история недоступна» не подсказывает решения,
-       а сообщение узла указывает на него прямо. */
+    /* A generic "history unavailable" does not hint at a fix, while
+       the node's message points to it directly. */
     await expect(source.fetch(query, node)).rejects.toThrow(/range/)
   })
 
-  it('не повторяет перевод, попавший в обе выборки', async () => {
+  it('does not repeat a transfer that landed in both queries', async () => {
     node.logs = [
       log({
         topics: [TRANSFER_TOPIC, addressToTopic(OWNER), addressToTopic(OWNER)],
@@ -366,7 +364,7 @@ describe('LogScanHistoryProvider: устойчивость', () => {
     expect(transfers[0]?.direction).toBe(TRANSFER_DIRECTION.Self)
   })
 
-  it('соблюдает предел числа записей', async () => {
+  it('respects the record-count limit', async () => {
     node.logs = Array.from({ length: 10 }, (_, index) =>
       log({
         topics: [TRANSFER_TOPIC, addressToTopic(OWNER), addressToTopic(PEER)],
@@ -379,18 +377,18 @@ describe('LogScanHistoryProvider: устойчивость', () => {
   })
 })
 
-describe('LogScanHistoryProvider: продолжение просмотра', () => {
-  it('первая страница обещает продолжение', async () => {
-    /* Разбор журналов охватывает лишь окно блоков. Метка продолжения —
-       единственное, что отличает «это вся история» от «это её конец
-       сверху», и без неё пустой список читался бы как отсутствие
-       операций за всё время. */
+describe('LogScanHistoryProvider: continuing the scan', () => {
+  it('the first page promises a continuation', async () => {
+    /* Log parsing covers only a window of blocks. The continuation
+       cursor is the only thing that distinguishes "this is all of
+       history" from "this is its top end", and without it an empty
+       list would be read as no operations ever. */
     expect((await source.fetch(query, node)).cursor).not.toBeNull()
   })
 
-  it('вторая страница просматривает окно, вплотную предшествующее первому', async () => {
-    /* Пропуск между окнами потерял бы операции беззвучно, перекрытие —
-       показало бы их дважды. Границы обязаны смыкаться. */
+  it('the second page scans the window immediately before the first', async () => {
+    /* A gap between windows would lose operations silently, an
+       overlap would show them twice. The bounds must meet. */
     const first = await source.fetch(query, node)
 
     node.requestedFilters = []
@@ -403,10 +401,10 @@ describe('LogScanHistoryProvider: продолжение просмотра', ()
     expect(node.requestedFilters[0]?.fromBlock).toBe(firstWindowStart - 10_000n)
   })
 
-  it('за меткой узел о последнем блоке не спрашивается', async () => {
-    /* Сеть уходит вперёд между страницами. Возьми продолжение свежий
-       последний блок — окно сдвинулось бы, и между страницами возник
-       бы пропуск ровно на выросшую часть цепи. */
+  it('after a cursor the node is not asked for the latest block', async () => {
+    /* The network moves on between pages. If continuation took a
+       fresh latest block, the window would shift and a gap the size
+       of the grown chain would open between pages. */
     const first = await source.fetch(query, node)
     let asked = 0
 
@@ -421,18 +419,18 @@ describe('LogScanHistoryProvider: продолжение просмотра', ()
     expect(asked).toBe(0)
   })
 
-  it('глубина просмотра суммируется по страницам', async () => {
-    /* Надпись «просмотрено десять тысяч блоков» после третьего
-       нажатия была бы неверна втрое. */
+  it('scan depth is summed across pages', async () => {
+    /* The label "ten thousand blocks scanned" after the third press
+       would be wrong by a factor of three. */
     const first = await source.fetch(query, node)
     const second = await source.fetch({ ...query, cursor: first.cursor }, node)
 
     expect(second.limits.scannedBlocks).toBe(20_000)
   })
 
-  it('у начала цепи продолжения нет', async () => {
-    /* Нулевой блок — дно истории. Метка здесь означала бы, что
-       кнопка «показать более ранние» никогда не исчезнет. */
+  it('there is no continuation at the start of the chain', async () => {
+    /* The zero block is the floor of history. A cursor here would
+       mean the "show earlier" button never disappears. */
     node.getBlockNumber = () => Promise.resolve(5_000n)
 
     const page = await source.fetch(query, node)
@@ -441,10 +439,10 @@ describe('LogScanHistoryProvider: продолжение просмотра', ()
     expect(page.limits.scannedBlocks).toBe(5_001)
   })
 
-  it('чужая метка начинает просмотр заново, а не ломает выдачу', async () => {
-    /* Метку выдал другой источник: истолковать её как номер блока
-       значило бы уйти в неизвестную часть цепи. Показать начало
-       заново — худшее, что при этом допустимо. */
+  it('a foreign cursor restarts the scan instead of breaking the listing', async () => {
+    /* Another source issued the cursor: reading it as a block number
+       would walk into an unknown part of the chain. Showing the
+       start again is the worst that is allowed. */
     const page = await source.fetch(
       { ...query, cursor: { providerId: 'alchemy', value: '{"sent":"key"}' } },
       node,

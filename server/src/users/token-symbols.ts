@@ -1,8 +1,8 @@
 /**
- * Тикеры из витрины `users.assets.tokens`.
+ * Tickers from the `users.assets.tokens` showcase.
  *
- * Одно множество на создание перевода и на кабинет: иначе поле
- * `sendings.symbol` и позиция в `tokens` разъедутся.
+ * One set for transfer create and the cabinet: otherwise
+ * `sendings.symbol` and the `tokens` holding would drift apart.
  */
 export const TOKEN_SYMBOL = {
   ETH: 'ETH',

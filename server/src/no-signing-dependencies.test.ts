@@ -5,23 +5,23 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Охранник зависимостей Node-слоя.
+ * Node-layer dependency guard.
  *
- * ОБЕЩАНИЕ «СЕРВИС НЕ ПОДПИСЫВАЕТ ТРАНЗАКЦИИ» ДОЛЖНО БЫТЬ ПРОВЕРЯЕМЫМ,
- * А НЕ УСТНЫМ. Подписать транзакцию без реализации эллиптической кривой
- * невозможно; восстановить ключ из seed-фразы — без реализации BIP-32
- * и BIP-39.
+ * THE PROMISE "THE SERVICE DOES NOT SIGN TRANSACTIONS" MUST BE
+ * TESTABLE, NOT ORAL. Signing a transaction without an elliptic-curve
+ * implementation is impossible; recovering a key from a seed phrase
+ * needs BIP-32 and BIP-39.
  *
- * После сведения в один `package.json` кошелёк законно тянет ethers и
- * bip39 — ими пользуется браузерный код. Проверяется не манифест, а то,
- * что `server/src` эти пакеты не импортирует.
+ * After the single `package.json` merge the wallet may lawfully pull
+ * ethers and bip39 — the browser code uses them. What is checked is
+ * not the manifest, but that `server/src` does not import those
+ * packages.
  *
- * ХЭШИРОВАНИЕ РАЗРЕШЕНО. `@noble/hashes` нужен для проверки контрольной
- * суммы EIP-55 в адресах каталога. Хэш-функция не подписывает и ключей
- * не выводит.
+ * HASHING IS ALLOWED. `@noble/hashes` is needed for EIP-55 checksums
+ * on catalog addresses. A hash function does not sign and does not
+ * derive keys.
  */
 
-/** Библиотеки, наличие которых в Node-слое означает способность подписывать. */
 const FORBIDDEN_DEPENDENCIES: readonly string[] = [
   'ethers',
   'web3',
@@ -40,8 +40,8 @@ const FORBIDDEN_DEPENDENCIES: readonly string[] = [
 
 const serverSrc = fileURLToPath(new URL('.', import.meta.url))
 
-describe('Исходный код Node-слоя', () => {
-  it('не импортирует библиотеки подписи и вывода ключей', async () => {
+describe('Node-layer source', () => {
+  it('does not import signing or key-derivation libraries', async () => {
     const { globSync } = await import('node:fs')
     const sources = globSync('**/*.ts', { cwd: serverSrc })
 

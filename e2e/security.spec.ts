@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Проверки безопасности собранного приложения.
+ * Security checks of the built application.
  *
- * ПОЧЕМУ ЭТО НЕЛЬЗЯ ПРОВЕРИТЬ БЕЗ БРАУЗЕРА. Content-Security-Policy —
- * это не строка в разметке, а поведение браузера. Meta-тег с правильным
- * текстом ничего не доказывает: доказывает заблокированный скрипт.
- * jsdom политику не применяет вовсе.
+ * WHY THIS CANNOT BE CHECKED WITHOUT A BROWSER. Content-Security-Policy
+ * is not a string in markup; it is browser behavior. A meta tag with
+ * the right text proves nothing: a blocked script does. jsdom does
+ * not apply the policy at all.
  */
 
-/** Директивы, отсутствие любой из которых — дыра, а не мелочь. */
+/** Directives whose absence is a hole, not a nit. */
 const REQUIRED_DIRECTIVES = [
   "default-src 'self'",
   "script-src 'self'",
@@ -22,7 +22,7 @@ const REQUIRED_DIRECTIVES = [
 ]
 
 test.describe('Content-Security-Policy', () => {
-  test('политика внедрена в боевую сборку', async ({ page }) => {
+  test('policy is embedded in the production build', async ({ page }) => {
     await page.goto('/')
 
     const policy = await page
@@ -36,9 +36,9 @@ test.describe('Content-Security-Policy', () => {
     }
   })
 
-  test("script-src не содержит 'unsafe-inline' и 'unsafe-eval'", async ({ page }) => {
-    /* Оба разрешения сводят на нет весь смысл политики: внедрённый
-       через XSS код снова становится исполняемым. */
+  test("script-src does not contain 'unsafe-inline' or 'unsafe-eval'", async ({ page }) => {
+    /* Either permission undoes the whole policy: XSS-injected code
+       becomes executable again. */
     await page.goto('/')
 
     const policy =
@@ -51,17 +51,17 @@ test.describe('Content-Security-Policy', () => {
     expect(scriptSrc).not.toContain('unsafe-eval')
   })
 
-  test('внедрённый код не исполняется', async ({ page }) => {
+  test('injected code does not execute', async ({ page }) => {
     /*
-      Главная проверка раздела: политика действует, а не просто
-      объявлена.
+      Main check of the section: the policy is enforced, not merely
+      declared.
 
-      Пробуются три пути, которыми пользуется XSS: тело скрипта,
-      разметка через `innerHTML` и обработчик события в атрибуте.
-      Каждый может быть остановлен по-разному — Trusted Types
-      отвергают само присваивание, `script-src` не даёт исполнить
-      уже вставленное, — и оба исхода одинаково верны. Проверяется
-      итог: код не выполнился.
+      Three XSS paths are tried: a script body, markup via `innerHTML`,
+      and an event handler in an attribute. Each may be stopped
+      differently — Trusted Types reject the assignment itself,
+      `script-src` refuses to run what was already inserted — and
+      both outcomes are correct. What is checked is the result: the
+      code did not run.
     */
     await page.goto('/')
 
@@ -73,39 +73,39 @@ test.describe('Content-Security-Policy', () => {
 
         script.textContent = 'globalThis.__injectedByTextContent = true'
         document.head.append(script)
-        results.push('textContent: присваивание прошло')
+        results.push('textContent: assignment succeeded')
       } catch {
-        results.push('textContent: отказано')
+        results.push('textContent: refused')
       }
 
       try {
-        /* Правило запрещает присваивание `innerHTML` — и запрещает
-           верно: это вектор XSS. Здесь оно выполняется намеренно,
-           потому что проверяется не наш код, а то, что попытку
-           останавливает браузер. */
+        /* The rule forbids assigning `innerHTML` — and forbids it
+           correctly: that is an XSS vector. It is done here on
+           purpose because we are not testing our code, but that the
+           browser stops the attempt. */
         // eslint-disable-next-line no-restricted-properties
         document.body.innerHTML += '<script>globalThis.__injectedByHtml = true</script>'
-        results.push('innerHTML: присваивание прошло')
+        results.push('innerHTML: assignment succeeded')
       } catch {
-        results.push('innerHTML: отказано')
+        results.push('innerHTML: refused')
       }
 
       try {
         const button = document.createElement('button')
 
         button.setAttribute('onclick', 'globalThis.__injectedByHandler = true')
-        button.id = 'проба-внедрения'
+        button.id = 'injection-probe'
         document.body.append(button)
         button.click()
-        results.push('обработчик: вставлен')
+        results.push('handler: inserted')
       } catch {
-        results.push('обработчик: отказано')
+        results.push('handler: refused')
       }
 
       return results
     })
 
-    /* Ни один из путей не привёл к исполнению. */
+    /* None of the paths led to execution. */
     const executed = await page.evaluate(() => ({
       byTextContent: '__injectedByTextContent' in globalThis,
       byHtml: '__injectedByHtml' in globalThis,
@@ -114,49 +114,49 @@ test.describe('Content-Security-Policy', () => {
 
     expect(executed).toEqual({ byTextContent: false, byHtml: false, byHandler: false })
 
-    /* Хотя бы один путь обязан быть закрыт на этапе присваивания:
-       это работа Trusted Types, и её отсутствие означало бы, что
-       директива объявлена, но не применяется. */
-    expect(refusals.join('; ')).toContain('отказано')
+    /* At least one path must be closed at assignment: that is
+       Trusted Types, and its absence would mean the directive is
+       declared but not applied. */
+    expect(refusals.join('; ')).toContain('refused')
   })
 
   /*
-    ПРОВЕРКИ «eval ЗАБЛОКИРОВАН» ЗДЕСЬ НЕТ, И ЭТО НЕ УПУЩЕНИЕ.
+    THERE IS NO "eval IS BLOCKED" CHECK HERE, AND THAT IS NOT A GAP.
 
-    Попытка была написана и отброшена: `page.evaluate` исполняется
-    через протокол отладки, а он к политике страницы не относится.
-    Сборка кода из строки внутри `page.evaluate` проходит успешно
-    независимо от CSP — то есть такая проверка измеряла бы средство
-    проверки, а не защиту, и создавала бы ложную уверенность.
+    The attempt was written and dropped: `page.evaluate` runs through
+    the debug protocol, which is outside the page policy. Building
+    code from a string inside `page.evaluate` succeeds regardless of
+    CSP — so such a check would measure the test harness, not the
+    defense, and would create false confidence.
 
-    Что проверяется вместо неё: отсутствие `'unsafe-eval'`
-    в `script-src` (проверка выше) и невозможность исполнить
-    внедрённый код теми путями, которыми на самом деле пользуется
-    XSS, — они идут через саму страницу, а не через отладчик.
+    What is checked instead: `'unsafe-eval'` is absent from
+    `script-src` (the check above) and injected code cannot run by
+    the paths XSS actually uses — those go through the page itself,
+    not the debugger.
   */
 })
 
-test.describe('Секреты в собранном приложении', () => {
-  test('в бандле нет включённых послаблений безопасности', async ({ page }) => {
-    /* Боевая сборка с включённым `IS_TEST_MODE` останавливается
-       на старте. Появление экрана приветствия означает, что флаг снят. */
+test.describe('Secrets in the built application', () => {
+  test('the bundle has no enabled security relaxations', async ({ page }) => {
+    /* A production build with `IS_TEST_MODE` on stops at start.
+       The welcome screen appearing means the flag is off. */
     await page.goto('/')
 
     await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
   })
 
-  test('вход по seed-фразе доступен', async ({ page }) => {
-    /* Обратная сторона той же проверки: временное послабление скрывало
-       восстановление кошелька целиком. */
+  test('seed-phrase login is available', async ({ page }) => {
+    /* The other side of the same check: a temporary relaxation hid
+       wallet restore entirely. */
     await page.goto('/')
 
     await expect(page.getByRole('link', { name: /import/i })).toBeVisible()
   })
 
-  test('приложение не встраивается во фрейм со стороннего адреса', async ({ page }) => {
-    /* `frame-ancestors` в meta-теге не поддерживается — защита
-       обязана прийти заголовком от хостинга. Проверка закрепляет, что
-       ограничение известно и не забыто. */
+  test('the app is not framed from a third-party origin', async ({ page }) => {
+    /* `frame-ancestors` is not supported in a meta tag — the defense
+       must come as a host header. The check records that the limit
+       is known and not forgotten. */
     await page.goto('/')
 
     const policy =

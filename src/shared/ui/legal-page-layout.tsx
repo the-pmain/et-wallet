@@ -11,10 +11,10 @@ interface LegalPageLayoutProps {
 }
 
 /**
- * Общая оболочка для правовых и информационных страниц.
+ * Shared shell for legal and information pages.
  *
- * Одинаковая шапка с возвратом и ширина текста: без неё каждая
- * страница расходилась бы в отступах и размере заголовка.
+ * Same back header and text width: without it each page would drift
+ * in padding and heading size.
  */
 export function LegalPageLayout({ title, children }: LegalPageLayoutProps) {
   const location = useLocation()

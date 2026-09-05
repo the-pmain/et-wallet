@@ -114,10 +114,10 @@ function testMarkets(): readonly IMarketCoin[] {
 }
 
 /**
- * `fetch` для экранов справочника: запись пользователя и курсы.
+ * `fetch` for directory screens: the user record and rates.
  *
- * Каталог рынка заполняется сразу: тесты не ждут сеть и не поднимают
- * второй запрос к CoinGecko.
+ * The market catalog is filled immediately: tests do not wait on
+ * the network and do not raise a second CoinGecko request.
  */
 export function mockDirectoryAndPriceFetch(
   userBody: unknown,

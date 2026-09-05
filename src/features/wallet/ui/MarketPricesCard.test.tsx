@@ -46,7 +46,7 @@ function renderCard(loadMarkets: MarketPricesLoader) {
 }
 
 describe('MarketPricesCard', () => {
-  it('запрашивает рынок при появлении и рисует строку без графика', async () => {
+  it('fetches the market on appear and draws a row without a chart', async () => {
     const loadMarkets = vi.fn<MarketPricesLoader>().mockResolvedValue([BITCOIN])
 
     renderCard(loadMarkets)
@@ -64,7 +64,7 @@ describe('MarketPricesCard', () => {
     expect(screen.getByText('7d')).toBeInTheDocument()
   })
 
-  it('прячет хвост списка за Show more', async () => {
+  it('hides the rest of the list behind Show more', async () => {
     const user = userEvent.setup()
     const coins = Array.from({ length: MARKET_PREVIEW_COUNT + 4 }, (_, index) => coinAt(index + 1))
     const hidden = coins[MARKET_PREVIEW_COUNT]
@@ -80,7 +80,7 @@ describe('MarketPricesCard', () => {
     expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
   })
 
-  it('не подменяет отказ источника пустой таблицей', async () => {
+  it('does not replace a source failure with an empty table', async () => {
     const user = userEvent.setup()
     const loadMarkets = vi
       .fn<MarketPricesLoader>()

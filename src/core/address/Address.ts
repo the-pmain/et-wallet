@@ -16,26 +16,26 @@ import {
   UNCOMPRESSED_PUBLIC_KEY_LENGTH,
 } from './types'
 
-/** Адрес EVM: 20 байт, то есть 40 шестнадцатеричных символов после `0x`. */
+/** EVM address: 20 bytes, i.e. 40 hex characters after `0x`. */
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 
-/** Порог полубайта хэша, при котором символ адреса становится заглавным. */
+/** Hash nibble threshold at which an address character becomes uppercase. */
 const CHECKSUM_UPPERCASE_THRESHOLD = 8
 
 /**
- * Вычисляет контрольную сумму адреса по EIP-55.
+ * Computes an address checksum per EIP-55.
  *
- * Алгоритм: keccak256 от адреса в нижнем регистре без префикса; далее
- * i-й символ адреса переводится в верхний регистр, если i-й полубайт хэша
- * не меньше 8.
+ * Algorithm: keccak256 of the lower-case address without the prefix;
+ * then the i-th address character is uppercased if the i-th hash
+ * nibble is at least 8.
  *
- * Зачем это нужно: адрес EVM не имеет собственной контрольной суммы,
- * поэтому опечатка в одном символе даёт другой синтаксически корректный
- * адрес. Средства, отправленные на него, теряются безвозвратно — приватного
- * ключа к нему не существует ни у кого. EIP-55 кодирует контрольную сумму
- * в регистре букв и ловит подавляющее большинство опечаток.
+ * Why this is needed: an EVM address has no checksum of its own, so
+ * a one-character typo yields another syntactically valid address.
+ * Funds sent there are lost for good — nobody has a private key to
+ * it. EIP-55 encodes the checksum in letter case and catches the
+ * vast majority of typos.
  *
- * @param value Адрес с префиксом `0x` в любом регистре.
+ * @param value Address with a `0x` prefix, in any case.
  */
 export function toChecksumAddress(value: string): Address {
   const lowercase = value.toLowerCase().slice(2)
@@ -54,25 +54,27 @@ export function toChecksumAddress(value: string): Address {
 }
 
 /**
- * Создаёт адрес с проверкой формата и контрольной суммы.
+ * Creates an address after checking format and checksum.
  *
- * Единственный допустимый способ получить значение типа `Address`.
+ * The only allowed way to obtain an `Address`.
  *
- * ПОВЕДЕНИЕ ПРИ РАЗНОМ РЕГИСТРЕ — ключевое место всего модуля:
+ * BEHAVIOUR UNDER DIFFERENT CASE — the key point of the whole
+ * module:
  *
- * - Адрес целиком в нижнем либо целиком в верхнем регистре не несёт
- *   контрольной суммы. Проверять нечего, адрес просто приводится
- *   к каноническому виду.
+ * - An address entirely in lower or entirely in upper case carries
+ *   no checksum. There is nothing to check; the address is simply
+ *   brought to canonical form.
  *
- * - Адрес со смешанным регистром контрольную сумму несёт, и она ПРОВЕРЯЕТСЯ.
- *   Несовпадение приводит к ошибке.
+ * - An address with mixed case carries a checksum, and it IS
+ *   CHECKED. A mismatch is an error.
  *
- * Молчаливое исправление регистра у смешанного адреса недопустимо: именно
- * в этом случае EIP-55 обязан сработать. Кошелёк, который «чинит» такой
- * адрес, отправит средства по адресу с опечаткой, откуда их не вернуть.
+ * Silently "fixing" the case of a mixed-case address is forbidden:
+ * that is exactly when EIP-55 must fire. A wallet that "repairs"
+ * such an address will send funds to a mistyped address, from
+ * which they cannot be recovered.
  *
- * @throws InvalidAddressError при несоответствии формату.
- * @throws AddressChecksumMismatchError при несовпадении контрольной суммы.
+ * @throws InvalidAddressError if the format does not match.
+ * @throws AddressChecksumMismatchError if the checksum does not match.
  */
 export function toAddress(value: string): Address {
   if (!ADDRESS_PATTERN.test(value)) {
@@ -95,7 +97,7 @@ export function toAddress(value: string): Address {
   return checksummed
 }
 
-/** Проверка без выбрасывания исключения. Для валидации по мере ввода. */
+/** Check without throwing. For validation as the user types. */
 export function isValidAddress(value: string): boolean {
   try {
     toAddress(value)
@@ -106,22 +108,22 @@ export function isValidAddress(value: string): boolean {
 }
 
 /**
- * Сравнивает адреса без учёта регистра.
+ * Compares addresses ignoring case.
  *
- * Прямое сравнение строк ненадёжно: один и тот же адрес встречается
- * в нижнем регистре (ответы RPC), в верхнем (некоторые обозреватели)
- * и в контрольной сумме EIP-55. Сравнение без нормализации приводит
- * к тому, что собственный аккаунт не распознаётся в списке.
+ * Direct string comparison is unreliable: the same address appears
+ * in lower case (RPC responses), in upper case (some explorers),
+ * and in EIP-55 checksum. A comparison without normalisation means
+ * the user's own account is not recognised in a list.
  */
 export function areAddressesEqual(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase()
 }
 
 /**
- * Преобразует адрес в 20 байт.
+ * Converts an address to 20 bytes.
  *
- * Требуется при формировании данных вызова контракта и при подписи
- * транзакции: туда адрес уходит в двоичном виде, а не строкой.
+ * Needed when building contract-call data and when signing a
+ * transaction: the address goes there in binary, not as a string.
  */
 export function addressToBytes(address: Address): Uint8Array {
   const body = address.slice(2)
@@ -135,12 +137,12 @@ export function addressToBytes(address: Address): Uint8Array {
 }
 
 /**
- * Создаёт адрес из 20 байт.
+ * Creates an address from 20 bytes.
  *
- * Результат всегда в контрольной сумме EIP-55: адрес, полученный
- * из двоичных данных, обязан выйти наружу в каноническом виде.
+ * The result is always in EIP-55 checksum form: an address obtained
+ * from binary data must leave in canonical form.
  *
- * @throws InvalidAddressError при неверной длине.
+ * @throws InvalidAddressError on a wrong length.
  */
 export function addressFromBytes(bytes: Uint8Array): Address {
   if (bytes.length !== ADDRESS_BYTE_LENGTH) {
@@ -153,62 +155,62 @@ export function addressFromBytes(bytes: Uint8Array): Address {
 }
 
 /**
- * Нулевой адрес.
+ * The zero address.
  *
- * Средства, отправленные сюда, безвозвратны: приватного ключа к нему
- * не существует. Одновременно это штатное значение поля `to` при
- * развёртывании контракта, поэтому запрещать его нельзя — интерфейс
- * обязан различать эти два случая.
+ * Funds sent here are unrecoverable: nobody has a private key to
+ * it. At the same time it is the legal `to` value when deploying a
+ * contract, so forbidding it is not allowed — the UI must tell
+ * those two cases apart.
  */
 export const ZERO_ADDRESS: Address = toChecksumAddress('0x0000000000000000000000000000000000000000')
 
 /**
- * Общепринятый адрес сжигания.
+ * The conventional burn address.
  *
- * Не является чем-то особенным на уровне протокола: обычный адрес,
- * приватный ключ к которому никому не известен. Используется проектами
- * для демонстративного уничтожения токенов.
+ * Nothing special at the protocol level: an ordinary address whose
+ * private key is known to nobody. Projects use it for a
+ * demonstrative destruction of tokens.
  */
 export const DEAD_ADDRESS: Address = toChecksumAddress('0x000000000000000000000000000000000000dead')
 
-/** Является ли адрес нулевым. */
 export function isZeroAddress(address: string): boolean {
   return areAddressesEqual(address, ZERO_ADDRESS)
 }
 
 /**
- * Является ли адрес заведомо невосстановимым.
+ * Whether the address is known to be unrecoverable.
  *
- * Проверка эвристическая и намеренно узкая: перечислены только адреса,
- * общепризнанно используемые для сжигания. Расширять список догадками
- * нельзя — ложное срабатывание на реальном адресе получателя заставит
- * пользователя отменить законный перевод.
+ * The check is heuristic and deliberately narrow: only addresses
+ * conventionally used for burning are listed. Expanding the list
+ * with guesses is forbidden — a false hit on a real recipient
+ * would make the user cancel a legitimate transfer.
  *
- * Отправку такой адрес не запрещает: сжигание бывает намеренным.
- * Решение принимает пользователь, задача ядра — сообщить.
+ * Such an address does not forbid the send: burning can be
+ * intentional. The user decides; the core's job is to say so.
  */
 export function isBurnAddress(address: string): boolean {
   return isZeroAddress(address) || areAddressesEqual(address, DEAD_ADDRESS)
 }
 
 /**
- * Выводит адрес EVM из публичного ключа.
+ * Derives an EVM address from a public key.
  *
- * Адрес — последние 20 байт keccak256 от НЕСЖАТОГО публичного ключа
- * без байта префикса `0x04`, то есть от 64 байт координат X и Y.
+ * The address is the last 20 bytes of keccak256 of the UNCOMPRESSED
+ * public key without the `0x04` prefix byte, i.e. of 64 bytes of
+ * coordinates X and Y.
  *
- * Принимаются три формы записи ключа:
- * - 33 байта, сжатая SEC1 (именно её отдаёт BIP-32);
- * - 65 байт, несжатая SEC1 с префиксом `0x04`;
- * - 64 байта, координаты без префикса.
+ * Three key encodings are accepted:
+ * - 33 bytes, compressed SEC1 (what BIP-32 returns);
+ * - 65 bytes, uncompressed SEC1 with prefix `0x04`;
+ * - 64 bytes, coordinates without a prefix.
  *
- * Сжатый ключ разворачивается через восстановление точки на кривой:
- * координата Y вычисляется из X по уравнению secp256k1. Операция
- * выполняется библиотекой `@noble/curves`; собственной реализации
- * арифметики на кривой здесь нет и быть не может.
+ * A compressed key is expanded by recovering the point on the
+ * curve: Y is computed from X by the secp256k1 equation. The
+ * operation is done by `@noble/curves`; there is no home-grown
+ * curve arithmetic here and there must not be.
  *
- * @throws InvalidPublicKeyError при недопустимой длине либо если точка
- *         не лежит на кривой.
+ * @throws InvalidPublicKeyError on a bad length or if the point
+ *         is not on the curve.
  */
 export function publicKeyToAddress(publicKey: Uint8Array): Address {
   const raw = toRawPublicKey(publicKey)
@@ -217,7 +219,7 @@ export function publicKeyToAddress(publicKey: Uint8Array): Address {
   return addressFromBytes(hash.slice(hash.length - ADDRESS_BYTE_LENGTH))
 }
 
-/** Приводит публичный ключ к 64 байтам координат X и Y. */
+/** Brings a public key to 64 bytes of coordinates X and Y. */
 function toRawPublicKey(publicKey: Uint8Array): Uint8Array {
   if (publicKey.length === RAW_PUBLIC_KEY_LENGTH) {
     return publicKey
@@ -233,9 +235,9 @@ function toRawPublicKey(publicKey: Uint8Array): Uint8Array {
 
   if (publicKey.length === COMPRESSED_PUBLIC_KEY_LENGTH) {
     try {
-      /* Восстановление точки проверяет, что она лежит на кривой.
-         Ключ, не проходящий проверку, отвергается, а не превращается
-         в адрес, к которому не существует приватного ключа. */
+      /* Point recovery checks that it lies on the curve. A key that
+         fails is rejected, not turned into an address to which no
+         private key exists. */
       return secp256k1.Point.fromBytes(publicKey).toBytes(false).slice(1)
     } catch (error) {
       throw new InvalidPublicKeyError('the point is not on the secp256k1 curve', { cause: error })

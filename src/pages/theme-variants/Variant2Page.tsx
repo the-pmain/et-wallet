@@ -17,10 +17,10 @@ import { InertButton, ThemeVariantStudio, TokenGlyph } from './ThemeVariantStudi
 import { VARIANT_ACCOUNT, VARIANT_BALANCE, VARIANT_TOKENS } from './mock-data'
 
 /**
- * Этюд 2: домашний экран Trust Wallet.
+ * Study 2: Trust Wallet home screen.
  *
- * Мобильная колонка, фиат первым, цветные круги действий, сине-зелёный
- * акцент. Щит — собственный рисунок, не товарный знак.
+ * Mobile column, fiat first, colored action circles, blue-green accent.
+ * The shield is an original drawing, not a trademark.
  */
 export function Variant2Page() {
   return (

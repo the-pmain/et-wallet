@@ -1,11 +1,11 @@
 import { SETTINGS_KEY, STORAGE_NAMESPACE, type IStorageService } from '@/core'
 
 /**
- * Допустимые сроки автоблокировки.
+ * Allowed auto-lock timeouts.
  *
- * Список закрытый, а не произвольное число: поле ввода позволило бы
- * назначить сутки и превратить защиту в её видимость. Значения выбраны
- * так, чтобы самый длинный оставался осмысленным.
+ * The list is closed, not a free number: an input field would let
+ * someone set a day and turn the protection into its appearance.
+ * Values are chosen so the longest one still means something.
  */
 export const AUTO_LOCK_OPTIONS: readonly number[] = [
   60_000,
@@ -15,35 +15,32 @@ export const AUTO_LOCK_OPTIONS: readonly number[] = [
   60 * 60_000,
 ]
 
-/** Срок по умолчанию: пятнадцать минут. */
 export const DEFAULT_AUTO_LOCK_MS = 15 * 60_000
 
-/** Настройки безопасности, хранимые между сессиями. */
+/** Security settings persisted across sessions. */
 export interface ISecuritySettings {
   readonly autoLockTimeoutMs: number
 
-  /** Требовать пароль перед подписью транзакции. */
   readonly confirmBeforeSigning: boolean
 }
 
-/** Значения по умолчанию. Применяются, пока пользователь не выбрал своё. */
 export const DEFAULT_SECURITY_SETTINGS: ISecuritySettings = {
   autoLockTimeoutMs: DEFAULT_AUTO_LOCK_MS,
   confirmBeforeSigning: true,
 }
 
 /**
- * Чтение и запись настроек безопасности.
+ * Read and write security settings.
  *
- * ХРАНЯТСЯ В НЕЗАШИФРОВАННОМ ХРАНИЛИЩЕ СОЗНАТЕЛЬНО. Срок автоблокировки
- * нужен до разблокировки — иначе кошелёк не знал бы, через сколько
- * блокироваться, пока пользователь не ввёл пароль. Секрета эти значения
- * не составляют: знание о том, что блокировка наступает через пятнадцать
- * минут, ничего не даёт нападающему, у которого нет пароля.
+ * STORED IN UNENCRYPTED STORAGE ON PURPOSE. The auto-lock timeout
+ * is needed before unlock — otherwise the wallet would not know
+ * when to lock until the user typed the password. These values
+ * are not a secret: knowing that lock happens in fifteen minutes
+ * gives an attacker without the password nothing.
  *
- * НЕПОНЯТНОЕ ЗНАЧЕНИЕ ЗАМЕНЯЕТСЯ УМОЛЧАНИЕМ, А НЕ ПРИНИМАЕТСЯ.
- * Испорченная запись — например, отрицательный срок — иначе отключила
- * бы автоблокировку насовсем.
+ * A GARBLED VALUE IS REPLACED WITH THE DEFAULT, NOT ACCEPTED.
+ * A corrupted record — a negative timeout, for example — would
+ * otherwise disable auto-lock for good.
  */
 export class SecuritySettingsRepository {
   readonly #storage: IStorageService
@@ -60,8 +57,8 @@ export class SecuritySettingsRepository {
 
     return {
       autoLockTimeoutMs: isAllowedTimeout(timeout) ? timeout : DEFAULT_AUTO_LOCK_MS,
-      /* Отсутствие записи означает «включено»: защита, выключенная
-         по умолчанию, защитой не является. */
+      /* A missing record means "on": a protection that is off by
+         default is not a protection. */
       confirmBeforeSigning: confirm !== false,
     }
   }
@@ -79,7 +76,6 @@ export class SecuritySettingsRepository {
   }
 }
 
-/** Входит ли срок в список допустимых. */
 function isAllowedTimeout(value: number | null): value is number {
   return value !== null && AUTO_LOCK_OPTIONS.includes(value)
 }

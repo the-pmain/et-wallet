@@ -6,11 +6,11 @@ const VALID =
   'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about'
 
 describe('readSeedPhrase', () => {
-  it('принимает каноническую фразу из 12 слов через запятую', () => {
+  it('accepts a canonical 12-word comma-separated phrase', () => {
     expect(readSeedPhrase(VALID)).toBe(VALID)
   })
 
-  it('отвергает пробельный BIP-39', () => {
+  it('rejects space-separated BIP-39', () => {
     expect(
       readSeedPhrase(
         'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
@@ -18,7 +18,7 @@ describe('readSeedPhrase', () => {
     ).toBeNull()
   })
 
-  it('отвергает запятые с пробелами', () => {
+  it('rejects commas with spaces', () => {
     expect(
       readSeedPhrase(
         'abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, about',
@@ -26,7 +26,7 @@ describe('readSeedPhrase', () => {
     ).toBeNull()
   })
 
-  it('отвергает неверную контрольную сумму', () => {
+  it('rejects a bad checksum', () => {
     expect(
       readSeedPhrase(
         'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon',
@@ -34,7 +34,7 @@ describe('readSeedPhrase', () => {
     ).toBeNull()
   })
 
-  it('отвергает пустую строку и не-строку', () => {
+  it('rejects an empty string and a non-string', () => {
     expect(readSeedPhrase('')).toBeNull()
     expect(readSeedPhrase(null)).toBeNull()
     expect(readSeedPhrase(12)).toBeNull()

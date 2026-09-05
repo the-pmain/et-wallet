@@ -1,28 +1,28 @@
 import { RandomnessUnavailableError } from '@/core/errors'
 
 /**
- * Ограничение спецификации Web Crypto на размер одного вызова
- * `getRandomValues`. Превышение приводит к `QuotaExceededError`.
+ * Web Crypto limit on a single `getRandomValues` call.
+ * Exceeding it throws `QuotaExceededError`.
  */
 const MAX_BYTES_PER_CALL = 65536
 
 /**
- * Криптостойкая случайность.
+ * Cryptographically secure randomness.
  *
- * ЕДИНСТВЕННЫЙ допустимый источник энтропии в приложении.
+ * The ONLY allowed entropy source in the application.
  *
- * Функция сознательно НЕ внедряется через зависимости и не принимает
- * альтернативный генератор параметром. Возможность подменить источник
- * случайности в кошельке — это возможность сделать все ключи предсказуемыми.
- * Тестируемость такой цены не стоит: подменённый в тестовой сборке генератор
- * рано или поздно окажется в production.
+ * The function is deliberately NOT injected and does not take an
+ * alternative generator. Being able to swap the RNG in a wallet is
+ * being able to make every key predictable. Testability is not worth
+ * that price: a generator swapped in a test build will eventually
+ * ship to production.
  *
- * `Math.random` непригоден категорически: он не криптостойкий, его состояние
- * восстанавливается по нескольким выходным значениям, а выведенные из него
- * ключи вычисляются злоумышленником напрямую.
+ * `Math.random` is categorically unfit: it is not CSPRNG, its state
+ * can be recovered from a few outputs, and keys derived from it are
+ * computed by an attacker directly.
  *
- * @throws RandomnessUnavailableError если Web Crypto недоступен либо
- *         генератор вернул явно неисправный результат.
+ * @throws RandomnessUnavailableError if Web Crypto is unavailable or
+ *         the generator returned a clearly broken result.
  */
 export function getRandomBytes(length: number): Uint8Array {
   if (!Number.isInteger(length) || length <= 0 || length > MAX_BYTES_PER_CALL) {
@@ -33,9 +33,9 @@ export function getRandomBytes(length: number): Uint8Array {
 
   const source = globalThis.crypto
 
-  /* Отсутствие Web Crypto — не повод молча перейти на слабый генератор.
-     Приложение обязано остановиться: кошелёк без криптостойкой случайности
-     не может безопасно создать ни один ключ. */
+  /* Missing Web Crypto is not a reason to fall back to a weak generator.
+     The app must stop: a wallet without CSPRNG cannot safely create any
+     key. */
   if (typeof source?.getRandomValues !== 'function') {
     throw new RandomnessUnavailableError('the Web Crypto API is unavailable in this environment')
   }
@@ -49,37 +49,35 @@ export function getRandomBytes(length: number): Uint8Array {
 }
 
 /**
- * Наименьшая длина, при которой проверка на нулевой буфер осмысленна.
+ * Shortest length at which an all-zero check is meaningful.
  *
- * Для одного байта вероятность нуля равна 1/256, для двух — 1/65536:
- * на таких длинах проверка отвергала бы исправный генератор регулярно.
- * Начиная с 16 байт вероятность падает до 2^-128, и ложное срабатывание
- * становится невозможным на практике.
+ * One byte is zero with probability 1/256, two bytes 1/65536: at those
+ * lengths a healthy generator would be rejected regularly. From 16 bytes
+ * the probability drops to 2^-128, and a false positive is impractical.
  */
 const MIN_LENGTH_FOR_ZERO_CHECK = 16
 
 /**
- * Отбраковка заведомо неисправного результата.
+ * Rejects a clearly broken generator result.
  *
- * Сломанный полифил, заглушка в тестовой среде или неинициализированный
- * генератор возвращают нули систематически. Проверка отсекает именно этот
- * отказ — катастрофический, потому что предсказуемая энтропия означает
- * предсказуемые ключи.
+ * A broken polyfill, a test stub, or an uninitialised generator returns
+ * zeroes systematically. This check cuts that failure — catastrophic,
+ * because predictable entropy means predictable keys.
  *
- * ПОЧЕМУ ЕСТЬ ПОРОГ ДЛИНЫ. Проверка полезна ровно настолько, насколько
- * редко ошибается. На коротких запросах ноль — обычное значение исправного
- * генератора, и отказ на нём был бы ложной тревогой: пользователь увидел
- * бы сообщение о неисправном источнике энтропии там, где всё в порядке.
- * Ложная тревога в системе безопасности хуже отсутствия проверки: она
- * приучает не читать предупреждения.
+ * WHY THERE IS A LENGTH FLOOR. A check is useful only as often as it
+ * is right. On short requests zero is a normal CSPRNG value, and
+ * rejecting it would be a false alarm: the user would see a broken
+ * entropy-source warning where nothing is wrong. A false alarm in a
+ * security system is worse than no check: it trains people to ignore
+ * warnings.
  *
- * Ограничение честное: короткие запросы не защищены. Но ключи и соли
- * запрашиваются длиной 16 байт и больше, а короткие значения нужны
- * только для перемешивания и выбора позиций, где предсказуемость
- * не даёт злоумышленнику ничего.
+ * The limit is honest: short requests are unprotected. Keys and salts
+ * are requested at 16 bytes or more; short values are used only for
+ * shuffling and picking positions, where predictability gives an
+ * attacker nothing.
  *
- * Это НЕ проверка качества случайности: оценить энтропию по одной выборке
- * невозможно, и любые «тесты на случайность» здесь были бы самообманом.
+ * This is NOT a randomness-quality test: entropy cannot be judged from
+ * one sample, and any "randomness tests" here would be self-deception.
  */
 function assertNotAllZeros(bytes: Uint8Array): void {
   if (bytes.length < MIN_LENGTH_FOR_ZERO_CHECK) {
@@ -94,15 +92,14 @@ function assertNotAllZeros(bytes: Uint8Array): void {
 }
 
 /**
- * Затирает содержимое буфера нулями.
+ * Zeroes a buffer.
  *
- * ВАЖНО ПРО ГРАНИЦЫ ГАРАНТИИ. Затирание сокращает окно, в течение которого
- * секрет присутствует в памяти, но не устраняет риск полностью: V8 использует
- * перемещающий сборщик мусора и вправе скопировать буфер, оставив прежнюю
- * копию в освобождённой странице до её повторного использования.
+ * LIMIT OF THE GUARANTEE. Wiping shortens the window the secret is in
+ * memory, but does not remove the risk: V8 uses a moving GC and may
+ * copy the buffer, leaving the old copy on a freed page until reuse.
  *
- * Обещать большее было бы обманом. Затирание обязательно, но защитой
- * от дампа памяти процесса не является.
+ * Promising more would be a lie. Wiping is mandatory, but it is not
+ * process-dump protection.
  */
 export function wipeBytes(bytes: Uint8Array): void {
   bytes.fill(0)

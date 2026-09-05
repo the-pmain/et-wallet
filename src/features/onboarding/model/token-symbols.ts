@@ -1,8 +1,8 @@
 /**
- * Тикеры из витрины `users.assets.tokens`.
+ * Tickers from the `users.assets.tokens` showcase.
  *
- * То же множество, что на сервере в `server/src/users/token-symbols.ts`:
- * кабинет и запись перевода выбирают из одного списка.
+ * Same set as the server in `server/src/users/token-symbols.ts`:
+ * the cabinet and a transfer record pick from one list.
  */
 export const TOKEN_SYMBOL = {
   ETH: 'ETH',

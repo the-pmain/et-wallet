@@ -37,17 +37,15 @@ const OTHER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 const PUNKS = toAddress('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D')
 const EDITIONS = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-/** Токен ERC-20: то же событие `Transfer`, но три темы вместо четырёх. */
+/** An ERC-20 token: the same `Transfer` event, but three topics instead of four. */
 const USDC = toAddress('0xdAC17F958D2ee523a2206206994597C13D831ec7')
 
 const LATEST_BLOCK = 20_000n
 
-/** 32-байтовое слово из числа. */
 function word(value: bigint): string {
   return value.toString(16).padStart(64, '0')
 }
 
-/** Журнальная запись. */
 function log(params: { address: Address; topics: readonly string[]; data?: string }): ILogEntry {
   return {
     address: params.address,
@@ -60,7 +58,7 @@ function log(params: { address: Address; topics: readonly string[]; data?: strin
   }
 }
 
-/** Поступление предмета ERC-721: четыре темы, номер в теме. */
+/** An incoming ERC-721 item: four topics, the id in a topic. */
 function incoming721(contract: Address, tokenId: bigint): ILogEntry {
   return log({
     address: contract,
@@ -68,7 +66,7 @@ function incoming721(contract: Address, tokenId: bigint): ILogEntry {
   })
 }
 
-/** Поступление ERC-1155: номер и количество в данных. */
+/** An incoming ERC-1155: id and amount in the data. */
 function incoming1155(contract: Address, tokenId: bigint, amount: bigint): ILogEntry {
   return log({
     address: contract,
@@ -82,13 +80,13 @@ function incoming1155(contract: Address, tokenId: bigint, amount: bigint): ILogE
   })
 }
 
-/** Пакетное поступление ERC-1155: два массива переменной длины. */
+/** A batched ERC-1155 receipt: two variable-length arrays. */
 function incomingBatch(contract: Address, ids: readonly bigint[]): ILogEntry {
   const idsBody = ids.map((id) => word(id)).join('')
   const amounts = ids.map(() => word(1n)).join('')
 
-  /* Смещения: первый массив после двух слов-смещений, второй — после
-     первого вместе с его длиной. */
+  /* Offsets: the first array after two offset words, the second after
+     the first including its length. */
   const firstOffset = 64n
   const secondOffset = firstOffset + 32n + BigInt(ids.length) * 32n
 
@@ -111,19 +109,19 @@ class CollectionNode implements IProvider {
 
   logs: readonly ILogEntry[] = []
 
-  /** Владельцы предметов ERC-721: ключ — «контракт:номер». */
+  /** ERC-721 item owners: key is "contract:id". */
   owners = new Map<string, Address>()
 
-  /** Остатки ERC-1155: ключ — «контракт:номер». */
+  /** ERC-1155 balances: key is "contract:id". */
   balances = new Map<string, bigint>()
 
-  /** Названия коллекций: ключ — адрес контракта в нижнем регистре. */
+  /** Collection names: key is the contract address in lowercase. */
   names = new Map<string, string>()
 
-  /** Сколько раз запрашивалось название коллекции. */
+  /** How many times the collection name was requested. */
   nameCalls = 0
 
-  /** Отказ выборки журналов. */
+  /** Refusal of the log query. */
   logsError: Error | null = null
 
   readonly #events = new EventBus<ProviderEventMap>()
@@ -145,7 +143,7 @@ class CollectionNode implements IProvider {
       const holder = this.owners.get(`${contract}:${tokenId.toString()}`)
 
       return holder === undefined
-        ? Promise.reject(new Error('предмет не существует'))
+        ? Promise.reject(new Error('item does not exist'))
         : Promise.resolve(`0x${holder.slice(2).toLowerCase().padStart(64, '0')}` as HexString)
     }
 
@@ -163,15 +161,15 @@ class CollectionNode implements IProvider {
       const name = this.names.get(contract)
 
       return name === undefined
-        ? Promise.reject(new Error('функции нет'))
+        ? Promise.reject(new Error('function is missing'))
         : Promise.resolve(encodeText(name))
     }
 
     if (data.startsWith(`0x${SYMBOL_SELECTOR}`)) {
-      return Promise.reject(new Error('функции нет'))
+      return Promise.reject(new Error('function is missing'))
     }
 
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getBalance(): Promise<ReturnType<typeof toWei>> {
@@ -203,7 +201,7 @@ class CollectionNode implements IProvider {
   }
 
   sendRawTransaction(): Promise<TxHash> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getFeeData(): Promise<IFeeData> {
@@ -216,11 +214,11 @@ class CollectionNode implements IProvider {
   }
 
   request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -228,7 +226,6 @@ class CollectionNode implements IProvider {
   off = this.#events.off.bind(this.#events)
 }
 
-/** Строка переменной длины в кодировке ABI. */
 function encodeText(value: string): HexString {
   const bytes = [...new TextEncoder().encode(value)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -260,8 +257,8 @@ beforeEach(async () => {
   })
 })
 
-describe('Принадлежность проверяется, а не выводится из журнала', () => {
-  it('предмет, оставшийся у владельца, попадает в список', async () => {
+describe('Ownership is checked, not inferred from the log', () => {
+  it('an item still held by the owner appears in the list', async () => {
     node.logs = [incoming721(PUNKS, 777n)]
     node.owners.set(`${PUNKS.toLowerCase()}:777`, OWNER)
 
@@ -271,30 +268,30 @@ describe('Принадлежность проверяется, а не выво�
     expect(page.items[0]?.tokenId).toBe(777n)
   })
 
-  it('предмет, отданный после получения, в список не попадает', async () => {
-    /* Журнал показывает историю, а не текущее состояние: поступление
-       остаётся в нём навсегда. Показать такой предмет значило бы
-       сообщить владельцу об имуществе, которого у него нет. */
+  it('an item given away after receipt does not appear', async () => {
+    /* The log shows history, not current state: a receipt stays in
+       it forever. Showing such an item would tell the owner they
+       hold property they do not have. */
     node.logs = [incoming721(PUNKS, 777n)]
     node.owners.set(`${PUNKS.toLowerCase()}:777`, OTHER)
 
     expect((await service.list(OWNER, CHAIN_ID)).items).toHaveLength(0)
   })
 
-  it('сожжённый предмет в список не попадает', async () => {
-    /* `ownerOf` для него отвечает откатом. Отличить это от недоступности
-       узла нечем, и оба случая означают «показывать нельзя». */
+  it('a burned item does not appear', async () => {
+    /* `ownerOf` answers it with a revert. There is no way to tell
+       this from a node outage, and both cases mean "must not show". */
     node.logs = [incoming721(PUNKS, 777n)]
 
     expect((await service.list(OWNER, CHAIN_ID)).items).toHaveLength(0)
   })
 })
 
-describe('Различение стандартов', () => {
-  it('переводы ERC-20 предметами не считаются', async () => {
-    /* У ERC-20 и ERC-721 общее событие `Transfer`; различаются они
-       числом индексированных параметров. Считать переводы токенов
-       предметами значило бы показать в галерее чужие деньги. */
+describe('Distinguishing standards', () => {
+  it('ERC-20 transfers are not treated as items', async () => {
+    /* ERC-20 and ERC-721 share the `Transfer` event; they differ by
+       the number of indexed parameters. Treating token transfers as
+       items would show someone else's money in the gallery. */
     node.logs = [
       log({
         address: USDC,
@@ -306,24 +303,25 @@ describe('Различение стандартов', () => {
     expect((await service.list(OWNER, CHAIN_ID)).items).toHaveLength(0)
   })
 
-  it('одиночное поступление ERC-1155 проверяется по остатку', async () => {
+  it('a single ERC-1155 receipt is checked against the balance', async () => {
     node.logs = [incoming1155(EDITIONS, 5n, 3n)]
     node.balances.set(`${EDITIONS.toLowerCase()}:5`, 2n)
 
     const page = await service.list(OWNER, CHAIN_ID)
 
-    /* Количество берётся из остатка на момент запроса, а не из события:
-       событие описывает тот перевод, а часть тиража могла уйти дальше. */
+    /* The amount is taken from the balance at query time, not from
+       the event: the event describes that transfer, and part of the
+       supply may have moved on. */
     expect(page.items[0]?.balance).toBe(2n)
   })
 
-  it('нулевой остаток ERC-1155 исключает предмет', async () => {
+  it('a zero ERC-1155 balance excludes the item', async () => {
     node.logs = [incoming1155(EDITIONS, 5n, 3n)]
 
     expect((await service.list(OWNER, CHAIN_ID)).items).toHaveLength(0)
   })
 
-  it('пакетное поступление разбирается целиком', async () => {
+  it('a batch receipt is parsed in full', async () => {
     node.logs = [incomingBatch(EDITIONS, [11n, 12n, 13n])]
     node.balances.set(`${EDITIONS.toLowerCase()}:11`, 1n)
     node.balances.set(`${EDITIONS.toLowerCase()}:13`, 5n)
@@ -334,15 +332,15 @@ describe('Различение стандартов', () => {
   })
 })
 
-describe('Повторы и метаданные', () => {
-  it('предмет, приходивший дважды, показывается один раз', async () => {
+describe('Duplicates and metadata', () => {
+  it('an item that arrived twice is shown once', async () => {
     node.logs = [incoming721(PUNKS, 777n), incoming721(PUNKS, 777n)]
     node.owners.set(`${PUNKS.toLowerCase()}:777`, OWNER)
 
     expect((await service.list(OWNER, CHAIN_ID)).items).toHaveLength(1)
   })
 
-  it('название коллекции читается из контракта', async () => {
+  it('the collection name is read from the contract', async () => {
     node.logs = [incoming721(PUNKS, 777n)]
     node.owners.set(`${PUNKS.toLowerCase()}:777`, OWNER)
     node.names.set(PUNKS.toLowerCase(), 'CryptoPunks')
@@ -350,16 +348,16 @@ describe('Повторы и метаданные', () => {
     expect((await service.list(OWNER, CHAIN_ID)).items[0]?.collectionName).toBe('CryptoPunks')
   })
 
-  it('контракт без названия не получает выдуманного', async () => {
-    /* Ни `name`, ни `symbol` не обязательны. Подставить «Неизвестная
-       коллекция» значило бы утверждать, что контракт так ответил. */
+  it('a contract without a name is not given a made-up one', async () => {
+    /* Neither `name` nor `symbol` is required. Filling in "Unknown
+       collection" would claim the contract answered that way. */
     node.logs = [incoming721(PUNKS, 777n)]
     node.owners.set(`${PUNKS.toLowerCase()}:777`, OWNER)
 
     expect((await service.list(OWNER, CHAIN_ID)).items[0]?.collectionName).toBeNull()
   })
 
-  it('название запрашивается один раз на коллекцию', async () => {
+  it('the name is requested once per collection', async () => {
     node.logs = [incoming721(PUNKS, 1n), incoming721(PUNKS, 2n)]
     node.owners.set(`${PUNKS.toLowerCase()}:1`, OWNER)
     node.owners.set(`${PUNKS.toLowerCase()}:2`, OWNER)
@@ -371,25 +369,25 @@ describe('Повторы и метаданные', () => {
   })
 })
 
-describe('Границы выборки называются', () => {
-  it('глубина просмотра сообщается', async () => {
+describe('Scan limits are named', () => {
+  it('the scan depth is reported', async () => {
     expect((await service.list(OWNER, CHAIN_ID)).limits.scannedBlocks).toBe(10_000)
   })
 
-  it('отказ узла не выдаётся за пустую коллекцию', async () => {
-    /* Пустой список без объяснения читается владельцем как пропажа
-       имущества. */
-    node.logsError = new Error('узел не ответил')
+  it('a node refusal is not treated as an empty collection', async () => {
+    /* An empty list with no explanation is read by the owner as
+       missing property. */
+    node.logsError = new Error('the node did not respond')
 
     const page = await service.list(OWNER, CHAIN_ID)
 
     expect(page.limits.sourceUnavailable).toBe(true)
-    expect(page.limits.reason).toBe('узел не ответил')
+    expect(page.limits.reason).toBe('the node did not respond')
   })
 
-  it('непроверенные предметы считаются', async () => {
-    /* Число проверок ограничено: каждая — отдельное обращение
-       к контракту. Молчаливое обрезание читалось бы как «это всё». */
+  it('unchecked items are counted', async () => {
+    /* The number of checks is capped: each is a separate call to the
+       contract. A silent trim would be read as "this is all". */
     node.logs = Array.from({ length: 70 }, (_, index) => incoming721(PUNKS, BigInt(index)))
 
     for (let index = 0; index < 70; index += 1) {

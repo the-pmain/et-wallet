@@ -15,18 +15,18 @@ import {
 
 const ADDRESS = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 
-describe('Идентификаторы событий', () => {
-  it('вычисляются, а не берутся из константы', () => {
-    /* Значение keccak256 от подписи `Transfer(address,address,uint256)`
-       опубликовано в стандарте ERC-20 и совпадает во всех сетях EVM.
-       Проверка фиксирует именно его: ошибка в одном символе дала бы
-       пустую историю без единого сообщения об ошибке. */
+describe('Event identifiers', () => {
+  it('are computed, not taken from a constant', () => {
+    /* The keccak256 of `Transfer(address,address,uint256)` is
+       published in ERC-20 and matches on every EVM network. The
+       check pins that exact value: one wrong character would yield
+       empty history with no error at all. */
     expect(TRANSFER_TOPIC).toBe(
       '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
     )
   })
 
-  it('различают события ERC-1155', () => {
+  it('distinguish ERC-1155 events', () => {
     expect(TRANSFER_SINGLE_TOPIC).toBe(
       '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62',
     )
@@ -35,13 +35,13 @@ describe('Идентификаторы событий', () => {
     )
   })
 
-  it('имеют длину 32 байта', () => {
+  it('are 32 bytes long', () => {
     for (const topic of [TRANSFER_TOPIC, TRANSFER_SINGLE_TOPIC, TRANSFER_BATCH_TOPIC]) {
       expect(topic).toHaveLength(66)
     }
   })
 
-  it('не совпадают между собой', () => {
+  it('do not match each other', () => {
     const topics = new Set([TRANSFER_TOPIC, TRANSFER_SINGLE_TOPIC, TRANSFER_BATCH_TOPIC])
 
     expect(topics.size).toBe(3)
@@ -49,50 +49,50 @@ describe('Идентификаторы событий', () => {
 })
 
 describe('addressToTopic', () => {
-  it('дополняет адрес нулями до 32 байт', () => {
+  it('pads the address with zeros to 32 bytes', () => {
     const topic = addressToTopic(ADDRESS)
 
     expect(topic).toHaveLength(66)
     expect(topic.startsWith('0x000000000000000000000000')).toBe(true)
   })
 
-  it('приводит адрес к нижнему регистру', () => {
-    /* Узел сравнивает темы побайтово: запись в контрольной сумме EIP-55
-       не совпала бы ни с одним журналом. */
+  it('lowercases the address', () => {
+    /* The node compares topics byte for byte: an EIP-55 writing
+       would match no log. */
     expect(addressToTopic(ADDRESS)).toBe(`0x${ADDRESS.slice(2).toLowerCase().padStart(64, '0')}`)
   })
 })
 
 describe('topicToAddress', () => {
-  it('восстанавливает адрес из темы', () => {
+  it('recovers the address from the topic', () => {
     expect(topicToAddress(addressToTopic(ADDRESS)).toLowerCase()).toBe(ADDRESS.toLowerCase())
   })
 
-  it('возвращает адрес в записи EIP-55', () => {
-    /* Тема хранит адрес в нижнем регистре, но наружу обязан выходить
-       адрес с контрольной суммой: без неё пользователь лишён единственной
-       возможности заметить подмену. */
+  it('returns the address in EIP-55 form', () => {
+    /* The topic stores the address in lowercase, but what leaves
+       must be checksummed: without it the user has no way to notice
+       a substitution. */
     expect(topicToAddress(addressToTopic(ADDRESS))).toBe(ADDRESS)
   })
 
-  it('отвергает тему неверной длины', () => {
+  it('rejects a topic of the wrong length', () => {
     expect(() => topicToAddress('0x1234' as HexString)).toThrow()
   })
 })
 
 describe('hexToBigInt', () => {
-  it('читает шестнадцатеричное значение', () => {
+  it('reads a hex value', () => {
     expect(hexToBigInt('0xff')).toBe(255n)
   })
 
-  it('считает пустое значение нулём', () => {
-    /* Узлы возвращают `0x` для пустых данных, а `BigInt('0x')`
-       выбрасывает исключение. */
+  it('treats an empty value as zero', () => {
+    /* Nodes return `0x` for empty data, and `BigInt('0x')`
+       throws. */
     expect(hexToBigInt('0x')).toBe(0n)
     expect(hexToBigInt('')).toBe(0n)
   })
 
-  it('не теряет точность на больших суммах', () => {
+  it('does not lose precision on large amounts', () => {
     const raw = '0xffffffffffffffffffffffff'
 
     expect(hexToBigInt(raw)).toBe(79_228_162_514_264_337_593_543_950_335n)
@@ -100,17 +100,17 @@ describe('hexToBigInt', () => {
 })
 
 describe('splitDataWords', () => {
-  it('делит данные на слова по 32 байта', () => {
+  it('splits data into 32-byte words', () => {
     const data = `0x${'1'.padStart(64, '0')}${'2'.padStart(64, '0')}` as HexString
 
     expect(splitDataWords(data)).toEqual([1n, 2n])
   })
 
-  it('возвращает пустой список для пустых данных', () => {
+  it('returns an empty list for empty data', () => {
     expect(splitDataWords('0x' as HexString)).toEqual([])
   })
 
-  it('игнорирует неполное последнее слово', () => {
+  it('ignores an incomplete last word', () => {
     const data = `0x${'1'.padStart(64, '0')}abcd` as HexString
 
     expect(splitDataWords(data)).toEqual([1n])

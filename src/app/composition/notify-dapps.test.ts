@@ -10,7 +10,6 @@ const OWNER_B = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 const ETHEREUM = toChainId(1n)
 const POLYGON = toChainId(137n)
 
-/** Сессия кошелька, у которой можно менять активную пару и дёргать подписчиков. */
 function fakeSession(chainId: ChainId, address: string) {
   const listeners = new Set<() => void>()
   let snapshot = { activeNetwork: { chainId }, activeAccount: { address } }
@@ -24,7 +23,6 @@ function fakeSession(chainId: ChainId, address: string) {
     getSnapshot() {
       return snapshot
     },
-    /** Меняет состояние и оповещает подписчиков — как настоящая сессия. */
     set(next: { chainId?: ChainId; address?: string }) {
       snapshot = {
         activeNetwork: { chainId: next.chainId ?? snapshot.activeNetwork.chainId },
@@ -38,8 +36,8 @@ function fakeSession(chainId: ChainId, address: string) {
   }
 }
 
-describe('Уведомление приложений при смене состояния кошелька', () => {
-  it('смена сети вызывает уведомление', () => {
+describe('dapp notification on wallet state change', () => {
+  it('notifies when the network changes', () => {
     const session = fakeSession(ETHEREUM, OWNER_A)
     let calls = 0
 
@@ -56,7 +54,7 @@ describe('Уведомление приложений при смене сост
     expect(calls).toBe(1)
   })
 
-  it('смена аккаунта вызывает уведомление', () => {
+  it('notifies when the account changes', () => {
     const session = fakeSession(ETHEREUM, OWNER_A)
     let calls = 0
 
@@ -73,12 +71,12 @@ describe('Уведомление приложений при смене сост
     expect(calls).toBe(1)
   })
 
-  it('повторное обновление с той же парой второго события не даёт', () => {
-    /* Сессия публикует снимок целиком при любом изменении — балансе,
-       истории, списке токенов. Первое оседание пары уведомить обязано:
-       приложение должно узнать текущие сеть и адрес. Но следующее
-       обновление с той же парой — уже нет, иначе событие уходило бы
-       на каждый пересчёт баланса. */
+  it('does not emit a second event for the same pair', () => {
+    /* The session publishes the whole snapshot on any change —
+       balance, history, token list. Settling the pair the first time
+       must notify: the app needs the current network and address.
+       A later update with the same pair must not, or an event would
+       fire on every balance recalculation. */
     const session = fakeSession(ETHEREUM, OWNER_A)
     let calls = 0
 
@@ -93,14 +91,14 @@ describe('Уведомление приложений при смене сост
     session.set({ chainId: POLYGON })
     const afterFirstSwitch = calls
 
-    /* Та же пара, что и после переключения: снимок «обновился»,
-       сеть и адрес не менялись. */
+    /* Same pair as after the switch: the snapshot "updated",
+       network and address did not. */
     session.set({ chainId: POLYGON, address: OWNER_A })
 
     expect(calls).toBe(afterFirstSwitch)
   })
 
-  it('каждая новая смена вызывает своё уведомление', () => {
+  it('emits a notification for each new change', () => {
     const session = fakeSession(ETHEREUM, OWNER_A)
     let calls = 0
 

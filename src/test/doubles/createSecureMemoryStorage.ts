@@ -4,20 +4,19 @@ import { MemoryStorageService } from '@/core/storage'
 import { FastEncryptionService } from './FastEncryptionService'
 
 /**
- * Готовое зашифрованное хранилище поверх памяти.
+ * Ready encrypted store on top of memory.
  *
- * ЗАЧЕМ ОТДЕЛЬНЫЙ ПОМОЩНИК. Проверки, которым нужен любой репозиторий
- * поверх шифрования, повторяли одни и те же четыре строки: создать
- * память, обернуть в `SecureStorage`, подставить быстрое шифрование,
- * не забыть `initialize`. Пропущенный последний шаг даёт отказ
- * «хранилище заблокировано» посреди проверки, которая про блокировку
- * ничего не проверяет.
+ * WHY A SEPARATE HELPER. Checks that need any repository on top of
+ * encryption repeated the same four lines: create memory, wrap in
+ * `SecureStorage`, inject fast encryption, remember `initialize`.
+ * Skipping that last step yields “store is locked” in the middle
+ * of a check that is not about locking.
  *
- * ШИФРОВАНИЕ УСКОРЕННОЕ. Настоящие 600 000 итераций PBKDF2 в каждой
- * проверке превратили бы прогон в минуты; стойкость проверяется там,
- * где она предмет проверки.
+ * ENCRYPTION IS FAST. Real 600 000 PBKDF2 iterations in every
+ * check would turn the run into minutes; strength is checked
+ * where it is the subject of the check.
  */
-/** Пароль тестового хранилища. Один на все проверки: секретом не является. */
+/** Test-store password. One for every check: it is not a secret. */
 const PASSWORD = 'Korova-7-Luna!'
 
 export async function createSecureMemoryStorage(
@@ -25,10 +24,10 @@ export async function createSecureMemoryStorage(
 ): Promise<SecureStorage> {
   const secure = new SecureStorage(storage, new FastEncryptionService())
 
-  /* Та же память может уже нести заголовок — например, когда проверка
-     пересоздаёт сервисы поверх прежнего хранилища, чтобы убедиться,
-     что данные пережили перезапуск. Повторная инициализация в этом
-     случае отказала бы, а нужен именно доступ. */
+  /* The same memory may already carry a header — for example when
+     a check rebuilds services on the previous store to prove data
+     survived a restart. Re-initialize would refuse in that case,
+     and what is needed is access. */
   if (await secure.isInitialized()) {
     await secure.unlock(PASSWORD)
   } else {

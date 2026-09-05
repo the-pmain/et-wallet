@@ -1,26 +1,26 @@
 import { TRANSFER_DIRECTION, TRANSFER_KIND, type ITransferRecord } from '@/core'
 
 /**
- * Категория для отбора записей.
+ * Category for filtering records.
  *
- * ERC-721 и ERC-1155 сведены в одну категорию «NFT» намеренно: для
- * пользователя это один вид имущества, а разница между стандартами —
- * подробность реализации контракта. Сам стандарт при этом остаётся
- * в записи и показывается в строке списка.
+ * ERC-721 and ERC-1155 are one "NFT" category on purpose: to the
+ * owner they are one kind of property, and the standard difference
+ * is a contract-implementation detail. The standard itself stays on
+ * the record and is shown in the list row.
  */
 export const TRANSFER_CATEGORY = {
   All: 'all',
-  /** Нативная валюта сети. */
+  /** Native currency of the chain. */
   Native: 'native',
-  /** Взаимозаменяемые токены ERC-20. */
+  /** Fungible ERC-20 tokens. */
   Erc20: 'erc20',
-  /** Коллекционные токены: ERC-721 и ERC-1155. */
+  /** Collectibles: ERC-721 and ERC-1155. */
   Nft: 'nft',
 } as const
 
 export type TransferCategory = (typeof TRANSFER_CATEGORY)[keyof typeof TRANSFER_CATEGORY]
 
-/** Направление для отбора записей. */
+/** Direction for filtering records. */
 export const DIRECTION_FILTER = {
   All: 'all',
   Incoming: 'incoming',
@@ -29,16 +29,16 @@ export const DIRECTION_FILTER = {
 
 export type DirectionFilter = (typeof DIRECTION_FILTER)[keyof typeof DIRECTION_FILTER]
 
-/** Условия отбора, заданные пользователем. */
+/** Filter conditions set by the user. */
 export interface ITransferFilter {
   readonly category: TransferCategory
   readonly direction: DirectionFilter
 
-  /** Строка поиска в том виде, в каком её ввёл пользователь. */
+  /** Search string exactly as the user typed it. */
   readonly query: string
 }
 
-/** Условия, не отсеивающие ничего. Исходное состояние экрана. */
+/** Conditions that filter nothing. The screen's initial state. */
 export const EMPTY_TRANSFER_FILTER: ITransferFilter = {
   category: TRANSFER_CATEGORY.All,
   direction: DIRECTION_FILTER.All,
@@ -46,12 +46,12 @@ export const EMPTY_TRANSFER_FILTER: ITransferFilter = {
 }
 
 /**
- * Отсеивает ли текущий набор условий хоть что-нибудь.
+ * Whether the current conditions filter anything.
  *
- * Нужен интерфейсу, чтобы отличить пустую историю от пустого результата
- * отбора. Это разные утверждения: «операций не было» и «под условия
- * ничего не подошло». Первое, показанное вместо второго, читается
- * владельцем средств как пропажа.
+ * The UI needs this to tell empty history from an empty filter
+ * result. Those are different claims: "there were no operations" and
+ * "nothing matched". The first in place of the second reads as funds
+ * gone.
  */
 export function isFilterActive(filter: ITransferFilter): boolean {
   return (
@@ -62,12 +62,11 @@ export function isFilterActive(filter: ITransferFilter): boolean {
 }
 
 /**
- * Отбирает записи истории по заданным условиям.
+ * Filter history records by the given conditions.
  *
- * ФУНКЦИЯ РАБОТАЕТ ТОЛЬКО С УЖЕ ПОЛУЧЕННЫМИ ЗАПИСЯМИ и ничего не знает
- * об ограничениях источника. Отсутствие записей в результате не означает
- * отсутствия таких операций в сети — об этом обязан сказать интерфейс,
- * опираясь на `IHistoryLimits`.
+ * Works only on records already fetched and knows nothing about the
+ * source's limits. An empty result does not mean those operations are
+ * absent on-chain — the UI must say so, using `IHistoryLimits`.
  */
 export function filterTransfers(
   transfers: readonly ITransferRecord[],
@@ -83,7 +82,7 @@ export function filterTransfers(
   )
 }
 
-/** Подходит ли запись под выбранную категорию. */
+/** Whether the record matches the selected category. */
 function matchesCategory(record: ITransferRecord, category: TransferCategory): boolean {
   switch (category) {
     case TRANSFER_CATEGORY.All:
@@ -98,12 +97,11 @@ function matchesCategory(record: ITransferRecord, category: TransferCategory): b
 }
 
 /**
- * Подходит ли запись под выбранное направление.
+ * Whether the record matches the selected direction.
  *
- * Перевод самому себе считается подходящим и под «входящие», и под
- * «исходящие»: он одновременно и то и другое. Исключение его из обоих
- * наборов скрыло бы от пользователя существующую операцию — а скрытая
- * операция в истории кошелька хуже лишней.
+ * A self-transfer matches both incoming and outgoing: it is both.
+ * Dropping it from both sets would hide an existing operation — and
+ * a hidden operation in wallet history is worse than an extra one.
  */
 function matchesDirection(record: ITransferRecord, direction: DirectionFilter): boolean {
   if (direction === DIRECTION_FILTER.All || record.direction === TRANSFER_DIRECTION.Self) {
@@ -114,20 +112,18 @@ function matchesDirection(record: ITransferRecord, direction: DirectionFilter): 
 }
 
 /**
- * Совпадает ли запись со строкой поиска.
+ * Whether the record matches the search string.
  *
- * ПОИСК ВЕДЁТСЯ ПО ПОДСТРОКЕ, А НЕ ПО НАЧАЛУ СТРОКИ. Совпадение по началу
- * не нашло бы адрес, от которого пользователь помнит последние символы, —
- * а именно они видны в усечённой записи адреса в списке. Пустой результат
- * поиска пользователь читает как «таких операций не было», и ошибка
- * в эту сторону обходится дороже лишней строки в выдаче: лишнюю он
- * увидит и отбросит, отсутствующую — нет.
+ * Search is a substring, not a prefix. A prefix match would miss an
+ * address the user remembers by its last characters — the ones shown
+ * in the truncated list form. An empty search result reads as "those
+ * operations never happened", and that error costs more than an extra
+ * row: an extra row is seen and discarded, a missing one is not.
  *
- * Регистр не учитывается: один и тот же адрес приходит и в нижнем
- * регистре от узла, и в записи с контрольной суммой EIP-55.
+ * Case is ignored: the same address arrives lowercase from the node
+ * and in EIP-55 checksum form.
  *
- * @param query Строка поиска, уже приведённая к нижнему регистру
- *        и очищенная от пробелов по краям.
+ * @param query Search string, already lowercased and trimmed.
  */
 function matchesQuery(record: ITransferRecord, query: string): boolean {
   if (query === '') {

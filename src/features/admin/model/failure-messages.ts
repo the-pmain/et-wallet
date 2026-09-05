@@ -1,8 +1,8 @@
 /**
- * Готовые причины отказа в правке sending.
+ * Ready-made rejection reasons when editing a sending.
  *
- * Это подписи для кабинета, не коды сети. Свободный текст остаётся:
- * пункт Custom открывает поле, если ни одна заготовка не подходит.
+ * These are cabinet labels, not network codes. Free text remains:
+ * Custom opens a field when no preset fits.
  */
 export const FAILURE_MESSAGE_NONE = ''
 export const FAILURE_MESSAGE_CUSTOM = '__custom__'
@@ -19,7 +19,7 @@ export const FAILURE_MESSAGE_PRESETS = [
 
 export type FailureMessagePreset = (typeof FAILURE_MESSAGE_PRESETS)[number]
 
-/** Значение `<select>`: пусто, заготовка или Custom. */
+/** `<select>` value: empty, a preset, or Custom. */
 export function failureMessageSelectValue(message: string | null | undefined): string {
   if (message === undefined || message === null || message === '') {
     return FAILURE_MESSAGE_NONE

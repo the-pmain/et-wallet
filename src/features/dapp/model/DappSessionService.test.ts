@@ -23,14 +23,13 @@ let transport: FakeSessionTransport
 let service: DappSessionService
 let execute: ReturnType<typeof vi.fn<(request: IDappRequest) => Promise<string>>>
 
-/** Запрос на подпись сообщения от заданного адреса. */
 function messageRequest(address: Address, id = 'req-1', chainId: ChainId = ETHEREUM): IDappRequest {
   return {
     id,
     sessionId: 'session',
-    dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
+    dapp: { name: 'Example', url: 'https://example.com', description: null, iconUrl: null },
     chainId,
-    payload: { kind: DAPP_REQUEST_KIND.SignMessage, address, message: 'Войти' },
+    payload: { kind: DAPP_REQUEST_KIND.SignMessage, address, message: 'Sign in' },
   }
 }
 
@@ -50,20 +49,20 @@ beforeEach(async () => {
   await service.init()
 })
 
-describe('Подготовка транспорта', () => {
-  it('после запуска раздел готов к работе', () => {
+describe('Preparing the transport', () => {
+  it('the section is ready after start', () => {
     expect(service.getSnapshot().isReady).toBe(true)
     expect(service.getSnapshot().error).toBeNull()
   })
 
-  it('повторная попытка после отказа не выполняется', async () => {
-    /* Транспорт отказывает по причинам, которые сами не проходят.
-       Повтор при каждом обращении превратился бы в бесконечный круг
-       и подвесил бы экран. */
+  it('does not retry automatically after failure', async () => {
+    /* The transport fails for reasons that do not heal themselves.
+       Retrying on every call would become an endless loop and hang
+       the screen. */
     const failing = new FakeSessionTransport()
     let attempts = 0
 
-    failing.initError = 'Не задан идентификатор проекта'
+    failing.initError = 'Project identifier is not set'
 
     const original = failing.init.bind(failing)
 
@@ -89,12 +88,12 @@ describe('Подготовка транспорта', () => {
     expect(attempts).toBe(1)
   })
 
-  it('отказ транспорта не роняет раздел, а объясняется', async () => {
-    /* Раздел обязан открыться и сказать, почему не работает,
-       а не остаться пустым экраном. */
+  it('a transport failure does not crash the section and is explained', async () => {
+    /* The section must open and say why it does not work, not
+       stay a blank screen. */
     const failing = new FakeSessionTransport()
 
-    failing.initError = 'Не задан идентификатор проекта'
+    failing.initError = 'Project identifier is not set'
 
     const withFailure = new DappSessionService({
       transport: failing,
@@ -108,37 +107,35 @@ describe('Подготовка транспорта', () => {
     await withFailure.init()
 
     expect(withFailure.getSnapshot().isReady).toBe(false)
-    expect(withFailure.getSnapshot().error).toContain('идентификатор проекта')
+    expect(withFailure.getSnapshot().error).toContain('Project identifier')
   })
 })
 
-describe('Подключение приложения', () => {
-  it('показывает предложение пользователю', () => {
+describe('Connecting an application', () => {
+  it('shows the proposal to the user', () => {
     transport.emitProposal('p1', [ETHEREUM])
 
     expect(service.getSnapshot().proposal?.id).toBe('p1')
   })
 
-  it('одобрение выдаёт адреса кошелька', async () => {
+  it('approval issues the wallet addresses', async () => {
     transport.emitProposal('p1', [ETHEREUM])
     await service.respondToProposal(true)
 
     expect(transport.lastApprovedAddresses()).toEqual([OWNER])
   })
 
-  it('отказ отправляется приложению явно', async () => {
-    /* Приложение, не получившее ответа, висит в ожидании
-       и подталкивает нажать ещё раз. */
+  it('a rejection is sent to the app explicitly', async () => {
+    /* An app that gets no reply hangs waiting and nudges another press. */
     transport.emitProposal('p1', [ETHEREUM])
     await service.respondToProposal(false)
 
     expect(transport.proposalAnswers.at(-1)?.[1]).toBeNull()
   })
 
-  it('не выдаёт сети, которых нет в кошельке', async () => {
-    /* Согласиться на неизвестную сеть значило бы пообещать подпись
-       там, где кошелёк не может ни оценить комиссию, ни показать
-       баланс. */
+  it('does not issue networks the wallet does not have', async () => {
+    /* Agreeing to an unknown network would promise a signature
+       where the wallet cannot estimate a fee or show a balance. */
     transport.emitProposal('p1', [UNKNOWN_CHAIN])
     await service.respondToProposal(true)
 
@@ -147,7 +144,7 @@ describe('Подключение приложения', () => {
     expect(approval.chainIds).not.toContain(UNKNOWN_CHAIN)
   })
 
-  it('оставляет только известные сети из запрошенных', async () => {
+  it('keeps only known networks from those requested', async () => {
     transport.emitProposal('p1', [ETHEREUM, UNKNOWN_CHAIN])
     await service.respondToProposal(true)
 
@@ -156,7 +153,7 @@ describe('Подключение приложения', () => {
     expect(approval.chainIds).toEqual([ETHEREUM])
   })
 
-  it('предложение исчезает после ответа', async () => {
+  it('the proposal disappears after a response', async () => {
     transport.emitProposal('p1', [ETHEREUM])
     await service.respondToProposal(true)
 
@@ -164,15 +161,15 @@ describe('Подключение приложения', () => {
   })
 })
 
-describe('Запрос на подпись', () => {
-  it('показывает запрос вместе с разбором рисков', () => {
+describe('A signature request', () => {
+  it('shows the request together with risk findings', () => {
     transport.emitRequest(messageRequest(OWNER))
 
     expect(service.getSnapshot().request?.request.id).toBe('req-1')
     expect(service.getSnapshot().request?.risks).toBeDefined()
   })
 
-  it('сообщает о расхождении сети в разборе', () => {
+  it('reports a network mismatch in the findings', () => {
     transport.emitRequest(messageRequest(OWNER, 'req-1', POLYGON))
 
     expect(service.getSnapshot().request?.risks.map((item) => item.risk)).toContain(
@@ -180,9 +177,9 @@ describe('Запрос на подпись', () => {
     )
   })
 
-  it('отклоняет запрос от чужого адреса без вопроса пользователю', async () => {
-    /* Подписать чужим адресом всё равно нечем, а лишний экран приучает
-       нажимать «подтвердить», не читая. */
+  it('rejects a request from a foreign address without asking the user', async () => {
+    /* There is nothing to sign a foreign address with, and an extra
+       screen trains people to press "confirm" without reading. */
     transport.emitRequest(messageRequest(STRANGER))
 
     await vi.waitFor(() => {
@@ -193,8 +190,8 @@ describe('Запрос на подпись', () => {
     expect(service.getSnapshot().request).toBeNull()
   })
 
-  it('отклоняет второй запрос, пока не отвечен первый', async () => {
-    /* Второй экран поверх первого — способ подписать не то. */
+  it('rejects a second request while the first is unanswered', async () => {
+    /* A second screen on top of the first is a way to sign the wrong thing. */
     transport.emitRequest(messageRequest(OWNER, 'req-1'))
     transport.emitRequest(messageRequest(OWNER, 'req-2'))
 
@@ -206,7 +203,7 @@ describe('Запрос на подпись', () => {
     expect(service.getSnapshot().request?.request.id).toBe('req-1')
   })
 
-  it('одобрение выполняет запрос и отправляет результат', async () => {
+  it('approval executes the request and sends the result', async () => {
     transport.emitRequest(messageRequest(OWNER))
     await service.respondToRequest(true)
 
@@ -217,7 +214,7 @@ describe('Запрос на подпись', () => {
     })
   })
 
-  it('отказ не выполняет запрос', async () => {
+  it('rejection does not execute the request', async () => {
     transport.emitRequest(messageRequest(OWNER))
     await service.respondToRequest(false)
 
@@ -225,10 +222,10 @@ describe('Запрос на подпись', () => {
     expect(transport.responses.at(-1)?.response.kind).toBe('rejected')
   })
 
-  it('сбой выполнения превращается в отказ, а не в молчание', async () => {
-    /* Иначе приложение ждёт ответа и подталкивает пользователя
-       нажать ещё раз — то есть подписать второй раз. */
-    execute.mockRejectedValueOnce(new Error('Узел не ответил'))
+  it('an execution failure becomes a rejection, not silence', async () => {
+    /* Otherwise the app waits and nudges another press — i.e. a
+       second signature. */
+    execute.mockRejectedValueOnce(new Error('The node did not respond'))
 
     transport.emitRequest(messageRequest(OWNER))
     await service.respondToRequest(true)
@@ -236,10 +233,12 @@ describe('Запрос на подпись', () => {
     const response = transport.responses.at(-1)?.response
 
     expect(response?.kind).toBe('rejected')
-    expect(response?.kind === 'rejected' ? response.reason : '').toContain('Узел не ответил')
+    expect(response?.kind === 'rejected' ? response.reason : '').toContain(
+      'The node did not respond',
+    )
   })
 
-  it('запрос исчезает после ответа', async () => {
+  it('the request disappears after a response', async () => {
     transport.emitRequest(messageRequest(OWNER))
     await service.respondToRequest(true)
 
@@ -247,11 +246,11 @@ describe('Запрос на подпись', () => {
   })
 })
 
-describe('Отключение сессий', () => {
-  it('разрывает подключение и обновляет список', async () => {
+describe('Disconnecting sessions', () => {
+  it('disconnects and refreshes the list', async () => {
     transport.emitConnected({
       id: 'session-1',
-      dapp: { name: 'Пример', url: 'https://example.com', description: null, iconUrl: null },
+      dapp: { name: 'Example', url: 'https://example.com', description: null, iconUrl: null },
       chainIds: [ETHEREUM],
       addresses: [OWNER],
       connectedAt: 0,
@@ -266,7 +265,7 @@ describe('Отключение сессий', () => {
     expect(service.getSnapshot().sessions).toHaveLength(0)
   })
 
-  it('закрытие сбрасывает состояние', async () => {
+  it('destroy resets state', async () => {
     transport.emitProposal('p1', [ETHEREUM])
     await service.destroy()
 
@@ -275,17 +274,17 @@ describe('Отключение сессий', () => {
   })
 })
 
-describe('Уведомление приложений о смене состояния', () => {
-  it('передаёт транспорту текущие сеть и адреса', async () => {
-    /* Приложение помнит сеть с момента подключения; без уведомления
-       оно готовит операцию для прежней. */
+describe('Notifying apps of a state change', () => {
+  it('passes the current network and addresses to the transport', async () => {
+    /* The app remembers the network from connect time; without a
+       notice it prepares an operation for the previous one. */
     await service.notifyWalletState()
 
     expect(transport.stateChanges).toEqual([{ chainId: ETHEREUM, addresses: [OWNER] }])
   })
 
-  it('до готовности транспорта молчит', async () => {
-    /* Уведомлять некому и нечем: сервис не прошёл init(). */
+  it('stays silent until the transport is ready', async () => {
+    /* No one and nothing to notify: the service has not run init(). */
     const idleTransport = new FakeSessionTransport()
     const notReady = new DappSessionService({
       transport: idleTransport,
@@ -301,8 +300,8 @@ describe('Уведомление приложений о смене состоя
     expect(idleTransport.stateChanges).toEqual([])
   })
 
-  it('без активной сети не уведомляет', async () => {
-    /* Между блокировкой и открытием сети нет; событие бессмысленно. */
+  it('does not notify without an active network', async () => {
+    /* Between lock and open there is no network; the event is meaningless. */
     const noChain = new DappSessionService({
       transport,
       logger: new NullLogger(),

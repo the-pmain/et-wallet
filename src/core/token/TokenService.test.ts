@@ -39,12 +39,10 @@ const CHAIN_ID = BUILT_IN_CHAIN_ID.Ethereum
 const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-/** Дополняет значение до слова ABI. */
 function word(value: string): string {
   return value.padStart(64, '0')
 }
 
-/** Кодирует текст как строку переменной длины ABI. */
 function encodeText(text: string): HexString {
   const bytes = [...new TextEncoder().encode(text)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -53,7 +51,7 @@ function encodeText(text: string): HexString {
   return `0x${word('20')}${word((bytes.length / 2).toString(16))}${bytes.padEnd(64, '0')}` as HexString
 }
 
-/** Ответы контракта на вызовы. `null` означает отказ. */
+/** Contract replies to calls. `null` means a refusal. */
 interface IContractResponses {
   decimals?: string | null
   symbol?: HexString | null
@@ -80,7 +78,7 @@ class StubProvider implements IProvider {
     const answer = this.#answer(selector)
 
     return answer === null || answer === undefined
-      ? Promise.reject(new Error('контракт отказал'))
+      ? Promise.reject(new Error('contract refused'))
       : Promise.resolve(answer)
   }
 
@@ -121,7 +119,7 @@ class StubProvider implements IProvider {
   }
 
   request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getBalance(): Promise<Wei> {
@@ -136,7 +134,7 @@ class StubProvider implements IProvider {
     return Promise.resolve(0)
   }
 
-  /** Байт-код по адресу. Обычный адрес: проверок контракта в этих тестах нет. */
+  /** Bytecode at the address. An ordinary address: these tests do not check for a contract. */
   getCode(): Promise<HexString> {
     return Promise.resolve('0x' as HexString)
   }
@@ -145,11 +143,11 @@ class StubProvider implements IProvider {
   }
 
   getFeeData(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   sendRawTransaction(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getTransactionReceipt(): Promise<null> {
@@ -157,7 +155,7 @@ class StubProvider implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -208,8 +206,8 @@ beforeEach(async () => {
   await service.init()
 })
 
-describe('TokenService: список', () => {
-  it('всегда содержит нативную валюту первой', () => {
+describe('TokenService: list', () => {
+  it('always contains the native currency first', () => {
     const [first] = service.list(CHAIN_ID)
 
     expect(first?.address).toBeNull()
@@ -217,24 +215,24 @@ describe('TokenService: список', () => {
     expect(first?.symbol).toBe('ETH')
   })
 
-  it('не помечает нативную валюту непроверенной', () => {
-    /* Она часть конфигурации сети, а не пользовательская добавка. */
+  it('does not mark the native currency as custom', () => {
+    /* It is part of the network config, not a user addition. */
     expect(service.list(CHAIN_ID)[0]?.isCustom).toBe(false)
   })
 
-  it('отказывает до инициализации', async () => {
+  it('refuses before initialisation', async () => {
     const fresh = await createService()
 
     expect(() => fresh.list(CHAIN_ID)).toThrow(NotInitializedError)
   })
 
-  it('возвращает пустой список для неизвестной сети', () => {
+  it('returns an empty list for an unknown network', () => {
     expect(service.list(999_999n as ChainId)).toHaveLength(0)
   })
 })
 
-describe('TokenService: чтение метаданных', () => {
-  it('читает символ, имя и число знаков из контракта', async () => {
+describe('TokenService: reading metadata', () => {
+  it('reads the symbol, name and decimals from the contract', async () => {
     const metadata = await service.fetchMetadata(CHAIN_ID, TOKEN)
 
     expect(metadata.symbol).toBe('USDC')
@@ -242,16 +240,16 @@ describe('TokenService: чтение метаданных', () => {
     expect(metadata.decimals).toBe(6)
   })
 
-  it('отвергает контракт, не сообщающий число знаков', async () => {
+  it('rejects a contract that does not report decimals', async () => {
     node.responses.decimals = null
 
-    /* Без числа знаков любая показанная сумма — выдумка. */
+    /* Without decimals any shown amount is made up. */
     await expect(service.fetchMetadata(CHAIN_ID, TOKEN)).rejects.toBeInstanceOf(
       InvalidTokenContractError,
     )
   })
 
-  it('отвергает недопустимое число знаков', async () => {
+  it('rejects an illegal decimals value', async () => {
     node.responses.decimals = 'ff'
 
     await expect(service.fetchMetadata(CHAIN_ID, TOKEN)).rejects.toBeInstanceOf(
@@ -259,19 +257,20 @@ describe('TokenService: чтение метаданных', () => {
     )
   })
 
-  it('подставляет усечённый адрес вместо отсутствующего символа', async () => {
+  it('fills in a truncated address when the symbol is missing', async () => {
     node.responses.symbol = null
     node.responses.name = null
 
     const metadata = await service.fetchMetadata(CHAIN_ID, TOKEN)
 
-    /* Символ и имя объявлены стандартом необязательными: отказ добавить
-       такой токен был бы чрезмерным, а усечённый адрес правдив. */
+    /* Symbol and name are optional in the standard: refusing to add
+       such a token would be excessive, and a truncated address is
+       truthful. */
     expect(metadata.symbol).toContain('0xA0b8')
     expect(metadata.name).toContain('0xA0b8')
   })
 
-  it('читает символ старого токена в виде bytes32', async () => {
+  it('reads an old token symbol as bytes32', async () => {
     const bytes = [...new TextEncoder().encode('MKR')]
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('')
@@ -282,8 +281,8 @@ describe('TokenService: чтение метаданных', () => {
   })
 })
 
-describe('TokenService: добавление', () => {
-  it('добавляет токен с метаданными из контракта', async () => {
+describe('TokenService: adding', () => {
+  it('adds a token with metadata from the contract', async () => {
     const token = await service.add({ chainId: CHAIN_ID, address: TOKEN })
 
     expect(token.symbol).toBe('USDC')
@@ -291,49 +290,49 @@ describe('TokenService: добавление', () => {
     expect(service.list(CHAIN_ID)).toHaveLength(2)
   })
 
-  it('помечает добавленный токен непроверенным', async () => {
-    /* Выпустить токен с обозначением известного проекта может кто угодно.
-       Встроенного списка проверенных нет: вписанный по памяти адрес
-       рисковал бы пометить подделку как настоящую. */
+  it('marks an added token as custom', async () => {
+    /* Anyone can issue a token with a known project's ticker. There
+       is no built-in verified list: an address written from memory
+       would risk marking a fake as genuine. */
     expect((await service.add({ chainId: CHAIN_ID, address: TOKEN })).isCustom).toBe(true)
   })
 
-  it('отвергает расхождение числа знаков с контрактом', async () => {
-    /* Токен с шестью знаками, записанный как восемнадцатизначный,
-       покажет одну миллионную настоящего баланса. */
+  it('rejects a decimals mismatch with the contract', async () => {
+    /* A six-decimal token recorded as eighteen-decimal would show
+       one millionth of the real balance. */
     await expect(
       service.add({ chainId: CHAIN_ID, address: TOKEN, decimals: 18 }),
     ).rejects.toBeInstanceOf(InvalidTokenContractError)
   })
 
-  it('принимает совпадающее число знаков', async () => {
+  it('accepts matching decimals', async () => {
     await expect(
       service.add({ chainId: CHAIN_ID, address: TOKEN, decimals: 6 }),
     ).resolves.toBeDefined()
   })
 
-  it('позволяет переопределить обозначение', async () => {
-    /* Символ — подпись на экране, а не арифметика: пользователь вправе
-       отличить подделку от настоящего собственной пометкой. */
+  it('allows the ticker to be overridden', async () => {
+    /* The symbol is a label on screen, not arithmetic: the user may
+       tell a fake from the real one with their own mark. */
     const token = await service.add({ chainId: CHAIN_ID, address: TOKEN, symbol: 'USDC (fake?)' })
 
     expect(token.symbol).toBe('USDC (fake?)')
     expect(token.decimals).toBe(6)
   })
 
-  it('отвергает значение, не являющееся адресом', async () => {
+  it('rejects a value that is not an address', async () => {
     await expect(
-      service.add({ chainId: CHAIN_ID, address: 'не адрес' as typeof TOKEN }),
+      service.add({ chainId: CHAIN_ID, address: 'not-an-address' as typeof TOKEN }),
     ).rejects.toBeInstanceOf(InvalidTokenContractError)
   })
 
-  it('отвергает неподдерживаемый стандарт', async () => {
+  it('rejects an unsupported standard', async () => {
     await expect(
       service.add({ chainId: CHAIN_ID, address: TOKEN, standard: TOKEN_STANDARD.Erc721 }),
     ).rejects.toBeInstanceOf(UnsupportedTokenStandardError)
   })
 
-  it('переживает перезапуск сессии', async () => {
+  it('survives a session restart', async () => {
     await service.add({ chainId: CHAIN_ID, address: TOKEN })
 
     const restored = await createServiceWith(secure)
@@ -342,7 +341,7 @@ describe('TokenService: добавление', () => {
     expect(restored.list(CHAIN_ID)).toHaveLength(2)
   })
 
-  it('порождает событие смены списка', async () => {
+  it('emits a list-changed event', async () => {
     let changed = 0
     service.on('token:listChanged', () => {
       changed += 1
@@ -354,36 +353,37 @@ describe('TokenService: добавление', () => {
   })
 })
 
-describe('TokenService: удаление', () => {
-  it('убирает токен из списка', async () => {
+describe('TokenService: removal', () => {
+  it('removes the token from the list', async () => {
     await service.add({ chainId: CHAIN_ID, address: TOKEN })
     await service.remove({ chainId: CHAIN_ID, address: TOKEN })
 
     expect(service.list(CHAIN_ID)).toHaveLength(1)
   })
 
-  it('не позволяет убрать нативную валюту', async () => {
-    /* Её отсутствие в списке означало бы, что баланс сети неизвестен. */
+  it('does not allow the native currency to be removed', async () => {
+    /* Its absence from the list would mean the network balance is
+       unknown. */
     await expect(service.remove({ chainId: CHAIN_ID, address: null })).rejects.toBeInstanceOf(
       UnsupportedTokenStandardError,
     )
   })
 
-  it('отказывает по неизвестному токену', async () => {
+  it('refuses on an unknown token', async () => {
     await expect(service.remove({ chainId: CHAIN_ID, address: TOKEN })).rejects.toBeInstanceOf(
       TokenNotFoundError,
     )
   })
 })
 
-describe('TokenService: баланс', () => {
-  it('читает баланс токена', async () => {
+describe('TokenService: balance', () => {
+  it('reads the token balance', async () => {
     const balance = await service.getBalance({ chainId: CHAIN_ID, address: TOKEN }, OWNER)
 
     expect(balance).toBe(0x1e8480n)
   })
 
-  it('передаёт адрес владельца в вызов', async () => {
+  it('passes the owner address into the call', async () => {
     await service.getBalance({ chainId: CHAIN_ID, address: TOKEN }, OWNER)
 
     const call = node.calls.find((item) => (item.data ?? '').includes(BALANCE_OF_SELECTOR))
@@ -391,23 +391,23 @@ describe('TokenService: баланс', () => {
     expect(call?.data).toContain(OWNER.slice(2).toLowerCase())
   })
 
-  it('отказывает по нативной валюте', async () => {
+  it('refuses on the native currency', async () => {
     await expect(
       service.getBalance({ chainId: CHAIN_ID, address: null }, OWNER),
     ).rejects.toBeInstanceOf(UnsupportedTokenStandardError)
   })
 
-  it('доводит отказ контракта до вызывающего кода', async () => {
+  it('forwards a contract refusal to the caller', async () => {
     node.responses.balance = null
 
-    /* Ноль вместо отказа означал бы утверждение «средств нет». */
+    /* Zero instead of a refusal would claim "there are no funds". */
     await expect(
       service.getBalance({ chainId: CHAIN_ID, address: TOKEN }, OWNER),
     ).rejects.toBeInstanceOf(InvalidTokenContractError)
   })
 })
 
-/** Пересоздаёт сервис поверх того же защищённого хранилища. */
+/** Rebuilds the service over the same secure storage. */
 async function createServiceWith(storage: SecureStorage): Promise<TokenService> {
   const logger = new NullLogger()
   const networks = new NetworkService({
@@ -429,32 +429,33 @@ async function createServiceWith(storage: SecureStorage): Promise<TokenService> 
   })
 }
 
-describe('Проверенные контракты', () => {
-  /* `TOKEN` — адрес USDC в Ethereum, он входит во встроенный список.
-     Дублёр отвечает теми же символом и числом знаков, что записаны
-     в списке. */
+describe('Verified contracts', () => {
+  /* `TOKEN` is the USDC address on Ethereum; it is in the built-in
+     list. The stand-in replies with the same symbol and decimals
+     that the list records. */
   const UNKNOWN = toAddress('0x1111111111111111111111111111111111111111')
 
-  it('токен из списка помечается проверенным', async () => {
+  it('a token from the list is marked as verified', async () => {
     expect((await service.add({ chainId: CHAIN_ID, address: TOKEN })).isVerified).toBe(true)
   })
 
-  it('признаки независимы: добавлен вручную и при этом проверен', async () => {
-    /* «Добавлен вручную» говорит о том, как токен попал в список,
-       «проверен» — о том, известен ли адрес. */
+  it('the flags are independent: added by hand and still verified', async () => {
+    /* "Added by hand" says how the token entered the list;
+       "verified" says whether the address is known. */
     const token = await service.add({ chainId: CHAIN_ID, address: TOKEN })
 
     expect(token.isCustom).toBe(true)
     expect(token.isVerified).toBe(true)
   })
 
-  it('незнакомый контракт проверенным не считается', async () => {
-    /* Это не обвинение в подделке: список заведомо неполон.
+  it('an unknown contract is not treated as verified', async () => {
+    /* This is not an accusation of a fake: the list is incomplete
+       by design.
 
-       Согласие здесь требуется потому, что дублёр узла отвечает
-       на любой адрес символом `USDC`: контракт по чужому адресу,
-       называющийся именем проверенного токена, — ровно тот случай,
-       ради которого проверка и написана. */
+       Consent is required here because the node stand-in answers
+       every address with the symbol `USDC`: a contract at a foreign
+       address that uses a verified token's name is exactly the case
+       the check was written for. */
     const token = await service.add({
       chainId: CHAIN_ID,
       address: UNKNOWN,
@@ -464,17 +465,18 @@ describe('Проверенные контракты', () => {
     expect(token.isVerified).toBe(false)
   })
 
-  it('расхождение с контрактом снимает пометку', async () => {
-    /* Контракт с обновляемой реализацией вправе изменить символ,
-       а список в коде мог устареть. Помечать такую запись проверенной
-       значило бы поручиться за то, что изменилось без нашего ведома. */
+  it('a mismatch with the contract clears the mark', async () => {
+    /* A contract with an upgradeable implementation may change its
+       symbol, and the list in the code may be stale. Marking such a
+       record as verified would vouch for something that changed
+       without our knowledge. */
     node.responses.symbol = encodeText('USDX')
 
     expect((await service.add({ chainId: CHAIN_ID, address: TOKEN })).isVerified).toBe(false)
   })
 
-  it('нативная валюта проверена всегда', () => {
-    /* Она часть конфигурации сети, а не пользовательская добавка. */
+  it('the native currency is always verified', () => {
+    /* It is part of the network config, not a user addition. */
     const native = service.list(CHAIN_ID)[0]
 
     expect(native?.address).toBeNull()

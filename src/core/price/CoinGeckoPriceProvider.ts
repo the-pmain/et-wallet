@@ -17,66 +17,65 @@ const PROVIDER_NAME = 'CoinGecko'
 const DEFAULT_BASE_URL = 'https://api.coingecko.com/api/v3'
 
 /**
- * Сколько адресов контрактов уходит в один запрос.
+ * How many contract addresses go in one request.
  *
- * ЕДИНИЦА — НЕ ОСТОРОЖНОСТЬ, А ИЗМЕРЕННОЕ ОГРАНИЧЕНИЕ. Бесплатный
- * публичный доступ отвечает отказом `10012` на запрос с двумя адресами:
+ * ONE IS NOT CAUTION, IT IS A MEASURED LIMIT. Free public access
+ * replies with refusal `10012` to a request with two addresses:
  * «Number of contract addresses in the request exceeds the allowed limit
- * of 1 contract address». Пакет больше единицы доступен только
- * с ключом, поэтому размер задаётся настройкой, а не константой.
+ * of 1 contract address». A batch larger than one is available only
+ * with a key, so the size is a setting, not a constant.
  */
 const DEFAULT_CONTRACT_BATCH_SIZE = 1
 
-/** Предел ожидания ответа. */
 const DEFAULT_TIMEOUT_MS = 10_000
 
-/** Настройки источника. */
 export interface ICoinGeckoOptions {
-  /** Базовый адрес. Заменяется в тестах и при использовании платного узла. */
+  /** Base URL. Replaced in tests and when using a paid node. */
   readonly baseUrl?: string
 
   /**
-   * Ключ демонстрационного либо платного доступа.
+   * Demo or paid access key.
    *
-   * Без ключа сервис отвечает на один адрес контракта за запрос
-   * и жёстко ограничивает частоту.
+   * Without a key the service answers one contract address per
+   * request and hard-limits the rate.
    */
   readonly apiKey?: string
 
-  /** Сколько адресов контрактов отправлять одним запросом. */
+  /** How many contract addresses to send in one request. */
   readonly contractBatchSize?: number
 
   readonly timeoutMs?: number
 
-  /** Замена `fetch` для тестов. */
   readonly fetchImpl?: typeof fetch
 
   /**
-   * Источник времени.
+   * Time source.
    *
-   * Нужен для ответов, в которых сервис не указал момент котировки:
-   * подставляется текущее время, и оно обязано быть управляемым
-   * в тесте, а не браться из системных часов напрямую.
+   * Needed for replies where the service did not give a quote
+   * instant: the current time is substituted, and it must be
+   * controllable in a test, not taken from the system clock
+   * directly.
    */
   readonly clock?: IClock
 }
 
 /**
- * Курсы из CoinGecko.
+ * Rates from CoinGecko.
  *
- * ЧТО СЕРВИС УЗНАЁТ О ПОЛЬЗОВАТЕЛЕ. Адреса контрактов, курсы которых
- * запрошены, идентификатор сети и IP-адрес. Этого достаточно, чтобы
- * узнать состав портфеля, но НЕ ДОСТАТОЧНО, чтобы связать его
- * с конкретным адресом кошелька: адрес владельца сюда не передаётся
- * ни в каком виде и передан быть не может — метод его не принимает.
+ * WHAT THE SERVICE LEARNS ABOUT THE USER. Contract addresses whose
+ * rates were requested, the network identifier, and the IP address.
+ * That is enough to learn the portfolio composition, but NOT enough
+ * to tie it to a specific wallet address: the owner's address is
+ * not passed here in any form and cannot be — the method does not
+ * accept it.
  *
- * Именно поэтому источник включается только явным согласием
- * пользователя, а не по умолчанию.
+ * That is why the source is turned on only by explicit user
+ * consent, not by default.
  *
- * ЗАПРОСЫ РАЗДЕЛЕНЫ НА ДВА ВИДА. Нативная валюта запрашивается
- * по идентификатору монеты (`simple/price`), токены — по адресу
- * контракта (`simple/token_price/{платформа}`). Это разные конечные
- * точки с разными ограничениями, и объединить их нельзя.
+ * REQUESTS ARE SPLIT INTO TWO KINDS. Native currency is requested
+ * by coin id (`simple/price`), tokens by contract address
+ * (`simple/token_price/{platform}`). These are different endpoints
+ * with different limits, and they cannot be merged.
  */
 export class CoinGeckoPriceProvider implements IPriceProvider {
   readonly id = PROVIDER_ID
@@ -111,17 +110,18 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
 
     const quotes = new Map<string, IPriceQuote>()
 
-    /* Отказ по одной группе не отменяет остальных: курс эфира полезен
-       и тогда, когда цену одного токена получить не удалось. Но если
-       не удалось ничего, наружу уходит исключение — пустой ответ
-       и недоступность сервиса читаются по-разному. */
+    /* A refusal on one group does not cancel the others: the ether
+       rate is useful even when one token's price could not be
+       obtained. But if nothing succeeded, an exception goes out —
+       an empty reply and an unavailable service read differently. */
     let failures = 0
     let attempts = 0
 
-    /* Причина первого отказа сохраняется. Общее «источник недоступен»
-       вместо неё скрыло бы единственное, что говорит, как быть дальше:
-       превышение предела адресов лечится настройкой, а ограничение
-       частоты — ожиданием, и это разные действия. */
+    /* The first refusal reason is kept. A generic "source
+       unavailable" in its place would hide the only thing that
+       says what to do next: exceeding the address limit is fixed
+       by a setting, a rate limit by waiting, and those are
+       different actions. */
     let firstError: Error | null = null
 
     for (const [chainKey, group] of groupByChain(supported)) {
@@ -164,7 +164,7 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
     return quotes
   }
 
-  /** Курс нативной валюты запрашивается по идентификатору монеты. */
+  /** Native-currency rate is requested by coin id. */
   async #loadNative(
     refs: readonly IPriceRef[],
     coinId: string,
@@ -190,7 +190,7 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
     }
   }
 
-  /** Курсы токенов запрашиваются по адресам контрактов. */
+  /** Token rates are requested by contract addresses. */
   async #loadTokens(
     refs: readonly IPriceRef[],
     platformId: string,
@@ -214,8 +214,8 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
     const payload = await this.#request(url)
 
     for (const ref of refs) {
-      /* Ответ приходит с адресами в нижнем регистре независимо от того,
-         в каком виде они были отправлены. */
+      /* The reply arrives with addresses in lowercase regardless of
+         the form they were sent in. */
       const quote = readQuote(payload[(ref.address ?? '').toLowerCase()], currency, this.#clock)
 
       if (quote !== null) {
@@ -225,11 +225,12 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
   }
 
   /**
-   * Выполняет запрос.
+   * Performs the request.
    *
-   * ОШИБКА В ТЕЛЕ ОТВЕТА ПРИ КОДЕ 200 — ОБЫЧНОЕ ПОВЕДЕНИЕ ЭТОГО СЕРВИСА.
-   * Превышение предела адресов приходит именно так, и без проверки
-   * поля `error_code` такой ответ был бы разобран как «курсов нет».
+   * AN ERROR IN THE REPLY BODY WITH STATUS 200 IS ORDINARY FOR THIS
+   * SERVICE. Exceeding the address limit arrives that way, and
+   * without checking the `error_code` field such a reply would be
+   * parsed as "there are no rates".
    */
   async #request(url: URL): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = { accept: 'application/json' }
@@ -241,8 +242,8 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
     const response = await this.#fetch(url.toString(), {
       headers,
       signal: AbortSignal.timeout(this.#timeoutMs),
-      /* Ни cookie, ни заголовков авторизации: браузер не должен
-         подставлять к запросу ничего, о чём пользователь не знает. */
+      /* Neither cookies nor authorization headers: the browser
+         must not attach anything the user does not know about. */
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
     })
@@ -267,12 +268,11 @@ export class CoinGeckoPriceProvider implements IPriceProvider {
   }
 }
 
-/** Приводит пойманное значение к ошибке, не теряя сообщения. */
+/** Converts a caught value to an error without losing the message. */
 function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value))
 }
 
-/** Достаёт понятное сообщение из ответа об ошибке. */
 function readErrorMessage(payload: Record<string, unknown>): string {
   const status = payload['status']
 
@@ -288,11 +288,11 @@ function readErrorMessage(payload: Record<string, unknown>): string {
 }
 
 /**
- * Разбирает одну котировку.
+ * Parses one quote.
  *
- * Возвращает `null`, если цены нет: запись без цены означает, что курс
- * неизвестен. Подставить ноль значило бы объявить актив ничего
- * не стоящим.
+ * Returns `null` if there is no price: a record without a price
+ * means the rate is unknown. Substituting zero would declare the
+ * asset worth nothing.
  */
 function readQuote(entry: unknown, currency: FiatCurrency, clock: IClock): IPriceQuote | null {
   if (typeof entry !== 'object' || entry === null) {
@@ -312,12 +312,13 @@ function readQuote(entry: unknown, currency: FiatCurrency, clock: IClock): IPric
   return {
     price,
     change24hPercent: typeof change === 'number' && Number.isFinite(change) ? change : null,
-    /* Сервис отдаёт момент в секундах; внутренний тип — миллисекунды. */
+    /* The service gives the instant in seconds; the internal type
+       is milliseconds. */
     updatedAt: typeof updatedAt === 'number' ? ((updatedAt * 1000) as Timestamp) : clock.now(),
   }
 }
 
-/** Разбивает запрос по сетям: у каждой свой идентификатор платформы. */
+/** Splits the request by network: each has its own platform id. */
 function groupByChain(refs: readonly IPriceRef[]): ReadonlyMap<string, readonly IPriceRef[]> {
   const groups = new Map<string, IPriceRef[]>()
 
@@ -335,7 +336,6 @@ function groupByChain(refs: readonly IPriceRef[]): ReadonlyMap<string, readonly 
   return groups
 }
 
-/** Режет список на части заданного размера. */
 function chunk<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
   const parts: T[][] = []
 

@@ -18,10 +18,11 @@ const EMPTY_ASSETS: IRemoteAssets = {
 }
 
 /**
- * Клиент кабинета администратора.
+ * Admin cabinet client.
  *
- * PIN живёт только в заголовке `x-admin-pin`. Сервер сверяет его с
- * `ADMIN_PIN` или `SUPER_ADMIN_PIN`; клиент PIN не знает заранее.
+ * The PIN lives only in the `x-admin-pin` header. The server checks
+ * it against `ADMIN_PIN` or `SUPER_ADMIN_PIN`; the client does not
+ * know the PIN in advance.
  */
 
 export class AdminAuthError extends Error {

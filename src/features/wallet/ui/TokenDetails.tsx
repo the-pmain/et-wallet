@@ -33,12 +33,12 @@ const RANGE_OPTIONS: readonly { readonly value: ChartRange; readonly label: stri
 ]
 
 /**
- * Выпадающая панель актива.
+ * Expanded asset panel.
  *
- * ЭТО НЕ ВТОРАЯ КАРТОЧКА БАЛАНСА. Количество и оценка уже стоят
- * в строке: повторять их восемнадцатью знаками и тем же долларом —
- * занимать высоту, ничего не добавляя. Здесь курс, его движение
- * и опознание контракта.
+ * This is not a second balance card. Quantity and estimate already
+ * sit in the row; repeating them at 18 digits and the same dollar
+ * would spend height for nothing. Here: the rate, its movement, and
+ * contract identification.
  */
 export function TokenDetails({ detailsId, token, portfolio }: TokenDetailsProps) {
   const [range, setRange] = useState<ChartRange>(CHART_RANGE.Hours24)
@@ -204,8 +204,8 @@ function CopyAddressButton({ address, symbol }: { readonly address: Address; rea
             setCopied(true)
           })
           .catch(() => {
-            /* Буфер недоступен на незащищённом соединении. Панель
-               не должна из-за этого размонтироваться. */
+            /* Clipboard is unavailable on an insecure connection.
+               The panel must not unmount because of that. */
           })
       }}
     >

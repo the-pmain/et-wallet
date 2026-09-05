@@ -27,38 +27,36 @@ import type { INftPage } from './types'
 const SERVICE_NAME = 'NftService'
 
 /**
- * Глубина выборки в блоках.
+ * Sample depth in blocks.
  *
- * То же значение, что у истории переводов: публичные узлы ограничивают
- * диапазон `eth_getLogs`, и десять тысяч блоков принимают почти все.
- * Больше просить бессмысленно — узел ответит отказом, и список окажется
- * пустым вместо короткого.
+ * The same value as transfer history: public nodes cap the
+ * `eth_getLogs` range, and ten thousand blocks are accepted by
+ * almost all of them. Asking for more is pointless — the node
+ * will reject, and the list will be empty instead of short.
  */
 const DEFAULT_SCAN_BLOCKS = 10_000
 
 /**
- * Сколько предметов проверяется на принадлежность.
+ * How many items are checked for ownership.
  *
- * Каждая проверка — отдельное обращение к контракту. У адреса, через
- * который прошли сотни предметов, полная проверка означала бы сотни
- * запросов: лимиты публичного узла исчерпаются, а пользователь будет
- * ждать минуты. Пропущенные считаются и показываются.
+ * Each check is a separate contract call. An address that hundreds
+ * of items passed through would mean hundreds of requests: public-
+ * node limits would run out, and the user would wait minutes.
+ * Skipped items are counted and shown.
  */
 const MAX_CHECKED_ITEMS = 60
 
 /**
- * Сколько проверок выполняется одновременно.
+ * How many checks run at once.
  *
- * Последовательная проверка шестидесяти предметов заняла бы десятки
- * секунд, а все сразу — верный способ получить отказ по числу запросов
- * в секунду. Восемь — середина, принимаемая публичными узлами.
+ * Checking sixty items in sequence would take tens of seconds;
+ * all at once is a sure way to be rejected for requests per
+ * second. Eight is the middle public nodes accept.
  */
 const BATCH_SIZE = 8
 
-/** Число тем у события ERC-721: идентификатор события плюс три параметра. */
 const ERC721_TOPIC_COUNT = 4
 
-/** Зависимости сервиса. */
 export interface INftServiceDependencies {
   readonly resolver: IProviderResolver
   readonly networks: INetworkService
@@ -66,27 +64,21 @@ export interface INftServiceDependencies {
   readonly scanBlocks?: number
 }
 
-/** Итог выборки журналов вместе с числом отказов. */
 interface IScanResult {
   readonly logs: readonly ILogEntry[]
 
-  /** Сколько запросов узел отклонил. */
   readonly failed: number
 
-  /** Сколько запросов было сделано всего. */
   readonly total: number
 
-  /** Причина последнего отказа. `null`, если отказов не было. */
   readonly reason: string | null
 }
 
-/** Название и обозначение коллекции, прочитанные из контракта. */
 interface ICollection {
   readonly name: string | null
   readonly symbol: string | null
 }
 
-/** Найденный предмет до проверки принадлежности. */
 interface ICandidate {
   readonly contract: Address
   readonly tokenId: bigint
@@ -94,21 +86,22 @@ interface ICandidate {
 }
 
 /**
- * Коллекционные токены, принадлежащие адресу.
+ * Collectibles belonging to an address.
  *
- * КАК ЭТО РАБОТАЕТ И ПОЧЕМУ ИНАЧЕ НЕЛЬЗЯ. Узел не умеет отвечать
- * на вопрос «что принадлежит адресу»: у него нет такого индекса.
- * Сервис находит поступления в журналах событий, а затем спрашивает
- * у каждого контракта, принадлежит ли предмет владельцу СЕЙЧАС.
+ * HOW IT WORKS AND WHY THERE IS NO OTHER WAY. The node cannot
+ * answer "what belongs to this address": it has no such index.
+ * The service finds arrivals in event logs, then asks each
+ * contract whether the item belongs to the owner NOW.
  *
- * ДВА ШАГА ОБЯЗАТЕЛЬНЫ. Журнал — это история: предмет, полученный вчера
- * и отданный сегодня, останется в нём навсегда. Список, построенный
- * по одним журналам, показывал бы чужое имущество как своё.
+ * BOTH STEPS ARE REQUIRED. The log is history: an item received
+ * yesterday and given away today stays there forever. A list
+ * built from the logs alone would show someone else's property
+ * as one's own.
  *
- * ЧЕГО СЕРВИС НЕ ДЕЛАЕТ. Он не загружает изображения и не обращается
- * по ссылкам из контрактов: адрес такой ссылки задаёт автор контракта,
- * и её загрузка раскрыла бы IP-адрес владельца произвольному серверу,
- * позволив связать его с кошельком.
+ * WHAT THE SERVICE DOES NOT DO. It does not load images and does
+ * not follow links from contracts: the contract author sets that
+ * link address, and fetching it would reveal the owner's IP to
+ * an arbitrary server, tying it to the wallet.
  */
 export class NftService {
   readonly #resolver: IProviderResolver
@@ -116,14 +109,14 @@ export class NftService {
   readonly #logger: ILogger
   readonly #scanBlocks: number
 
-  /* Названия коллекций живут до конца сессии: они не меняются, а запрос
-     их заново на каждое обновление списка удваивал бы число обращений
-     к узлу. Ключ — сеть и адрес контракта: один адрес в разных сетях —
-     разные коллекции.
+  /* Collection names live until the session ends: they do not
+     change, and asking again on every list refresh would double
+     the node calls. The key is network plus contract address:
+     the same address on different networks is different collections.
 
-     ХРАНИТСЯ ОБЕЩАНИЕ, А НЕ ГОТОВОЕ ЗНАЧЕНИЕ. Предметы одной коллекции
-     проверяются одновременно, и кэш с результатом не успел бы
-     заполниться: каждый спросил бы контракт заново. */
+     A PROMISE IS STORED, NOT A FINISHED VALUE. Items of one
+     collection are checked at once, and a cache of results would
+     not fill in time: each would ask the contract again. */
   readonly #collections = new Map<string, Promise<ICollection>>()
 
   constructor(dependencies: INftServiceDependencies) {
@@ -134,11 +127,11 @@ export class NftService {
   }
 
   /**
-   * Возвращает предметы, принадлежащие владельцу.
+   * Returns items belonging to the owner.
    *
-   * Отказ узла не выбрасывается наружу: список остаётся пустым,
-   * а причина попадает в `limits`. Пустой список без объяснения
-   * читается владельцем как пропажа имущества.
+   * A node reject is not thrown outward: the list stays empty
+   * and the reason goes into `limits`. An empty list without an
+   * explanation is read by the owner as missing property.
    */
   async list(owner: Address, chainId: ChainId): Promise<INftPage> {
     const network = this.#networks.getByChainId(chainId)
@@ -168,9 +161,9 @@ export class NftService {
       }
     }
 
-    /* Отказ по одному виду событий оставляет список неполным,
-       но осмысленным; отказ по всем означает, что узел не ответил
-       вовсе, и пустой список тогда ничего не утверждает. */
+    /* A reject on one event kind leaves the list incomplete but
+       meaningful; a reject on all means the node did not answer
+       at all, and an empty list then asserts nothing. */
     if (scan.failed === scan.total) {
       return {
         items: [],
@@ -198,20 +191,21 @@ export class NftService {
     }
   }
 
-  /** Забывает названия коллекций. Вызывается при закрытии сессии. */
+  /** Forgets collection names. Called when the session closes. */
   clear(): void {
     this.#collections.clear()
   }
 
   /**
-   * Журналы поступлений владельцу.
+   * Arrival logs for the owner.
    *
-   * ТРИ ЗАПРОСА, А НЕ ОДИН. Позиция получателя в темах различается:
-   * у ERC-721 это вторая индексированная величина, у ERC-1155 — третья.
-   * Один запрос без фильтра по получателю вернул бы переводы всей сети.
+   * THREE REQUESTS, NOT ONE. The recipient's position in the topics
+   * differs: for ERC-721 it is the second indexed value, for
+   * ERC-1155 the third. One request without a recipient filter
+   * would return transfers of the whole network.
    *
-   * Отказ по одному виду событий не отменяет остальные: узел может
-   * не осилить широкий запрос, но ответить на узкий.
+   * A reject on one event kind does not cancel the others: the node
+   * may fail a wide query but answer a narrow one.
    */
   async #fetchIncoming(
     provider: IProvider,
@@ -252,11 +246,11 @@ export class NftService {
   }
 
   /**
-   * Оставляет предметы, принадлежащие владельцу сейчас.
+   * Keeps items that belong to the owner now.
    *
-   * Отказ контракта означает «проверить не удалось» и предмет
-   * отбрасывается: показать непроверенное как своё — то же, что
-   * показать чужое.
+   * A contract reject means "could not check" and the item is
+   * dropped: showing an unchecked item as owned is the same as
+   * showing someone else's.
    */
   async #keepOwned(
     provider: IProvider,
@@ -297,7 +291,6 @@ export class NftService {
     return owned
   }
 
-  /** Сколько экземпляров предмета принадлежит владельцу. */
   async #ownedAmount(provider: IProvider, owner: Address, candidate: ICandidate): Promise<bigint> {
     try {
       if (candidate.standard === TOKEN_STANDARD.Erc721) {
@@ -308,8 +301,8 @@ export class NftService {
           }),
         )
 
-        /* Предмет неделим: он либо принадлежит владельцу целиком,
-           либо не принадлежит вовсе. */
+        /* The item is indivisible: it either belongs to the owner
+           entirely, or not at all. */
         return areAddressesEqual(holder, owner) ? 1n : 0n
       }
 
@@ -320,9 +313,9 @@ export class NftService {
 
       return balance === '0x' ? 0n : BigInt(balance)
     } catch (error) {
-      /* Сожжённый предмет — самый частый случай: `ownerOf` для него
-         отвечает откатом. Отличить его от недоступности узла нечем,
-         и оба означают «показывать нельзя». */
+      /* A burned item is the most common case: `ownerOf` reverts
+         for it. There is no way to tell that from a node outage,
+         and both mean "must not be shown". */
       this.#logger.debug('Ownership of the item was not confirmed', {
         reason: error instanceof Error ? error.message : String(error),
       })
@@ -331,7 +324,6 @@ export class NftService {
     }
   }
 
-  /** Название и обозначение коллекции. Читаются один раз на контракт. */
   #collection(provider: IProvider, chainId: ChainId, contract: Address): Promise<ICollection> {
     const key = `${chainId.toString()}:${contract.toLowerCase()}`
     const cached = this.#collections.get(key)
@@ -351,12 +343,12 @@ export class NftService {
   }
 
   /**
-   * Читает строковое поле контракта.
+   * Reads a string field of the contract.
    *
-   * `null` вместо выдуманного значения: ни `name`, ни `symbol`
-   * не обязательны для ERC-721 и вовсе не предусмотрены ERC-1155.
-   * Подставить сюда «Неизвестная коллекция» значило бы утверждать,
-   * что контракт так ответил.
+   * `null` instead of an invented value: neither `name` nor `symbol`
+   * is required for ERC-721, and ERC-1155 does not provide them at
+   * all. Putting "Unknown collection" here would claim the contract
+   * answered so.
    */
   async #readText(
     provider: IProvider,
@@ -372,13 +364,13 @@ export class NftService {
 }
 
 /**
- * Собирает предметы из журналов, отбрасывая повторы.
+ * Collects items from the logs, dropping duplicates.
  *
- * ВИД СОБЫТИЯ ОПРЕДЕЛЯЕТ СТАНДАРТ. У ERC-20 и ERC-721 общее событие
- * `Transfer`, и различаются они только числом индексированных
- * параметров: у ERC-721 номер предмета тоже индексирован, отчего тем
- * становится четыре. Считать переводы ERC-20 предметами значило бы
- * показать в галерее чужие деньги.
+ * THE EVENT KIND DECIDES THE STANDARD. ERC-20 and ERC-721 share
+ * the `Transfer` event and differ only in the number of indexed
+ * parameters: ERC-721 also indexes the item id, so there are four
+ * topics. Treating ERC-20 transfers as items would show other
+ * people's money in the gallery.
  */
 function collectCandidates(logs: readonly ILogEntry[]): readonly ICandidate[] {
   const seen = new Map<string, ICandidate>()
@@ -405,9 +397,9 @@ function collectCandidates(logs: readonly ILogEntry[]): readonly ICandidate[] {
     }
 
     if (topic === TRANSFER_SINGLE_TOPIC) {
-      /* Данные события: номер предмета и количество. Количество здесь
-         не берётся — оно описывает тот перевод, а не остаток на момент
-         запроса. */
+      /* Event data: item id and amount. The amount is not taken
+         here — it describes that transfer, not the remainder at
+         query time. */
       const tokenId = splitDataWords(log.data)[0]
 
       if (tokenId !== undefined) {
@@ -428,13 +420,13 @@ function collectCandidates(logs: readonly ILogEntry[]): readonly ICandidate[] {
 }
 
 /**
- * Читает номера предметов из события `TransferBatch`.
+ * Reads item ids from a `TransferBatch` event.
  *
- * Данные содержат два массива переменной длины: номера и количества.
- * Первое слово — смещение до первого массива, по нему лежит длина,
- * затем значения. Смещение читается, а не предполагается равным 64:
- * стандарт этого не гарантирует, и предположение молча дало бы чужие
- * числа.
+ * The data holds two variable-length arrays: ids and amounts.
+ * The first word is the offset to the first array; the length
+ * sits there, then the values. The offset is read, not assumed
+ * to be 64: the standard does not guarantee that, and the
+ * assumption would silently yield someone else's numbers.
  */
 function decodeBatchIds(data: HexString): readonly bigint[] {
   const words = splitDataWords(data)
@@ -444,7 +436,7 @@ function decodeBatchIds(data: HexString): readonly bigint[] {
     return []
   }
 
-  /* Смещение задано в байтах, а слово занимает 32 байта. */
+  /* The offset is in bytes; a word is 32 bytes. */
   const start = Number(offsetWord) / 32
   const lengthWord = words[start]
 

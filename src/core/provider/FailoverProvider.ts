@@ -19,75 +19,74 @@ import type {
 const PROVIDER_NAME = 'FailoverProvider'
 
 /**
- * Вызовы, отказ по которым говорит об умениях узла, а не о цепи.
+ * Calls whose failure describes a node's capabilities, not the chain.
  *
- * Только чтение: опрос соседей повторяет вызов на нескольких узлах,
- * и действие с последствиями исполнилось бы несколько раз.
+ * Read-only: probing neighbors repeats the call on several nodes,
+ * so a mutating action would execute more than once.
  *
- * `eth_simulateV1` — новый метод, и поддержка у публичных узлов
- * разрозненная: измерено, что первый узел встроенного списка Ethereum
- * его не выполняет, а второй выполняет.
+ * `eth_simulateV1` is a newer method, and public-node support is uneven:
+ * measured that the first Ethereum built-in endpoint does not implement
+ * it, while the second does.
  */
 const NODE_CAPABILITY_METHODS: ReadonlySet<string> = new Set(['eth_simulateV1'])
 
-/** Подключение к одному адресу. Внедряется, чтобы не тянуть сюда транспорт. */
+/** Connects to a single endpoint. Injected so this module does not own transport. */
 export type EndpointConnector = (endpoint: IRpcEndpoint, chainId: ChainId) => Promise<IProvider>
 
-/** Уведомление о смене действующего узла. */
+/** Notified when the active node is replaced. */
 export type EndpointSwitchListener = (
   failed: IRpcEndpoint,
   next: IRpcEndpoint | null,
   reason: string,
 ) => void
 
-/** Зависимости провайдера. */
+/** Provider dependencies. */
 export interface IFailoverProviderDependencies {
   readonly chainId: ChainId
   readonly endpoints: readonly IRpcEndpoint[]
   readonly connect: EndpointConnector
   readonly logger: ILogger
 
-  /** Вызывается при исключении адреса из перебора. */
+  /** Called when an address is dropped from rotation. */
   readonly onSwitch?: EndpointSwitchListener
 }
 
 /**
- * Транспорт, переживающий отказ узла.
+ * Transport that survives a node failure.
  *
- * ЗАЧЕМ. Перебор резервных адресов при подключении существовал и раньше,
- * но действовал ровно один раз. Узел, отказавший через минуту после
- * подключения, обрекал все последующие вызовы до конца сессии: кошелёк
- * показывал недоступность сети, имея в конфигурации два исправных
- * резервных адреса.
+ * WHY. Backup-address rotation at connect time already existed, but it
+ * ran exactly once. A node that failed a minute after connect doomed
+ * every later call for the rest of the session: the wallet showed the
+ * network as unavailable while two working backups sat in config.
  *
- * ПЕРЕКЛЮЧЕНИЕ ТОЛЬКО ПРИ ОТКАЗЕ ТРАНСПОРТА. Ответ узла с ошибкой
- * JSON-RPC переключения не вызывает: узел, который ответил, работает,
- * и второй узел ответит то же самое. Различие принципиально —
- * `ProviderUnavailableError` означает «ответа не было», а `RpcError`
- * означает «ответ получен и он отрицательный».
+ * SWITCH ONLY ON TRANSPORT FAILURE. A JSON-RPC error response does not
+ * trigger a switch: the node that answered is alive, and a second node
+ * would answer the same. The distinction is essential —
+ * `ProviderUnavailableError` means "no response", `RpcError` means
+ * "a negative response was received".
  *
- * ВЫБОРКА ЖУРНАЛОВ ПЕРЕБОР НЕ РАСХОДУЕТ. `eth_getLogs` — единственный
- * вызов, отказ по которому не говорит о здоровье узла: узел, живой для
- * баланса и nonce, отказывает в широком поиске по журналам постоянно.
- * Такой отказ опрашивает соседние адреса временными соединениями, но
- * действующий узел не меняет. Подробности — в `getLogs`.
+ * LOG QUERIES DO NOT CONSUME ROTATION. `eth_getLogs` is the only call
+ * whose failure does not speak to node health: a node that is fine for
+ * balance and nonce routinely refuses a wide log search. That failure
+ * probes neighbors via temporary connections and does not replace the
+ * active node. Details in `getLogs`.
  *
- * ТО ЖЕ ДЛЯ ВЫЗОВОВ ИЗ `NODE_CAPABILITY_METHODS`. Они зависят от умений
- * узла, а не от состояния цепи: измерено, что узел, отдающий журналы,
- * отказывает в симуляции, и наоборот. Опрос соседей — единственный
- * способ иметь и то, и другое, не перебирая рабочий узел.
+ * SAME FOR `NODE_CAPABILITY_METHODS`. Those depend on node features,
+ * not chain state: measured that a node which serves logs refuses
+ * simulation, and vice versa. Neighbor probing is the only way to have
+ * both without rotating away from a working node.
  *
- * ОТПРАВКА ТРАНЗАКЦИИ НЕ ПОВТОРЯЕТСЯ. `sendRawTransaction` при отказе
- * транспорта завершается ошибкой без попытки на другом узле. Причина
- * не в идемпотентности — повторная публикация тех же подписанных байтов
- * безопасна, — а в том, что судьба первой отправки неизвестна: узел мог
- * принять транзакцию и не успеть ответить. Второй узел вернёт
- * «already known», и кошелёк показал бы отказ по фактически принятой
- * транзакции. Пользователь обязан узнать о неопределённости, а не
- * получить придуманный за него ответ.
+ * TRANSACTION SEND IS NOT RETRIED. `sendRawTransaction` fails on
+ * transport error without trying another node. Not because of
+ * idempotency — republishing the same signed bytes is safe — but because
+ * the fate of the first send is unknown: the node may have accepted
+ * the transaction and failed to reply. The second node would return
+ * "already known", and the wallet would show a failure for a transaction
+ * that was actually accepted. The user must learn about the uncertainty
+ * rather than get an invented answer.
  *
- * ИСЧЕРПАНИЕ СПИСКА — ЭТО ОТКАЗ, А НЕ МОЛЧАНИЕ. Когда пригодных адресов
- * не осталось, вызовы завершаются `ProviderUnavailableError`.
+ * EXHAUSTING THE LIST IS A FAILURE, NOT SILENCE. When no usable
+ * addresses remain, calls throw `ProviderUnavailableError`.
  */
 export class FailoverProvider implements IProvider {
   readonly chainId: ChainId
@@ -111,47 +110,46 @@ export class FailoverProvider implements IProvider {
     this.#onSwitch = dependencies.onSwitch ?? null
   }
 
-  /** Адрес действующего узла. Пустая строка, пока соединения нет. */
+  /** Active node URL. Empty string until a connection exists. */
   get rpcUrl(): string {
     return this.#current?.rpcUrl ?? ''
   }
 
   /**
-   * Пригоден ли провайдер к работе.
+   * Whether the provider can still serve calls.
    *
-   * ИСЧЕРПАННЫЙ СПИСОК — ЭТО НЕПРИГОДНОСТЬ, А НЕ ОСОБОЕ СОСТОЯНИЕ.
-   * Перебрав все адреса, объект остаётся живым, но отвечать ему нечем:
-   * каждый вызов немедленно завершается отказом, не обращаясь к сети.
-   * Пока такой провайдер числился действующим, `RpcManager` держал его
-   * в кэше и отдавал всем желающим — кошелёк показывал «сеть
-   * недоступна» при исправных узлах, и починить это до перезагрузки
-   * было нечем.
+   * AN EXHAUSTED LIST IS UNFIT, NOT A SPECIAL STATE.
+   * After every address is tried, the object stays alive but has nothing
+   * to answer with: each call fails immediately without touching the
+   * network. While such a provider was still treated as active, `RpcManager`
+   * kept it in cache and handed it out — the wallet showed "network
+   * unavailable" with healthy nodes, and nothing could fix that until reload.
    *
-   * Признавшись в непригодности, провайдер позволяет `RpcManager`
-   * выбросить его и собрать новый: тот заново прочитает список адресов
-   * и учтёт истёкшие выдержки.
+   * By reporting itself unfit, the provider lets `RpcManager` drop it
+   * and build a new one: that rereads the address list and honors expired
+   * cooldowns.
    */
   get isActive(): boolean {
     return !this.#destroyed && this.#index < this.#endpoints.length
   }
 
-  /** Действующий адрес с указанием источника. `null`, пока соединения нет. */
+  /** Active endpoint with its source. `null` until a connection exists. */
   get activeEndpoint(): IRpcEndpoint | null {
     return this.#current === null ? null : (this.#endpoints[this.#index] ?? null)
   }
 
   /**
-   * Произвольный вызов JSON-RPC.
+   * Arbitrary JSON-RPC call.
    *
-   * МЕТОДЫ ИЗ `NODE_CAPABILITY_METHODS` ПРИ ОТКАЗЕ СПРАШИВАЮТСЯ
-   * У СОСЕДЕЙ. Причина та же, что у журналов: отказ означает не
-   * состояние цепи, а умения узла, и у соседа ответ может быть другим.
-   * Измерено на живых узлах: шлюз, отдающий журналы, отказывает
-   * в симуляции, а узел, выполняющий симуляцию, не отдаёт журналов.
-   * Без опроса соседей одно из двух всегда оставалось бы недоступным.
+   * `NODE_CAPABILITY_METHODS` ARE ASKED OF NEIGHBORS ON FAILURE.
+   * Same reason as logs: failure means node capability, not chain state,
+   * and a neighbor may answer differently. Measured on live nodes: a
+   * gateway that serves logs refuses simulation, and a node that simulates
+   * does not serve logs. Without neighbor probing, one of the two would
+   * always stay unavailable.
    *
-   * Действующий узел при этом не меняется: он исправен, просто
-   * не умеет именно этого.
+   * The active node is not replaced: it is healthy, it just cannot do
+   * this particular call.
    */
   async request<TResult>(request: IRpcRequest): Promise<TResult> {
     if (!NODE_CAPABILITY_METHODS.has(request.method)) {
@@ -206,9 +204,9 @@ export class FailoverProvider implements IProvider {
   }
 
   /**
-   * Публикует подписанную транзакцию БЕЗ повтора на другом узле.
+   * Publishes a signed transaction WITHOUT retrying on another node.
    *
-   * Обоснование — в описании класса.
+   * Rationale is in the class description.
    */
   async sendRawTransaction(signedTransaction: HexString): Promise<TxHash> {
     const provider = await this.#ensureConnected()
@@ -221,31 +219,31 @@ export class FailoverProvider implements IProvider {
   }
 
   /**
-   * Выборка журналов: спрашивает соседей, но НЕ исключает действующий узел.
+   * Log query: asks neighbors but does NOT drop the active node.
    *
-   * ПОЧЕМУ ЭТОТ ВЫЗОВ ОБРАБОТАН ОТДЕЛЬНО ОТ ВСЕХ ПРОЧИХ. `eth_getLogs`
-   * на порядок тяжелее остальных запросов, и отказ по нему означает не
-   * то же самое, что отказ по балансу. Измерено на живых узлах: при
-   * поиске истории `eth.drpc.org` ответил «408 Request Timeout», а
-   * `ethereum-rpc.publicnode.com` — «403: архивные запросы требуют
-   * личного токена». Оба узла в ту же секунду исправно отдавали баланс,
-   * номер блока и nonce.
+   * WHY THIS CALL IS HANDLED APART FROM THE REST. `eth_getLogs` is an
+   * order of magnitude heavier than other requests, and its failure does
+   * not mean the same as a balance failure. Measured on live nodes: during
+   * a history search `eth.drpc.org` returned "408 Request Timeout" and
+   * `ethereum-rpc.publicnode.com` returned "403: archive requests require
+   * a personal token". Both nodes were serving balance, block number, and
+   * nonce in the same second.
    *
-   * Отсюда правило: отказ на журналах — приговор запросу, а не узлу.
-   * Пропусти мы его через общий перебор, каждый заход в историю
-   * вычёркивал бы по узлу, и после двух заходов кошелёк остался бы
-   * вовсе без соединения — без балансов и без отправки. Это наблюдалось
-   * живьём: экран истории сообщал «нет доступных адресов», не сделав
-   * ни одного запроса, потому что список был исчерпан заранее.
+   * Rule: a log failure condemns the request, not the node. Routing it
+   * through general rotation would drop a node on every history visit,
+   * and after two visits the wallet would have no connection at all —
+   * no balances, no send. Observed live: the history screen reported
+   * "no available addresses" without making a request, because the list
+   * had already been exhausted.
    *
-   * Поэтому здесь: действующий узел спрашивается первым и остаётся
-   * действующим при любом исходе, а при отказе опрашиваются остальные
-   * адреса — временными соединениями, не трогая перебор.
+   * So: the active node is asked first and stays active regardless of
+   * outcome; on failure the other addresses are probed via temporary
+   * connections, without touching rotation.
    *
-   * ЦЕНА, КОТОРУЮ НАДО ЗНАТЬ. Второй узел узнаёт тот же запрос: адрес
-   * владельца и набор тем. Расплата ограничена — опрос идёт только
-   * после отказа и только по уже настроенным адресам, — но операторов,
-   * видящих запрос, становится больше одного.
+   * COST TO KNOW. The second node sees the same request: owner address
+   * and topics. The cost is bounded — probing runs only after failure
+   * and only against already configured addresses — but more than one
+   * operator sees the query.
    */
   async getLogs(filter: ILogFilter): Promise<readonly ILogEntry[]> {
     let firstError: unknown
@@ -288,10 +286,10 @@ export class FailoverProvider implements IProvider {
   }
 
   /**
-   * Выполняет вызов, переключаясь на следующий адрес при отказе транспорта.
+   * Runs a call, switching to the next address on transport failure.
    *
-   * Каждый адрес пробуется не более одного раза за вызов: повтор на уже
-   * отказавшем адресе только удлинил бы ожидание.
+   * Each address is tried at most once per call: retrying an address
+   * that already failed would only lengthen the wait.
    */
   async #withFailover<TResult>(call: (provider: IProvider) => Promise<TResult>): Promise<TResult> {
     let lastError: unknown = null
@@ -303,9 +301,9 @@ export class FailoverProvider implements IProvider {
         return await call(await this.#ensureConnected())
       } catch (error) {
         if (!(error instanceof ProviderUnavailableError)) {
-          /* Узел ответил, и ответ отрицательный. Другой узел ответит
-             то же самое: недостаток средств и откат вызова не зависят
-             от того, кого спрашивать. */
+          /* The node answered, and the answer is negative. Another node
+             would say the same: insufficient funds and a reverted call
+             do not depend on whom you ask. */
           throw error
         }
 
@@ -318,20 +316,18 @@ export class FailoverProvider implements IProvider {
   }
 
   /**
-   * Опрашивает остальные адреса, не меняя действующий узел.
+   * Probes remaining addresses without changing the active node.
    *
-   * Соединения здесь временные и закрываются сразу: это разовый вопрос
-   * соседу, а не смена рабочего канала. Порядок обхода — порядок списка,
-   * действующий адрес пропускается: его уже спросили.
+   * Connections here are temporary and closed immediately: a one-shot
+   * question to a neighbor, not a change of working channel. Walk order
+   * is list order; the active address is skipped because it was already asked.
    *
-   * ГОДИТСЯ ТОЛЬКО ДЛЯ ЧТЕНИЯ. Вызов уходит нескольким узлам, и
-   * действие с последствиями — отправка транзакции — так исполнилось
-   * бы несколько раз.
+   * READ-ONLY ONLY. The call goes to several nodes, so a mutating
+   * action — sending a transaction — would execute more than once.
    *
-   * @throws Исходную ошибку, если ни один сосед не ответил. Наружу
-   *         обязана уйти именно она: ошибка последнего опрошенного узла
-   *         рассказывала бы о случайном соседе вместо того узла, с
-   *         которым кошелёк работает.
+   * @throws The original error if no neighbor answered. That error must
+   *         surface: the last probed node's error would describe a
+   *         random neighbor instead of the node the wallet is using.
    */
   async #askElsewhere<TResult>(
     call: (provider: IProvider) => Promise<TResult>,
@@ -347,17 +343,17 @@ export class FailoverProvider implements IProvider {
       try {
         probe = await this.#connect(endpoint, this.chainId)
       } catch {
-        /* Сосед недоступен. Действующий узел это не затрагивает. */
+        /* Neighbor unreachable. Does not affect the active node. */
         continue
       }
 
       try {
         return await call(probe)
       } catch {
-        /* Сосед тоже отказал. Это ожидаемый исход, а не происшествие:
-           публичные узлы отказывают в широком поиске сплошь и рядом.
-           В журнал не пишем — строка на каждый заход в историю
-           превратилась бы в шум, а причину покажет исходная ошибка. */
+        /* Neighbor refused too. Expected, not an incident: public nodes
+           refuse wide searches all the time. Not logged — a line per
+           history visit would become noise, and the original error
+           already names the cause. */
         continue
       } finally {
         probe.destroy()
@@ -367,7 +363,7 @@ export class FailoverProvider implements IProvider {
     throw firstError
   }
 
-  /** Возвращает действующее соединение, устанавливая его при необходимости. */
+  /** Returns the active connection, establishing it if needed. */
   async #ensureConnected(): Promise<IProvider> {
     if (this.#destroyed) {
       throw new ProviderUnavailableError(this.chainId)
@@ -377,8 +373,8 @@ export class FailoverProvider implements IProvider {
       return this.#current
     }
 
-    /* Параллельные вызовы разделяют одно подключение: экран, запросивший
-       баланс и nonce одновременно, иначе открыл бы два соединения. */
+    /* Concurrent calls share one connect: a screen that asks for
+       balance and nonce at once would otherwise open two connections. */
     this.#connecting ??= this.#connectFromCurrentIndex()
 
     try {
@@ -389,9 +385,9 @@ export class FailoverProvider implements IProvider {
   }
 
   /**
-   * Подключается, перебирая адреса начиная с текущего.
+   * Connects, walking addresses from the current index.
    *
-   * @throws ProviderUnavailableError если пригодных адресов не осталось.
+   * @throws ProviderUnavailableError if no usable addresses remain.
    */
   async #connectFromCurrentIndex(): Promise<IProvider> {
     let lastError: unknown = null
@@ -414,7 +410,7 @@ export class FailoverProvider implements IProvider {
     throw new ProviderUnavailableError(this.chainId, { cause: lastError })
   }
 
-  /** Исключает текущий адрес и переходит к следующему. */
+  /** Drops the current address and moves to the next. */
   #rotate(failed: IRpcEndpoint, reason: string): void {
     this.#current?.destroy()
     this.#current = null
@@ -422,10 +418,10 @@ export class FailoverProvider implements IProvider {
 
     const next = this.#endpoints[this.#index] ?? null
 
-    /* В журнал уходит идентификатор источника, но НЕ адрес. Адрес узла
-       Alchemy содержит ключ API, а адрес собственного узла пользователя —
-       ключ его учётной записи либо расположение машины. Журнал попадает
-       в отчёты об ошибках и в консоль браузера. */
+    /* The log gets the source id, NOT the URL. An Alchemy URL contains
+       an API key, and a user's own node URL is an account key or a
+       machine location. The log ends up in error reports and the
+       browser console. */
     this.#logger.warn('The node was excluded from the rotation', {
       providerId: failed.providerId,
       hasReplacement: next !== null,

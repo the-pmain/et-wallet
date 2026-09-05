@@ -21,24 +21,23 @@ import {
 const SERVICE_NAME = 'EnsService'
 
 /**
- * Срок жизни записи в кэше.
+ * Cache entry lifetime.
  *
- * Имена меняют владельцев: срок регистрации истекает, запись
- * переписывается. Пять минут — компромисс между «не спрашивать узел
- * на каждое нажатие клавиши» и «не показывать вчерашнего владельца».
- * Перед отправкой средств имя разрешается заново — на это кэш
- * не влияет, потому что подтверждение перевода идёт по адресу,
- * а не по имени.
+ * Names change owners: registration expires, the record is
+ * rewritten. Five minutes is the compromise between "do not ask
+ * the node on every keystroke" and "do not show yesterday's
+ * owner". Before funds are sent the name is resolved again —
+ * the cache does not affect that, because transfer confirmation
+ * goes by address, not by name.
  */
 const CACHE_TTL_MS = 5 * 60 * 1000
 
-/** Запись кэша. `value` равен `null`, если записи в ENS нет. */
+/** Cache entry. `value` is `null` when ENS has no record. */
 interface ICacheEntry<TValue> {
   readonly value: TValue | null
   readonly at: Timestamp
 }
 
-/** Зависимости сервиса. */
 export interface IEnsServiceDependencies {
   readonly resolver: IProviderResolver
   readonly networks: INetworkService
@@ -47,23 +46,25 @@ export interface IEnsServiceDependencies {
 }
 
 /**
- * Разрешение имён ENS поверх активного соединения.
+ * ENS name resolution over the active connection.
  *
- * РАБОТАЕТ ТОЛЬКО КОГДА АКТИВНА СЕТЬ ETHEREUM. Реестр ENS существует
- * в одной цепи, и разрешить имя из Polygon можно было бы, лишь открыв
- * второе соединение — с узлом Ethereum, которому при этом сообщается,
- * какое имя и с какого адреса ищет пользователь. Такой запрос уходил бы
- * незаметно для владельца, находящегося, как он считает, в другой сети.
- * Решение о втором операторе принимает он, а не умолчание в коде;
- * до появления такого выбора ENS доступен там, где он живёт.
+ * WORKS ONLY WHEN THE ETHEREUM NETWORK IS ACTIVE. The ENS registry
+ * exists on one chain, and resolving a name from Polygon would
+ * mean opening a second connection — to an Ethereum node that is
+ * then told which name and from which address the user is looking
+ * up. That request would leave unnoticed by an owner who believes
+ * they are on another network. The decision about a second operator
+ * is theirs, not a default in the code; until that choice exists,
+ * ENS is available where it lives.
  *
- * КЭШ ХРАНИТ И ОТРИЦАТЕЛЬНЫЕ ОТВЕТЫ. Поле ввода получателя обращается
- * к сервису на каждое нажатие клавиши, и недописанное имя — самый частый
- * запрос. Не запомнив «записи нет», кошелёк опрашивал бы узел десятки
- * раз за одно введённое имя.
+ * THE CACHE STORES NEGATIVE ANSWERS TOO. The recipient field talks
+ * to the service on every keystroke, and an unfinished name is the
+ * most common request. Without remembering "no record", the wallet
+ * would query the node dozens of times for one typed name.
  *
- * ОТКАЗЫ УЗЛА НЕ КЭШИРУЮТСЯ НИКОГДА: запомнить «неизвестно» на пять
- * минут значит превратить единичный сбой сети в пятиминутную поломку.
+ * NODE FAILURES ARE NEVER CACHED: remembering "unknown" for five
+ * minutes would turn a single network glitch into a five-minute
+ * outage.
  */
 export class EnsService implements IEnsService {
   readonly #resolver: IProviderResolver
@@ -175,24 +176,24 @@ export class EnsService implements IEnsService {
   }
 
   /**
-   * Подтверждает обратную запись прямым разрешением.
+   * Confirms a reverse record with a forward resolve.
    *
-   * САМАЯ ВАЖНАЯ ПРОВЕРКА ВО ВСЁМ МОДУЛЕ. Обратная запись задаётся
-   * владельцем адреса и никем не проверяется: объявить своим именем
-   * `binance.eth` вправе кто угодно. Единственное, что делает имя
-   * осмысленным, — совпадение адреса, на который указывает само имя,
-   * с адресом, у которого это имя спросили.
+   * THE MOST IMPORTANT CHECK IN THE WHOLE MODULE. A reverse record
+   * is set by the address owner and checked by nobody: anyone may
+   * declare `binance.eth` as their name. The only thing that makes
+   * the name meaningful is that the address the name itself points
+   * at matches the address the name was asked of.
    *
-   * Несовпадение записывается в журнал: это не сбой, а попытка выдать
-   * себя за другого, и след от неё остаться должен.
+   * A mismatch is written to the log: this is not a failure, it is
+   * an attempt to pass as someone else, and a trace of it must remain.
    */
   async #verify(address: Address, claimed: string): Promise<IEnsResolution | null> {
     const normalized = normalizeEnsName(claimed)
 
     if (normalized === null) {
-      /* Имя не прошло ENSIP-15: смешение письменностей, запрещённый
-         символ либо метка `xn--`. Показать его непроверенным — значит
-         показать ровно ту строку, которую подделывают. */
+      /* The name failed ENSIP-15: mixed scripts, a forbidden
+         character, or an `xn--` label. Showing it unchecked would
+         show exactly the string that is forged. */
       this.#logger.warn('The ENS reverse record failed normalisation', {
         note: 'the name is not shown; the address is displayed instead',
       })
@@ -213,7 +214,7 @@ export class EnsService implements IEnsService {
     return forward
   }
 
-  /** Адрес резолвера узла либо `null`, если узел не зарегистрирован. */
+  /** Resolver address of the node, or `null` if the node is unregistered. */
   async #resolverOf(provider: IProvider, node: HexString): Promise<Address | null> {
     return decodeAddressWord(
       await provider.call({
@@ -224,10 +225,10 @@ export class EnsService implements IEnsService {
   }
 
   /**
-   * Соединение с сетью, в которой живёт реестр.
+   * Connection to the network the registry lives on.
    *
-   * `null`, если активна другая сеть. Второе соединение здесь
-   * не открывается — см. пояснение к классу.
+   * `null` if another network is active. A second connection is
+   * not opened here — see the class note.
    */
   async #provider(): Promise<IProvider | null> {
     const network = this.#networks.getActive()
@@ -239,7 +240,6 @@ export class EnsService implements IEnsService {
     return await this.#resolver.get(network)
   }
 
-  /** Кладёт значение в кэш вместе со временем записи. */
   #remember<TValue>(
     cache: Map<string, ICacheEntry<TValue>>,
     key: string,
@@ -249,10 +249,10 @@ export class EnsService implements IEnsService {
   }
 
   /**
-   * Читает кэш.
+   * Reads the cache.
    *
-   * @returns `undefined`, если записи нет либо она устарела; `null`,
-   *          если запомнено отсутствие записи в ENS.
+   * @returns `undefined` if there is no entry or it is stale; `null`
+   *          if the absence of an ENS record was remembered.
    */
   static #read<TValue>(
     cache: Map<string, ICacheEntry<TValue>>,

@@ -30,43 +30,43 @@ import type { IBackupManager, IMnemonicCheck } from './contracts'
 
 const SERVICE_NAME = 'BackupManager'
 
-/** Зависимости менеджера. Внедряются конструктором. */
 export interface IBackupManagerDependencies {
-  /** Источник фразы и единственное место проверки пароля. */
+  /** Phrase source and the only place the password is checked. */
   readonly secureStorage: ISecureStorage
 
   readonly mnemonicService: IMnemonicService
 
-  /** Оценка риска и выдача разрешений. Обойти его нельзя. */
+  /** Risk assessment and permit issuance. It cannot be bypassed. */
   readonly exportGuard: IExportGuard
 
-  /** Владелец аккаунтов. Выдачу приватных ключей выполняет он. */
+  /** Account owner. Private-key reveal is done by it. */
   readonly accounts: IAccountManager
 
-  /** Нужен ради пути аккаунта: он определяет область экспорта. */
+  /** Needed for the account path: it defines the export scope. */
   readonly hdWallet: IHDWalletService
 
   readonly logger: ILogger
 }
 
 /**
- * Резервное копирование секретов кошелька.
+ * Backup of wallet secrets.
  *
- * ЧТО ЭТОТ КЛАСС ДЕЛАЕТ. Сводит воедино три независимых требования,
- * каждое из которых по отдельности легко забыть: подтверждение паролем,
- * разрешение под показанный уровень риска и запись в журнал экспортов.
- * Пропуск любого из них не даёт ни ошибки сборки, ни падения теста —
- * он молча превращает защиту в её видимость.
+ * WHAT THIS CLASS DOES. It brings together three independent
+ * requirements, each of which is easy to forget on its own:
+ * password confirmation, a permit for the shown risk level, and an
+ * entry in the export log. Skipping any of them gives neither a
+ * build error nor a failing test — it silently turns the protection
+ * into its appearance.
  *
- * ЧЕГО ЭТОТ КЛАСС НЕ ДЕЛАЕТ. Не хранит секретов, не кэширует фразу,
- * не создаёт файлов. Выданный буфер принадлежит вызывающему, и затирать
- * его обязан он.
+ * WHAT THIS CLASS DOES NOT DO. It does not store secrets, does not
+ * cache the phrase, does not create files. The issued buffer belongs
+ * to the caller, and wiping it is their job.
  *
- * ПОЧЕМУ ФАЙЛОВОЙ РЕЗЕРВНОЙ КОПИИ НЕТ. Зашифрованный файл с seed-фразой
- * стоек ровно настолько, насколько стоек пароль, и попадает туда, куда
- * пользователь его положит: в загрузки, в облачную синхронизацию папки,
- * в корзину. Бумага такой особенности не имеет. Файл — это подбор пароля
- * без ограничения скорости и без нашего ведома.
+ * WHY THERE IS NO FILE BACKUP. An encrypted file with the seed
+ * phrase is only as strong as the password, and it ends up wherever
+ * the user puts it: downloads, cloud folder sync, the trash. Paper
+ * has no such feature. A file is password guessing with no rate
+ * limit and without our knowledge.
  */
 export class BackupManager implements IBackupManager {
   readonly #secureStorage: ISecureStorage
@@ -90,21 +90,22 @@ export class BackupManager implements IBackupManager {
   }
 
   /**
-   * Выдаёт мнемоническую фразу.
+   * Reveals the mnemonic phrase.
    *
-   * ПОРЯДОК ДЕЙСТВИЙ ВЫБРАН СОЗНАТЕЛЬНО: сначала пароль, затем разрешение.
-   * `confirm` пишет в журнал экспортов до выдачи разрешения, и обратный
-   * порядок означал бы запись «фраза выгружена» на каждую опечатку
-   * в пароле. Журнал, полный несостоявшихся выгрузок, завышал бы оценку
-   * риска последующих операций — то есть учил бы не читать предупреждения.
+   * THE ORDER OF STEPS IS DELIBERATE: password first, then the
+   * permit. `confirm` writes to the export log before the permit is
+   * issued, and the reverse order would record "phrase exported" on
+   * every password typo. A log full of failed exports would inflate
+   * the risk of later operations — that is, teach people not to
+   * read the warnings.
    */
   async exportMnemonic(password: string, acknowledgedRisk: ExportRisk): Promise<ISecretBuffer> {
     await this.#requirePassword(password)
 
-    /* Разрешение не передаётся никуда дальше: выдачу выполняет сам
-       менеджер. Ценность вызова не в объекте разрешения, а в двух его
-       побочных действиях — сверке подтверждённого риска с фактическим
-       и записи в журнал. */
+    /* The permit is not passed further: the manager itself does the
+       reveal. The value of the call is not the permit object but
+       its two side effects — matching the acknowledged risk to the
+       actual one, and writing the log. */
     const permit = await this.#exportGuard.confirm(
       BackupManager.#mnemonicRequest(),
       acknowledgedRisk,
@@ -119,49 +120,51 @@ export class BackupManager implements IBackupManager {
       throw new WalletNotInitializedError()
     }
 
-    /* Гасится до выдачи секрета: исключение при выдаче не должно
-       оставлять действующее разрешение. */
+    /* Consumed before the secret is issued: an exception during
+       reveal must not leave a live permit. */
     permit.consume()
 
     this.#logger.warn('Seed phrase revealed', {
       note: 'anyone who obtains it can reproduce the whole wallet',
     })
 
-    /* Разбор фразы заново, а не возврат строки из хранилища: вызывающий
-       получает затираемый буфер, а не ещё одну неочищаемую строку. */
+    /* Parse the phrase again, do not return the storage string: the
+       caller gets a wipeable buffer, not another uncleared string. */
     return this.#mnemonicService.fromPhrase(phrase)
   }
 
   /**
-   * Сверяет переписанную фразу с хранимой.
+   * Checks a rewritten phrase against the stored one.
    *
-   * ЗАЧЕМ ЭТО ОТДЕЛЬНЫЙ МЕТОД, А НЕ ПОВТОРНЫЙ ПОКАЗ ФРАЗЫ. Единственным
-   * способом убедиться в правильности записи был показ фразы и сверка
-   * глазами — то есть лишнее раскрытие ровно того, что мы защищаем,
-   * ради проверки, которую можно выполнить не раскрывая ничего.
-   * Ошибка при переписывании не гипотетична: обнаруживается она при
-   * восстановлении, когда исправить уже нечего.
+   * WHY THIS IS A SEPARATE METHOD, NOT SHOWING THE PHRASE AGAIN.
+   * The only way to confirm the written copy used to be showing the
+   * phrase and checking by eye — that is, an extra reveal of exactly
+   * what we protect, for a check that can be done without revealing
+   * anything. A rewrite error is not hypothetical: it is found at
+   * restore, when there is nothing left to fix.
    *
-   * ПАРОЛЬ ОБЯЗАТЕЛЕН. Без него метод превращается в оракул: нашедший
-   * бумагу с несколькими смазанными словами перебирал бы остаток,
-   * получая ответ «да/нет» на каждую догадку. Владельцу требование
-   * не стоит ничего — у него пароль есть, — а постороннему, у которого
-   * пароль есть, метод не даёт ничего нового: фразу он и так получит
-   * выгрузкой.
+   * THE PASSWORD IS REQUIRED. Without it the method becomes an
+   * oracle: someone who found a paper with a few smeared words
+   * would guess the rest, getting yes/no on every attempt. The
+   * requirement costs the owner nothing — they have the password —
+   * and a stranger who has the password learns nothing new: they
+   * will get the phrase by export anyway.
    *
-   * СРАВНЕНИЕ БЕЗ ДОСРОЧНОГО ВЫХОДА. Обычное сравнение строк
-   * возвращается на первом различии, и время ответа выдаёт число
-   * совпавших символов — подбирать фразу можно было бы по одному слову.
-   * Здесь просматриваются все байты независимо от результата.
+   * COMPARISON WITHOUT EARLY EXIT. Ordinary string comparison
+   * returns on the first difference, and the response time leaks
+   * how many characters matched — the phrase could be guessed one
+   * word at a time. Here every byte is inspected regardless of the
+   * result.
    *
-   * ОТВЕТ — ОДИН БИТ. Указание, какое слово отличается, помогло бы
-   * и владельцу, и подбирающему, но владельцу есть куда посмотреть:
-   * у него бумага. Замечания о самой введённой фразе (слова нет
-   * в словаре, контрольная сумма не сходится) выдаёт `checkMnemonic`
-   * и они о хранимой фразе не говорят ничего.
+   * THE ANSWER IS ONE BIT. Pointing at the differing word would
+   * help both the owner and the guesser, but the owner has
+   * somewhere to look: they have the paper. Remarks about the
+   * entered phrase itself (word not in the wordlist, checksum
+   * mismatch) come from `checkMnemonic` and say nothing about the
+   * stored phrase.
    *
-   * В ЖУРНАЛ ЭКСПОРТОВ НЕ ПИШЕТСЯ: секрет не выдан, а запись завышала бы
-   * оценку риска последующих настоящих выгрузок.
+   * NOTHING IS WRITTEN TO THE EXPORT LOG: no secret was issued, and
+   * an entry would inflate the risk of later real exports.
    *
    * @throws InvalidPasswordError, WalletNotInitializedError
    */
@@ -182,7 +185,8 @@ export class BackupManager implements IBackupManager {
       normalizeMnemonicInput(phrase),
     )
 
-    /* Содержимое в журнал не попадает: ни фраза, ни её часть, ни длина. */
+    /* Contents do not enter the log: neither the phrase, nor a
+       part of it, nor its length. */
     this.#logger.info('The written copy of the seed phrase was checked', { matches })
 
     return matches
@@ -193,14 +197,15 @@ export class BackupManager implements IBackupManager {
   }
 
   /**
-   * Выдаёт приватный ключ аккаунта.
+   * Reveals an account private key.
    *
-   * ПАРОЛЬ ПРОВЕРЯЕТСЯ ДВАЖДЫ — здесь и внутри `AccountManager`. Убрать
-   * ни одну из проверок нельзя. Первая нужна, чтобы неверный пароль
-   * не оставлял записи в журнале экспортов (см. `exportMnemonic`);
-   * вторая — собственная гарантия `AccountManager`, действующая для всех
-   * его вызывающих, а не только для этого. Цена — двойной вывод ключа
-   * из пароля, около секунды на осознанном действии пользователя.
+   * THE PASSWORD IS CHECKED TWICE — here and inside
+   * `AccountManager`. Neither check can be removed. The first is
+   * needed so a wrong password does not leave an export-log entry
+   * (see `exportMnemonic`); the second is `AccountManager`'s own
+   * guarantee, applying to every caller, not only this one. The
+   * cost is deriving the key from the password twice, about a
+   * second on a deliberate user action.
    */
   async exportPrivateKey(
     id: AccountId,
@@ -224,7 +229,7 @@ export class BackupManager implements IBackupManager {
     return checkMnemonic(phrase, this.#mnemonicService)
   }
 
-  /** Проверяет пароль, не выдавая расшифрованного содержимого. */
+  /** Checks the password without revealing decrypted contents. */
   async #requirePassword(password: string): Promise<void> {
     if (!(await this.#secureStorage.verifyPassword(password))) {
       throw new InvalidPasswordError()
@@ -232,11 +237,11 @@ export class BackupManager implements IBackupManager {
   }
 
   /**
-   * Строит запрос на выдачу приватного ключа конкретного аккаунта.
+   * Builds a request to reveal a specific account's private key.
    *
-   * Область различает импортированный ключ и ветвь HD-дерева: приравняв
-   * их, мы помечали бы HD-аккаунт скомпрометированным из-за экспорта
-   * ключа, не имеющего к нему отношения.
+   * The scope distinguishes an imported key from an HD-tree branch:
+   * treating them as equal would mark an HD account compromised
+   * because of an export of a key that has nothing to do with it.
    */
   #privateKeyRequest(id: AccountId): IExportRequest {
     const account = this.#accounts.getById(id)
@@ -264,19 +269,19 @@ export class BackupManager implements IBackupManager {
 }
 
 /**
- * Сравнивает две строки, не выходя на первом различии.
+ * Compares two strings without exiting on the first difference.
  *
- * Разница в длине скрыта быть не может — она видна и по времени ввода, —
- * зато позиция первого различия не выдаётся ничем: просматриваются все
- * символы более длинной строки.
+ * A length difference cannot be hidden — it is visible from typing
+ * time too — but the position of the first difference is leaked by
+ * nothing: every character of the longer string is inspected.
  */
 function equalInConstantTime(left: string, right: string): boolean {
   const length = Math.max(left.length, right.length)
   let difference = left.length ^ right.length
 
   for (let index = 0; index < length; index += 1) {
-    /* Выход за границы даёт NaN у `charCodeAt`, поэтому берётся
-       заведомо отсутствующий в тексте код. */
+    /* Going out of range yields NaN from `charCodeAt`, so a code
+       that is certainly absent from the text is used. */
     difference |= (left.codePointAt(index) ?? -1) ^ (right.codePointAt(index) ?? -2)
   }
 

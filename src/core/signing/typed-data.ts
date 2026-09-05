@@ -5,21 +5,21 @@ import type { ITypedData } from '@/core/transaction'
 import { toChainId, type ChainId, type HexString } from '@/core/types'
 
 /**
- * Имя типа домена EIP-712.
+ * EIP-712 domain type name.
  *
- * Присутствует в полезной нагрузке `eth_signTypedData_v4`, но НЕ должно
- * передаваться кодировщику: он выводит домен из отдельного аргумента
- * и выбрасывает исключение при обнаружении этого типа среди прочих.
- * Требование стандарта, а не особенность библиотеки.
+ * Present in an `eth_signTypedData_v4` payload, but MUST NOT be passed
+ * to the encoder: it derives the domain from a separate argument and
+ * throws if it finds this type among the others. A standard
+ * requirement, not a library quirk.
  */
 const EIP712_DOMAIN_TYPE = 'EIP712Domain'
 
 /**
- * Убирает служебный тип домена из набора типов.
+ * Removes the domain service type from the type set.
  *
- * Возвращается новый объект: полезная нагрузка приходит от dApp,
- * и изменять её на месте нельзя — вызывающий код может показывать
- * пользователю именно исходную структуру.
+ * A new object is returned: the payload comes from a dApp, and
+ * mutating it in place is forbidden — the caller may be showing the
+ * user that original structure.
  */
 export function stripDomainType(
   types: ITypedData['types'],
@@ -36,27 +36,28 @@ export function stripDomainType(
 }
 
 /**
- * Проверяет пригодность структуры к подписи.
+ * Checks that a structure is fit to sign.
  *
- * ГЛАВНАЯ ПРОВЕРКА — соответствие `domain.chainId` активной сети.
+ * THE MAIN CHECK — `domain.chainId` matches the active network.
  *
- * Подпись EIP-712 привязана к сети только через это поле. Структура
- * с чужим chainId, подписанная в одной сети, предъявляется контракту
- * в другой. Классический сценарий: пользователю показывают «вход
- * на сайт», а подписанное сообщение оказывается разрешением `Permit`
- * на распоряжение токенами в основной сети.
+ * An EIP-712 signature is bound to a network only through this field.
+ * A structure with a foreign chainId, signed on one network, is
+ * presented to a contract on another. Classic scenario: the user is
+ * shown a "site login", and the signed message is a `Permit` to spend
+ * tokens on mainnet.
  *
- * Проверка выполняется ДО подписи и без исключений быть не может:
- * молчаливое приведение chainId к активному изменило бы подписываемые
- * данные, а отказ от проверки оставил бы атаку открытой.
+ * The check runs BEFORE signing and cannot be optional: silently
+ * coercing chainId to the active one would change the signed data,
+ * and skipping the check would leave the attack open.
  *
- * ЧЕГО ЭТА ПРОВЕРКА НЕ ДЕЛАЕТ. Она не оценивает смысл подписываемого.
- * Разрешение на неограниченное расходование токенов — корректная
- * структура с правильным chainId. Разбор опасных шаблонов
- * (`Permit`, `PermitSingle`, seaport-ордера) — задача слоя, который
- * показывает подтверждение пользователю.
+ * WHAT THIS CHECK DOES NOT DO. It does not judge the meaning of what
+ * is signed. An unlimited token allowance is a valid structure with
+ * the right chainId. Parsing dangerous templates (`Permit`,
+ * `PermitSingle`, Seaport orders) is the job of the layer that shows
+ * confirmation to the user.
  *
- * @throws InvalidArgumentError при несовпадении сети либо нарушении структуры.
+ * @throws InvalidArgumentError on a network mismatch or a broken
+ *         structure.
  */
 export function assertTypedDataMatchesChain(data: ITypedData, expectedChainId: ChainId): void {
   if (typeof data.primaryType !== 'string' || data.primaryType.length === 0) {
@@ -73,17 +74,18 @@ export function assertTypedDataMatchesChain(data: ITypedData, expectedChainId: C
   const domainChainId = data.domain.chainId
 
   if (domainChainId === undefined) {
-    /* Домен без chainId допустим стандартом, но для кошелька означает
-       подпись, действительную во всех сетях сразу. Отказ намеренный. */
+    /* A domain without chainId is allowed by the standard, but for a
+       wallet it means a signature valid on every network at once.
+       The refusal is deliberate. */
     throw new InvalidArgumentError(
       'typedData.domain.chainId',
       'a structure without a chain identifier is valid in every network at once',
     )
   }
 
-  /* Значение приходит из полезной нагрузки dApp: оно объявлено как ChainId,
-     но фактически может быть любым. Валидирующий конструктор отсеет
-     некорректное до сравнения. */
+  /* The value comes from a dApp payload: it is declared as ChainId
+     but may in fact be anything. The validating constructor rejects
+     an illegal value before comparison. */
   const actual = toChainId(domainChainId)
 
   if (actual !== expectedChainId) {
@@ -96,12 +98,12 @@ export function assertTypedDataMatchesChain(data: ITypedData, expectedChainId: C
 }
 
 /**
- * Вычисляет итоговый хэш структуры по EIP-712.
+ * Computes the EIP-712 digest of a structure.
  *
- * Это ровно то значение, которое будет подписано. Вызывающий код обязан
- * иметь возможность получить его отдельно от подписи: пользователь должен
- * видеть, что именно подписывается, а сравнение хэша — единственный
- * способ убедиться, что показанное и подписанное совпадают.
+ * This is exactly the value that will be signed. The caller must be
+ * able to obtain it separately from the signature: the user must see
+ * what is being signed, and comparing the hash is the only way to
+ * confirm that what was shown and what was signed match.
  */
 export function hashTypedData(data: ITypedData): HexString {
   return TypedDataEncoder.hash(
@@ -111,7 +113,6 @@ export function hashTypedData(data: ITypedData): HexString {
   ) as HexString
 }
 
-/** Приводит домен к виду, понятному ethers. */
 export function toEthersDomain(domain: ITypedData['domain']): Record<string, unknown> {
   return {
     ...(domain.name === undefined ? {} : { name: domain.name }),

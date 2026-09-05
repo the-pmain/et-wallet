@@ -20,7 +20,7 @@ const PASSWORD = 'Korova-7-Luna!'
 
 const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
-/** Десять эфиров: хватает и на перевод, и на комиссию. */
+/** Ten ether: enough for a transfer and the fee. */
 const BALANCE = (10n ** 19n) as Wei
 
 let services: ITestAppServices
@@ -33,7 +33,6 @@ function renderApp() {
   )
 }
 
-/** Открывает экран отправки из панели. */
 async function openSend(): Promise<void> {
   const user = userEvent.setup()
 
@@ -42,14 +41,12 @@ async function openSend(): Promise<void> {
   await screen.findByRole('heading', { name: 'Send' })
 }
 
-/** Открывает список активов на экране отправки. */
 async function openAssetSelect(): Promise<void> {
   const user = userEvent.setup()
 
   await user.click(screen.getByRole('combobox', { name: 'What to send' }))
 }
 
-/** Выбирает актив в списке «Что отправить». */
 async function selectSendAsset(label: string | RegExp): Promise<void> {
   const user = userEvent.setup()
 
@@ -58,12 +55,13 @@ async function selectSendAsset(label: string | RegExp): Promise<void> {
 }
 
 /**
- * Заполняет форму и переходит к подтверждению.
+ * Fills the form and moves to confirmation.
  *
- * ОЖИДАНИЕ РАЗБОРА ОБЯЗАТЕЛЬНО. Поле принимает и адрес, и имя ENS,
- * поэтому введённое разбирается с задержкой и асинхронно. Кнопка «Далее»
- * до окончания разбора заблокирована — нажатие без ожидания попало бы
- * в неактивную кнопку и тест падал бы через раз.
+ * WAITING FOR RESOLUTION IS REQUIRED. The field accepts both an
+ * address and an ENS name, so the input is resolved with a delay
+ * and asynchronously. Next is disabled until resolution ends — a
+ * click without waiting would hit a disabled button and the test
+ * would flake.
  */
 async function fillAndContinue(recipient: string, amount: string): Promise<void> {
   const user = userEvent.setup()
@@ -81,10 +79,10 @@ async function fillAndContinue(recipient: string, amount: string): Promise<void>
 }
 
 /**
- * Проходит подтверждение отправки целиком, включая повторный ввод пароля.
+ * Completes send confirmation, including typing the password again.
  *
- * Пароль спрашивается по умолчанию: он защищает от того, кто получил
- * доступ к уже разблокированному кошельку.
+ * The password is asked by default: it protects against someone who
+ * reached an already unlocked wallet.
  */
 async function confirmAndSend(): Promise<void> {
   const user = userEvent.setup()
@@ -102,8 +100,8 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Отправка: форма', () => {
-  it('подключается к SSE sendings и закрывает поток при уходе', async () => {
+describe('Send: form', () => {
+  it('connects to sendings SSE and closes the stream on leave', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -120,37 +118,37 @@ describe('Отправка: форма', () => {
     expect(sources[0]?.closed).toBe(true)
   })
 
-  it('показывает отправителя и доступный баланс', async () => {
+  it('shows the sender and the available balance', async () => {
     renderApp()
     await openSend()
 
     const expected = TEST_MNEMONIC_ADDRESSES[0] as string
     const shortened = `${expected.slice(0, 6)}…${expected.slice(-6)}`
 
-    /* Усечённый адрес встречается и в шапке оболочки: запрос ограничен
-       карточкой отправителя. */
+    /* The shortened address also appears in the shell header: the
+       query is scoped to the sender card. */
     const card = screen.getByText('From').closest('[data-slot=card]') as HTMLElement
 
     expect(within(card).getByText(shortened)).toBeInTheDocument()
 
-    /* Доступная сумма стоит не в карточке отправителя, а у поля ввода:
-       это ограничение на вводимое число, и читать его нужно там, где
-       число вводят. Проверяется именно соседство с полем — иначе
-       правка вернула бы подпись обратно наверх незамеченной. */
+    /* Available amount sits next to the input, not on the sender
+       card: it is a limit on the number being typed, and it must be
+       read where the number is typed. The check is the adjacency —
+       otherwise a change could move the label back up unnoticed. */
     const amountField = screen.getByLabelText(/^Amount/)
     const amountBlock = amountField.parentElement as HTMLElement
 
     expect(within(amountBlock).getByText('10 ETH')).toBeInTheDocument()
   })
 
-  it('не пускает дальше без адреса получателя', async () => {
+  it('does not go further without a recipient address', async () => {
     renderApp()
     await openSend()
 
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('не пускает дальше с некорректным адресом', async () => {
+  it('does not go further with an invalid address', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -159,53 +157,54 @@ describe('Отправка: форма', () => {
     await user.type(screen.getByLabelText(/Recipient address/), '0x123')
     await user.type(screen.getByLabelText(/Amount/), '1')
 
-    /* Ожидание нужно и здесь: разбор идёт с задержкой, и проверка
-       сразу после ввода застала бы кнопку заблокированной по другой
-       причине — потому что разбор ещё не закончился. */
+    /* The wait is needed here too: resolution is delayed, and a
+       check right after typing would catch the button disabled for
+       another reason — resolution not finished yet. */
     expect(await screen.findByText(/Enter a 42-character address/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('сообщает о недопустимой сумме', async () => {
+  it('reports an invalid amount', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '0')
 
-    /* Ноль отвергается до обращения к сети: незачем оценивать газ
-       для перевода, которого не будет. */
+    /* Zero is rejected before talking to the network: there is no
+       point pricing gas for a transfer that will not happen. */
     expect(await screen.findByText(/greater than zero/i)).toBeInTheDocument()
   })
 
 })
 
-describe('Отправка: подтверждение', () => {
-  it('показывает поля подписываемой транзакции', async () => {
+describe('Send: confirmation', () => {
+  it('shows the fields of the transaction being signed', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
 
     await screen.findByRole('heading', { name: 'Confirmation' })
 
-    /* Показанное обязано совпадать с подписываемым: экран выводит поля
-       готового объекта, а не пересчитанные заново значения. */
+    /* What is shown must match what is signed: the screen prints
+       fields of the ready object, not values recalculated from
+       scratch. */
     expect(screen.getByText('1 ETH')).toBeInTheDocument()
     expect(screen.getByText(RECIPIENT)).toBeInTheDocument()
     expect(screen.getByText(TEST_MNEMONIC_ADDRESSES[0] as string)).toBeInTheDocument()
   })
 
-  it('показывает получателя целиком, а не усечённым', async () => {
+  it('shows the recipient in full, not shortened', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
 
     await screen.findByRole('heading', { name: 'Confirmation' })
 
-    /* Усечённый адрес невозможно сверить посимвольно, а именно сверка
-       защищает от подмены содержимого буфера обмена. */
+    /* A shortened address cannot be checked character by character,
+       and that check is what protects against clipboard swap. */
     expect(screen.getByText(RECIPIENT)).toBeInTheDocument()
   })
 
-  it('показывает chainId, nonce и лимит газа', async () => {
+  it('shows chainId, nonce, and the gas limit', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
@@ -217,7 +216,7 @@ describe('Отправка: подтверждение', () => {
     expect(screen.getByText('Gas limit')).toBeInTheDocument()
   })
 
-  it('предупреждает о необратимости перевода', async () => {
+  it('warns that the transfer is irreversible', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
@@ -227,7 +226,7 @@ describe('Отправка: подтверждение', () => {
     expect(screen.getByText(/A transfer on the blockchain cannot be undone/i)).toBeInTheDocument()
   })
 
-  it('предупреждает об адресе без контрольной суммы', async () => {
+  it('warns about an address without a checksum', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT.toLowerCase(), '1')
@@ -237,7 +236,7 @@ describe('Отправка: подтверждение', () => {
     expect(screen.getByText(/a typo in it goes unnoticed/i)).toBeInTheDocument()
   })
 
-  it('предупреждает о переводе самому себе', async () => {
+  it('warns about a transfer to self', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(TEST_MNEMONIC_ADDRESSES[0] as string, '1')
@@ -247,7 +246,7 @@ describe('Отправка: подтверждение', () => {
     expect(screen.getByText(/The recipient is the same as the sender/i)).toBeInTheDocument()
   })
 
-  it('позволяет вернуться к правке', async () => {
+  it('lets the user go back to edit', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -261,8 +260,8 @@ describe('Отправка: подтверждение', () => {
   })
 })
 
-describe('Отправка: результат', () => {
-  it('показывает хэш опубликованной транзакции', async () => {
+describe('Send: result', () => {
+  it('shows the hash of the published transaction', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
@@ -274,7 +273,7 @@ describe('Отправка: результат', () => {
     expect(screen.getByText(/^0x[0-9a-fA-F]+$/)).toBeInTheDocument()
   })
 
-  it('оговаривает, что принятие узлом не означает включения в блок', async () => {
+  it('notes that acceptance by the node does not mean inclusion in a block', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
@@ -288,10 +287,10 @@ describe('Отправка: результат', () => {
   })
 })
 
-describe('Отправка: подтверждение паролем', () => {
-  it('спрашивает пароль перед подписью', async () => {
-    /* Защищает от того, кто получил доступ к уже разблокированному
-       кошельку: к оставленному устройству, к чужой сессии. */
+describe('Send: password confirmation', () => {
+  it('asks for the password before signing', async () => {
+    /* Protects against someone who reached an already unlocked
+       wallet: a left-behind device, someone else's session. */
     const user = userEvent.setup()
 
     renderApp()
@@ -305,7 +304,7 @@ describe('Отправка: подтверждение паролем', () => {
     expect(screen.getByText(/sending the transfer/i)).toBeInTheDocument()
   })
 
-  it('не отправляет при неверном пароле', async () => {
+  it('does not send on a wrong password', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -321,7 +320,7 @@ describe('Отправка: подтверждение паролем', () => {
     expect(screen.queryByRole('heading', { name: 'Transaction sent' })).not.toBeInTheDocument()
   })
 
-  it('позволяет отказаться от подтверждения', async () => {
+  it('lets the user decline confirmation', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -336,10 +335,10 @@ describe('Отправка: подтверждение паролем', () => {
   })
 })
 
-describe('Отправка: получатель-контракт', () => {
-  it('предупреждает о переводе на адрес с кодом', async () => {
-    /* Монеты, отправленные контракту, который их не принимает,
-       теряются безвозвратно. */
+describe('Send: contract recipient', () => {
+  it('warns about a transfer to an address that has code', async () => {
+    /* Coins sent to a contract that does not accept them are lost
+       for good. */
     services.providerFactory.configure({ balance: BALANCE, contractAddresses: [RECIPIENT] })
 
     renderApp()
@@ -351,7 +350,7 @@ describe('Отправка: получатель-контракт', () => {
     expect(screen.getByText('The recipient is a contract')).toBeInTheDocument()
   })
 
-  it('не предупреждает об обычном адресе', async () => {
+  it('does not warn about an ordinary address', async () => {
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
@@ -362,8 +361,8 @@ describe('Отправка: получатель-контракт', () => {
   })
 })
 
-describe('Отправка: недостаток средств', () => {
-  it('отвергает перевод, на который не хватает средств вместе с комиссией', async () => {
+describe('Send: insufficient funds', () => {
+  it('rejects a transfer that lacks funds together with the fee', async () => {
     services.providerFactory.configure({ balance: 1n as Wei })
 
     renderApp()
@@ -378,10 +377,10 @@ describe('Отправка: недостаток средств', () => {
   })
 })
 
-describe('Отправка: токен ERC-20', () => {
+describe('Send: ERC-20 token', () => {
   const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-  /** Токен с шестью знаками: подстановка привычных восемнадцати заметна. */
+  /** A six-decimal token: substituting the usual eighteen is visible. */
   const USDC: IFakeToken = {
     address: TOKEN,
     symbol: 'USDC',
@@ -390,7 +389,6 @@ describe('Отправка: токен ERC-20', () => {
     balance: 250_000_000n,
   }
 
-  /** Выбирает токен в списке активов и заполняет форму. */
   async function fillTokenForm(amount: string): Promise<void> {
     await selectSendAsset(/Select USDC on Ethereum/)
     await fillAndContinue(RECIPIENT, amount)
@@ -399,13 +397,13 @@ describe('Отправка: токен ERC-20', () => {
   beforeEach(async () => {
     services.providerFactory.configure({ balance: BALANCE, tokens: [USDC] })
 
-    /* Токен добавляется до рендера: экран отправки берёт список активов
-       из снимка, а наполняет его сессия. */
+    /* The token is added before render: the send screen takes the
+       asset list from the snapshot, and the session fills it. */
     await services.session.open()
     await services.session.addToken(TOKEN)
   })
 
-  it('токен доступен для отправки в списке активов', async () => {
+  it('the token is available to send in the asset list', async () => {
     renderApp()
     await openSend()
     await openAssetSelect()
@@ -413,43 +411,44 @@ describe('Отправка: токен ERC-20', () => {
     expect(screen.getByRole('option', { name: /Select USDC on Ethereum/ })).toBeInTheDocument()
   })
 
-  it('показывает адрес контракта выбранного токена', async () => {
+  it('shows the contract address of the selected token', async () => {
     renderApp()
     await openSend()
     await selectSendAsset(/Select USDC on Ethereum/)
 
-    /* Символ задаёт автор контракта, и выпустить токен с символом USDC
-       может кто угодно. Адрес — единственное, что отличает настоящий
-       от поддельного. */
+    /* The symbol is set by the contract author, and anyone can mint
+       a token named USDC. The address is what distinguishes the real
+       one from a fake. */
     expect(screen.getByText(TOKEN)).toBeInTheDocument()
   })
 
-  it('сумма считается по числу знаков токена, а не по восемнадцати', async () => {
+  it('the amount uses the token decimals, not eighteen', async () => {
     renderApp()
     await openSend()
     await fillTokenForm('10')
 
     await screen.findByRole('heading', { name: 'Confirmation' })
 
-    /* Десять USDC — это 10 000 000 единиц, а не 10^19. Подстановка
-       привычных восемнадцати знаков занизила бы перевод в триллион раз. */
+    /* Ten USDC is 10 000 000 units, not 10^19. Substituting the
+       usual eighteen decimals would shrink the transfer by a
+       trillion. */
     expect(screen.getByText('10 USDC')).toBeInTheDocument()
   })
 
-  it('транзакция адресована контракту, и это сказано прямо', async () => {
+  it('the transaction is addressed to the contract, and that is said plainly', async () => {
     renderApp()
     await openSend()
     await fillTokenForm('1')
 
     await screen.findByRole('heading', { name: 'Confirmation' })
 
-    /* Человек, сверяющий адреса, обязан понимать, почему их два: иначе
-       он решит, что кошелёк подменил получателя. */
+    /* Someone comparing addresses must understand why there are two:
+       otherwise they will think the wallet swapped the recipient. */
     expect(screen.getByText(/will be sent to the token contract/i)).toBeInTheDocument()
     expect(screen.getByText(TOKEN)).toBeInTheDocument()
   })
 
-  it('получатель показан настоящий, а не адрес контракта', async () => {
+  it('the real recipient is shown, not the contract address', async () => {
     renderApp()
     await openSend()
     await fillTokenForm('1')
@@ -459,7 +458,7 @@ describe('Отправка: токен ERC-20', () => {
     expect(screen.getByText(RECIPIENT)).toBeInTheDocument()
   })
 
-  it('не даёт отправить больше, чем есть токенов', async () => {
+  it('does not let more tokens be sent than are held', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -472,7 +471,7 @@ describe('Отправка: токен ERC-20', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('смена актива очищает сумму', async () => {
+  it('changing the asset clears the amount', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -480,12 +479,12 @@ describe('Отправка: токен ERC-20', () => {
     await user.type(screen.getByLabelText(/Amount/), '10')
     await selectSendAsset(/Select USDC on Ethereum/)
 
-    /* Число знаков у активов разное: «10», набранное для эфира,
-       при шести знаках означало бы совсем другую величину. */
+    /* Assets have different decimals: "10" typed for ether would
+       mean a different quantity at six decimals. */
     expect(screen.getByLabelText(/Amount/)).toHaveValue('')
   })
 
-  it('доступное количество показано в единицах токена', async () => {
+  it('available amount is shown in token units', async () => {
     renderApp()
     await openSend()
     await selectSendAsset(/Select USDC on Ethereum/)
@@ -493,7 +492,7 @@ describe('Отправка: токен ERC-20', () => {
     expect(await screen.findByText('250 USDC')).toBeInTheDocument()
   })
 
-  it('отправленный токен попадает в историю как перевод токена', async () => {
+  it('a sent token appears in history as a token transfer', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -507,8 +506,9 @@ describe('Отправка: токен ERC-20', () => {
     await user.click(screen.getByRole('link', { name: /back to the wallet/i }))
     await user.click(await screen.findByRole('link', { name: /all activity/i }))
 
-    /* Запись строится из подписанных данных: не разбери кошелёк вызов,
-       в истории оказался бы перевод нуля неизвестно кому. */
+    /* The record is built from the signed data: if the wallet did
+       not decode the call, history would show a transfer of zero to
+       an unknown party. */
     const list = within(await screen.findByRole('list'))
 
     expect(list.getByText('Token')).toBeInTheDocument()
@@ -516,7 +516,7 @@ describe('Отправка: токен ERC-20', () => {
   })
 })
 
-describe('Отправка: получатель — контракт самого токена', () => {
+describe('Send: recipient is the token contract', () => {
   const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
   const USDC: IFakeToken = {
@@ -534,11 +534,11 @@ describe('Отправка: получатель — контракт самог
     await services.session.addToken(TOKEN)
   })
 
-  it('предупреждает о заведомой потере', async () => {
-    /* Самая частая безвозвратная ошибка с токенами: адрес контракта
-       копируют из обозревателя или из списка активов и вставляют
-       в поле получателя. Забрать оттуда токены может только код самого
-       контракта, а его почти никогда нет. */
+  it('warns about a certain loss', async () => {
+    /* The most common irreversible token mistake: the contract
+       address is copied from the explorer or the asset list and
+       pasted into the recipient field. Only the contract's own code
+       can take tokens back, and that code is almost never there. */
     renderApp()
     await openSend()
     await selectSendAsset(/Select USDC on Ethereum/)
@@ -547,7 +547,7 @@ describe('Отправка: получатель — контракт самог
     expect(await screen.findByText(/recipient is the token contract itself/i)).toBeInTheDocument()
   })
 
-  it('объясняет, откуда берётся такая ошибка', async () => {
+  it('explains where that mistake comes from', async () => {
     renderApp()
     await openSend()
     await selectSendAsset(/Select USDC on Ethereum/)
@@ -556,9 +556,9 @@ describe('Отправка: получатель — контракт самог
     expect(await screen.findByText(/copied instead of the recipient address/i)).toBeInTheDocument()
   })
 
-  it('обычный получатель этого предупреждения не вызывает', async () => {
-    /* Ложная тревога приучает не читать предупреждения, и настоящее
-       останется незамеченным. */
+  it('an ordinary recipient does not trigger this warning', async () => {
+    /* A false alarm trains people not to read warnings, and the
+       real one will go unnoticed. */
     renderApp()
     await openSend()
     await selectSendAsset(/Select USDC on Ethereum/)
@@ -569,10 +569,10 @@ describe('Отправка: получатель — контракт самог
     expect(screen.queryByText(/recipient is the token contract itself/i)).not.toBeInTheDocument()
   })
 
-  it('при переводе валюты на тот же адрес предупреждение другое', async () => {
-    /* Нативная валюта, отправленная контракту, теряется по другой
-       причине и требует другого объяснения: у неё контракта нет,
-       и «его собственный контракт» — бессмыслица. */
+  it('sending native currency to the same address shows a different warning', async () => {
+    /* Native currency sent to a contract is lost for a different
+       reason and needs a different explanation: it has no contract,
+       and "its own contract" is nonsense. */
     renderApp()
     await openSend()
     await fillAndContinue(TOKEN, '0.1')
@@ -583,11 +583,11 @@ describe('Отправка: получатель — контракт самог
   })
 })
 
-describe('Проверка вызова до подписи', () => {
-  it('пройденная проверка названа проверкой текущего состояния, а не обещанием', async () => {
-    /* «Транзакция пройдёт» — обещание, которого кошелёк выполнить
-       не может: между проверкой и включением в блок состояние
-       меняется. */
+describe('Call check before signing', () => {
+  it('a passed check is named a check of current state, not a promise', async () => {
+    /* "The transaction will go through" is a promise the wallet
+       cannot keep: between the check and inclusion the state
+       changes. */
     renderApp()
     await openSend()
     await fillAndContinue(RECIPIENT, '1')
@@ -596,9 +596,9 @@ describe('Проверка вызова до подписи', () => {
     expect(screen.getByText(/It is not a promise/i)).toBeInTheDocument()
   })
 
-  it('откат показывается до подписи вместе с причиной контракта', async () => {
-    /* Отправив такую транзакцию, человек сжёг бы газ и не получил
-       ничего. Причина словами контракта указывает, что исправить. */
+  it('a revert is shown before signing together with the contract reason', async () => {
+    /* Sending such a transaction would burn gas and yield nothing.
+       The contract's own words say what to fix. */
     services.providerFactory.configure({
       balance: BALANCE,
       callRevert: { to: RECIPIENT, reason: 'the recipient is on a deny list' },
@@ -612,9 +612,9 @@ describe('Проверка вызова до подписи', () => {
     expect(screen.getByText(/the recipient is on a deny list/i)).toBeInTheDocument()
   })
 
-  it('отказ проверки не выдаётся за успешную проверку', async () => {
-    /* Молчание узла не подтверждает ничего, и молчание кошелька
-       об этом читается как «проверено». */
+  it('a failed check is not presented as a successful one', async () => {
+    /* Node silence confirms nothing, and wallet silence about that
+       reads as "checked". */
     services.providerFactory.configure({ balance: BALANCE, callFails: true })
 
     renderApp()
@@ -625,9 +625,9 @@ describe('Проверка вызова до подписи', () => {
     expect(screen.getByText(/not the same as a successful check/i)).toBeInTheDocument()
   })
 
-  it('отказ проверки отправку не запрещает', async () => {
-    /* Решение остаётся за владельцем средств: он мог знать
-       о встречной транзакции, которой узел ещё не видит. */
+  it('a failed check does not forbid the send', async () => {
+    /* The owner of the funds decides: they may know about a
+       counter-transaction the node has not seen yet. */
     services.providerFactory.configure({ balance: BALANCE, callFails: true })
 
     renderApp()
@@ -639,7 +639,7 @@ describe('Проверка вызова до подписи', () => {
   })
 })
 
-describe('Отправка: запись справочника', () => {
+describe('Send: directory record', () => {
   const originalFetch = globalThis.fetch
 
   afterEach(() => {
@@ -647,7 +647,7 @@ describe('Отправка: запись справочника', () => {
     localStorage.clear()
   })
 
-  it('показывает токены из users.assets в списке «Что отправить»', async () => {
+  it('shows tokens from users.assets in the What to send list', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'theguy@email.com',
@@ -733,7 +733,7 @@ describe('Отправка: запись справочника', () => {
     })
   })
 
-  it('обновляет Available после GET /v1/users/:id', async () => {
+  it('updates Available after GET /v1/users/:id', async () => {
     const staleUser = {
       id: '7',
       email: 'theguy@email.com',
@@ -806,7 +806,7 @@ describe('Отправка: запись справочника', () => {
     expect(screen.queryByText(/1\.2847 ETH/)).not.toBeInTheDocument()
   })
 
-  it('показывает failureMessage в панели статуса, если SSE update совпал с текущей отправкой', async () => {
+  it('shows failureMessage in the status panel when the SSE update matches the current send', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'theguy@email.com',
@@ -876,7 +876,7 @@ describe('Отправка: запись справочника', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('показывает success в панели статуса, если SSE update совпал с текущей отправкой', async () => {
+  it('shows success in the status panel when the SSE update matches the current send', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'theguy@email.com',
@@ -946,7 +946,7 @@ describe('Отправка: запись справочника', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('красит Available и блокирует отправку, если сумма больше баланса', async () => {
+  it('colors Available and blocks send when the amount exceeds the balance', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: '7',
       email: 'theguy@email.com',
@@ -994,7 +994,7 @@ describe('Отправка: запись справочника', () => {
     ).toBe(false)
   })
 
-  it('берёт user_id из etwallet.login-credentials.id, даже если это число', async () => {
+  it('takes user_id from etwallet.login-credentials.id even when it is a number', async () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({
       id: 70,
       email: 'theguy@email.com',

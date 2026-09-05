@@ -37,11 +37,11 @@ import {
 } from '@/core'
 
 /**
- * Провайдер-дублёр.
+ * Provider double.
  *
- * Отвечает на `eth_chainId` заранее заданным значением. Именно это позволяет
- * проверить главную защиту сетевого модуля: отказ добавить сеть, если узел
- * обслуживает другую цепь.
+ * Answers `eth_chainId` with a preset value. That is what lets a
+ * test check the network module's main protection: refuse to add a
+ * network if the node serves another chain.
  */
 class FakeProvider implements IProvider {
   readonly chainId: ChainId
@@ -50,9 +50,10 @@ class FakeProvider implements IProvider {
 
   readonly #reportedChainId: ChainId
 
-  /* Баланс читается через функцию, а не копируется при создании.
-     Соединения переиспользуются пулом, и тест, меняющий настройки
-     после первого запроса, иначе не увидел бы нового значения. */
+  /* Balance is read through a function, not copied at construction.
+     Connections are reused by the pool, and a test that changes
+     options after the first request would otherwise not see the
+     new value. */
   readonly #readBalance: () => Wei | null
   readonly #readBalancesByAddress: () => readonly {
     readonly address: string
@@ -113,7 +114,7 @@ class FakeProvider implements IProvider {
       return Promise.resolve(chainIdToHex(this.#reportedChainId) as TResult)
     }
 
-    return Promise.reject(new Error(`Метод "${request.method}" не поддержан дублёром.`))
+    return Promise.reject(new Error(`Method "${request.method}" is not supported by the double.`))
   }
 
   getChainId(): Promise<ChainId> {
@@ -139,10 +140,10 @@ class FakeProvider implements IProvider {
 
     const balance = this.#readBalance()
 
-    /* Отказ по умолчанию намеренный: тест, забывший задать баланс,
-       обязан упасть, а не получить незаметный ноль. */
+    /* Default refusal is intentional: a test that forgot to set a
+       balance must fail, not get a silent zero. */
     return balance === null
-      ? Promise.reject(new Error('Баланс не задан в настройках дублёра.'))
+      ? Promise.reject(new Error('Balance is not set in the double settings.'))
       : Promise.resolve(balance)
   }
 
@@ -151,11 +152,12 @@ class FakeProvider implements IProvider {
   }
 
   /**
-   * Вызов контракта.
+   * Contract call.
    *
-   * Поддержан только реестр ENS и его резолвер. Отказ по умолчанию
-   * намеренный: тест, ожидающий ответа от контракта, о котором дублёр
-   * не знает, обязан упасть, а не получить пустую строку.
+   * Only the ENS registry and its resolver are supported. Default
+   * refusal is intentional: a test expecting a reply from a
+   * contract the double does not know must fail, not get an empty
+   * string.
    */
   call(request: ICallRequest): Promise<HexString> {
     const approval = answerApprovalCall(request, this.#readApprovals())
@@ -189,8 +191,8 @@ class FakeProvider implements IProvider {
     const revert = this.#readCallRevert()
 
     if (revert !== null && areAddressesEqual(toAddress(revert.to), request.to)) {
-      /* Настоящий узел отвечает на откат ошибкой с данными причины,
-         и разбор этих данных — то, ради чего существует проверка. */
+      /* A real node answers a revert with an error that carries the
+         reason, and parsing that data is what the check exists for. */
       return Promise.reject(
         new GasEstimationFailedError(revert.reason, {
           revertData: encodeErrorString(revert.reason),
@@ -198,22 +200,23 @@ class FakeProvider implements IProvider {
       )
     }
 
-    /* ПЕРЕВОД БЕЗ ДАННЫХ ВЫЗОВА УЗЕЛ ВЫПОЛНЯЕТ И ВОЗВРАЩАЕТ ПУСТО.
-       Дублёр, отказывающий здесь, превратил бы обычную отправку
-       в «проверить не удалось» во всех проверках разом. */
+    /* A TRANSFER WITH NO CALL DATA THE NODE EXECUTES AND RETURNS
+       EMPTY. A double that refuses here would turn an ordinary
+       send into “could not check” in every test at once. */
     if (request.data === undefined || request.data === '0x') {
       return Promise.resolve('0x' as HexString)
     }
 
-    return Promise.reject(new Error('Не поддержано дублёром.'))
+    return Promise.reject(new Error('Not supported by the double.'))
   }
 
   /**
-   * Байт-код по адресу.
+   * Bytecode at an address.
    *
-   * По умолчанию адрес считается обычным. Тест, проверяющий
-   * предупреждение о переводе на контракт, задаёт `contractAddresses`
-   * явно: молчаливое «всё контракты» скрыло бы отсутствие проверки.
+   * By default the address is treated as an EOA. A test that
+   * checks the warning about sending to a contract sets
+   * `contractAddresses` explicitly: a silent “everything is a
+   * contract” would hide a missing check.
    */
   getCode(address: Address): Promise<HexString> {
     const contracts = this.#readContracts().map((item) => item.toLowerCase())
@@ -228,11 +231,11 @@ class FakeProvider implements IProvider {
   }
 
   /**
-   * Данные о комиссии.
+   * Fee data.
    *
-   * Возвращаются значения работающей сети с поддержкой EIP-1559: отказ
-   * здесь означал бы узел, у которого нельзя подготовить ни одну
-   * транзакцию, а такой узел не годится даже как дублёр.
+   * Returns values of a working EIP-1559 network: a refusal here
+   * would mean a node that cannot prepare any transaction, and
+   * such a node is useless even as a double.
    */
   getFeeData(): Promise<IFeeData> {
     return Promise.resolve(
@@ -246,10 +249,10 @@ class FakeProvider implements IProvider {
   }
 
   /**
-   * Публикация подписанной транзакции.
+   * Publish a signed transaction.
    *
-   * Возвращает постоянный хэш: тесты проверяют, что он доходит
-   * до интерфейса, а не его конкретное значение.
+   * Returns a constant hash: tests check that it reaches the UI,
+   * not its specific value.
    */
   sendRawTransaction(): Promise<TxHash> {
     const failure = this.#readSendError()
@@ -262,13 +265,13 @@ class FakeProvider implements IProvider {
   }
 
   /**
-   * Выборка журналов.
+   * Log query.
    *
-   * Отбор выполняется по тем же правилам, что и на узле: диапазон блоков,
-   * адрес контракта и позиционное совпадение тем, где `null` означает
-   * «любое значение». Дублёр, отдающий все записи подряд, скрыл бы ошибку
-   * в составлении запроса — а именно она приводит к пропаже операций
-   * из истории.
+   * Filtering follows the same rules as on a node: block range,
+   * contract address, and positional topic match, where `null`
+   * means “any value”. A double that returns every record would
+   * hide a bug in building the query — and that is what makes
+   * operations vanish from history.
    */
   getLogs(filter: ILogFilter): Promise<readonly ILogEntry[]> {
     const failure = this.#readLogsError()
@@ -287,194 +290,184 @@ class FakeProvider implements IProvider {
   off = this.#events.off.bind(this.#events)
 }
 
-/** Действующее разрешение ERC-20 у дублёра. */
 export interface IFakeAllowance {
   readonly contract: string
   readonly spender: string
   readonly amount: bigint
 }
 
-/** Действующее разрешение на коллекцию. */
 export interface IFakeOperatorApproval {
   readonly contract: string
   readonly operator: string
 }
 
-/** Владелец предмета ERC-721 у дублёра. */
 export interface IFakeNftOwner {
   readonly contract: string
   readonly tokenId: bigint
   readonly owner: string
 }
 
-/** Остаток предмета ERC-1155 у владельца. */
 export interface IFakeNftBalance {
   readonly contract: string
   readonly tokenId: bigint
   readonly balance: bigint
 }
 
-/** Название коллекции, которое отдаёт контракт. */
 export interface IFakeCollection {
   readonly address: string
   readonly name: string
 }
 
-/** Токен-контракт, отвечающий дублёру узла. */
 export interface IFakeToken {
   readonly address: string
   readonly symbol: string
   readonly name: string
   readonly decimals: number
 
-  /** Баланс владельца. Один на всех: адресность здесь ничего не проверяет. */
+  /** Owner balance. One for all: address matching is not what this checks. */
   readonly balance: bigint
 }
 
-/** Настройки поведения фабрики в конкретном тесте. */
 export interface IFakeProviderOptions {
   /**
-   * Идентификатор, который узел сообщит в ответ на `eth_chainId`.
-   * Если не задан, возвращается заявленный в конфигурации.
+   * Id the node will report for `eth_chainId`.
+   * If unset, the one declared in the config is returned.
    */
   readonly reportedChainId?: ChainId
 
-  /** Имитировать полную недоступность узлов. */
   readonly unavailable?: boolean
 
-  /** Баланс, возвращаемый `getBalance`. Без него метод отвечает отказом. */
+  /** Balance returned by `getBalance`. Without it the method refuses. */
   readonly balance?: Wei
 
   /**
-   * Балансы отдельных адресов.
+   * Per-address balances.
    *
-   * Нужны поиску занятых адресов: он отличает использованный адрес
-   * от пустого, и общий баланс на все адреса сделал бы проверку
-   * бессмысленной.
+   * Needed by used-address discovery: it distinguishes a used
+   * address from an empty one, and one balance for every address
+   * would make the check meaningless.
    */
   readonly balancesByAddress?: readonly { readonly address: string; readonly balance: Wei }[]
 
   /**
-   * Проверять chainId при создании, как это делает `RpcClientFactory`.
+   * Verify chainId on create, as `RpcClientFactory` does.
    *
-   * По умолчанию выключено: `NetworkService` сверяет идентификатор сам,
-   * уже после создания соединения, и ему нужен провайдер, отвечающий
-   * чужим значением.
+   * Off by default: `NetworkService` checks the id itself, after
+   * the connection is created, and it needs a provider that
+   * answers with a foreign value.
    *
-   * Включённая проверка воспроизводит поведение боевой фабрики целиком,
-   * включая заворачивание причины: наружу выходит `ProviderUnavailableError`
-   * с `cause` в виде `ChainIdMismatchError`. Без такой точности тест
-   * не заметил бы, что настоящая причина отказа потеряна по дороге.
+   * When on, the check reproduces the production factory fully,
+   * including wrapping the cause: the outside sees
+   * `ProviderUnavailableError` with `cause` a
+   * `ChainIdMismatchError`. Without that precision a test would
+   * miss the real refusal reason being lost along the way.
    */
   readonly verifyChainIdOnCreate?: boolean
 
-  /** Данные о комиссии. Без них возвращаются значения работающей сети. */
+  /** Fee data. Without it, values of a working network are returned. */
   readonly feeData?: IFeeData
 
-  /** Причина отказа при публикации транзакции. Без неё публикация удаётся. */
+  /** Send failure reason. Without it, publish succeeds. */
   readonly sendError?: string
 
-  /** Журнальные записи, доступные выборке. По умолчанию их нет. */
   readonly logs?: readonly ILogEntry[]
 
   /**
-   * Адрес, вызовы к которому откатываются с заданной причиной.
+   * Address whose calls revert with the given reason.
    *
-   * Нужен проверкам предварительного прогона: без отката проверить,
-   * что причина контракта доходит до экрана, нечем.
+   * Needed by preflight checks: without a revert there is nothing
+   * to prove the contract reason reaches the screen.
    */
   readonly callRevert?: { readonly to: string; readonly reason: string }
 
   /**
-   * Узел не отвечает на `eth_call`.
+   * The node does not answer `eth_call`.
    *
-   * Отличается от отката: там вызов выполнен и отвергнут, здесь —
-   * не выполнен вовсе, и говорить о нём нечего.
+   * Different from a revert: there the call ran and was rejected;
+   * here it never ran, and there is nothing to say about it.
    */
   readonly callFails?: boolean
 
   /**
-   * Номер последнего блока.
+   * Latest block number.
    *
-   * Влияет на диапазон выборки журналов: источник истории просматривает
-   * окно, отсчитанное от последнего блока назад.
+   * Affects the log-query window: the history source looks back
+   * from the latest block.
    */
   readonly latestBlock?: bigint
 
   /**
-   * Токен-контракты, отвечающие на `decimals`, `symbol`, `name`
-   * и `balanceOf`.
+   * Token contracts that answer `decimals`, `symbol`, `name`,
+   * and `balanceOf`.
    *
-   * Нужны проверкам отправки токена: без ответа контракта токен нельзя
-   * ни добавить, ни оценить его баланс, и весь путь остался бы
-   * непроверенным.
+   * Needed by token-send checks: without a contract reply a token
+   * cannot be added or have its balance valued, and the whole
+   * path would stay untested.
    */
   readonly tokens?: readonly IFakeToken[]
 
-  /** Владельцы предметов ERC-721. Предмет без записи считается сожжённым. */
+  /** ERC-721 owners. An item with no record is treated as burned. */
   readonly nftOwners?: readonly IFakeNftOwner[]
 
-  /** Остатки предметов ERC-1155. Без записи остаток нулевой. */
+  /** ERC-1155 balances. No record means a zero balance. */
   readonly nftBalances?: readonly IFakeNftBalance[]
 
-  /** Названия коллекций. Без записи контракт отвечает отказом. */
+  /** Collection names. No record means the contract refuses. */
   readonly collections?: readonly IFakeCollection[]
 
-  /** Действующие разрешения ERC-20. Без записи разрешение нулевое. */
+  /** Active ERC-20 allowances. No record means a zero allowance. */
   readonly allowances?: readonly IFakeAllowance[]
 
-  /** Действующие разрешения на коллекции. */
   readonly operatorApprovals?: readonly IFakeOperatorApproval[]
 
-  /** Причина отказа выборки журналов. Без неё выборка удаётся. */
+  /** Log-query failure reason. Without it the query succeeds. */
   readonly logsError?: string
 
-  /** Адреса, по которым `getCode` вернёт байт-код. По умолчанию таких нет. */
+  /** Addresses for which `getCode` returns bytecode. None by default. */
   readonly contractAddresses?: readonly string[]
 
-  /** Записи ENS. По умолчанию реестр пуст и отвечает нулями. */
+  /** ENS records. By default the registry is empty and answers zeros. */
   readonly ensRecords?: readonly IFakeEnsRecord[]
 }
 
 /**
- * Запись ENS в дублёре.
+ * ENS record in the double.
  *
- * ХРАНИТСЯ ИМЕНЕМ, А НЕ УЗЛОМ. Дублёр вычисляет `namehash` тем же кодом,
- * что и боевой сервис, и отвечает на запрос по узлу. Ошибка в реализации
- * namehash из-за этого приводит к падению теста, а не к совпадению
- * двух одинаково неверных значений.
+ * STORED BY NAME, NOT BY NODE. The double computes `namehash` with
+ * the same code as the production service and answers by node. A
+ * namehash bug then fails the test instead of matching two equally
+ * wrong values.
  */
 export interface IFakeEnsRecord {
-  /** Нормализованное имя, каким его увидит реестр. */
+  /** Normalized name as the registry will see it. */
   readonly name: string
 
   /**
-   * Адрес из записи `addr`. `null` означает «резолвер есть, записи нет».
+   * Address from the `addr` record. `null` means “resolver exists,
+   * record does not”.
    */
   readonly address: string | null
 
   /**
-   * Адрес, у которого эта запись объявлена обратной.
+   * Address for which this record is declared as reverse.
    *
-   * Задаётся отдельно от `address` намеренно: обратная запись
-   * не проверяется никем, и тест обязан уметь описать расхождение —
-   * адрес объявляет имя, которое на него не указывает.
+   * Set separately from `address` on purpose: reverse is checked
+   * by nobody, and a test must be able to describe a mismatch —
+   * an address claims a name that does not point at it.
    */
   readonly reverseFor?: string
 }
 
-/** Адрес резолвера, который выдаёт дублёр. Значение произвольно и постоянно. */
+/** Resolver address the double returns. Arbitrary and constant. */
 const FAKE_RESOLVER = toAddress(`0x${'11'.repeat(20)}`)
 
-/** Слово ABI из тридцати двух нулевых байт. */
 const ZERO_WORD = '0'.repeat(64)
 
-/** Кодирует адрес словом ABI. */
 function encodeAddressWord(address: string): HexString {
   return `0x${address.slice(2).toLowerCase().padStart(64, '0')}` as HexString
 }
 
-/** Кодирует строку по правилам ABI: смещение, длина, содержимое. */
+/** Encodes a string the ABI way: offset, length, content. */
 function encodeStringResult(value: string): HexString {
   const bytes = new TextEncoder().encode(value)
 
@@ -492,9 +485,9 @@ function encodeStringResult(value: string): HexString {
 }
 
 /**
- * Отвечает на вызов реестра либо резолвера ENS.
+ * Answers a registry or ENS resolver call.
  *
- * @returns `null`, если вызов к ENS отношения не имеет.
+ * @returns `null` if the call is unrelated to ENS.
  */
 function answerEnsCall(
   request: ICallRequest,
@@ -508,8 +501,9 @@ function answerEnsCall(
       return null
     }
 
-    /* Резолвер выдаётся и прямому узлу имени, и обратному узлу адреса:
-       и то и другое зарегистрировано, если про них есть запись. */
+    /* The resolver is returned for both the forward name node and
+       the reverse address node: both are registered if a record
+       exists for them. */
     const known =
       records.some((record) => namehash(record.name) === node) ||
       records.some(
@@ -544,7 +538,6 @@ function answerEnsCall(
   return null
 }
 
-/** Подходит ли журнальная запись под условия выборки. */
 function matchesFilter(entry: ILogEntry, filter: ILogFilter): boolean {
   if (filter.fromBlock !== undefined && entry.blockNumber < filter.fromBlock) {
     return false
@@ -568,21 +561,20 @@ function matchesFilter(entry: ILogEntry, filter: ILogFilter): boolean {
 }
 
 /**
- * Хэш, возвращаемый при публикации.
+ * Hash returned on publish.
  *
- * Постоянный: тесты проверяют, что значение доходит до интерфейса,
- * а не какое именно оно.
+ * Constant: tests check that the value reaches the UI, not which
+ * value it is.
  */
 const FAKE_TX_HASH = `0x${'ab'.repeat(32)}` as TxHash
 
-/** Фабрика провайдеров-дублёров. */
 export class FakeProviderFactory implements IProviderFactory {
   #options: IFakeProviderOptions = {}
 
-  /** Число созданных провайдеров. Позволяет проверить, что соединение закрывается. */
+  /** Providers created. Lets a test check that the connection is closed. */
   createdCount = 0
 
-  /** Последний созданный провайдер. Используется для проверки вызова destroy. */
+  /** Last created provider. Used to check that destroy was called. */
   lastProvider: IProvider | null = null
 
   configure(options: IFakeProviderOptions): void {
@@ -638,10 +630,10 @@ export class FakeProviderFactory implements IProviderFactory {
 }
 
 /**
- * Кодирует `Error(string)` так, как это делает виртуальная машина.
+ * Encodes `Error(string)` the way the virtual machine does.
  *
- * Дублёр обязан отвечать в том же виде, что и узел: разбор именно этих
- * данных и проверяется.
+ * The double must answer in the same form as a node: parsing that
+ * data is what is being checked.
  */
 function encodeErrorString(text: string): string {
   const bytes = new TextEncoder().encode(text)
@@ -653,11 +645,11 @@ function encodeErrorString(text: string): string {
 }
 
 /**
- * Ответ токен-контракта.
+ * Token-contract reply.
  *
- * Различаются вызовы по селектору — так же, как это делает настоящий
- * контракт. Дублёр, отвечающий одинаково на любой вызов, скрыл бы
- * ошибку в составлении данных.
+ * Calls are distinguished by selector — the way a real contract
+ * does. A double that answers every call the same way would hide
+ * a bug in building the data.
  */
 function answerTokenCall(request: ICallRequest, tokens: readonly IFakeToken[]): HexString | null {
   const token = tokens.find((entry) => areAddressesEqual(entry.address, request.to))
@@ -687,29 +679,27 @@ function answerTokenCall(request: ICallRequest, tokens: readonly IFakeToken[]): 
   return null
 }
 
-/** Одно слово ABI с числом. */
 function word(value: bigint): HexString {
   return `0x${value.toString(16).padStart(64, '0')}` as HexString
 }
 
-/** Строка переменной длины в кодировке ABI: смещение, длина, содержимое. */
+/** Variable-length ABI string: offset, length, content. */
 function text(value: string): HexString {
   const encoded = new TextEncoder().encode(value)
   const bytes = [...encoded].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 
-  /* ДЛИНА В БАЙТАХ, А НЕ В СИМВОЛАХ. Кодировка ABI объявляет длину
-     строки числом байтов; `value.length` считает единицы UTF-16.
-     Для ASCII эти числа совпадают, и расхождение было незаметно —
-     а любая не-ASCII строка контракта обрезалась на середине символа
-     и доходила до кошелька испорченной. Проверка подделки символа
-     кириллицей на таком дублёре не работала бы, причём молча. */
+  /* LENGTH IN BYTES, NOT CHARACTERS. ABI encoding declares string
+     length as a byte count; `value.length` counts UTF-16 units.
+     For ASCII the numbers match, so the mismatch was invisible —
+     and any non-ASCII contract string was cut mid-character and
+     reached the wallet corrupted. A Cyrillic-symbol spoof check
+     on such a double would fail silently. */
   const length = BigInt(encoded.length).toString(16).padStart(64, '0')
   const padded = bytes.padEnd(Math.max(64, Math.ceil(bytes.length / 64) * 64), '0')
 
   return `0x${32n.toString(16).padStart(64, '0')}${length}${padded}` as HexString
 }
 
-/** Состояние коллекций у дублёра. */
 export interface IFakeCollections {
   readonly owners: readonly IFakeNftOwner[]
   readonly balances: readonly IFakeNftBalance[]
@@ -717,11 +707,11 @@ export interface IFakeCollections {
 }
 
 /**
- * Ответ контракта коллекции.
+ * Collection-contract reply.
  *
- * Возвращает `null`, если вызов к коллекциям не относится, и `Error`,
- * если контракт обязан ответить отказом: `ownerOf` несуществующего
- * предмета откатывается, и именно так выглядит сожжённый предмет.
+ * Returns `null` if the call is unrelated to collections, and
+ * `Error` if the contract must refuse: `ownerOf` of a missing item
+ * reverts, and that is how a burned item looks.
  */
 function answerCollectionCall(
   request: ICallRequest,
@@ -749,8 +739,8 @@ function answerCollectionCall(
     return `0x${(record?.balance ?? 0n).toString(16).padStart(64, '0')}` as HexString
   }
 
-  /* Название спрашивается и у коллекций, и у токенов ERC-20. Здесь
-     отвечают только известные коллекции; остальное уходит дальше. */
+  /* Name is asked of both collections and ERC-20 tokens. Only
+     known collections answer here; the rest is passed on. */
   if (data.startsWith(`0x${NAME_SELECTOR}`)) {
     const record = state.names.find((entry) => areAddressesEqual(entry.address, request.to))
 
@@ -760,17 +750,16 @@ function answerCollectionCall(
   return null
 }
 
-/** Состояние разрешений у дублёра. */
 export interface IFakeApprovals {
   readonly allowances: readonly IFakeAllowance[]
   readonly operators: readonly IFakeOperatorApproval[]
 }
 
 /**
- * Ответ контракта на чтение разрешения.
+ * Contract reply for reading an approval.
  *
- * Отсутствие записи означает ноль и `false` — то есть «разрешения нет»,
- * а не отказ: настоящий контракт отвечает так же.
+ * A missing record means zero and `false` — “no approval”, not a
+ * refusal: a real contract answers the same way.
  */
 function answerApprovalCall(request: ICallRequest, state: IFakeApprovals): HexString | null {
   const data = request.data ?? '0x'

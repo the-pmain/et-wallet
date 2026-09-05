@@ -29,16 +29,16 @@ beforeEach(() => {
   guard = new ExportGuard(auditLog, clock)
 })
 
-describe('порядок уровней риска', () => {
-  it('возрастает от низкого к критическому', () => {
+describe('risk-level order', () => {
+  it('rises from low to critical', () => {
     expect(riskLevel(EXPORT_RISK.Low)).toBeLessThan(riskLevel(EXPORT_RISK.Elevated))
     expect(riskLevel(EXPORT_RISK.Elevated)).toBeLessThan(riskLevel(EXPORT_RISK.AccountCompromise))
     expect(riskLevel(EXPORT_RISK.AccountCompromise)).toBeLessThan(riskLevel(EXPORT_RISK.Critical))
   })
 })
 
-describe('ExportGuard: секреты полного доступа', () => {
-  it('оценивает мнемонику как критический риск', async () => {
+describe('ExportGuard: full-access secrets', () => {
+  it('rates a mnemonic as critical risk', async () => {
     const assessment = await guard.assess(
       accountExportRequest(EXPORT_KIND.Mnemonic, SIGNING_ACCOUNT),
     )
@@ -47,14 +47,14 @@ describe('ExportGuard: секреты полного доступа', () => {
     expect(assessment.reason).toBe(EXPORT_RISK_REASON.GrantsWholeWallet)
   })
 
-  it('оценивает xprv как критический риск', async () => {
+  it('rates an xprv as critical risk', async () => {
     const assessment = await guard.assess(accountExportRequest(EXPORT_KIND.Xprv, SIGNING_ACCOUNT))
 
     expect(assessment.risk).toBe(EXPORT_RISK.Critical)
     expect(assessment.reason).toBe(EXPORT_RISK_REASON.GrantsWholeAccount)
   })
 
-  it('не понижает оценку xprv при чистой истории', async () => {
+  it('does not lower the xprv rating on a clean history', async () => {
     const assessment = await guard.assess(
       accountExportRequest(EXPORT_KIND.Xprv, WATCH_ONLY_ACCOUNT),
     )
@@ -63,12 +63,12 @@ describe('ExportGuard: секреты полного доступа', () => {
   })
 })
 
-describe('ExportGuard: обнаружение опасной пары', () => {
-  /* Главное, ради чего существует модуль. По отдельности выдача xpub
-     и выдача приватного ключа выглядят безобидно; вторая из них замыкает
-     пару, после которой получатель вычисляет весь аккаунт. */
+describe('ExportGuard: detecting the dangerous pair', () => {
+  /* The reason this module exists. On their own, an xpub export and a
+     private-key export look harmless; the second closes the pair,
+     after which the recipient computes the whole account. */
 
-  it('приватный ключ после выданного xpub — компрометация аккаунта', async () => {
+  it('a private key after an exported xpub is account compromise', async () => {
     await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, SIGNING_ACCOUNT),
       EXPORT_RISK.Elevated,
@@ -81,7 +81,7 @@ describe('ExportGuard: обнаружение опасной пары', () => {
     expect(assessment.closesCompromisePair).toBe(true)
   })
 
-  it('xpub после выданного приватного ключа — компрометация аккаунта', async () => {
+  it('an xpub after an exported private key is account compromise', async () => {
     await guard.confirm(privateKeyExportRequest(SIGNING_ACCOUNT, 0), EXPORT_RISK.Elevated)
 
     const assessment = await guard.assess(accountExportRequest(EXPORT_KIND.Xpub, SIGNING_ACCOUNT))
@@ -91,7 +91,7 @@ describe('ExportGuard: обнаружение опасной пары', () => {
     expect(assessment.closesCompromisePair).toBe(true)
   })
 
-  it('xpub после выданного xprv — компрометация аккаунта', async () => {
+  it('an xpub after an exported xprv is account compromise', async () => {
     await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xprv, SIGNING_ACCOUNT),
       EXPORT_RISK.Critical,
@@ -102,25 +102,26 @@ describe('ExportGuard: обнаружение опасной пары', () => {
     expect(assessment.risk).toBe(EXPORT_RISK.AccountCompromise)
   })
 
-  it('замыкание пары определяется по конкретному адресу независимо', async () => {
+  it('pair-closing is detected for a specific address independently', async () => {
     await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, SIGNING_ACCOUNT),
       EXPORT_RISK.Elevated,
     )
 
-    /* Индекс адреса значения не имеет: приватный ключ ЛЮБОГО потомка
-       вместе с родительским xpub раскрывает родительский ключ. */
+    /* The address index does not matter: the private key of ANY child
+       plus the parent xpub reveals the parent key. */
     const assessment = await guard.assess(privateKeyExportRequest(SIGNING_ACCOUNT, 42))
 
     expect(assessment.risk).toBe(EXPORT_RISK.AccountCompromise)
   })
 })
 
-describe('ExportGuard: изоляция аккаунтов', () => {
-  /* Уровень аккаунта в BIP-44 закалён, поэтому компрометация одного
-     аккаунта не затрагивает другие. Это структурная мера, а не соглашение. */
+describe('ExportGuard: account isolation', () => {
+  /* The BIP-44 account level is hardened, so compromising one account
+     does not touch the others. That is a structural defence, not a
+     convention. */
 
-  it('не переносит риск между разными аккаунтами', async () => {
+  it('does not carry risk across accounts', async () => {
     await guard.confirm(accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT), EXPORT_RISK.Low)
 
     const assessment = await guard.assess(privateKeyExportRequest(SIGNING_ACCOUNT, 0))
@@ -129,7 +130,7 @@ describe('ExportGuard: изоляция аккаунтов', () => {
     expect(assessment.closesCompromisePair).toBe(false)
   })
 
-  it('xpub из выделенного аккаунта наблюдения имеет низкий риск', async () => {
+  it('an xpub from the dedicated watch account has low risk', async () => {
     const assessment = await guard.assess(
       accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT),
     )
@@ -138,7 +139,7 @@ describe('ExportGuard: изоляция аккаунтов', () => {
     expect(assessment.suggestsSeparateAccount).toBe(false)
   })
 
-  it('xpub из подписывающего аккаунта повышает риск и рекомендует отдельный', async () => {
+  it('an xpub from the signing account raises risk and recommends a separate one', async () => {
     const assessment = await guard.assess(accountExportRequest(EXPORT_KIND.Xpub, SIGNING_ACCOUNT))
 
     expect(assessment.risk).toBe(EXPORT_RISK.Elevated)
@@ -146,7 +147,7 @@ describe('ExportGuard: изоляция аккаунтов', () => {
     expect(assessment.suggestsSeparateAccount).toBe(true)
   })
 
-  it('приватный ключ без выданного xpub имеет повышенный, но не критический риск', async () => {
+  it('a private key without an exported xpub has elevated, not critical, risk', async () => {
     const assessment = await guard.assess(privateKeyExportRequest(SIGNING_ACCOUNT, 0))
 
     expect(assessment.risk).toBe(EXPORT_RISK.Elevated)
@@ -154,8 +155,8 @@ describe('ExportGuard: изоляция аккаунтов', () => {
   })
 })
 
-describe('ExportGuard: подтверждение уровня риска', () => {
-  it('выдаёт разрешение при точном совпадении уровня', async () => {
+describe('ExportGuard: acknowledging the risk level', () => {
+  it('issues a permit when the level matches exactly', async () => {
     const permit = await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT),
       EXPORT_RISK.Low,
@@ -165,7 +166,7 @@ describe('ExportGuard: подтверждение уровня риска', () =
     expect(permit.isConsumed).toBe(false)
   })
 
-  it('выдаёт разрешение при подтверждении более высокого уровня', async () => {
+  it('issues a permit when a higher level is acknowledged', async () => {
     const permit = await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT),
       EXPORT_RISK.Critical,
@@ -174,16 +175,16 @@ describe('ExportGuard: подтверждение уровня риска', () =
     expect(permit.risk).toBe(EXPORT_RISK.Low)
   })
 
-  it('отказывает, если интерфейс показал более мягкое предупреждение', async () => {
-    /* Ключевая проверка. Без неё интерфейс мог бы показать «низкий риск»
-       там, где выдача секрета раскрывает весь аккаунт, и оценка риска
-       осталась бы декоративной. */
+  it('refuses if the UI showed a softer warning', async () => {
+    /* The key check. Without it the UI could show "low risk" where
+       releasing the secret opens the whole account, and the
+       assessment would stay decorative. */
     await expect(
       guard.confirm(accountExportRequest(EXPORT_KIND.Xprv, SIGNING_ACCOUNT), EXPORT_RISK.Low),
     ).rejects.toThrow(ExportNotPermittedError)
   })
 
-  it('отказывает при занижении на один уровень', async () => {
+  it('refuses when understated by one level', async () => {
     await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, SIGNING_ACCOUNT),
       EXPORT_RISK.Elevated,
@@ -194,7 +195,7 @@ describe('ExportGuard: подтверждение уровня риска', () =
     ).rejects.toThrow(ExportNotPermittedError)
   })
 
-  it('не записывает в журнал при отказе', async () => {
+  it('does not write to the log on refusal', async () => {
     await expect(
       guard.confirm(accountExportRequest(EXPORT_KIND.Xprv, SIGNING_ACCOUNT), EXPORT_RISK.Low),
     ).rejects.toThrow()
@@ -203,8 +204,8 @@ describe('ExportGuard: подтверждение уровня риска', () =
   })
 })
 
-describe('ExportGuard: журнал', () => {
-  it('записывает факт экспорта', async () => {
+describe('ExportGuard: log', () => {
+  it('records the fact of an export', async () => {
     await guard.confirm(accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT), EXPORT_RISK.Low)
 
     const history = await guard.getHistory(WATCH_ONLY_ACCOUNT)
@@ -214,7 +215,7 @@ describe('ExportGuard: журнал', () => {
     expect(history[0]?.risk).toBe(EXPORT_RISK.Low)
   })
 
-  it('сохраняет момент экспорта', async () => {
+  it('keeps the export timestamp', async () => {
     await guard.confirm(accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT), EXPORT_RISK.Low)
 
     const history = await guard.getHistory(WATCH_ONLY_ACCOUNT)
@@ -222,7 +223,7 @@ describe('ExportGuard: журнал', () => {
     expect(history[0]?.at).toBe(1_700_000_000_000)
   })
 
-  it('возвращает записи от новых к старым', async () => {
+  it('returns records newest first', async () => {
     await guard.confirm(privateKeyExportRequest(WATCH_ONLY_ACCOUNT, 0), EXPORT_RISK.Elevated)
     clock.advance(60_000)
     await guard.confirm(privateKeyExportRequest(WATCH_ONLY_ACCOUNT, 1), EXPORT_RISK.Critical)
@@ -233,10 +234,10 @@ describe('ExportGuard: журнал', () => {
     expect(history[1]?.addressIndex).toBe(0)
   })
 
-  it('записывает экспорт до выдачи разрешения', async () => {
-    /* Направление ошибки выбрано сознательно: лишняя запись приводит
-       к более строгому предупреждению, пропущенная — к отсутствию
-       предупреждения там, где оно необходимо. */
+  it('records the export before issuing the permit', async () => {
+    /* The error direction is deliberate: an extra record leads to a
+       stricter warning; a missed one leads to no warning where one
+       is required. */
     const permit = await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT),
       EXPORT_RISK.Low,
@@ -246,13 +247,13 @@ describe('ExportGuard: журнал', () => {
     await expect(guard.getHistory(WATCH_ONLY_ACCOUNT)).resolves.toHaveLength(1)
   })
 
-  it('разделяет истории разных аккаунтов', async () => {
+  it('keeps histories of different accounts separate', async () => {
     await guard.confirm(accountExportRequest(EXPORT_KIND.Xpub, WATCH_ONLY_ACCOUNT), EXPORT_RISK.Low)
 
     await expect(guard.getHistory(SIGNING_ACCOUNT)).resolves.toHaveLength(0)
   })
 
-  it('переживает пересоздание защитника поверх того же хранилища', async () => {
+  it('survives recreating the guard on the same store', async () => {
     const storage = new InMemoryStorageService()
     const first = new ExportGuard(new ExportAuditLog(storage), clock)
     await first.confirm(
@@ -268,11 +269,11 @@ describe('ExportGuard: журнал', () => {
 })
 
 describe('ExportAuditLog', () => {
-  it('сообщает об отсутствии экспортов у нового аккаунта', async () => {
+  it('reports no exports for a new account', async () => {
     await expect(auditLog.hasExported(SIGNING_ACCOUNT, EXPORT_KIND.Xpub)).resolves.toBe(false)
   })
 
-  it('различает виды экспорта', async () => {
+  it('distinguishes export kinds', async () => {
     await auditLog.record({
       kind: EXPORT_KIND.Xpub,
       scope: SIGNING_ACCOUNT,
@@ -285,7 +286,7 @@ describe('ExportAuditLog', () => {
     await expect(auditLog.hasExported(SIGNING_ACCOUNT, EXPORT_KIND.PrivateKey)).resolves.toBe(false)
   })
 
-  it('очищает историю аккаунта', async () => {
+  it('clears an account history', async () => {
     await auditLog.record({
       kind: EXPORT_KIND.Xpub,
       scope: SIGNING_ACCOUNT,

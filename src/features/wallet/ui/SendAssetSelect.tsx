@@ -19,7 +19,7 @@ interface SendAssetSelectProps {
   readonly onChange: (address: Address | null) => void
 }
 
-/** Совпадают ли активы. `null` с обеих сторон — нативная валюта. */
+/** Whether two assets match. `null` on both sides is native currency. */
 function sameAsset(left: Address | null, right: Address | null): boolean {
   if (left === null || right === null) {
     return left === right
@@ -29,11 +29,11 @@ function sameAsset(left: Address | null, right: Address | null): boolean {
 }
 
 /**
- * Выбор актива для отправки.
+ * Asset picker for send.
  *
- * Тот же вид, что у меню «Add crypto» в кабинете: знак, тикер,
- * полное имя и сеть. Нативный `<select>` не умеет такую строку,
- * а список активов без знака хуже отличает подделку от оригинала.
+ * Same look as the cabinet "Add crypto" menu: mark, ticker, full
+ * name, and chain. A native `<select>` cannot render that row, and a
+ * list without marks is worse at telling a fake from the original.
  */
 export function SendAssetSelect({
   id,

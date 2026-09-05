@@ -8,7 +8,7 @@ const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const ALICE = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 const BOB = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 
-/** Ответ об успешной транзакции с одним изменением баланса. */
+/** Reply for a successful transaction with one balance change. */
 function succeeded(changes: unknown): unknown {
   return {
     simulation: { status: true, gas_used: 51_000 },
@@ -16,8 +16,8 @@ function succeeded(changes: unknown): unknown {
   }
 }
 
-describe('parseSimulation: молчание вместо догадки', () => {
-  it('разбирает перевод токена', () => {
+describe('parseSimulation: silence instead of a guess', () => {
+  it('parses a token transfer', () => {
     const result = parseSimulation(
       succeeded([
         {
@@ -36,7 +36,7 @@ describe('parseSimulation: молчание вместо догадки', () => 
     expect(result?.movements[0]?.amount).toBe(1_500_000n)
   })
 
-  it('изменение без адреса контракта считает нативной валютой', () => {
+  it('treats a change without a contract address as native currency', () => {
     const result = parseSimulation(
       succeeded([{ from: ALICE, to: BOB, raw_amount: '1000000000000000000' }]),
     )
@@ -45,27 +45,28 @@ describe('parseSimulation: молчание вместо догадки', () => 
     expect(result?.movements[0]?.contract).toBeNull()
   })
 
-  it('пустой перечень изменений — законный ответ', () => {
-    /* Транзакция, которая ничего не двигает, существует: одобрение
-       расходования средств меняет разрешение, а не баланс. */
+  it('an empty change list is a lawful reply', () => {
+    /* A transaction that moves nothing exists: an allowance
+       approval changes a permit, not a balance. */
     const result = parseSimulation(succeeded([]))
 
     expect(result?.outcome).toBe(SIMULATION_OUTCOME.Succeeded)
     expect(result?.movements).toHaveLength(0)
   })
 
-  it('ОТСУТСТВИЕ перечня изменений — молчание, а не пустота', () => {
-    /* ГЛАВНАЯ ПРОВЕРКА МОДУЛЯ. Разбор, вернувший «выполнено, перемещений
-       нет» там, где поля просто не пришло, показал бы владельцу
-       подтверждение безопасности вызова, который выносит кошелёк. */
+  it('ABSENCE of a change list is silence, not emptiness', () => {
+    /* THE MAIN CHECK OF THE MODULE. A parse that returned
+       "succeeded, no movements" where the field simply did not
+       arrive would show the owner a safety confirmation of a call
+       that empties the wallet. */
     expect(parseSimulation(succeeded(undefined))).toBeNull()
     expect(parseSimulation({ simulation: { status: true } })).toBeNull()
     expect(parseSimulation({ simulation: { status: true }, transaction: {} })).toBeNull()
   })
 
-  it('непонятое изменение отменяет весь ответ', () => {
-    /* Пропустить одну непонятую строку значило бы показать неполный
-       перечень как полный. Лучше уступить узлу целиком. */
+  it('an unrecognised change cancels the whole reply', () => {
+    /* Skipping one unrecognised row would show an incomplete list
+       as complete. Better to yield to the node entirely. */
     const result = parseSimulation(
       succeeded([
         {
@@ -78,7 +79,7 @@ describe('parseSimulation: молчание вместо догадки', () => 
           from: ALICE,
           to: BOB,
           raw_amount: '2',
-          token_info: { standard: 'ERC-НЕИЗВЕСТНО', contract_address: USDC },
+          token_info: { standard: 'ERC-UNKNOWN', contract_address: USDC },
         },
       ]),
     )
@@ -86,7 +87,7 @@ describe('parseSimulation: молчание вместо догадки', () => 
     expect(result).toBeNull()
   })
 
-  it('откат разбирается вместе с причиной', () => {
+  it('a revert is parsed together with the reason', () => {
     const result = parseSimulation({
       simulation: { status: false, gas_used: 21_000, error_message: 'execution reverted: EXPIRED' },
     })
@@ -94,21 +95,22 @@ describe('parseSimulation: молчание вместо догадки', () => 
     expect(result?.outcome).toBe(SIMULATION_OUTCOME.Reverted)
     expect(result?.reason).toBe('execution reverted: EXPIRED')
 
-    /* При откате пустой перечень означает именно «ничего не произойдёт»,
-       а не «разобрать не удалось»: транзакция не состоится вовсе. */
+    /* On revert an empty list means exactly "nothing will happen",
+       not "could not parse": the transaction will not occur at all. */
     expect(result?.movements).toHaveLength(0)
   })
 
-  it('ответ без признака успеха не разбирается', () => {
+  it('a reply without a success flag is not parsed', () => {
     expect(parseSimulation({})).toBeNull()
     expect(parseSimulation(null)).toBeNull()
     expect(parseSimulation({ simulation: {} })).toBeNull()
     expect(parseSimulation({ simulation: { status: 'true' } })).toBeNull()
   })
 
-  it('нечитаемое количество не подменяется нулём', () => {
-    /* Ноль на месте неизвестной суммы — утверждение, которого симуляция
-       не делала. Само перемещение при этом известно и показывается. */
+  it('an unreadable amount is not replaced with zero', () => {
+    /* Zero in place of an unknown amount is an assertion the
+       simulation did not make. The movement itself is known and is
+       shown. */
     const result = parseSimulation(
       succeeded([
         {

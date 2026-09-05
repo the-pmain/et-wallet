@@ -1,46 +1,40 @@
 /**
- * Копирование с последующей очисткой буфера обмена.
+ * Copy, then clear the clipboard.
  *
- * ЗАЧЕМ ОЧИЩАТЬ. Буфер обмена — общая для всей системы область,
- * доступная любому приложению и любой странице с разрешением на чтение.
- * Скопированный адрес получателя живёт там до следующего копирования,
- * а вредоносное расширение читает его и подменяет.
+ * WHY CLEAR. The clipboard is a system-wide area, readable by any
+ * app and any page with the read permission. A copied recipient
+ * address lives there until the next copy, and a malicious
+ * extension reads it and swaps it.
  *
- * ЭТО СМЯГЧЕНИЕ, А НЕ ЗАЩИТА. Тот, кто читает буфер в момент
- * копирования, прочтёт его в любом случае: окно между копированием
- * и вставкой существует всегда. Очистка сокращает время, в течение
- * которого значение доступно, — и только.
+ * THIS IS A MITIGATION, NOT A DEFENSE. Whoever reads the clipboard
+ * at the moment of copy will read it anyway: the window between
+ * copy and paste always exists. Clearing only shortens the time
+ * the value is available.
  *
- * ОЧИЩАЕТСЯ ТОЛЬКО СВОЁ ЗНАЧЕНИЕ. Если пользователь успел скопировать
- * что-то ещё, буфер не трогается: стереть чужое содержимое значило бы
- * уничтожить данные, к которым кошелёк отношения не имеет.
+ * ONLY OUR OWN VALUE IS CLEARED. If the user already copied
+ * something else, the clipboard is left alone: wiping someone
+ * else's content would destroy data the wallet has no claim on.
  */
 
-/** Через сколько буфер очищается. */
 const DEFAULT_CLEAR_DELAY_MS = 60_000
 
-/** Результат копирования. */
 export interface ICopyHandle {
-  /** Отменяет запланированную очистку. */
   readonly cancel: () => void
 }
 
-/** Настройки копирования. */
 export interface ICopyOptions {
   readonly clearAfterMs?: number
 
-  /** Замена API буфера обмена. Внедряется тестом. */
+  /** Clipboard API stand-in. Injected by tests. */
   readonly clipboard?: Pick<Clipboard, 'writeText' | 'readText'>
 
-  /** Планировщик. Внедряется тестом вместо системных таймеров. */
+  /** Scheduler. Injected by tests in place of system timers. */
   readonly schedule?: (handler: () => void, delayMs: number) => () => void
 }
 
 /**
- * Копирует значение и планирует очистку буфера.
- *
- * @throws Error если буфер обмена недоступен — например, страница
- *         открыта без защищённого соединения.
+ * @throws Error if the clipboard is unavailable — for example the
+ *         page is open without a secure connection.
  */
 export async function copyWithAutoClear(
   value: string,
@@ -69,12 +63,12 @@ export async function copyWithAutoClear(
 }
 
 /**
- * Очищает буфер, если в нём всё ещё наше значение.
+ * Clear the clipboard if it still holds our value.
  *
- * Чтение буфера может быть запрещено пользователем — тогда узнать
- * содержимое нельзя, и стирать вслепую нельзя тоже: под очистку попало
- * бы чужое. Отказ проглатывается: неудачная очистка буфера не имеет
- * права уронить экран.
+ * Reading the clipboard may be denied by the user — then the
+ * contents cannot be known, and wiping blindly is also forbidden:
+ * someone else's data would be cleared. The refusal is swallowed:
+ * a failed clipboard clear must not take down the screen.
  */
 async function clearIfUnchanged(
   clipboard: Pick<Clipboard, 'writeText' | 'readText'>,
@@ -85,7 +79,7 @@ async function clearIfUnchanged(
       await clipboard.writeText('')
     }
   } catch {
-    /* Чтение запрещено либо вкладка потеряла фокус. Очистка вслепую
-       уничтожила бы данные, к которым кошелёк отношения не имеет. */
+    /* Read is denied or the tab lost focus. A blind clear would
+       destroy data the wallet has no claim on. */
   }
 }

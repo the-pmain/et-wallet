@@ -2,11 +2,12 @@ import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, listVerifiedTokens, toChainId, ty
 import type { IRemoteAssetToken } from '@/features/onboarding/model/RemoteUserDirectory'
 
 /**
- * Криптовалюта, которую кабинет может дописать в витрину `assets`.
+ * A cryptocurrency the cabinet can add to the `assets` showcase.
  *
- * Источник — встроенные сети и проверенные контракты. Произвольный
- * адрес сюда не попадает: знак в списке выдаётся только по этой паре
- * «сеть и адрес», и чужой контракт с тем же тикером знака не получит.
+ * Source is built-in networks and verified contracts. An arbitrary
+ * address does not land here: the mark in the list is issued only
+ * for this network-and-address pair, and a foreign contract with
+ * the same ticker will not get the mark.
  */
 export interface IAddableAsset {
   readonly id: string
@@ -15,19 +16,19 @@ export interface IAddableAsset {
   readonly token: IRemoteAssetToken
 }
 
-/** Ключ позиции: сеть и адрес, без учёта регистра адреса. */
+/** Position key: network and address, address case-insensitive. */
 export function remoteAssetKey(token: Pick<IRemoteAssetToken, 'chainId' | 'address'>): string {
   return `${token.chainId}:${token.address === null ? 'native' : token.address.toLowerCase()}`
 }
 
-/** Имя сети для подписи строки. Неизвестная сеть — номер, не выдумка. */
+/** Network name for the row label. An unknown network is a number, not an invention. */
 export function networkNameForChain(chainId: string): string {
   const match = BUILT_IN_NETWORKS.find((network) => network.chainId.toString() === chainId)
 
   return match === undefined ? `Chain ${chainId}` : match.name
 }
 
-/** Идентификатор сети для знака. Битая строка — `null`, список не падает. */
+/** Network id for the mark. A broken string is `null`; the list does not crash. */
 export function parseRemoteChainId(chainId: string): ChainId | null {
   try {
     return toChainId(chainId)
@@ -90,19 +91,20 @@ function buildAddableAssets(): readonly IAddableAsset[] {
 }
 
 /**
- * Список криптовалют в меню добавления.
+ * Cryptocurrencies in the add menu.
  *
- * Порядок как у сетей: сначала нативная валюта, затем проверенные
- * контракты этой сети. Повторных ключей нет — это свойство сборки,
- * а не фильтра при открытии меню.
+ * Order matches the networks: native currency first, then that
+ * network's verified contracts. Duplicate keys do not exist — a
+ * property of the build, not a filter when the menu opens.
  */
 export const ADDABLE_ASSETS: readonly IAddableAsset[] = buildAddableAssets()
 
 /**
- * Строка витрины по тикеру из `sendings.symbol`.
+ * Showcase row by ticker from `sendings.symbol`.
  *
- * Один тикер бывает в нескольких сетях. Для кабинета берём Ethereum,
- * затем первую найденную — иначе знака не будет вовсе.
+ * One ticker can exist on several networks. The cabinet prefers
+ * Ethereum, then the first match — otherwise there would be no
+ * mark at all.
  */
 export function addableAssetBySymbol(symbol: string | null): IAddableAsset | null {
   if (symbol === null) {

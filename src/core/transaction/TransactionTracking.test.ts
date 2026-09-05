@@ -32,22 +32,21 @@ const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
 const HASH = '0x1111111111111111111111111111111111111111111111111111111111111111' as TxHash
 
-/** Период опроса, заданный сервисом. */
 const TRACKING_INTERVAL_MS = 12_000
 
-/** Узел, состояние которого задаёт проверка. */
+/** A node whose state the check sets. */
 class TrackingNode implements IProvider {
   readonly chainId = CHAIN_ID
   readonly rpcUrl = 'https://stub.example'
   readonly isActive = true
 
-  /** Квитанция. `null` означает «транзакции в блоке нет». */
+  /** Receipt. `null` means the transaction is not in a block. */
   receipt: ITransactionReceipt | null = null
 
-  /** Номер последнего блока. Определяет глубину подтверждения. */
+  /** Latest block number. Determines confirmation depth. */
   latestBlock = 100n
 
-  /** Сколько транзакций с адреса уже включено в блоки. */
+  /** How many transactions from the address are already in blocks. */
   confirmedNonce = 7
 
   readonly #events = new EventBus<ProviderEventMap>()
@@ -85,7 +84,7 @@ class TrackingNode implements IProvider {
   }
 
   getFeeData(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   sendRawTransaction(): Promise<TxHash> {
@@ -93,7 +92,7 @@ class TrackingNode implements IProvider {
   }
 
   request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   call(): Promise<HexString> {
@@ -105,7 +104,7 @@ class TrackingNode implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -113,7 +112,7 @@ class TrackingNode implements IProvider {
   off = this.#events.off.bind(this.#events)
 }
 
-/** Квитанция с заданным исходом выполнения. */
+/** A receipt with a given execution outcome. */
 function receiptAt(blockNumber: bigint, status: 'success' | 'reverted'): ITransactionReceipt {
   return {
     transactionHash: HASH,
@@ -134,7 +133,7 @@ let clock: FakeClock
 let repository: TransactionRepository
 let service: TransactionService
 
-/** Кладёт в хранилище ожидающую транзакцию. */
+/** Puts a pending transaction into storage. */
 async function savePending(overrides: Partial<ITransactionRecord> = {}): Promise<void> {
   await repository.save({
     hash: HASH,
@@ -161,7 +160,7 @@ async function savePending(overrides: Partial<ITransactionRecord> = {}): Promise
   })
 }
 
-/** Дожидается состояния записи в хранилище. */
+/** Waits until the record in storage has the given status. */
 async function expectStatus(status: TransactionStatus): Promise<ITransactionRecord> {
   return await vi.waitFor(async () => {
     const record = await repository.findByHash(HASH)
@@ -169,7 +168,7 @@ async function expectStatus(status: TransactionStatus): Promise<ITransactionReco
     expect(record?.status).toBe(status)
 
     if (record === null) {
-      throw new Error('запись пропала')
+      throw new Error('the record disappeared')
     }
 
     return record
@@ -206,8 +205,8 @@ beforeEach(async () => {
   })
 })
 
-describe('Отслеживание: транзакция попала в блок', () => {
-  it('успешное выполнение помечается подтверждением', async () => {
+describe('Tracking: the transaction landed in a block', () => {
+  it('successful execution is marked as confirmed', async () => {
     await savePending()
     node.receipt = receiptAt(100n, 'success')
 
@@ -219,10 +218,10 @@ describe('Отслеживание: транзакция попала в бло�
     expect(record.gasUsed).toBe(21_000n)
   })
 
-  it('откат выполнения НЕ показывается как успех', async () => {
-    /* Транзакция, включённая в блок, могла завершиться откатом: газ
-       списан, операция не выполнена. Показать её успешной значит
-       сообщить о переводе, которого не было. */
+  it('an execution revert is NOT shown as success', async () => {
+    /* A transaction included in a block may have reverted: gas is
+       charged, the operation is not done. Showing it as successful
+       would report a transfer that never happened. */
     await savePending()
     node.receipt = receiptAt(100n, 'reverted')
 
@@ -231,7 +230,7 @@ describe('Отслеживание: транзакция попала в бло�
     await expectStatus(TRANSACTION_STATUS.Reverted)
   })
 
-  it('считает глубину подтверждения', async () => {
+  it('counts the confirmation depth', async () => {
     await savePending()
     node.receipt = receiptAt(98n, 'success')
     node.latestBlock = 100n
@@ -240,13 +239,13 @@ describe('Отслеживание: транзакция попала в бло�
 
     const record = await expectStatus(TRANSACTION_STATUS.Confirmed)
 
-    /* Блок 98 при последнем 100 — три подтверждения: сам блок и два
-       поверх него. */
+    /* Block 98 with latest 100 is three confirmations: the block
+       itself and two on top of it. */
     expect(record.confirmations).toBe(3)
   })
 
-  it('включение в последний блок даёт одно подтверждение', async () => {
-    /* Состояние, из которого реорганизация ещё может её вернуть. */
+  it('inclusion in the latest block yields one confirmation', async () => {
+    /* A state from which a reorg can still take it back. */
     await savePending()
     node.receipt = receiptAt(100n, 'success')
     node.latestBlock = 100n
@@ -256,7 +255,7 @@ describe('Отслеживание: транзакция попала в бло�
     expect((await expectStatus(TRANSACTION_STATUS.Confirmed)).confirmations).toBe(1)
   })
 
-  it('сообщает о смене состояния', async () => {
+  it('announces a status change', async () => {
     const seen: TransactionStatus[] = []
 
     service.on('transaction:statusChanged', ({ status }) => {
@@ -274,23 +273,23 @@ describe('Отслеживание: транзакция попала в бло�
   })
 })
 
-describe('Отслеживание: транзакции в блоке нет', () => {
-  it('незанятый nonce означает, что она ещё в мемпуле', async () => {
+describe('Tracking: the transaction is not in a block', () => {
+  it('an unused nonce means it is still in the mempool', async () => {
     await savePending()
     node.receipt = null
     node.confirmedNonce = 7
 
     service.startTracking()
 
-    /* Проход выполняется, состояние не меняется. */
     await vi.waitFor(async () => {
       expect((await repository.findByHash(HASH))?.status).toBe(TRANSACTION_STATUS.Pending)
     })
   })
 
-  it('израсходованный nonce означает замещение', async () => {
-    /* Место транзакции занято другой того же отправителя. Показывать
-       её ожидающей значило бы обещать перевод, которого не будет. */
+  it('a spent nonce means replacement', async () => {
+    /* The transaction's slot is taken by another from the same
+       sender. Showing it as pending would promise a transfer that
+       will not happen. */
     await savePending()
     node.receipt = null
     node.confirmedNonce = 8
@@ -301,11 +300,11 @@ describe('Отслеживание: транзакции в блоке нет', 
   })
 })
 
-describe('Отслеживание: реорганизация цепи', () => {
-  it('исчезнувшая квитанция возвращает запись в ожидание', async () => {
-    /* Блок, содержавший транзакцию, вытеснен другим. Оставить запись
-       подтверждённой значило бы утверждать состоявшимся то, чего
-       в цепи нет. */
+describe('Tracking: chain reorganisation', () => {
+  it('a vanished receipt returns the record to pending', async () => {
+    /* The block that held the transaction was displaced by another.
+       Leaving the record confirmed would claim as done something
+       that is not on the chain. */
     await savePending({
       status: TRANSACTION_STATUS.Pending,
       confirmations: 2,
@@ -318,16 +317,16 @@ describe('Отслеживание: реорганизация цепи', () => 
 
     service.startTracking()
 
-    /* Ожидается именно откат глубины: состояние записи и до него
-       числилось ожидающим, и проверка по нему прошла бы, ничего
-       не проверив. */
+    /* The depth rollback is what is awaited: the record status was
+       already pending, and a check against it would pass without
+       checking anything. */
     const record = await vi.waitFor(async () => {
       const found = await repository.findByHash(HASH)
 
       expect(found?.confirmations).toBe(0)
 
       if (found === null) {
-        throw new Error('запись пропала')
+        throw new Error('the record disappeared')
       }
 
       return found
@@ -339,10 +338,10 @@ describe('Отслеживание: реорганизация цепи', () => 
   })
 })
 
-describe('Отслеживание: жизненный цикл', () => {
-  it('первый проход выполняется сразу, а не через период', async () => {
-    /* Приложение могло быть закрыто на час: ждать ещё период опроса,
-       чтобы узнать судьбу перевода, незачем. */
+describe('Tracking: lifecycle', () => {
+  it('the first pass runs immediately, not after the interval', async () => {
+    /* The app may have been closed for an hour: waiting another
+       poll interval to learn the transfer's fate is pointless. */
     await savePending()
     node.receipt = receiptAt(100n, 'success')
 
@@ -351,7 +350,7 @@ describe('Отслеживание: жизненный цикл', () => {
     await expectStatus(TRANSACTION_STATUS.Confirmed)
   })
 
-  it('повторный запуск не создаёт второго таймера', async () => {
+  it('a second start does not create a second timer', async () => {
     await savePending()
 
     service.startTracking()
@@ -359,8 +358,8 @@ describe('Отслеживание: жизненный цикл', () => {
 
     service.stopTracking()
 
-    /* После остановки опрос прекращается: изменение на узле
-       не подхватывается. */
+    /* After a halt, polling stops: a change on the node is not
+       picked up. */
     node.receipt = receiptAt(100n, 'success')
     clock.advance(TRACKING_INTERVAL_MS * 3)
 
@@ -369,7 +368,7 @@ describe('Отслеживание: жизненный цикл', () => {
     expect((await repository.findByHash(HASH))?.status).toBe(TRANSACTION_STATUS.Pending)
   })
 
-  it('после остановки опрос прекращается', async () => {
+  it('polling stops after a halt', async () => {
     await savePending()
 
     service.startTracking()
@@ -384,9 +383,9 @@ describe('Отслеживание: жизненный цикл', () => {
     expect((await repository.findByHash(HASH))?.status).toBe(TRANSACTION_STATUS.Pending)
   })
 
-  it('неглубоко подтверждённая запись продолжает опрашиваться', async () => {
-    /* Иначе обработка реорганизации была бы мёртвым кодом:
-       подтверждённая запись просто не попадала бы в выборку. */
+  it('a shallowly confirmed record keeps being polled', async () => {
+    /* Otherwise reorg handling would be dead code: a confirmed
+       record would simply never enter the sample. */
     await savePending()
     node.receipt = receiptAt(100n, 'success')
     node.latestBlock = 100n
@@ -397,7 +396,7 @@ describe('Отслеживание: жизненный цикл', () => {
     await expect(repository.findUnsettled(3)).resolves.toHaveLength(1)
   })
 
-  it('глубоко подтверждённая запись выходит из выборки', async () => {
+  it('a deeply confirmed record leaves the sample', async () => {
     await savePending()
     node.receipt = receiptAt(90n, 'success')
     node.latestBlock = 100n
@@ -408,8 +407,8 @@ describe('Отслеживание: жизненный цикл', () => {
     await expect(repository.findUnsettled(3)).resolves.toHaveLength(0)
   })
 
-  it('замещённая запись из выборки выходит навсегда', async () => {
-    /* Её место занято, и вернуть её в цепь нечем. */
+  it('a replaced record leaves the sample for good', async () => {
+    /* Its slot is taken, and there is no way to put it back on chain. */
     await savePending()
     node.receipt = null
     node.confirmedNonce = 8

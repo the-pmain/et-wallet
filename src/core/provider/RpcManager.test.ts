@@ -22,7 +22,7 @@ const ETHEREUM = BUILT_IN_NETWORKS.find(
 
 const COOLDOWN_MS = 60_000
 
-/** Произвольный адрес: важен сам факт вызова, а не чей баланс. */
+/** Arbitrary address: the call itself matters, not whose balance. */
 const ETHEREUM_OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 
 let factory: FakeProviderFactory
@@ -54,31 +54,31 @@ beforeEach(async () => {
   manager = await createManager()
 })
 
-describe('RpcManager: порядок источников', () => {
-  it('без ключа и без своих адресов использует публичные узлы', () => {
+describe('RpcManager: source order', () => {
+  it('uses public nodes when there is no key and no own addresses', () => {
     const endpoints = manager.listEndpoints(ETHEREUM)
 
     expect(endpoints.every((endpoint) => endpoint.providerId === RPC_PROVIDER_ID.Public)).toBe(true)
     expect(endpoints.map((endpoint) => endpoint.url)).toEqual(ETHEREUM.rpcUrls)
   })
 
-  it('ставит Alchemy впереди публичных узлов', async () => {
+  it('puts Alchemy ahead of public nodes', async () => {
     const withKey = await createManager('test-key')
 
     expect(withKey.listEndpoints(ETHEREUM)[0]?.providerId).toBe(RPC_PROVIDER_ID.Alchemy)
   })
 
-  it('ставит собственный узел пользователя впереди Alchemy', async () => {
+  it('puts the user own node ahead of Alchemy', async () => {
     const withKey = await createManager('test-key')
 
     await custom.add(BUILT_IN_CHAIN_ID.Ethereum, 'https://my-node.example')
 
-    /* Пользователь выбрал адрес сознательно. Подставлять вместо него
-       значение по умолчанию значит отменять решение владельца средств. */
+    /* The user chose the address on purpose. Substituting a default
+       would undo the owner's decision. */
     expect(withKey.listEndpoints(ETHEREUM)[0]?.providerId).toBe(RPC_PROVIDER_ID.Custom)
   })
 
-  it('не повторяет один адрес дважды', async () => {
+  it('does not list the same address twice', async () => {
     const duplicated = ETHEREUM.rpcUrls[0] as string
 
     await custom.add(BUILT_IN_CHAIN_ID.Ethereum, duplicated)
@@ -88,7 +88,7 @@ describe('RpcManager: порядок источников', () => {
     expect(urls.filter((url) => url === duplicated)).toHaveLength(1)
   })
 
-  it('пропускает источник, не обслуживающий сеть', async () => {
+  it('skips a source that does not serve the network', async () => {
     const withKey = await createManager('test-key')
     const unknown: INetworkConfig = { ...ETHEREUM, chainId: toChainId(999_999n) }
 
@@ -98,36 +98,36 @@ describe('RpcManager: порядок источников', () => {
   })
 })
 
-describe('RpcManager: кэш соединений', () => {
-  it('переиспользует соединение при повторном обращении', async () => {
+describe('RpcManager: connection cache', () => {
+  it('reuses the connection on a later call', async () => {
     await manager.get(ETHEREUM)
     await manager.get(ETHEREUM)
 
     expect(factory.createdCount).toBe(1)
   })
 
-  it('разделяет одно создание между параллельными обращениями', async () => {
+  it('shares one creation among concurrent calls', async () => {
     await Promise.all([manager.get(ETHEREUM), manager.get(ETHEREUM), manager.get(ETHEREUM)])
 
     expect(factory.createdCount).toBe(1)
   })
 
-  it('не оставляет отклонённую попытку в кэше', async () => {
+  it('does not leave a rejected attempt in cache', async () => {
     factory.configure({ unavailable: true })
 
     await expect(manager.get(ETHEREUM)).rejects.toBeInstanceOf(ProviderUnavailableError)
 
     factory.configure({ balance: 1n as Wei })
 
-    /* Следующий вызов обязан попробовать снова: узел мог восстановиться. */
+    /* The next call must try again: the node may have recovered. */
     await expect(manager.get(ETHEREUM)).resolves.toBeDefined()
   })
 
-  it('пересобирает соединение, исчерпавшее список адресов', async () => {
+  it('rebuilds a connection that exhausted its address list', async () => {
     const provider = await manager.get(ETHEREUM)
 
-    /* Узел отвалился посреди сеанса и больше не поднимается: перебор
-       обходит все адреса и доходит до конца списка. */
+    /* The node died mid-session and does not come back: rotation
+       walks every address and reaches the end of the list. */
     factory.lastProvider?.destroy()
     factory.configure({ unavailable: true })
 
@@ -138,23 +138,23 @@ describe('RpcManager: кэш соединений', () => {
 
     factory.configure({ balance: 5n as Wei })
 
-    /* Узлы восстановились. Исчерпанный провайдер обязан уйти из кэша,
-       иначе кошелёк сообщал бы о недоступной сети до перезагрузки,
-       не обращаясь к сети вовсе. */
+    /* The nodes recovered. The exhausted provider must leave the
+       cache, otherwise the wallet would report the network
+       unavailable until reload without talking to the network at all. */
     const rebuilt = await manager.get(ETHEREUM)
 
     expect(rebuilt).not.toBe(provider)
     expect(await rebuilt.getBalance(ETHEREUM_OWNER)).toBe(5n)
   })
 
-  it('закрывает соединение по release', async () => {
+  it('closes the connection on release', async () => {
     await manager.get(ETHEREUM)
     await manager.release(ETHEREUM.chainId)
 
     expect(factory.lastProvider?.isActive).toBe(false)
   })
 
-  it('закрывает все соединения по destroy', async () => {
+  it('closes every connection on destroy', async () => {
     await manager.get(ETHEREUM)
     await manager.destroy()
 
@@ -163,21 +163,21 @@ describe('RpcManager: кэш соединений', () => {
   })
 })
 
-describe('RpcManager: проверка доступности', () => {
-  it('проверяет каждый адрес сети', async () => {
+describe('RpcManager: availability check', () => {
+  it('checks every address on the network', async () => {
     const health = await manager.checkHealth(ETHEREUM)
 
     expect(health).toHaveLength(ETHEREUM.rpcUrls.length)
     expect(health.every((item) => item.isHealthy)).toBe(true)
   })
 
-  it('измеряет время ответа', async () => {
+  it('measures response time', async () => {
     const health = await manager.checkHealth(ETHEREUM)
 
     expect(health[0]?.latencyMs).not.toBeNull()
   })
 
-  it('сообщает причину отказа, а не молчит', async () => {
+  it('reports the failure reason instead of staying silent', async () => {
     factory.configure({ unavailable: true })
 
     const health = await manager.checkHealth(ETHEREUM)
@@ -187,36 +187,37 @@ describe('RpcManager: проверка доступности', () => {
     expect(health[0]?.latencyMs).toBeNull()
   })
 
-  it('отделяет чужую сеть от недоступности', async () => {
+  it('separates a foreign network from unavailability', async () => {
     factory.configure({ reportedChainId: toChainId(137n), verifyChainIdOnCreate: true })
 
     const health = await manager.checkHealth(ETHEREUM)
 
-    /* Недоступный узел — неудобство. Узел с чужим chainId — ошибка
-       настройки либо попытка подмены, и это требует внимания. */
+    /* An unreachable node is an inconvenience. A node with a foreign
+       chainId is a misconfiguration or an impersonation attempt, and
+       that needs attention. */
     expect(health[0]?.isChainMismatch).toBe(true)
   })
 
-  it('закрывает диагностические соединения', async () => {
+  it('closes diagnostic connections', async () => {
     await manager.checkHealth(ETHEREUM)
 
     expect(factory.lastProvider?.isActive).toBe(false)
   })
 })
 
-describe('RpcManager: выдержка после отказа', () => {
-  it('исключает отказавший адрес из ближайших попыток', async () => {
+describe('RpcManager: cooldown after failure', () => {
+  it('excludes a failed address from the next attempts', async () => {
     factory.configure({ unavailable: true })
     await manager.checkHealth(ETHEREUM)
 
     factory.configure({ balance: 1n as Wei })
 
-    /* Все адреса отбывают выдержку, поэтому список не пуст: отказать
-       в подключении, имея непроверенные адреса, хуже, чем попробовать. */
+    /* Every address is on cooldown, so the list is not empty: refusing
+       to connect while unchecked addresses exist is worse than trying. */
     await expect(manager.get(ETHEREUM)).resolves.toBeDefined()
   })
 
-  it('возвращает адрес в перебор по истечении выдержки', async () => {
+  it('returns the address to rotation after the cooldown ends', async () => {
     factory.configure({ unavailable: true })
     await manager.checkHealth(ETHEREUM)
 
@@ -229,26 +230,26 @@ describe('RpcManager: выдержка после отказа', () => {
   })
 })
 
-describe('RpcManager: пользовательский адрес', () => {
-  it('сохраняет адрес после проверки узла', async () => {
+describe('RpcManager: user address', () => {
+  it('saves the address after verifying the node', async () => {
     await manager.addCustomEndpoint(ETHEREUM, 'https://my-node.example')
 
     expect(custom.listUrls(ETHEREUM.chainId)).toEqual(['https://my-node.example'])
   })
 
-  it('не сохраняет адрес узла, обслуживающего другую сеть', async () => {
+  it('does not save an address of a node that serves another network', async () => {
     factory.configure({ reportedChainId: toChainId(137n), verifyChainIdOnCreate: true })
 
     await expect(
       manager.addCustomEndpoint(ETHEREUM, 'https://wrong-chain.example'),
     ).rejects.toBeInstanceOf(ChainIdMismatchError)
 
-    /* Иначе адрес чужой сети применялся бы при каждом запуске: подписи,
-       сделанные для другой цепи, пригодны для повторного проигрывания. */
+    /* Otherwise a foreign-network address would be applied on every
+       launch: signatures made for another chain are valid for replay. */
     expect(custom.listUrls(ETHEREUM.chainId)).toHaveLength(0)
   })
 
-  it('не сохраняет недоступный адрес', async () => {
+  it('does not save an unreachable address', async () => {
     factory.configure({ unavailable: true })
 
     await expect(
@@ -258,7 +259,7 @@ describe('RpcManager: пользовательский адрес', () => {
     expect(custom.listUrls(ETHEREUM.chainId)).toHaveLength(0)
   })
 
-  it('отвергает открытый HTTP до обращения к сети', async () => {
+  it('rejects cleartext HTTP before talking to the network', async () => {
     const before = factory.createdCount
 
     await expect(
@@ -268,18 +269,18 @@ describe('RpcManager: пользовательский адрес', () => {
     expect(factory.createdCount).toBe(before)
   })
 
-  it('пересоздаёт соединение после добавления адреса', async () => {
+  it('rebuilds the connection after adding an address', async () => {
     await manager.get(ETHEREUM)
 
     const before = factory.lastProvider
 
     await manager.addCustomEndpoint(ETHEREUM, 'https://my-node.example')
 
-    /* Иначе выбор пользователя не применялся бы до перезапуска. */
+    /* Otherwise the user's choice would not apply until restart. */
     expect(before?.isActive).toBe(false)
   })
 
-  it('удаляет адрес и возвращается к прежним источникам', async () => {
+  it('removes the address and returns to the previous sources', async () => {
     await manager.addCustomEndpoint(ETHEREUM, 'https://my-node.example')
     await manager.removeCustomEndpoint(ETHEREUM, 'https://my-node.example')
 

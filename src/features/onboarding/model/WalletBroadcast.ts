@@ -1,20 +1,20 @@
 import type { Unsubscribe } from '@/core'
 
 /**
- * Событие, о котором вкладки обязаны знать друг от друга.
+ * Event that tabs must learn from one another.
  *
- * СПИСОК НАМЕРЕННО КОРОТКИЙ. Через канал между вкладками не передаётся
- * ничего, кроме факта события: ни ключей, ни адресов, ни сумм. Канал
- * доступен любому коду того же источника, включая внедрённый через XSS,
- * и всё, что в него попадает, следует считать раскрытым.
+ * THE LIST IS SHORT ON PURPOSE. The inter-tab channel carries only
+ * the fact of an event: no keys, addresses, or amounts. Any code of
+ * the same origin can read it, including XSS, so anything sent must
+ * be treated as disclosed.
  */
 export const WALLET_BROADCAST = {
   /**
-   * Кошелёк стёрт с устройства.
+   * The wallet was erased from the device.
    *
-   * Единственное событие, которое обязано пересекать границу вкладки:
-   * оно уничтожает общий ресурс. Блокировка, смена сети и прочее —
-   * решения одной вкладки, и навязывать их остальным незачем.
+   * The only event that must cross the tab boundary: it destroys a
+   * shared resource. Lock, network change, and the rest are one tab's
+   * decisions and need not be imposed on the others.
    */
   Erased: 'wallet-erased',
 } as const
@@ -22,25 +22,24 @@ export const WALLET_BROADCAST = {
 export type WalletBroadcastEvent = (typeof WALLET_BROADCAST)[keyof typeof WALLET_BROADCAST]
 
 /**
- * Оповещение между вкладками одного кошелька.
+ * Notify other tabs of the same wallet.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Вкладки делят хранилище, но не память: у каждой
- * собственный ключ шифрования и собственный снимок состояния. Вкладка,
- * пережившая стирание кошелька в соседней, продолжала показывать
- * балансы и предлагать отправку — ключи-то у неё в памяти. Владелец
- * видел работающий кошелёк, которого на диске уже нет; хуже того,
- * человек, стерший кошелёк перед передачей устройства, оставлял
- * открытую дверь.
+ * WHY THIS EXISTS. Tabs share storage, not memory: each has its own
+ * encryption key and state snapshot. A tab that survived a wallet
+ * erase in a sibling kept showing balances and offering send — its
+ * keys were still in memory. The owner saw a working wallet already
+ * gone from disk; worse, someone who erased the wallet before handing
+ * the device over left a door open.
  *
- * ПОЧЕМУ `BroadcastChannel`, А НЕ СОБЫТИЕ ХРАНИЛИЩА. События `storage`
- * порождает только `localStorage`, который в проекте запрещён;
- * IndexedDB об изменениях не оповещает вовсе. Опрос базы означал бы
- * постоянную работу ради события, случающегося раз в жизни кошелька.
+ * WHY `BroadcastChannel`, NOT A STORAGE EVENT. `storage` events come
+ * only from `localStorage`, which this project forbids; IndexedDB
+ * does not notify at all. Polling the database would mean constant
+ * work for an event that happens once in a wallet's life.
  *
- * ОТСУТСТВИЕ КАНАЛА НЕ ОШИБКА. В средах без `BroadcastChannel`
- * оповещение просто не работает: кошелёк остаётся таким же, каким был
- * до этой возможности. Ронять приложение из-за отсутствия удобства
- * нельзя.
+ * A MISSING CHANNEL IS NOT AN ERROR. In environments without
+ * `BroadcastChannel`, notification simply does not run: the wallet
+ * stays as it was before this feature. Crashing the app for a missing
+ * convenience is not allowed.
  */
 export class WalletBroadcast {
   readonly #channel: BroadcastChannel | null
@@ -49,16 +48,15 @@ export class WalletBroadcast {
     this.#channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(name)
   }
 
-  /** Сообщает остальным вкладкам о событии. */
   post(event: WalletBroadcastEvent): void {
     this.#channel?.postMessage(event)
   }
 
   /**
-   * Подписывает на события соседних вкладок.
+   * Subscribe to events from sibling tabs.
    *
-   * Собственные сообщения обратно не приходят — так устроен
-   * `BroadcastChannel`, и отдельной защиты от петли не требуется.
+   * Own messages are not echoed back — that is how `BroadcastChannel`
+   * works, so no extra loop guard is needed.
    */
   subscribe(handler: (event: WalletBroadcastEvent) => void): Unsubscribe {
     const channel = this.#channel
@@ -68,9 +66,9 @@ export class WalletBroadcast {
     }
 
     const listener = (message: MessageEvent<unknown>): void => {
-      /* Проверяется значение, а не тип: в канал того же источника
-         писать может любой код, включая внедрённый. Неизвестное
-         сообщение игнорируется. */
+      /* Check the value, not the type: any same-origin code can write
+         to the channel, including injected code. Unknown messages
+         are ignored. */
       if (message.data === WALLET_BROADCAST.Erased) {
         handler(WALLET_BROADCAST.Erased)
       }
@@ -83,7 +81,6 @@ export class WalletBroadcast {
     }
   }
 
-  /** Закрывает канал. Вызывается при размонтировании приложения. */
   close(): void {
     this.#channel?.close()
   }

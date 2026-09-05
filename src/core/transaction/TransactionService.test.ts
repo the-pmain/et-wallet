@@ -32,7 +32,7 @@ const CHAIN_ID = BUILT_IN_CHAIN_ID.Ethereum
 const SENDER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
-/** Один эфир в минимальных единицах. */
+/** One ether in the smallest units. */
 const ONE_ETHER = 10n ** 18n
 
 class StubProvider implements IProvider {
@@ -59,11 +59,11 @@ class StubProvider implements IProvider {
     return Promise.resolve(this.nonce)
   }
 
-  /** Байт-код по адресу. Обычный адрес: проверок контракта в этих тестах нет. */
+  /** Bytecode at the address. An ordinary address: these tests do not check for a contract. */
   getCode(): Promise<HexString> {
     return Promise.resolve('0x' as HexString)
   }
-  /** Последний запрос оценки газа. Позволяет проверить, что ушло узлу. */
+  /** Last gas-estimate request. Lets the test see what went to the node. */
   lastEstimateRequest: { readonly to: unknown } | null = null
 
   estimateGas(request: { readonly to: unknown }): Promise<bigint> {
@@ -105,20 +105,20 @@ class StubProvider implements IProvider {
   }
 
   request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getTransactionCount(): Promise<number> {
     return Promise.resolve(this.nonce)
   }
 
-  /** Ответ контракта на `call`. По умолчанию — баланс токена. */
+  /** Contract reply to `call`. Defaults to a token balance. */
   tokenBalance = 1_000_000n
 
-  /** Владелец предмета, которого назовёт `ownerOf`. */
+  /** Owner that `ownerOf` will name. */
   nftOwner: string | null = null
 
-  /** Отказ узла при чтении баланса токена. */
+  /** Node refusal when reading the token balance. */
   callError: Error | null = null
 
   call(request: { readonly data?: HexString }): Promise<HexString> {
@@ -126,8 +126,8 @@ class StubProvider implements IProvider {
       return Promise.reject(this.callError)
     }
 
-    /* `ownerOf` отвечает адресом; отсутствие владельца — откат,
-       как у сожжённого предмета. */
+    /* `ownerOf` replies with an address; no owner is a revert,
+       as with a burned item. */
     if (this.nftOwner !== null && (request.data ?? '').startsWith('0x6352211e')) {
       return Promise.resolve(
         `0x${this.nftOwner.slice(2).toLowerCase().padStart(64, '0')}` as HexString,
@@ -142,7 +142,7 @@ class StubProvider implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -186,28 +186,28 @@ beforeEach(async () => {
 })
 
 describe('TransactionService.prepare', () => {
-  it('берёт nonce с учётом мемпула', async () => {
-    /* Значение без учёта ожидающих транзакций заставило бы новую
-       заменить собой предыдущую вместо постановки в очередь. */
+  it('takes a nonce that includes the mempool', async () => {
+    /* A value that ignored pending transactions would make the new
+       one replace the previous instead of queuing behind it. */
     expect((await service.prepare(request)).nonce).toBe(7)
   })
 
-  it('подставляет chainId сети в подписываемые данные', async () => {
-    /* Без chainId подпись действительна во всех сетях EVM сразу
-       и проигрывается в основной сети (EIP-155). */
+  it('puts the network chainId into the signed data', async () => {
+    /* Without chainId the signature is valid on every EVM network
+       at once and can be replayed on mainnet (EIP-155). */
     expect((await service.prepare(request)).chainId).toBe(CHAIN_ID)
   })
 
-  it('добавляет запас к оценке лимита газа', async () => {
+  it('adds a buffer to the gas-limit estimate', async () => {
     node.gasEstimate = 21_000n
 
-    /* Оценка выполняется на текущем блоке, а транзакция попадёт
-       в следующий: точного лимита может не хватить, а неизрасходованный
-       газ возвращается. */
+    /* The estimate is made on the current block, and the transaction
+       lands in the next: the exact limit may not be enough, and unused
+       gas is refunded. */
     expect((await service.prepare(request)).gasLimit).toBe(25_200n)
   })
 
-  it('строит транзакцию EIP-1559 в поддерживающей сети', async () => {
+  it('builds an EIP-1559 transaction on a supporting network', async () => {
     const transaction = await service.prepare(request)
 
     expect(transaction.type).toBe(TRANSACTION_TYPE.Eip1559)
@@ -215,40 +215,40 @@ describe('TransactionService.prepare', () => {
     expect(transaction.gasPrice).toBeNull()
   })
 
-  it('строит транзакцию прежнего формата, когда узел не сообщает базовую комиссию', async () => {
+  it('builds a legacy transaction when the node reports no base fee', async () => {
     node.feeData = { ...node.feeData, maxFeePerGas: null, maxPriorityFeePerGas: null }
 
     const transaction = await service.prepare(request)
 
-    /* Сеть заявляет EIP-1559, но узел данных не дал: транзакция второго
-       типа была бы отвергнута. */
+    /* The network claims EIP-1559, but the node gave no data: a type-2
+       transaction would be rejected. */
     expect(transaction.type).toBe(TRANSACTION_TYPE.Legacy)
     expect(transaction.gasPrice).toBe(25_000_000_000n)
   })
 
-  it('не отправляет транзакцию, которая откатится', async () => {
-    node.gasEstimate = new GasEstimationFailedError('вызов завершится откатом')
+  it('does not send a transaction that will revert', async () => {
+    node.gasEstimate = new GasEstimationFailedError('the call will revert')
 
-    /* Откат означает списание газа без выполнения операции. Назначить
-       лимит произвольно в этом случае — гарантированно сжечь средства. */
+    /* A revert charges gas without performing the operation. Assigning
+       a limit arbitrarily here would burn funds for certain. */
     await expect(service.prepare(request)).rejects.toBeInstanceOf(GasEstimationFailedError)
   })
 
-  it('отвергает перевод, на который не хватает средств вместе с комиссией', async () => {
+  it('rejects a transfer that cannot cover the amount plus the fee', async () => {
     node.balance = ONE_ETHER
 
-    /* Сумма равна балансу, но комиссию платить нечем. Проверка
-       выполняется по верхней границе комиссии — именно её проверяет узел. */
+    /* The amount equals the balance, but there is nothing left for the
+       fee. The check uses the fee cap — that is what the node checks. */
     await expect(service.prepare(request)).rejects.toBeInstanceOf(InsufficientFundsError)
   })
 
-  it('пропускает перевод, когда средств хватает вместе с комиссией', async () => {
+  it('allows a transfer when funds cover the amount plus the fee', async () => {
     node.balance = ONE_ETHER * 2n
 
     await expect(service.prepare(request)).resolves.toBeDefined()
   })
 
-  it('уважает явно заданные nonce и лимит газа', async () => {
+  it('respects an explicit nonce and gas limit', async () => {
     const transaction = await service.prepare({ ...request, nonce: 42, gasLimit: 100_000n })
 
     expect(transaction.nonce).toBe(42)
@@ -257,7 +257,7 @@ describe('TransactionService.prepare', () => {
 })
 
 describe('TransactionService.estimateFees', () => {
-  it('предлагает три уровня срочности', async () => {
+  it('offers three urgency levels', async () => {
     const fees = await service.estimateFees(await service.prepare(request))
 
     expect(fees.map((fee) => fee.priority)).toEqual([
@@ -267,7 +267,7 @@ describe('TransactionService.estimateFees', () => {
     ])
   })
 
-  it('повышает приоритетную надбавку с ростом срочности', async () => {
+  it('raises the priority tip as urgency grows', async () => {
     const fees = await service.estimateFees(await service.prepare(request))
     const tips = fees.map((fee) => fee.maxPriorityFeePerGas ?? 0n)
 
@@ -275,16 +275,15 @@ describe('TransactionService.estimateFees', () => {
     expect(tips[1]).toBeLessThan(tips[2] ?? 0n)
   })
 
-  it('не обещает время подтверждения', async () => {
+  it('does not promise a confirmation time', async () => {
     const fees = await service.estimateFees(await service.prepare(request))
 
-    /* Время зависит от загрузки сети в момент включения в блок.
-       Выдуманное число было бы обещанием, за которое кошелёк
-       не отвечает. */
+    /* Time depends on network load at the moment of inclusion.
+       A made-up number would be a promise the wallet cannot keep. */
     expect(fees.every((fee) => fee.estimatedSeconds === null)).toBe(true)
   })
 
-  it('считает верхнюю границу списания', async () => {
+  it('computes the upper bound of the charge', async () => {
     const transaction = await service.prepare(request)
     const [fee] = await service.estimateFees(transaction)
 
@@ -311,17 +310,17 @@ describe('TransactionService.send', () => {
     },
   })
 
-  it('публикует подписанные байты без изменений', async () => {
+  it('publishes the signed bytes unchanged', async () => {
     await service.send(signed('0xsigned'))
 
     expect(node.sentRaw).toBe('0xsigned')
   })
 
-  it('возвращает хэш транзакции', async () => {
+  it('returns the transaction hash', async () => {
     expect(await service.send(signed('0xsigned'))).toBe('0xdeadbeef')
   })
 
-  it('заносит запись в историю после успешной публикации', async () => {
+  it('writes a history record after a successful publish', async () => {
     await service.send(signed('0xsigned'))
 
     const record = await repository.findByHash('0xdeadbeef' as TxHash)
@@ -330,17 +329,17 @@ describe('TransactionService.send', () => {
     expect(record?.value).toBe(ONE_ETHER)
   })
 
-  it('не сохраняет запись, если публикация не удалась', async () => {
-    node.sendError = new Error('узел не ответил')
+  it('does not save a record if publish fails', async () => {
+    node.sendError = new Error('the node did not respond')
 
     await expect(service.send(signed('0xsigned'))).rejects.toThrow()
 
-    /* Запись о транзакции, которой в сети нет, заставила бы пользователя
-       ждать подтверждения того, что никуда не отправлено. */
+    /* A record of a transaction that is not on the network would make
+       the user wait for confirmation of something never sent. */
     expect(await repository.findByHash('0xdeadbeef' as TxHash)).toBeNull()
   })
 
-  it('сообщает о публикации событием', async () => {
+  it('announces the publish with an event', async () => {
     let submitted = 0
     service.on('transaction:submitted', () => {
       submitted += 1
@@ -352,7 +351,7 @@ describe('TransactionService.send', () => {
   })
 })
 
-describe('Перевод токена', () => {
+describe('Token transfer', () => {
   const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
   const tokenRequest = {
@@ -363,19 +362,19 @@ describe('Перевод токена', () => {
     amount: 250_000n,
   }
 
-  it('транзакция адресована контракту, а не получателю', async () => {
-    /* Перевод токена — вызов функции контракта. Поставить в `to` адрес
-       человека значило бы отправить ему нативную валюту вместо токена. */
+  it('the transaction is addressed to the contract, not the recipient', async () => {
+    /* A token transfer is a contract call. Putting a person's address
+       in `to` would send them native currency instead of the token. */
     const transaction = await service.prepareTokenTransfer(tokenRequest)
 
     expect(transaction.to).toBe(TOKEN)
   })
 
-  it('нативная валюта не переводится', async () => {
+  it('no native currency is transferred', async () => {
     expect((await service.prepareTokenTransfer(tokenRequest)).value).toBe(0n)
   })
 
-  it('получатель и сумма лежат в данных вызова', async () => {
+  it('the recipient and amount sit in the call data', async () => {
     const transaction = await service.prepareTokenTransfer(tokenRequest)
 
     expect(transaction.data).toBe(
@@ -385,19 +384,20 @@ describe('Перевод токена', () => {
     )
   })
 
-  it('лимит газа оценивается узлом, а не назначается', async () => {
-    /* Вызов контракта стоит дороже простого перевода, и насколько —
-       зависит от контракта: у токена с начислениями или чёрным списком
-       расход выше. Назначенный наугад лимит приводит к откату
-       со списанием газа. */
+  it('the gas limit is estimated by the node, not assigned', async () => {
+    /* A contract call costs more than a simple transfer, and how much
+       depends on the contract: a token with rebates or a blacklist
+       burns more. A guessed limit leads to a revert that still
+       charges gas. */
     node.gasEstimate = 65_000n
 
     expect((await service.prepareTokenTransfer(tokenRequest)).gasLimit).toBeGreaterThan(65_000n)
   })
 
-  it('отказывает, если токенов на балансе меньше суммы', async () => {
-    /* Иначе контракт откатил бы вызов, газ списался, а перевода
-       не случилось бы. Отказ узла в оценке газа причину не называет. */
+  it('refuses when the token balance is below the amount', async () => {
+    /* Otherwise the contract would revert the call, gas would be
+       charged, and no transfer would happen. A node gas-estimate
+       refusal does not name the reason. */
     node.tokenBalance = 100n
 
     await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toThrow(
@@ -405,7 +405,7 @@ describe('Перевод токена', () => {
     )
   })
 
-  it('называет требуемое и доступное количество', async () => {
+  it('names the required and available amounts', async () => {
     node.tokenBalance = 100n
 
     await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toMatchObject({
@@ -414,25 +414,25 @@ describe('Перевод токена', () => {
     })
   })
 
-  it('недоступность контракта не выдаётся за нулевой баланс', async () => {
-    /* «Check не удалось» и «токенов нет» — разные утверждения.
-       Отказ по неполученному значению не давал бы отправить перевод
-       из-за недоступности узла. */
+  it('does not treat a contract outage as a zero balance', async () => {
+    /* "The check failed" and "there are no tokens" are different
+       claims. Refusing on a missing value would block a transfer
+       just because the node is down. */
     node.tokenBalance = 0n
-    node.callError = new Error('узел не ответил')
+    node.callError = new Error('the node did not respond')
 
     await expect(service.prepareTokenTransfer(tokenRequest)).resolves.toMatchObject({ to: TOKEN })
   })
 
-  it('нехватка нативной валюты на комиссию по-прежнему ловится', async () => {
-    /* Токенов достаточно, а газ платить нечем. */
+  it('still catches a native-currency shortage for the fee', async () => {
+    /* There are enough tokens, but nothing to pay gas with. */
     node.balance = 1n
 
     await expect(service.prepareTokenTransfer(tokenRequest)).rejects.toThrow(InsufficientFundsError)
   })
 })
 
-describe('Передача коллекционного предмета', () => {
+describe('Collectible transfer', () => {
   const COLLECTION = toAddress('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D')
 
   const nftRequest = {
@@ -444,29 +444,29 @@ describe('Передача коллекционного предмета', () =>
     standard: TOKEN_STANDARD.Erc721,
   }
 
-  it('транзакция адресована контракту коллекции', async () => {
+  it('the transaction is addressed to the collection contract', async () => {
     node.nftOwner = SENDER
 
     expect((await service.prepareNftTransfer(nftRequest)).to).toBe(COLLECTION)
   })
 
-  it('нативная валюта не переводится', async () => {
+  it('no native currency is transferred', async () => {
     node.nftOwner = SENDER
 
     expect((await service.prepareNftTransfer(nftRequest)).value).toBe(0n)
   })
 
-  it('вызывается безопасная передача', async () => {
-    /* Обычный `transferFrom` отправит предмет и контракту, который
-       не умеет их принимать: оттуда он не вернётся никогда. */
+  it('calls the safe transfer', async () => {
+    /* Plain `transferFrom` will also send the item to a contract that
+       cannot receive it: from there it never comes back. */
     node.nftOwner = SENDER
 
     expect((await service.prepareNftTransfer(nftRequest)).data.startsWith('0x42842e0e')).toBe(true)
   })
 
-  it('отправитель входит в данные вызова', async () => {
-    /* `safeTransferFrom` принимает его явным аргументом: контракт
-       разрешает передачу и доверенному лицу. */
+  it('the sender is included in the call data', async () => {
+    /* `safeTransferFrom` takes it as an explicit argument: the
+       contract also allows a transfer by an approved operator. */
     node.nftOwner = SENDER
 
     const data = (await service.prepareNftTransfer(nftRequest)).data
@@ -474,15 +474,15 @@ describe('Передача коллекционного предмета', () =>
     expect(data.slice(10, 74)).toContain(SENDER.slice(2).toLowerCase())
   })
 
-  it('отказывает, если предмет принадлежит другому адресу', async () => {
-    /* Контракт отверг бы вызов и сам, но газ при этом списался бы,
-       а причина осталась бы невнятной. */
+  it('refuses when the item belongs to another address', async () => {
+    /* The contract would reject the call itself, but gas would still
+       be charged and the reason would stay unclear. */
     node.nftOwner = RECIPIENT
 
     await expect(service.prepareNftTransfer(nftRequest)).rejects.toThrow(NftNotOwnedError)
   })
 
-  it('ERC-1155 передаётся с количеством', async () => {
+  it('ERC-1155 is transferred with an amount', async () => {
     node.tokenBalance = 5n
 
     const transaction = await service.prepareNftTransfer({
@@ -495,7 +495,7 @@ describe('Передача коллекционного предмета', () =>
     expect(BigInt(`0x${transaction.data.slice(202, 266)}`)).toBe(3n)
   })
 
-  it('ERC-1155 отказывает, когда экземпляров меньше', async () => {
+  it('ERC-1155 refuses when fewer copies are held', async () => {
     node.tokenBalance = 1n
 
     await expect(
@@ -507,10 +507,11 @@ describe('Передача коллекционного предмета', () =>
     ).rejects.toThrow(NftNotOwnedError)
   })
 
-  it('недоступность контракта не запрещает передачу', async () => {
-    /* «Check не удалось» и «предмет не ваш» — разные утверждения.
-       Отказ по молчанию узла не дал бы распорядиться своим имуществом. */
-    node.callError = new Error('узел не ответил')
+  it('a contract outage does not block the transfer', async () => {
+    /* "The check failed" and "the item is not yours" are different
+       claims. Refusing on a silent node would lock the owner out of
+       their own property. */
+    node.callError = new Error('the node did not respond')
 
     await expect(service.prepareNftTransfer(nftRequest)).resolves.toMatchObject({
       to: COLLECTION,
@@ -518,8 +519,8 @@ describe('Передача коллекционного предмета', () =>
   })
 })
 
-describe('Развёртывание контракта', () => {
-  /* Данные вызова без получателя: так выглядит развёртывание. */
+describe('Contract deployment', () => {
+  /* Call data with no recipient: that is what a deployment looks like. */
   const BYTECODE = '0x60806040' as HexString
 
   const deployment = {
@@ -530,29 +531,29 @@ describe('Развёртывание контракта', () => {
     data: BYTECODE,
   }
 
-  it('получатель остаётся пустым', async () => {
-    /* Подстановка адреса отправителя превратила бы развёртывание
-       в перевод самому себе: пользователь одобрял бы одно,
-       а подписывал другое. */
+  it('the recipient stays empty', async () => {
+    /* Filling in the sender address would turn a deployment into a
+       transfer to oneself: the user would approve one thing and
+       sign another. */
     expect((await service.prepare(deployment)).to).toBeNull()
   })
 
-  it('узлу уходит запрос без получателя', async () => {
-    /* Именно отсутствие поля `to` сообщает узлу, что оценивается
-       развёртывание. С подставленным адресом он оценил бы простой
-       перевод, и назначенного лимита не хватило бы: откат
-       со списанием газа. */
+  it('the node is asked without a recipient', async () => {
+    /* The missing `to` field is what tells the node a deployment is
+       being estimated. With a filled-in address it would estimate a
+       simple transfer, and the assigned limit would fall short: a
+       revert that still charges gas. */
     await service.prepare(deployment)
 
     expect(node.lastEstimateRequest?.to).toBeNull()
   })
 
-  it('данные вызова сохраняются целиком', async () => {
+  it('the call data is kept in full', async () => {
     expect((await service.prepare(deployment)).data).toBe(BYTECODE)
   })
 })
 
-describe('Отзыв разрешения', () => {
+describe('Approval revocation', () => {
   const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
   const SPENDER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
@@ -564,20 +565,20 @@ describe('Отзыв разрешения', () => {
     standard: TOKEN_STANDARD.Erc20,
   }
 
-  it('транзакция адресована контракту, хранящему разрешение', async () => {
+  it('the transaction is addressed to the contract that holds the approval', async () => {
     expect((await service.prepareRevokeApproval(revokeRequest)).to).toBe(TOKEN)
   })
 
-  it('у токена отзыв выдаёт ноль', async () => {
-    /* Отдельной функции «отозвать» в стандарте нет: разрешение
-       перезаписывается значением. */
+  it('for a token, revocation writes zero', async () => {
+    /* The standard has no separate "revoke" function: the
+       allowance is overwritten. */
     const transaction = await service.prepareRevokeApproval(revokeRequest)
 
     expect(transaction.data.startsWith('0x095ea7b3')).toBe(true)
     expect(BigInt(`0x${transaction.data.slice(74)}`)).toBe(0n)
   })
 
-  it('у коллекции отзыв снимает признак', async () => {
+  it('for a collection, revocation clears the flag', async () => {
     const transaction = await service.prepareRevokeApproval({
       ...revokeRequest,
       standard: TOKEN_STANDARD.Erc721,
@@ -587,11 +588,11 @@ describe('Отзыв разрешения', () => {
     expect(BigInt(`0x${transaction.data.slice(74)}`)).toBe(0n)
   })
 
-  it('нативная валюта не переводится', async () => {
+  it('no native currency is transferred', async () => {
     expect((await service.prepareRevokeApproval(revokeRequest)).value).toBe(0n)
   })
 
-  it('получатель разрешения входит в данные вызова', async () => {
+  it('the approval recipient is included in the call data', async () => {
     const transaction = await service.prepareRevokeApproval(revokeRequest)
 
     expect(transaction.data.slice(10, 74)).toContain(SPENDER.slice(2).toLowerCase())

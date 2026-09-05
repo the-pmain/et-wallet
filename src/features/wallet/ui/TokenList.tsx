@@ -16,7 +16,7 @@ import { TokenAvatar } from './TokenAvatar'
 import { TokenDetails } from './TokenDetails'
 import { TokenTrustBadge } from './TokenTrustBadge'
 
-/** Сколько строк-заполнителей, пока список ещё пуст. */
+/** Placeholder rows while the list is still empty. */
 export const TOKEN_LIST_SKELETON_COUNT = 3
 
 interface TokenListProps {
@@ -24,42 +24,40 @@ interface TokenListProps {
   readonly isLoading: boolean
 
   /**
-   * Удаление добавленного контракта. Нет обработчика — нет кнопки:
-   * витрина записи пользователя не правится с этого экрана.
+   * Remove an added contract. No handler means no button: the
+   * user-record showcase is not edited from this screen.
    */
   readonly onRemove?: (address: Address) => void
 
   /**
-   * Сводка портфеля. Отсюда берутся только курсы: оценка считается
-   * от показанного количества.
+   * Portfolio summary. Only quotes are taken; the estimate is computed
+   * from the displayed quantity.
    *
-   * `null` — курсы неизвестны либо согласия на них нет. Тогда столбец
-   * оценки не появляется вовсе; нулей вместо неизвестного не бывает.
+   * `null` means quotes are unknown or consent is missing. The value
+   * column then does not appear at all; zeros are never used for unknown.
    */
   readonly portfolio?: IPortfolioSummary | null
 }
 
 /**
- * Список токенов с балансами.
+ * Token list with balances.
  *
- * НЕПРОЧИТАННЫЙ БАЛАНС НЕ ПОКАЗЫВАЕТСЯ НУЛЁМ. Контракт мог перестать
- * отвечать; ноль на его месте — утверждение «средств нет», которое
- * кошелёк в этот момент проверить не может.
+ * An unread balance is never shown as zero. The contract may have
+ * stopped answering; a zero would claim "no funds", which the wallet
+ * cannot verify at that moment.
  *
- * ДОБАВЛЕННЫЕ ВРУЧНУЮ ТОКЕНЫ ПОМЕЧЕНЫ. Обозначение сообщил контракт,
- * а выпустить токен с обозначением известного проекта может кто угодно.
- * Пометка не мешает пользоваться, но не даёт спутать подделку
- * с нативной валютой сети, чья конфигурация проверена.
+ * Manually added tokens are marked. Anyone can mint a token with a
+ * known project's ticker. The mark does not block use, but it keeps
+ * a fake from looking like the network native whose config is verified.
  *
- * СТРОКА РАСКРЫВАЕТСЯ НА МЕСТЕ. Сведения живут в той же позиции списка,
- * а не во всплывающем меню: меню закрыло бы соседние балансы, а второе
- * `listitem` внутри строки сломало бы счётчик позиций. Удаление —
- * соседняя кнопка, не потомок раскрывающей: вложенные кнопки запрещены.
+ * The row expands in place. A popover would hide neighboring balances,
+ * and a nested `listitem` would break the position count. Remove is a
+ * sibling button, not a child of the expander: nested buttons are
+ * forbidden.
  */
 export function TokenList({ tokens, isLoading, onRemove, portfolio = null }: TokenListProps) {
-  /* `aria-busy` по той же причине, что и на карточке баланса: пока
-     количество читается, на его месте вращается значок и больше
-     ничего — зрячий это видит, слушающий страницу нет. */
+  /* `aria-busy` for the same reason as the balance card: while the
+     quantity is loading the only cue is a spinner. */
   return (
     <ul className="divide-y divide-border" aria-busy={isLoading}>
       {isLoading && tokens.length === 0 ? <TokenListSkeleton /> : null}
@@ -111,9 +109,9 @@ function TokenRow({ entry, isLoading, portfolio, onRemove }: TokenRowProps) {
           />
 
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            {/* Символ и имя задаёт автор контракта: они могут содержать
-                невидимые символы и переопределение направления письма,
-                делающие подделку визуально неотличимой от оригинала. */}
+            {/* Symbol and name come from the contract author: they can
+                carry invisible characters and bidi overrides that make
+                a fake visually identical to the original. */}
             <span className="flex items-center gap-1.5 truncate text-sm font-medium">
               <UntrustedText value={entry.token.symbol} />
               <TokenTrustBadge token={entry.token} />
@@ -126,14 +124,10 @@ function TokenRow({ entry, isLoading, portfolio, onRemove }: TokenRowProps) {
 
           <span className="flex min-w-0 items-center gap-2">
             <span className="flex min-w-0 flex-col items-end gap-0.5">
-              {/* Количество — то, ради чего список открывают, и потому
-                  весит больше имени. Табличные цифры плюс выравнивание
-                  по правому краю: разряды обязаны встать друг под друга.
-
-                  `min-w-0` и перенос по символам — защита от предельного
-                  числа: измерено, что баланс спам-токена растягивал
-                  строку до 1738 пикселей при доступных 734. Обрезать
-                  сумму нельзя, поэтому она переносится. */}
+              {/* Quantity outweighs the name. Tabular figures, right
+                  aligned. `min-w-0` plus character wrap: a spam-token
+                  balance stretched the row to 1738px in 734px. The
+                  amount must not be truncated, so it wraps. */}
               <span className="min-w-0 text-right text-base font-semibold break-all tabular-nums">
                 {entry.balance === null ? (
                   isLoading ? (
@@ -150,19 +144,12 @@ function TokenRow({ entry, isLoading, portfolio, onRemove }: TokenRowProps) {
                 )}
               </span>
 
-              {/* ОЦЕНКА ПОД КОЛИЧЕСТВОМ, А НЕ ВМЕСТО НЕГО. Настоящая
-                  величина — та, что в монетах: она точна, она
-                  подписывается, она не зависит от чужого сервиса.
-                  Долларовая производная и набрана мельче именно
-                  поэтому.
-
-                  Строки нет там, где курс неизвестен: у токена вне
-                  реестра источника, при отсутствии согласия на курсы
-                  и при неполученном балансе. Прочерк в этих случаях
-                  добавил бы столбец пустых прочерков во всю длину
-                  списка, ничего не сообщая; отсутствие строки читается
-                  так же и не занимает места. Что именно выпало
-                  из оценки и почему — перечислено на экране портфеля. */}
+              {/* Estimate under the quantity, not instead of it. The
+                  coin figure is exact and signed; the dollar line is
+                  derivative and smaller for that reason. No row when
+                  the rate is unknown (unlisted token, no consent, or
+                  unread balance) — a dash column would add noise
+                  without information. */}
               <AssetValue
                 balance={entry.balance}
                 decimals={entry.token.decimals}
@@ -173,10 +160,9 @@ function TokenRow({ entry, isLoading, portfolio, onRemove }: TokenRowProps) {
               />
             </span>
 
-            {/* Распорка только когда удаление реально есть. Пустой
-                квадрат справа от шеврона перехватывал нажатие и
-                строка казалась мёртвой — на витрине справочника
-                удаления нет вовсе. */}
+            {/* Spacer only when remove is real. An empty square next
+                to the chevron intercepted clicks and made the row
+                feel dead; the catalog showcase has no remove at all. */}
             {canRemove ? <span className="size-8 shrink-0" aria-hidden /> : null}
 
             <ChevronDown
@@ -220,7 +206,7 @@ interface AssetValueProps {
   readonly isLoading: boolean
 }
 
-/** Оценка одной строки списка. Место под строку занято всегда. */
+/** Estimate for one list row. The slot is always reserved. */
 function AssetValue({
   balance,
   decimals,

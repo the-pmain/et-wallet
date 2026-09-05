@@ -7,15 +7,17 @@ import { App } from './App'
 import { AppProviders } from './providers'
 import './styles/index.css'
 
-/* Проверка стоит до отрисовки: боевая сборка с временно снятыми защитами
-   обязана не запуститься, а не заработать незаметно. Забытый флаг — это
-   не гипотетическая оплошность, а обычный способ потерять чужие деньги. */
+/* The check runs before render: a production build with temporarily
+   lifted protections must refuse to start, not work unnoticed. A
+   forgotten flag is not a hypothetical slip — it is a usual way to
+   lose someone else's money. */
 assertTestModeIsDisabledInProduction()
 
 const rootElement = document.getElementById('root')
 
-/* Отсутствие корневого узла — неустранимая ошибка конфигурации index.html.
-   Явная проверка лучше `!`: она даёт понятное сообщение вместо разыменования null. */
+/* A missing root node is an unrecoverable index.html config error.
+   An explicit check is better than `!`: it gives a clear message
+   instead of a null dereference. */
 if (rootElement === null) {
   throw new Error('The root element #root was not found in index.html.')
 }

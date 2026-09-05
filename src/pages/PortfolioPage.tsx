@@ -42,18 +42,19 @@ import {
 } from '@/shared/ui'
 
 /**
- * Портфель: стоимость, распределение, изменение и статистика.
+ * Portfolio: value, allocation, change, and stats.
  *
- * ОЦЕНКА ТРЕБУЕТ СОГЛАСИЯ И НЕ ПОЯВЛЯЕТСЯ САМА. Курс токена
- * запрашивается по адресу его контракта, то есть запрос сообщает
- * стороннему сервису состав портфеля. Адрес кошелька при этом
- * не передаётся — сервису неизвестно, чей это портфель, — но состав
- * он узнаёт, и решение об этом принимает владелец средств.
+ * VALUATION REQUIRES CONSENT AND DOES NOT APPEAR ON ITS OWN. A token
+ * rate is requested by contract address, so the request tells a
+ * third-party service the portfolio composition. The wallet address
+ * is not sent — the service does not know whose portfolio it is —
+ * but it does learn the holdings, and the owner of the funds decides
+ * that.
  *
- * НЕИЗВЕСТНОЕ НЕ ПОДМЕНЯЕТСЯ НУЛЁМ. Позиция без курса не входит
- * в стоимость и не исчезает из списка: она показывается с прочерком
- * и учитывается в отдельной строке статистики. Сумма, в которую молча
- * не вошла половина активов, — это неверная сумма, выданная за верную.
+ * UNKNOWN IS NOT REPLACED WITH ZERO. A position without a rate is
+ * left out of the total and stays in the list: it is shown with a
+ * dash and counted on a separate stats row. A total that silently
+ * omitted half the assets is a wrong total presented as right.
  */
 export function PortfolioPage() {
   const session = useWallet()
@@ -83,7 +84,7 @@ export function PortfolioPage() {
           </Link>
         </Button>
 
-        <h1 className="flex-1 text-lg font-semibold">Portfolio</h1>
+        <h1 className="flex-1 text-2xl font-semibold tracking-tight">Portfolio</h1>
 
         {snapshot.arePricesEnabled ? (
           <Button
@@ -156,11 +157,11 @@ interface PriceConsentProps {
 }
 
 /**
- * Запрос согласия на обращение к источнику курсов.
+ * Consent request to talk to the price source.
  *
- * ПЕРЕЧИСЛЕНО ИМЕННО ТО, ЧТО УЙДЁТ НАРУЖУ, И ТО, ЧТО НЕ УЙДЁТ.
- * Согласие, данное на общее «улучшение работы», согласием не является:
- * человек не может принять решение о том, чего ему не назвали.
+ * WHAT LEAVES AND WHAT DOES NOT ARE BOTH NAMED. Consent given for a
+ * vague "better experience" is not consent: a person cannot decide
+ * about what they were not told.
  */
 function PriceConsent({ sourceName, isBusy, onEnable }: PriceConsentProps) {
   return (
@@ -176,18 +177,19 @@ function PriceConsent({ sourceName, isBusy, onEnable }: PriceConsentProps) {
         </p>
 
         {/*
-          ДВЕ СТОРОНЫ СДЕЛКИ — ДВА РАЗНЫХ БЛОКА, А НЕ ОДИН СПИСОК.
+          THE TWO SIDES OF THE DEAL ARE TWO BLOCKS, NOT ONE LIST.
 
-          Прежде «что узнает» и «чего не узнает» шли одной стопкой
-          в общей рамке: чтобы взвесить, приходилось читать всё подряд
-          и держать обе половины в голове. Согласие даётся именно
-          о соотношении цены и защищённого, и увидеть это соотношение
-          нужно целиком, а не собирать по строкам.
+          "What it learns" and "what it does not" used to sit in one
+          stack inside a shared frame: weighing them meant reading
+          everything in order and holding both halves in mind.
+          Consent is given on the ratio of cost to what stays
+          protected, and that ratio must be seen whole, not assembled
+          line by line.
 
-          Цвета взяты из смысловой шкалы риска: жёлтая сторона — цена,
-          зелёная — то, что не уходит. Цвет при этом не единственный
-          признак: у каждой стороны свой значок и свой заголовок, и
-          смысл читается без различения цветов.
+          Colors come from the semantic risk scale: yellow is the
+          cost, green is what does not leave. Color is not the only
+          cue: each side has its own icon and heading, so the meaning
+          reads without telling colors apart.
         */}
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="flex flex-col gap-2 rounded-xl border border-risk-medium/40 bg-risk-medium/5 p-3 text-xs">
@@ -200,12 +202,12 @@ function PriceConsent({ sourceName, isBusy, onEnable }: PriceConsentProps) {
                 the contract addresses of your tokens — that is, the composition of the portfolio;
               </li>
               <li>the network you work in;</li>
-              {/* Строка про длительность сессии здесь стояла, пока
-                  курсы опрашивались раз в минуту. Опрос снят, обращение
-                  снова разовое — и строка убрана вместе с ним: перечень
-                  обязан описывать то, что делается сейчас, а не то,
-                  что делалось когда-то. Лишнее предупреждение обесценивает
-                  соседние не меньше, чем недостающее. */}
+              {/* A line about session length lived here while rates
+                  were polled every minute. Polling is gone, the call
+                  is one-shot again — and the line left with it: the
+                  list must describe what happens now, not what used
+                  to. An extra warning devalues its neighbors as much
+                  as a missing one. */}
               <li>your IP address.</li>
             </ul>
           </div>
@@ -241,16 +243,14 @@ interface PortfolioValueProps {
   readonly networkName: string
 }
 
-/** Стоимость и её суточное изменение. */
 function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
   const { formatUsd } = useDisplayCurrency()
   const isGrowing = (portfolio.change24hPercent ?? 0) >= 0
   const ChangeIcon = isGrowing ? TrendingUp : TrendingDown
 
-  /* Ни одной оценённой позиции — значит стоимость неизвестна, а не равна
-     нулю. Показать «0,00 $» здесь означало бы сообщить владельцу, что его
-     активы ничего не стоят, тогда как кошелёк всего лишь не получил
-     ни одного курса. */
+  /* No valued position means the total is unknown, not zero. Showing
+     "$0.00" here would tell the owner their assets are worthless,
+     when the wallet simply received no rates. */
   const hasValued = portfolio.positions.some((position) => position.value !== null)
 
   return (
@@ -272,11 +272,12 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
         )}
 
         {!hasValued ? null : portfolio.change24hPercent === null ? (
-          /* Две разные причины отсутствия процента, и называть их одним
-             текстом нельзя: «источник не сообщил изменение» — утверждение
-             об источнике, а нулевая вчерашняя стоимость — свойство самого
-             портфеля. Сказать первое вместо второго значит обвинить
-             сервис в том, чего он не делал. */
+          /* Two different reasons for a missing percent, and they
+             cannot share one sentence: "the source did not report a
+             change" is a claim about the source, and a zero yesterday
+             value is a property of the portfolio. Saying the first
+             instead of the second blames the service for something
+             it did not do. */
           <span className="text-xs text-muted-foreground">
             {portfolio.previousValue === null
               ? 'The 24-hour change is unknown: the source reported none for any asset.'
@@ -295,9 +296,9 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
           </span>
         )}
 
-        {/* Различение, без которого число вводит в заблуждение: покупка
-            актива за сутки увеличивает стоимость портфеля, но это не рост
-            курса, и приписывать его пользователю как доход нельзя. */}
+        {/* A distinction without which the number misleads: buying an
+            asset in a day raises portfolio value, but that is not a
+            price rise, and it must not be credited as income. */}
         <p className="text-xs text-muted-foreground">
           The change is computed from asset prices with an unchanged composition. Purchases, sales
           and transfers made during the day are not part of it.
@@ -307,7 +308,7 @@ function PortfolioValue({ portfolio, networkName }: PortfolioValueProps) {
   )
 }
 
-/** Распределение активов: кольцо плюс список с числами. */
+/** Asset allocation: a ring plus a list with numbers. */
 function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }) {
   const { formatUsd } = useDisplayCurrency()
   const valued = portfolio.positions.filter((position) => position.share !== null)
@@ -336,9 +337,9 @@ function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }
           captionHint={valued.length === 1 ? 'asset' : 'assets'}
         />
 
-        {/* Список обязателен: разница между 18 % и 22 % на кольце
-            неразличима, а цвет как единственный признак недоступен
-            людям с нарушением цветовосприятия. */}
+        {/* The list is required: 18% vs 22% is invisible on the
+            ring, and color as the only cue is unavailable to people
+            with impaired color vision. */}
         <ul className="flex w-full flex-col gap-2">
           {valued.map((position, index) => (
             <li key={positionKey(position)} className="flex items-center gap-2 text-sm">
@@ -362,14 +363,14 @@ function AllocationCard({ portfolio }: { readonly portfolio: IPortfolioSummary }
   )
 }
 
-/** Полный список позиций, включая те, для которых оценки нет. */
+/** Full position list, including those without a valuation. */
 function PositionsCard({
   portfolio,
   chainId,
 }: {
   readonly portfolio: IPortfolioSummary
-  /* Знак монеты выдаётся по паре «сеть и адрес»: один адрес в разных
-     сетях — разные контракты. */
+  /* The coin mark is keyed by network plus address: the same
+     address on different networks is different contracts. */
   readonly chainId: ChainId | null
 }) {
   return (
@@ -389,7 +390,6 @@ function PositionsCard({
   )
 }
 
-/** Одна строка списка активов. */
 function PositionRow({
   position,
   chainId,
@@ -434,7 +434,7 @@ interface StatisticsCardProps {
   readonly sourceName: string
 }
 
-/** Статистика портфеля и оговорки о полноте оценки. */
+/** Portfolio stats and caveats about how complete the valuation is. */
 function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
   const { formatUsd } = useDisplayCurrency()
   const valued = portfolio.positions.filter((position) => position.value !== null)
@@ -450,9 +450,9 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
         <StatRow label="Assets in total" value={String(portfolio.positions.length)} />
         <StatRow label="Included in the valuation" value={String(valued.length)} />
 
-        {/* Доля неизвестна, когда стоимость портфеля нулевая: делить
-            не на что. Строка «наибольшая доля — прочерк» ничего
-            не сообщает и занимает место, которое читают. */}
+        {/* Share is unknown when portfolio value is zero: there is
+            nothing to divide by. A "largest share — dash" row says
+            nothing and occupies space people read. */}
         {largest === null || largest.share === null ? null : (
           <StatRow
             label="Largest share"
@@ -497,7 +497,6 @@ function StatisticsCard({ portfolio, sourceName }: StatisticsCardProps) {
   )
 }
 
-/** Строка «название — значение». */
 function StatRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">

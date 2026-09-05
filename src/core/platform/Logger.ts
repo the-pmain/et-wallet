@@ -1,4 +1,4 @@
-/** Уровни журналирования в порядке возрастания важности. */
+/** Log levels in ascending importance. */
 export const LOG_LEVEL = {
   Debug: 'debug',
   Info: 'info',
@@ -8,28 +8,27 @@ export const LOG_LEVEL = {
 
 export type LogLevel = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL]
 
-/** Дополнительный контекст записи журнала. */
 export type LogContext = Readonly<Record<string, unknown>>
 
 /**
- * Журналирование.
+ * Logging.
  *
- * ТРЕБОВАНИЕ БЕЗОПАСНОСТИ, обязательное для любой реализации: логгер обязан
- * редактировать чувствительные значения перед выводом. Не «желательно», а
- * обязан, потому что журнал кошелька попадает в отчёты об ошибках, в консоль
- * браузера и в буфер обмена пользователя.
+ * A SECURITY REQUIREMENT, binding on every implementation: the
+ * logger must redact sensitive values before output. Not "should",
+ * but must, because a wallet log ends up in error reports, the
+ * browser console, and the user's clipboard.
  *
- * Безусловной редакции подлежат:
- * - seed-фразы и приватные ключи в любом виде;
- * - пароли и производные от них ключи;
- * - содержимое `ISecretBuffer`;
- * - подписи до их публикации в сети.
+ * Unconditionally redacted:
+ * - seed phrases and private keys in any form;
+ * - passwords and keys derived from them;
+ * - contents of `ISecretBuffer`;
+ * - signatures before they are published on the network.
  *
- * Адреса и суммы редактируются частично: адрес усекается до первых и
- * последних символов. Полный адрес в журнале — это идентификатор личности
- * пользователя, связывающий его с историей операций.
+ * Addresses and amounts are redacted in part: an address is
+ * truncated to the first and last characters. A full address in the
+ * log is a personal identifier that ties the user to their history.
  *
- * Уровень `Debug` в production-сборке обязан быть выключен.
+ * The `Debug` level must be off in a production build.
  */
 export interface ILogger {
   debug(message: string, context?: LogContext): void
@@ -38,8 +37,8 @@ export interface ILogger {
   error(message: string, context?: LogContext): void
 
   /**
-   * Создаёт дочерний логгер с постоянным префиксом.
-   * Позволяет не дублировать имя модуля в каждом вызове.
+   * Creates a child logger with a fixed prefix.
+   * Avoids repeating the module name on every call.
    */
   child(scope: string): ILogger
 }

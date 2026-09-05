@@ -8,33 +8,33 @@ import { NullLogger } from '@/test/doubles'
 
 import { DEFAULT_GAP_LIMIT, MAX_SCANNED_ADDRESSES, discoverUsedAccounts } from './AccountDiscovery'
 
-/** Адрес по номеру: значение не важно, важна различимость. */
+/** Address by number: the value does not matter, distinguishability does. */
 function addressAt(index: number): Address {
   return toAddress(`0x${index.toString(16).padStart(40, '0')}`)
 }
 
 /**
- * Узел, у которого заданы занятые адреса.
+ * A node with occupied addresses set.
  *
- * Занятость задаётся раздельно счётчиком и балансом: адрес, на который
- * только присылали, имеет нулевой счётчик, а опустошённый — нулевой
- * баланс, и оба обязаны находиться.
+ * Occupancy is set separately by count and by balance: an address
+ * that only received has a zero count, an emptied one has a zero
+ * balance, and both must be found.
  */
 class DiscoveryNode implements IProvider {
   readonly chainId = 1n as ChainId
   readonly rpcUrl = 'https://stub.example'
   readonly isActive = true
 
-  /** Индексы адресов, с которых отправляли. */
+  /** Indexes of addresses that have sent. */
   sent = new Set<number>()
 
-  /** Индексы адресов, на которых лежат средства. */
+  /** Indexes of addresses that hold funds. */
   funded = new Set<number>()
 
-  /** Отказ узла. Прерывает поиск, а не пропускает адрес. */
+  /** Node refusal. Stops the search, does not skip the address. */
   failure: Error | null = null
 
-  /** Сколько адресов было опрошено. */
+  /** How many addresses were queried. */
   queried = 0
 
   readonly #events = new EventBus<ProviderEventMap>()
@@ -111,7 +111,7 @@ class DiscoveryNode implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -121,8 +121,8 @@ class DiscoveryNode implements IProvider {
 
 const logger = new NullLogger()
 
-describe('Признаки использованного адреса', () => {
-  it('адрес с отправленными транзакциями находится', async () => {
+describe('Signs of a used address', () => {
+  it('an address with sent transactions is found', async () => {
     const node = new DiscoveryNode()
 
     node.sent.add(0)
@@ -130,9 +130,9 @@ describe('Признаки использованного адреса', () => {
     expect((await discoverUsedAccounts(node, addressAt, logger)).usedIndexes).toEqual([0])
   })
 
-  it('адрес с балансом находится, даже если с него не отправляли', async () => {
-    /* На адрес только присылали: счётчик транзакций у него нулевой,
-       и по одному этому признаку он был бы потерян. */
+  it('an address with a balance is found even if it never sent', async () => {
+    /* Only received: its transaction count is zero, and by that
+       sign alone it would be lost. */
     const node = new DiscoveryNode()
 
     node.funded.add(0)
@@ -140,9 +140,10 @@ describe('Признаки использованного адреса', () => {
     expect((await discoverUsedAccounts(node, addressAt, logger)).usedIndexes).toEqual([0])
   })
 
-  it('опустошённый адрес находится по счётчику', async () => {
-    /* Всё вывели: баланс нулевой, но адресом пользовались, и терять
-       его нельзя — на нём может лежать токен либо предмет. */
+  it('an emptied address is found by the count', async () => {
+    /* Everything was withdrawn: the balance is zero, but the
+       address was used, and it must not be lost — a token or item
+       may sit on it. */
     const node = new DiscoveryNode()
 
     node.sent.add(2)
@@ -150,17 +151,17 @@ describe('Признаки использованного адреса', () => {
     expect((await discoverUsedAccounts(node, addressAt, logger)).usedIndexes).toEqual([2])
   })
 
-  it('пустой кошелёк даёт пустой список', async () => {
+  it('an empty wallet yields an empty list', async () => {
     expect(
       (await discoverUsedAccounts(new DiscoveryNode(), addressAt, logger)).usedIndexes,
     ).toEqual([])
   })
 })
 
-describe('Промежуток пустых адресов', () => {
-  it('поиск не останавливается на первом пустом', async () => {
-    /* Кошельки пропускают адреса при создании: остановка на первом
-       пустом потеряла бы всё, что за ним. */
+describe('Gap of empty addresses', () => {
+  it('the search does not stop at the first empty one', async () => {
+    /* Wallets skip addresses at creation: stopping at the first
+       empty one would lose everything after it. */
     const node = new DiscoveryNode()
 
     node.sent.add(0)
@@ -169,7 +170,7 @@ describe('Промежуток пустых адресов', () => {
     expect((await discoverUsedAccounts(node, addressAt, logger)).usedIndexes).toEqual([0, 5])
   })
 
-  it('находит адрес на границе промежутка', async () => {
+  it('finds an address on the gap boundary', async () => {
     const node = new DiscoveryNode()
 
     node.sent.add(DEFAULT_GAP_LIMIT - 1)
@@ -179,9 +180,9 @@ describe('Промежуток пустых адресов', () => {
     ])
   })
 
-  it('за промежутком не ищет', async () => {
-    /* Правило BIP-44: двадцать подряд пустых означают конец. Искать
-       дальше значило бы опрашивать узел без предела. */
+  it('does not search past the gap', async () => {
+    /* BIP-44 rule: twenty empty in a row mean the end. Searching
+       further would mean querying the node without a limit. */
     const node = new DiscoveryNode()
 
     node.sent.add(DEFAULT_GAP_LIMIT + 5)
@@ -189,7 +190,7 @@ describe('Промежуток пустых адресов', () => {
     expect((await discoverUsedAccounts(node, addressAt, logger)).usedIndexes).toEqual([])
   })
 
-  it('промежуток отсчитывается заново после находки', async () => {
+  it('the gap is counted again after a find', async () => {
     const node = new DiscoveryNode()
 
     node.sent.add(0)
@@ -201,7 +202,7 @@ describe('Промежуток пустых адресов', () => {
     ])
   })
 
-  it('пустой кошелёк опрашивается ровно на глубину промежутка', async () => {
+  it('an empty wallet is queried exactly to the gap depth', async () => {
     const node = new DiscoveryNode()
 
     const result = await discoverUsedAccounts(node, addressAt, logger)
@@ -211,10 +212,10 @@ describe('Промежуток пустых адресов', () => {
   })
 })
 
-describe('Пределы и отказы', () => {
-  it('поиск ограничен сверху', async () => {
-    /* Узел, сообщающий активность по любому адресу, не должен уводить
-       поиск в бесконечность. */
+describe('Limits and refusals', () => {
+  it('the search is capped from above', async () => {
+    /* A node that reports activity on every address must not take
+       the search to infinity. */
     const node = new DiscoveryNode()
 
     for (let index = 0; index < 500; index += 1) {
@@ -227,17 +228,17 @@ describe('Пределы и отказы', () => {
     expect(result.stoppedByLimit).toBe(true)
   })
 
-  it('остановка по промежутку пределом не считается', async () => {
-    /* Разница важна для интерфейса: в одном случае «это всё»,
-       в другом — «дальше могло остаться». */
+  it('a stop by gap is not counted as the cap', async () => {
+    /* The difference matters to the UI: in one case “that is
+       all”, in the other — “more may remain further on”. */
     expect(
       (await discoverUsedAccounts(new DiscoveryNode(), addressAt, logger)).stoppedByLimit,
     ).toBe(false)
   })
 
-  it('отказ узла прерывает поиск и возвращает найденное', async () => {
-    /* Пропустить адрес значило бы молча потерять аккаунт — ровно то,
-       против чего написан весь этот поиск. */
+  it('a node refusal stops the search and returns what was found', async () => {
+    /* Skipping an address would silently lose an account — exactly
+       what this whole search is written against. */
     const node = new DiscoveryNode()
 
     node.sent.add(0)
@@ -253,7 +254,7 @@ describe('Пределы и отказы', () => {
     expect(second.stoppedByLimit).toBe(false)
   })
 
-  it('настраиваемый промежуток соблюдается', async () => {
+  it('a configurable gap is honoured', async () => {
     const node = new DiscoveryNode()
 
     node.sent.add(3)
@@ -264,12 +265,12 @@ describe('Пределы и отказы', () => {
   })
 })
 
-describe('Недостоверный ответ узла', () => {
-  it('узел, отвечающий за любой адрес, упирается в предел', async () => {
-    /* Так выглядит либо узел-обманка, либо неисправность: у живого
-       кошелька две сотни занятых адресов подряд не бывает. Отличить
-       это от настоящей находки может только вызывающий, и признак
-       для него — остановка пределом. */
+describe('Untrustworthy node reply', () => {
+  it('a node that answers for every address hits the cap', async () => {
+    /* That looks like either a decoy node or a fault: a live
+       wallet does not have two hundred occupied addresses in a
+       row. Only the caller can tell this from a real find, and
+       the sign for them is a stop by the cap. */
     const node = new DiscoveryNode()
 
     for (let index = 0; index < MAX_SCANNED_ADDRESSES + 10; index += 1) {

@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/shared/ui'
 
 import { formatTokenAmount, shortenAddress } from '../lib/format'
 
-/** Что известно об активе: обозначение и число знаков. */
+/** What is known about an asset: ticker and decimals. */
 export interface ISimulationAsset {
   readonly symbol: string
   readonly decimals: number
@@ -22,45 +22,44 @@ export interface ISimulationAsset {
 interface SimulationNoticeProps {
   readonly simulation: ISimulationResult
 
-  /** Адрес владельца: по нему определяется направление перемещения. */
+  /** Owner address: used to decide movement direction. */
   readonly owner: Address
 
   /**
-   * Известные активы по адресу контракта в нижнем регистре.
+   * Known assets keyed by lowercase contract address.
    *
-   * Ключ `native` описывает валюту сети. Чего в наборе нет, то
-   * показывается в наименьших единицах с оговоркой: подставить
-   * восемнадцать знаков «по умолчанию» значило бы ошибиться
-   * на порядки у токенов с шестью.
+   * The `native` key is the chain currency. Anything not in the map
+   * is shown in smallest units with a note: assuming eighteen
+   * decimals would be off by orders of magnitude on six-decimal
+   * tokens.
    */
   readonly assets: ReadonlyMap<string, ISimulationAsset>
 }
 
-/** Ключ нативной валюты в наборе активов. */
+/** Native-currency key in the asset map. */
 export const NATIVE_ASSET_KEY = 'native'
 
 /**
- * Что транзакция сделает по нынешнему состоянию цепи.
+ * What the transaction will do against the current chain state.
  *
- * ЗАЧЕМ ЭТО РЯДОМ С ПОЛЯМИ ФОРМЫ. Экран подтверждения показывает
- * получателя и сумму такими, какими их собрал кошелёк. Симуляция
- * показывает, что насчитал узел, выполнив вызов. Совпадение этих
- * двух источников и есть проверка; расхождение — признак того, что
- * подписывается не то, что задумано.
+ * Why this sits next to the form fields. Confirm shows the recipient
+ * and amount as the wallet assembled them. Simulation shows what the
+ * node computed by running the call. Matching those two sources is
+ * the check; a mismatch means something other than intended is being
+ * signed.
  *
- * ПУСТОЙ ПЕРЕЧЕНЬ ЗНАЧИМ ТОЛЬКО ПРИ УСПЕХЕ. При исходах «узел не умеет»
- * и «не удалось» перемещения неизвестны, и показывать «ничего
- * не двинется» было бы утверждением, которого никто не проверял.
+ * An empty movement list is meaningful only on success. On
+ * "unsupported" and "failed" the movements are unknown, and
+ * "nothing will move" would be a claim nobody checked.
  *
- * НЕИЗВЕСТНОЕ ЧИСЛО ЗНАКОВ НЕ ПОДМЕНЯЕТСЯ ВОСЕМНАДЦАТЬЮ. У токена,
- * которого нет в наборе, количество показывается в наименьших
- * единицах и помечается словом: «1000000» при шести знаках — это
- * одна единица, а не миллион.
+ * Unknown decimals are never replaced with eighteen. A token not in
+ * the map is shown in smallest units and marked: "1000000" at six
+ * decimals is one unit, not a million.
  */
 export function SimulationNotice({ simulation, owner, assets }: SimulationNoticeProps) {
   if (simulation.outcome === SIMULATION_OUTCOME.Unsupported) {
-    /* Свойство узла, а не происшествие: оформлено сноской, а не
-       предупреждением. Оранжевый в этой палитре означает риск. */
+    /* A node property, not an incident: styled as a footnote, not a
+       warning. Orange in this palette means risk. */
     return (
       <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
         <CircleHelp className="mt-0.5 size-3.5 shrink-0" aria-hidden />
@@ -76,10 +75,10 @@ export function SimulationNotice({ simulation, owner, assets }: SimulationNotice
     return (
       <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
         <CircleHelp className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        {/* Формулировка нарочно не повторяет соседний блок о прогоне.
-            Два почти одинаковых предложения на одном экране читаются
-            как сбой, и человек перестаёт различать, что именно
-            не проверено. Здесь неизвестен ПЕРЕЧЕНЬ ПЕРЕМЕЩЕНИЙ. */}
+        {/* Wording deliberately does not repeat the neighboring
+            preflight block. Two nearly identical sentences on one
+            screen read as a glitch. What is unknown here is the
+            MOVEMENT LIST. */}
         <span>
           The node did not answer the simulation, so what this transaction moves stays unknown. That
           is not the same as “nothing moves”.
@@ -89,9 +88,9 @@ export function SimulationNotice({ simulation, owner, assets }: SimulationNotice
   }
 
   if (simulation.outcome === SIMULATION_OUTCOME.Reverted) {
-    /* Одной строкой, а не вторым красным блоком: о том, что вызов
-       не пройдёт, уже сказал прогон, и повторять это другими словами
-       на том же экране — шум, из-за которого перестают читать оба. */
+    /* One line, not a second red block: preflight already said the
+       call will fail, and repeating that in other words is noise
+       that makes both unread. */
     return (
       <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-destructive">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
@@ -123,8 +122,8 @@ export function SimulationNotice({ simulation, owner, assets }: SimulationNotice
         <ul className="flex flex-col gap-1.5">
           {simulation.movements.map((movement, index) => (
             <MovementRow
-              /* Порядок перемещений и есть их различие: два одинаковых
-                 перевода подряд — законный случай. */
+              /* Order is what distinguishes them: two identical
+                 transfers in a row are a legitimate case. */
               key={`${movement.contract ?? NATIVE_ASSET_KEY}:${String(index)}`}
               movement={movement}
               owner={owner}
@@ -178,8 +177,9 @@ function MovementRow({
         </span>
 
         <span className="truncate font-mono text-xs text-muted-foreground">
-          {/* Направление называется словом, а не только знаком и цветом:
-              минус легко не заметить, а цвет виден не всем. */}
+          {/* Direction is named in words, not only a sign and color:
+              a minus is easy to miss, and color is not visible to
+              everyone. */}
           {isOutgoing ? 'to ' : 'from '}
           {shortenAddress(counterparty)}
         </span>
@@ -189,10 +189,10 @@ function MovementRow({
 }
 
 /**
- * Складывает количество в строку.
+ * Fold a quantity into a string.
  *
- * Неизвестное число знаков и неизвестное количество называются прямо,
- * а не заменяются правдоподобным числом.
+ * Unknown decimals and an unknown quantity are named plainly, not
+ * replaced with a plausible number.
  */
 function describeAmount(movement: IAssetMovement, asset: ISimulationAsset | null): string {
   if (movement.kind === MOVEMENT_KIND.Erc721) {
@@ -210,8 +210,8 @@ function describeAmount(movement: IAssetMovement, asset: ISimulationAsset | null
   }
 
   if (asset === null) {
-    /* Токен не отслеживается, и число знаков неоткуда взять. Показать
-       сырые единицы без пометки — обмануть на порядки. */
+    /* The token is not tracked, so decimals are unknown. Showing
+       raw units without a mark would deceive by orders of magnitude. */
     return `${movement.amount.toString()} units of ${
       movement.contract === null ? 'the network currency' : shortenAddress(movement.contract)
     }`

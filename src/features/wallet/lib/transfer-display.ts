@@ -2,47 +2,45 @@ import { TRANSFER_KIND, type INetworkConfig, type ITransferRecord, type Transfer
 
 import { formatTokenAmount } from './format'
 
-/** Готовая к показу сумма перевода. */
+/** Transfer amount ready for display. */
 export interface ITransferAmount {
-  /** Числовое значение для показа. */
+  /** Numeric value for display. */
   readonly text: string
 
-  /** Обозначение: символ токена, идентификатор предмета либо пометка. */
+  /** Unit: token symbol, item id, or a note. */
   readonly unit: string
 
   /**
-   * Величина показана в необработанных единицах.
+   * The figure is shown in raw units.
    *
-   * Значит, число знаков контракта неизвестно, и сравнивать эту сумму
-   * с другими нельзя. Интерфейс обязан пометить такую строку.
+   * Contract decimals are unknown, so this amount must not be compared
+   * with others. The UI must mark the row.
    */
   readonly isRaw: boolean
 }
 
 /**
- * Приводит перевод к виду, пригодному для показа.
+ * Shape a transfer for display.
  *
- * ЧИСЛО ЗНАКОВ НИКОГДА НЕ ДОДУМЫВАЕТСЯ. Привычные восемнадцать знаков —
- * соглашение, а не правило: у USDC их шесть, у WBTC восемь, у отдельных
- * токенов ноль. Подстановка восемнадцати для токена с шестью занизила бы
- * показанную сумму в триллион раз, и пользователь решил бы, что перевода
- * почти не было.
+ * Decimals are never guessed. Eighteen is a convention, not a rule:
+ * USDC has six, WBTC eight, some tokens zero. Assuming eighteen for a
+ * six-decimal token would understate the amount by a trillion, and
+ * the user would think almost nothing moved.
  *
- * Поэтому при неизвестном числе знаков выводятся необработанные единицы
- * с пометкой `isRaw`, а не правдоподобная, но выдуманная величина.
+ * Unknown decimals therefore show raw units with `isRaw`, not a
+ * plausible invented figure.
  *
- * СИМВОЛ ТОКЕНА НЕДОВЕРЕННЫЙ: его задаёт автор контракта, и выпустить
- * токен с символом `USDC` может кто угодно. Здесь он лишь передаётся
- * дальше; отличать проверенные токены от произвольных — задача
- * интерфейса.
+ * The token symbol is untrusted: the contract author sets it, and
+ * anyone can mint `USDC`. It is passed through; telling verified
+ * tokens from arbitrary ones is the UI's job.
  */
 export function describeAmount(
   record: ITransferRecord,
   network: INetworkConfig | null,
 ): ITransferAmount {
   if (record.kind === TRANSFER_KIND.Erc721) {
-    /* Уникальный предмет не имеет количества: показывать «1» бессмысленно,
-       значение несёт идентификатор. */
+    /* A unique item has no quantity: showing "1" is meaningless; the
+       id carries the value. */
     return {
       text: record.tokenId === null ? '—' : `#${record.tokenId.toString()}`,
       unit: record.asset.symbol ?? 'NFT',
@@ -77,7 +75,7 @@ export function describeAmount(
   }
 }
 
-/** Человекочитаемое название категории перевода. */
+/** Human-readable transfer category name. */
 export function describeKind(kind: TransferKind): string {
   switch (kind) {
     case TRANSFER_KIND.Native:

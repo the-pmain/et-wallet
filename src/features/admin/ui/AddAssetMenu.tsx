@@ -15,14 +15,14 @@ interface AddAssetMenuProps {
 }
 
 /**
- * Меню добавления криптовалюты в витрину записи.
+ * Menu to add a cryptocurrency to the record showcase.
  *
- * СПИСОК ОТКРЫВАЕТСЯ ПО НАЖАТИЮ, А НЕ ПО НАВЕДЕНИЮ. Наведение на шапке
- * срабатывает мимоходом, и кабинет тогда сам вываливал бы длинный
- * перечень. Клик — намерение.
+ * THE LIST OPENS ON CLICK, NOT HOVER. Hover on the header fires in
+ * passing, and the cabinet would then dump a long list by itself.
+ * A click is intent.
  *
- * ЗНАК СТОИТ В КАЖДОЙ СТРОКЕ. Это те же файлы, что в кошельке: пара
- * «сеть и адрес» из встроенного реестра, а не картинка по тикеру.
+ * EVERY ROW HAS A MARK. Same files as the wallet: a network-and-
+ * address pair from the built-in registry, not an image by ticker.
  */
 export function AddAssetMenu({ existing, disabled, onAdd }: AddAssetMenuProps) {
   const menuId = useId()

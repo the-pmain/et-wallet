@@ -1,58 +1,56 @@
 /**
- * Сравнение версий вида `МАЖОР.МИНОР.ПАТЧ`.
+ * Comparison of `MAJOR.MINOR.PATCH` versions.
  *
- * ПОЧЕМУ БЕЗ БИБЛИОТЕКИ. Полный semver включает предвыпускные метки
- * и метаданные сборки с нетривиальными правилами упорядочивания.
- * Версии приложения устроены проще, и десять строк, покрытых тестами,
- * понятнее зависимости, поведение которой в крайних случаях приходится
- * принимать на веру. Если понадобятся предвыпуски — брать библиотеку,
- * а не дописывать правила сюда.
+ * WHY NO LIBRARY. Full semver includes pre-release tags and build
+ * metadata with non-trivial ordering. App versions are simpler, and
+ * ten tested lines are clearer than a dependency whose edge cases
+ * you have to take on faith. If pre-releases are needed — take a
+ * library, do not add rules here.
  *
- * СРАВНЕНИЕ ЧИСЛОВОЕ, А НЕ СТРОКОВОЕ. Строковое сравнение ставит
- * `0.10.0` ниже `0.9.0`, и приложение объявляет свежую версию
- * устаревшей — либо, что хуже, устаревшую поддерживаемой.
+ * NUMERIC COMPARISON, NOT STRING. String compare ranks `0.10.0`
+ * below `0.9.0`, and the app calls a fresh version outdated — or,
+ * worse, an outdated one supported.
  */
 
 const VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/u
 
-/** Разобранная версия. */
 interface IVersionParts {
   readonly major: number
   readonly minor: number
   readonly patch: number
 }
 
-/** Соответствует ли строка виду `МАЖОР.МИНОР.ПАТЧ`. */
+/** Whether the string is `MAJOR.MINOR.PATCH`. */
 export function isValidVersion(value: string): boolean {
   return VERSION_PATTERN.test(value)
 }
 
 /**
- * Разбирает версию.
+ * Parses a version.
  *
- * @throws Error если строка не соответствует виду `МАЖОР.МИНОР.ПАТЧ`.
+ * @throws Error if the string is not `MAJOR.MINOR.PATCH`.
  */
 export function parseVersion(value: string): IVersionParts {
   const match = VERSION_PATTERN.exec(value)
 
   if (match === null) {
-    throw new Error(`Версия должна иметь вид МАЖОР.МИНОР.ПАТЧ, получено: ${value}`)
+    throw new Error(`Version must look like MAJOR.MINOR.PATCH, received: ${value}`)
   }
 
-  /* Группы существуют по построению выражения, но проверка индексов
-     включена настройкой компилятора и обходить её приведением типа
-     значило бы отключить ровно ту защиту, ради которой она включена. */
+  /* Groups exist by construction of the regex, but index checks are
+     on in the compiler settings, and bypassing them with a cast would
+     disable exactly the protection they exist for. */
   const [, major = '0', minor = '0', patch = '0'] = match
 
   return { major: Number(major), minor: Number(minor), patch: Number(patch) }
 }
 
 /**
- * Сравнивает две версии.
+ * Compares two versions.
  *
- * @returns Отрицательное число, если `left` ниже `right`, ноль при
- *          равенстве, положительное, если `left` выше.
- * @throws Error если любая из строк составлена неверно.
+ * @returns Negative if `left` is below `right`, zero if equal,
+ *          positive if `left` is above.
+ * @throws Error if either string is malformed.
  */
 export function compareVersions(left: string, right: string): number {
   const first = parseVersion(left)

@@ -24,8 +24,8 @@ beforeEach(() => {
   service = new MnemonicService()
 })
 
-describe('MnemonicService: соответствие официальным векторам BIP-39', () => {
-  it.each(BIP39_VECTORS)('энтропия $entropy даёт ожидаемую фразу', ({ entropy, mnemonic }) => {
+describe('MnemonicService: official BIP-39 vectors', () => {
+  it.each(BIP39_VECTORS)('entropy $entropy yields the expected phrase', ({ entropy, mnemonic }) => {
     const buffer = service.fromEntropy(hexToBytes(entropy))
 
     try {
@@ -36,7 +36,7 @@ describe('MnemonicService: соответствие официальным ве�
   })
 
   it.each(BIP39_VECTORS)(
-    'фраза для $entropy восстанавливает исходную энтропию',
+    'the phrase for $entropy restores the original entropy',
     ({ entropy, mnemonic }) => {
       const buffer = service.fromPhrase(mnemonic)
       const recovered = service.toEntropy(buffer)
@@ -51,7 +51,7 @@ describe('MnemonicService: соответствие официальным ве�
   )
 
   it.each(BIP39_VECTORS.filter((vector) => vector.seed !== null))(
-    'seed для $entropy совпадает с эталоном',
+    'the seed for $entropy matches the reference',
     async ({ mnemonic, seed }) => {
       const buffer = service.fromPhrase(mnemonic)
       const derived = await service.toSeed(buffer, TREZOR_PASSPHRASE)
@@ -66,8 +66,8 @@ describe('MnemonicService: соответствие официальным ве�
   )
 })
 
-describe('MnemonicService: генерация', () => {
-  it('по умолчанию создаёт 12 слов', () => {
+describe('MnemonicService: generation', () => {
+  it('creates 12 words by default', () => {
     const buffer = service.generate()
 
     try {
@@ -77,7 +77,7 @@ describe('MnemonicService: генерация', () => {
     }
   })
 
-  it('создаёт 24 слова при стойкости 256 бит', () => {
+  it('creates 24 words at 256-bit strength', () => {
     const buffer = service.generate(MNEMONIC_STRENGTH.Words24)
 
     try {
@@ -87,7 +87,7 @@ describe('MnemonicService: генерация', () => {
     }
   })
 
-  it('создаёт фразу, проходящую собственную валидацию', () => {
+  it('creates a phrase that passes its own validation', () => {
     const buffer = service.generate(MNEMONIC_STRENGTH.Words24)
 
     try {
@@ -97,7 +97,7 @@ describe('MnemonicService: генерация', () => {
     }
   })
 
-  it('создаёт разные фразы при каждом вызове', () => {
+  it('creates a different phrase on every call', () => {
     const first = service.generate()
     const second = service.generate()
 
@@ -109,11 +109,11 @@ describe('MnemonicService: генерация', () => {
     }
   })
 
-  it('отвергает недопустимую стойкость', () => {
+  it('rejects an illegal strength', () => {
     expect(() => service.generate(192 as never)).toThrow(InvalidArgumentError)
   })
 
-  it('использует только слова из словаря', () => {
+  it('uses only wordlist words', () => {
     const buffer = service.generate(MNEMONIC_STRENGTH.Words24)
 
     try {
@@ -126,8 +126,8 @@ describe('MnemonicService: генерация', () => {
   })
 })
 
-describe('MnemonicService: валидация', () => {
-  it('принимает корректную фразу из 12 слов', () => {
+describe('MnemonicService: validation', () => {
+  it('accepts a valid 12-word phrase', () => {
     expect(service.validate(VALID_12)).toEqual({
       isValid: true,
       wordCount: 12,
@@ -136,13 +136,13 @@ describe('MnemonicService: валидация', () => {
     })
   })
 
-  it('принимает корректную фразу из 24 слов', () => {
+  it('accepts a valid 24-word phrase', () => {
     expect(service.validate(VALID_24).isValid).toBe(true)
   })
 
-  it.each(VALID_WORD_COUNTS)('признаёт допустимой длину %i слов', (count) => {
-    /* BIP-39: каждые три слова кодируют 32 бита энтропии,
-       то есть 4 байта. Отсюда 12 слов -> 16 байт, 24 слова -> 32 байта. */
+  it.each(VALID_WORD_COUNTS)('accepts a length of %i words', (count) => {
+    /* BIP-39: every three words encode 32 bits of entropy,
+       i.e. 4 bytes. Hence 12 words -> 16 bytes, 24 words -> 32 bytes. */
     const entropyBytes = (count * 4) / 3
     const buffer = service.fromEntropy(new Uint8Array(entropyBytes).fill(1))
 
@@ -153,18 +153,18 @@ describe('MnemonicService: валидация', () => {
     }
   })
 
-  it('отвергает пустой ввод', () => {
+  it('rejects empty input', () => {
     expect(service.validate('')).toMatchObject({
       isValid: false,
       reason: MNEMONIC_INVALID_REASON.Empty,
     })
   })
 
-  it('отвергает ввод из одних пробелов', () => {
+  it('rejects input of only whitespace', () => {
     expect(service.validate('   \n\t  ').reason).toBe(MNEMONIC_INVALID_REASON.Empty)
   })
 
-  it('отвергает недопустимое число слов', () => {
+  it('rejects an illegal word count', () => {
     expect(service.validate('abandon abandon about')).toMatchObject({
       isValid: false,
       wordCount: 3,
@@ -172,11 +172,11 @@ describe('MnemonicService: валидация', () => {
     })
   })
 
-  it('отвергает 13 слов', () => {
+  it('rejects 13 words', () => {
     expect(service.validate(`${VALID_12} about`).reason).toBe(MNEMONIC_INVALID_REASON.WordCount)
   })
 
-  it('указывает позиции слов вне словаря', () => {
+  it('reports positions of words outside the wordlist', () => {
     const phrase = VALID_12.replace(
       'abandon abandon abandon abandon',
       'abandon xyzzy abandon qwerty',
@@ -189,14 +189,14 @@ describe('MnemonicService: валидация', () => {
     })
   })
 
-  it('не раскрывает сами ошибочные слова, только позиции', () => {
+  it('does not reveal the wrong words themselves, only positions', () => {
     const result = service.validate(VALID_12.replace('about', 'xyzzy'))
 
     expect(JSON.stringify(result)).not.toContain('xyzzy')
   })
 
-  it('отвергает фразу с неверной контрольной суммой', () => {
-    /* Все слова из словаря, но последнее не соответствует контрольной сумме. */
+  it('rejects a phrase with a wrong checksum', () => {
+    /* Every word is in the wordlist, but the last does not match the checksum. */
     const phrase = VALID_12.replace(/about$/, 'abandon')
 
     expect(service.validate(phrase)).toMatchObject({
@@ -207,7 +207,7 @@ describe('MnemonicService: валидация', () => {
     })
   })
 
-  it('отвергает переставленные местами слова корректной фразы', () => {
+  it('rejects swapped words of a valid phrase', () => {
     const words = [...VALID_24.split(' ')]
     const [first] = words
     words[0] = words[23] as string
@@ -217,40 +217,40 @@ describe('MnemonicService: валидация', () => {
   })
 })
 
-describe('MnemonicService: нормализация ввода', () => {
-  it('игнорирует ведущие и завершающие пробелы', () => {
+describe('MnemonicService: input normalisation', () => {
+  it('ignores leading and trailing spaces', () => {
     expect(service.validate(`   ${VALID_12}   `).isValid).toBe(true)
   })
 
-  it('схлопывает повторяющиеся пробелы', () => {
+  it('collapses repeated spaces', () => {
     expect(service.validate(VALID_12.replace(/ /g, '   ')).isValid).toBe(true)
   })
 
-  it('принимает перевод строки как разделитель', () => {
+  it('accepts a newline as a separator', () => {
     expect(service.validate(VALID_12.replace(/ /g, '\n')).isValid).toBe(true)
   })
 
-  it('приводит верхний регистр к нижнему', () => {
+  it('forces upper case to lower case', () => {
     expect(service.validate(VALID_12.toUpperCase()).isValid).toBe(true)
   })
 
-  it('удаляет неразрывные пробелы из скопированного текста', () => {
+  it('removes non-breaking spaces from copied text', () => {
     expect(service.validate(VALID_12.replace(/ /g, ' ')).isValid).toBe(true)
   })
 
-  it('удаляет идеографические пробелы', () => {
+  it('removes ideographic spaces', () => {
     expect(service.validate(VALID_12.replace(/ /g, '\u3000')).isValid).toBe(true)
   })
 
-  it('удаляет символы нулевой ширины и BOM', () => {
+  it('removes zero-width characters and BOM', () => {
     expect(service.validate(`\u200B${VALID_12}\uFEFF`).isValid).toBe(true)
   })
 
-  it('удаляет мягкие переносы из скопированного текста', () => {
+  it('removes soft hyphens from copied text', () => {
     expect(service.validate(`aban\u00ADdon${VALID_12.slice(7)}`).isValid).toBe(true)
   })
 
-  it('сохраняет нормализованный вид при импорте', () => {
+  it('keeps the normalised form on import', () => {
     const buffer = service.fromPhrase(`  ${VALID_12.toUpperCase()}  `)
 
     try {
@@ -261,8 +261,8 @@ describe('MnemonicService: нормализация ввода', () => {
   })
 })
 
-describe('MnemonicService: импорт', () => {
-  it('импортирует корректную фразу', () => {
+describe('MnemonicService: import', () => {
+  it('imports a valid phrase', () => {
     const buffer = service.fromPhrase(VALID_12)
 
     try {
@@ -273,7 +273,7 @@ describe('MnemonicService: импорт', () => {
     }
   })
 
-  it('сообщает причину отказа в поле reason', () => {
+  it('reports the failure reason in the reason field', () => {
     expect.assertions(2)
 
     try {
@@ -284,7 +284,7 @@ describe('MnemonicService: импорт', () => {
     }
   })
 
-  it('не раскрывает фразу в тексте ошибки', () => {
+  it('does not reveal the phrase in the error text', () => {
     expect.assertions(1)
 
     try {
@@ -295,8 +295,8 @@ describe('MnemonicService: импорт', () => {
   })
 })
 
-describe('MnemonicService: экспорт и энтропия', () => {
-  it('раскрывает фразу списком слов', () => {
+describe('MnemonicService: export and entropy', () => {
+  it('reveals the phrase as a list of words', () => {
     const buffer = service.fromPhrase(VALID_12)
 
     try {
@@ -309,7 +309,7 @@ describe('MnemonicService: экспорт и энтропия', () => {
     }
   })
 
-  it('обратим: энтропия -> фраза -> энтропия', () => {
+  it('is reversible: entropy -> phrase -> entropy', () => {
     const original = new Uint8Array(32)
     original.set([1, 2, 3, 4, 5])
 
@@ -324,15 +324,15 @@ describe('MnemonicService: экспорт и энтропия', () => {
     }
   })
 
-  it('отвергает энтропию недопустимой длины', () => {
+  it('rejects entropy of an illegal length', () => {
     expect(() => service.fromEntropy(new Uint8Array(17))).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает пустую энтропию', () => {
+  it('rejects empty entropy', () => {
     expect(() => service.fromEntropy(new Uint8Array(0))).toThrow(InvalidArgumentError)
   })
 
-  it('отказывается извлечь энтропию из повреждённой фразы', () => {
+  it('refuses to extract entropy from a damaged phrase', () => {
     const broken = SecretBuffer.fromUtf8(VALID_12.replace(/about$/, 'abandon'))
 
     try {
@@ -343,8 +343,8 @@ describe('MnemonicService: экспорт и энтропия', () => {
   })
 })
 
-describe('MnemonicService: вывод seed', () => {
-  it('даёт ровно 64 байта', async () => {
+describe('MnemonicService: seed derivation', () => {
+  it('yields exactly 64 bytes', async () => {
     const buffer = service.fromPhrase(VALID_12)
     const seed = await service.toSeed(buffer)
 
@@ -356,7 +356,7 @@ describe('MnemonicService: вывод seed', () => {
     }
   })
 
-  it('детерминирован для одной и той же фразы', async () => {
+  it('is deterministic for the same phrase', async () => {
     const buffer = service.fromPhrase(VALID_12)
     const first = await service.toSeed(buffer)
     const second = await service.toSeed(buffer)
@@ -370,10 +370,10 @@ describe('MnemonicService: вывод seed', () => {
     }
   })
 
-  it('парольная фраза полностью меняет seed', async () => {
+  it('a passphrase changes the seed entirely', async () => {
     const buffer = service.fromPhrase(VALID_12)
     const withoutPassphrase = await service.toSeed(buffer)
-    const withPassphrase = await service.toSeed(buffer, 'дополнительный пароль')
+    const withPassphrase = await service.toSeed(buffer, 'additional password')
 
     try {
       expect(bytesToHex(withoutPassphrase.bytes)).not.toBe(bytesToHex(withPassphrase.bytes))
@@ -384,7 +384,7 @@ describe('MnemonicService: вывод seed', () => {
     }
   })
 
-  it('различает пустую и отсутствующую парольную фразу как одно и то же', async () => {
+  it('treats an empty and a missing passphrase as the same', async () => {
     const buffer = service.fromPhrase(VALID_12)
     const implicit = await service.toSeed(buffer)
     const explicit = await service.toSeed(buffer, '')
@@ -398,7 +398,7 @@ describe('MnemonicService: вывод seed', () => {
     }
   })
 
-  it('отказывается работать с затёртым буфером', async () => {
+  it('refuses to work with a wiped buffer', async () => {
     const buffer = service.fromPhrase(VALID_12)
     buffer.wipe()
 
@@ -406,28 +406,28 @@ describe('MnemonicService: вывод seed', () => {
   })
 })
 
-describe('MnemonicService: подсказки при вводе', () => {
-  it('находит слова по префиксу', () => {
+describe('MnemonicService: typing suggestions', () => {
+  it('finds words by prefix', () => {
     expect(service.findWordsByPrefix('aban')).toContain('abandon')
   })
 
-  it('ограничивает число подсказок', () => {
+  it('caps the number of suggestions', () => {
     expect(service.findWordsByPrefix('a', 3)).toHaveLength(3)
   })
 
-  it('возвращает пустой список для пустого префикса', () => {
+  it('returns an empty list for an empty prefix', () => {
     expect(service.findWordsByPrefix('')).toEqual([])
   })
 
-  it('возвращает пустой список для несуществующего префикса', () => {
+  it('returns an empty list for a nonexistent prefix', () => {
     expect(service.findWordsByPrefix('qwertyuiop')).toEqual([])
   })
 
-  it('нечувствителен к регистру', () => {
+  it('is case-insensitive', () => {
     expect(service.findWordsByPrefix('ABAN')).toContain('abandon')
   })
 
-  it('возвращает пустой список при нулевом лимите', () => {
+  it('returns an empty list at a zero limit', () => {
     expect(service.findWordsByPrefix('aban', 0)).toEqual([])
   })
 })

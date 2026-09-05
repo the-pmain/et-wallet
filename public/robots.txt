@@ -1,6 +1,6 @@
-# Кошелёк не является публичным сайтом: его не нужно ни обходить,
-# ни показывать в выдаче. Этот файл останавливает роботов, которые
-# читают только robots.txt. Запрет обхода не заменяет noindex —
-# тот стоит метатегом и заголовком X-Robots-Tag.
+# The wallet is not a public site: it should not be crawled or shown
+# in search results. This file stops robots that only read robots.txt.
+# A crawl ban does not replace noindex — that lives on the meta tag
+# and the X-Robots-Tag header.
 User-agent: *
 Disallow: /

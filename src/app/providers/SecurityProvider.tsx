@@ -17,26 +17,25 @@ interface SecurityProviderProps {
   readonly settingsRepository: SecuritySettingsRepository
 
   /**
-   * Хранилище приложения.
+   * App storage.
    *
-   * Нужно ровно ради одного вопроса: переживут ли данные закрытие
-   * вкладки и не вправе ли браузер их вытеснить. Ответ определяет,
-   * увидит ли владелец предупреждение о риске потерять кошелёк.
+   * Needed for exactly one question: will the data survive a tab
+   * close, and may the browser evict it. The answer decides whether
+   * the owner sees a warning about losing the wallet.
    */
   readonly storage: IStorageService
 }
 
 /**
- * Модуль безопасности приложения.
+ * App security module.
  *
- * СОБИРАЕТСЯ ЗДЕСЬ, ПОТОМУ ЧТО ОБЪЕДИНЯЕТ РАЗНЫЕ СЛОИ: отсчёт времени
- * из ядра, события браузера, состояние блокировки из онбординга
- * и настройки из хранилища. Ни один из этих слоёв не вправе знать
- * об остальных.
+ * ASSEMBLED HERE BECAUSE IT JOINS DIFFERENT LAYERS: time from core,
+ * browser events, lock state from onboarding, and settings from
+ * storage. None of those layers may know about the others.
  *
- * НАСТРОЙКИ ЧИТАЮТСЯ ДО РАЗБЛОКИРОВКИ. Срок автоблокировки хранится
- * незашифрованным именно ради этого: иначе кошелёк не знал бы, через
- * сколько блокироваться, пока пароль не введён.
+ * SETTINGS ARE READ BEFORE UNLOCK. The auto-lock timeout is stored
+ * unencrypted for this reason: otherwise the wallet would not know
+ * when to lock until the password is entered.
  */
 export function SecurityProvider({
   children,
@@ -50,9 +49,9 @@ export function SecurityProvider({
   const [settings, setSettings] = useState<ISecuritySettings>(DEFAULT_SECURITY_SETTINGS)
   const [storageDurability, setStorageDurability] = useState<StorageDurability | null>(null)
 
-  /* Состояние хранилища читается один раз: оно не меняется в течение
-     сессии, а запрос разрешения на постоянное хранение выполняется
-     при открытии базы. */
+  /* Storage state is read once: it does not change during a session,
+     and the persistent-storage permission request runs when the
+     database opens. */
   useEffect(() => {
     let isActive = true
 
@@ -81,9 +80,9 @@ export function SecurityProvider({
     }
   }, [settingsRepository])
 
-  /* Блокировка вынесена в стабильную ссылку: хук автоблокировки
-     пересоздавал бы подписки на каждый рендер, а вместе с ними
-     и отсчёт — сессия не истекла бы никогда. */
+  /* Lock is a stable reference: the auto-lock hook would recreate
+     subscriptions on every render, and with them the countdown —
+     the session would never expire. */
   const handleExpire = useCallback(() => {
     onboarding.lock()
   }, [onboarding])

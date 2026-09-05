@@ -4,58 +4,59 @@ import type { ChainId } from '@/core/types'
 import type { IAddNetworkParams, INetworkConfig, NetworkEventMap } from './types'
 
 /**
- * Управление списком сетей и выбором активной.
+ * Manages the network list and the active selection.
  *
- * Сервис работает только с конфигурациями. Сетевые запросы выполняет
- * `IProvider`: смешение конфигурации и транспорта в одном объекте — типичная
- * ошибка, из-за которой конфигурацию сети становится невозможно сохранить
- * в хранилище (в ней оказываются сокеты и внутреннее состояние соединения).
+ * The service works with configurations only. Network requests are
+ * made by `IProvider`: mixing configuration and transport in one
+ * object is a typical mistake that makes a network config
+ * impossible to persist (sockets and connection state end up in it).
  */
 export interface INetworkService extends IEventSource<NetworkEventMap> {
   /**
-   * Загружает сети и восстанавливает выбор активной.
+   * Loads networks and restores the active selection.
    *
-   * Встроенные сети берутся из кода и имеют приоритет над сохранёнными
-   * копиями. Это защита от подмены: перезаписанный в хранилище RPC-адрес
-   * основной сети был бы использован при каждом запуске.
+   * Built-in networks come from code and take priority over saved
+   * copies. That is the defence against substitution: an RPC
+   * address of the main network overwritten in storage would be
+   * used on every launch.
    */
   init(): Promise<void>
 
   /**
-   * Активная сеть.
+   * Active network.
    *
-   * @throws NotInitializedError если `init()` ещё не вызван.
+   * @throws NotInitializedError if `init()` has not been called yet.
    */
   getActive(): INetworkConfig
 
-  /** Все доступные сети: встроенные, затем добавленные пользователем. */
+  /** All available networks: built-in first, then user-added. */
   list(): readonly INetworkConfig[]
 
-  /** Поиск по идентификатору. `null`, если сеть не зарегистрирована. */
+  /** Lookup by id. `null` if the network is not registered. */
   getByChainId(chainId: ChainId): INetworkConfig | null
 
   /**
-   * Переключает активную сеть.
+   * Switches the active network.
    *
-   * Переключение НЕ снимает и НЕ ставит блокировку кошелька: состояние
-   * блокировки и выбор сети независимы.
+   * Switching does NOT lock or unlock the wallet: lock state and
+   * network selection are independent.
    *
-   * Повторное переключение на уже активную сеть не порождает события.
+   * Switching again to the already-active network does not emit.
    *
    * @throws NetworkNotFoundError, NotInitializedError
    */
   switchTo(chainId: ChainId): Promise<void>
 
   /**
-   * Добавляет пользовательскую сеть.
+   * Adds a user network.
    *
-   * До сохранения выполняются две проверки:
-   * 1. Схема каждого RPC-адреса — только `https:` и `wss:`.
-   * 2. Запрос `eth_chainId` у узла и сверка с заявленным значением.
+   * Two checks run before save:
+   * 1. Each RPC address scheme is only `https:` or `wss:`.
+   * 2. An `eth_chainId` request to the node, checked against the claimed value.
    *
-   * Второй пункт закрывает сценарий, в котором сайт предлагает добавить
-   * «ту же сеть с более быстрым узлом», а узел на деле обслуживает другую
-   * сеть и получает подписи, пригодные для повторного проигрывания.
+   * The second closes the scenario where a site offers to add
+   * "the same network with a faster node", while the node in fact
+   * serves another network and collects signatures fit for replay.
    *
    * @throws NetworkAlreadyExistsError, InsecureRpcUrlError,
    *         InvalidRpcUrlError, ChainIdMismatchError, ProviderUnavailableError
@@ -63,19 +64,19 @@ export interface INetworkService extends IEventSource<NetworkEventMap> {
   add(params: IAddNetworkParams): Promise<INetworkConfig>
 
   /**
-   * Удаляет пользовательскую сеть.
+   * Removes a user network.
    *
-   * Если удаляется активная сеть, активной становится сеть по умолчанию.
+   * If the active network is removed, the default network becomes active.
    *
    * @throws NetworkNotFoundError, BuiltInNetworkImmutableError
    */
   remove(chainId: ChainId): Promise<void>
 
   /**
-   * Изменяет параметры пользовательской сети.
+   * Changes parameters of a user network.
    *
-   * Изменение `chainId` не поддерживается: это создание другой сети,
-   * а не правка существующей.
+   * Changing `chainId` is not supported: that is creating another
+   * network, not editing the existing one.
    *
    * @throws NetworkNotFoundError, BuiltInNetworkImmutableError,
    *         InsecureRpcUrlError, InvalidRpcUrlError
@@ -84,12 +85,13 @@ export interface INetworkService extends IEventSource<NetworkEventMap> {
 }
 
 /**
- * Долговременное хранение конфигураций сетей.
+ * Long-term storage of network configurations.
  *
- * Репозиторий отделён от сервиса по принципу разделения обязанностей:
- * сервис содержит правила предметной области (что можно удалять, что надо
- * проверять), репозиторий — только доступ к данным. Это позволяет заменить
- * хранилище, не трогая правила, и тестировать правила без хранилища.
+ * The repository is split from the service by responsibility:
+ * the service holds domain rules (what may be deleted, what must
+ * be checked), the repository — data access only. That lets the
+ * store be replaced without touching the rules, and the rules
+ * tested without a store.
  */
 export interface INetworkRepository {
   findAll(): Promise<readonly INetworkConfig[]>
@@ -97,7 +99,6 @@ export interface INetworkRepository {
   save(config: INetworkConfig): Promise<void>
   delete(chainId: ChainId): Promise<void>
 
-  /** Сохранённый выбор активной сети. */
   getActiveChainId(): Promise<ChainId | null>
   setActiveChainId(chainId: ChainId): Promise<void>
 }

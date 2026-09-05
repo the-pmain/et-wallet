@@ -3,31 +3,30 @@ import type { Plugin } from 'vite'
 import { buildContentSecurityPolicy } from './csp-plugin'
 
 /**
- * Заголовки безопасности для размещения.
+ * Security headers for hosting.
  *
- * ЗАЧЕМ ОНИ, ЕСЛИ ЕСТЬ META-ТЕГ. Метатег не поддерживает `frame-ancestors`
- * и `report-*`: встраивание кошелька в чужую страницу им не запретить.
- * Страница кошелька в невидимом кадре поверх чужой — это подпись,
- * которую владелец сделал, целясь в другую кнопку.
+ * WHY THESE IF THERE IS A META TAG. The meta tag does not support
+ * `frame-ancestors` or `report-*`: it cannot stop the wallet being
+ * framed on a foreign page. A wallet page in an invisible frame over
+ * another page is a signature the owner made while aiming at another
+ * button.
  *
- * ЗАГОЛОВКИ ПОРОЖДАЮТСЯ ИЗ ТОГО ЖЕ ИСТОЧНИКА, ЧТО И МЕТАТЕГ. Два списка
- * директив, написанные руками, расходятся при первом же изменении,
- * и расхождение это молчаливое: сборка проходит, проверки проходят,
- * а политика на боевом размещении оказывается слабее объявленной.
+ * HEADERS ARE GENERATED FROM THE SAME SOURCE AS THE META TAG. Two
+ * hand-written directive lists diverge on the first change, and the
+ * divergence is silent: the build passes, tests pass, and the live
+ * policy is weaker than the declared one.
  */
 
 /**
- * Разрешения браузера.
+ * Browser permissions.
  *
- * КАМЕРА И HID НУЖНЫ ПО ДЕЛУ, а не «на всякий случай»: первая читает
- * ссылку подключения со штрих-кода, второй разговаривает с аппаратным
- * кошельком. Размещение, оставившее настройки по умолчанию, отключило бы
- * обе возможности молча — они просто перестали бы работать без единого
- * сообщения.
+ * CAMERA AND HID ARE NEEDED FOR REAL WORK, not "just in case": the
+ * first reads a connect link from a barcode, the second talks to a
+ * hardware wallet. A host that left defaults would silently disable
+ * both — they would simply stop working with no message.
  *
- * Всё остальное закрыто явно: перечислять только нужное безопаснее,
- * чем полагаться на умолчания браузера, которые меняются от версии
- * к версии.
+ * Everything else is closed explicitly: listing only what is needed
+ * is safer than relying on browser defaults that change by version.
  */
 const PERMISSIONS_POLICY = [
   'camera=(self)',
@@ -48,81 +47,77 @@ const PERMISSIONS_POLICY = [
 ].join(', ')
 
 /**
- * Значение `X-Robots-Tag` и метатега `robots`.
+ * Value of `X-Robots-Tag` and the `robots` meta tag.
  *
- * ОДНА СТРОКА НА ВСЕ ПОВЕРХНОСТИ. Заголовок размещения, Vite
- * (dev и preview) и метатег в `index.html` обязаны говорить
- * одно и то же: иначе робот, пришедший одним путём, получит
- * разрешение, которого нет на другом.
+ * ONE STRING ON EVERY SURFACE. The host header, Vite (dev and
+ * preview), and the meta tag in `index.html` must say the same
+ * thing: otherwise a robot that arrived by one path gets a
+ * permission the other path does not grant.
  */
 export const ROBOTS_TAG_VALUE =
   'noindex, nofollow, noarchive, nosnippet, noimageindex'
 
-/** Заголовок безопасности: имя и значение. */
 export interface ISecurityHeader {
   readonly name: string
   readonly value: string
 }
 
 /**
- * Заголовки, обязательные для размещения кошелька.
+ * Headers required to host the wallet.
  *
- * @param connectSrc Источники соединений. По умолчанию — как в метатеге.
+ * @param connectSrc Connect sources. Default matches the meta tag.
  */
 export function buildSecurityHeaders(connectSrc?: string): readonly ISecurityHeader[] {
   return [
     {
       name: 'Content-Security-Policy',
-      /* `frame-ancestors` добавляется только здесь: метатег эту
-         директиву игнорирует, и объявлять её там значило бы создавать
-         видимость защиты. */
+      /* `frame-ancestors` is added only here: the meta tag ignores
+         that directive, and declaring it there would fake a defense. */
       value: `${buildContentSecurityPolicy(connectSrc)}; frame-ancestors 'none'`,
     },
-    /* Дублирует `frame-ancestors` для браузеров, которые её не знают.
-       Стоит одной строки. */
+    /* Duplicates `frame-ancestors` for browsers that do not know it.
+       One line. */
     { name: 'X-Frame-Options', value: 'DENY' },
     { name: 'X-Content-Type-Options', value: 'nosniff' },
     /*
-      Кошелёк — клиент, а не публичный сайт. Метатег `robots` видят
-      только те, кто загрузил HTML. Заголовок закрывает и ответы без
-      разметки: JSON API, скрипты, значки. `noarchive` / `nosnippet`
-      не дают поисковику держать копию страницы, если URL всё же
-      попал в индекс по внешней ссылке.
+      The wallet is a client, not a public site. The `robots` meta tag
+      is seen only by those who loaded HTML. The header also covers
+      responses without markup: JSON API, scripts, icons. `noarchive`
+      / `nosnippet` keep a search engine from holding a page copy if
+      the URL still lands in the index via an inbound link.
     */
     { name: 'X-Robots-Tag', value: ROBOTS_TAG_VALUE },
     /*
-      Ни один адрес кошелька не должен уходить чужому серверу в заголовке
-      перехода. Адресная строка содержит маршрут, а маршруты у нас
-      не содержат адресов — но полагаться на это как на постоянное
-      свойство нельзя.
+      No wallet address should leave in a Referer to a foreign server.
+      The location bar holds a route, and our routes hold no addresses
+      — but that must not be treated as a permanent property.
     */
     { name: 'Referrer-Policy', value: 'no-referrer' },
     /*
-      Два года и с поддоменами: перехват первого же обращения по HTTP
-      позволяет подменить всю страницу, а страница и есть кошелёк.
-      `preload` включает домен в список браузеров — там он защищён
-      с самого первого посещения.
+      Two years and subdomains: intercepting the first HTTP request
+      can swap the whole page, and the page is the wallet. `preload`
+      puts the domain on the browser list — protected from the first
+      visit.
     */
     {
       name: 'Strict-Transport-Security',
       value: 'max-age=63072000; includeSubDomains; preload',
     },
     { name: 'Permissions-Policy', value: PERMISSIONS_POLICY },
-    /* Окно, открытое кошельком либо открывшее его, не получает ссылки
-       на его контекст. */
+    /* A window the wallet opened, or that opened it, does not get a
+       handle to its context. */
     { name: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
     { name: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
   ]
 }
 
 /**
- * Правила хранения в кэше.
+ * Cache rules.
  *
- * ФАЙЛЫ СБОРКИ НЕИЗМЕНЯЕМЫ, ТОЧКА ВХОДА — НЕТ. Имена в `assets`
- * содержат отпечаток содержимого, поэтому их можно хранить сколько
- * угодно. `index.html` имени не меняет: сохрани его браузер надолго —
- * и человек остался бы на прежней сборке, включая ту, из которой
- * исправлена уязвимость.
+ * BUILD FILES ARE IMMUTABLE; THE ENTRY IS NOT. Names in `assets`
+ * include a content hash, so they can be cached forever. `index.html`
+ * does not change name: if the browser kept it long, the user would
+ * stay on the previous build — including one with a fixed hole.
  */
 const CACHE_RULES: readonly { readonly path: string; readonly value: string }[] = [
   { path: '/assets/*', value: 'public, max-age=31536000, immutable' },
@@ -130,7 +125,6 @@ const CACHE_RULES: readonly { readonly path: string; readonly value: string }[] 
   { path: '/', value: 'no-cache' },
 ]
 
-/** Формирует файл `_headers` (Netlify, Cloudflare Pages). */
 export function buildNetlifyHeaders(connectSrc?: string): string {
   const lines = ['/*']
 
@@ -145,21 +139,21 @@ export function buildNetlifyHeaders(connectSrc?: string): string {
   return `${lines.join('\n')}\n`
 }
 
-/** Формирует фрагмент настройки nginx. */
 export function buildNginxSnippet(connectSrc?: string): string {
   const lines = [
-    '# Заголовки безопасности для ETWallet.',
+    '# Security headers for ETWallet.',
     '#',
-    '# Файл порождён сборкой из того же источника, что и метатег политики:',
-    '# править его руками нельзя — правка потеряется при следующей сборке.',
+    '# This file is generated by the build from the same source as the',
+    '# policy meta tag: do not edit it by hand — the next build will',
+    '# overwrite the change.',
     '#',
-    '# Подключение: include этого файла внутри блока server.',
+    '# Wire-up: include this file inside the server block.',
     '',
   ]
 
   for (const header of buildSecurityHeaders(connectSrc)) {
-    /* `always` обязателен: без него заголовок не ставится на ответах
-       с кодом ошибки, а страница ошибки — тоже страница. */
+    /* `always` is required: without it the header is omitted on
+       error responses, and an error page is still a page. */
     lines.push(`add_header ${header.name} "${header.value}" always;`)
   }
 
@@ -178,11 +172,11 @@ export function buildNginxSnippet(connectSrc?: string): string {
 }
 
 /**
- * Кладёт файлы настройки размещения рядом со сборкой.
+ * Writes host config files next to the build.
  *
- * Файлы попадают в `dist`, а не в репозиторий: они выведены из политики
- * и обязаны меняться вместе с ней. Файл в репозитории пришлось бы
- * обновлять руками, и он разошёлся бы с действующей политикой молча.
+ * Files land in `dist`, not the repository: they are derived from
+ * the policy and must change with it. A repo file would have to be
+ * updated by hand and would silently drift from the live policy.
  */
 export function securityHeadersPlugin(): Plugin {
   return {

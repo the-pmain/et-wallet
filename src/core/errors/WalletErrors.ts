@@ -2,14 +2,14 @@ import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 
 /**
- * Ошибки жизненного цикла кошелька, доступа и работы с ключами.
+ * Wallet lifecycle, access, and key-handling errors.
  *
- * Общее правило для всех классов ниже: сообщение НЕ содержит ни введённого
- * пароля, ни фрагментов мнемоники, ни приватного ключа. Даже часть секрета
- * в тексте ошибки означает его попадание в журнал и в отчёт о сбое.
+ * Common rule for every class below: the message contains neither the
+ * entered password, nor mnemonic fragments, nor a private key. Even
+ * part of a secret in an error text means it lands in the log and in
+ * a crash report.
  */
 
-/** Операция требует снятой блокировки. */
 export class WalletLockedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WalletLocked
 
@@ -18,7 +18,6 @@ export class WalletLockedError extends AppError {
   }
 }
 
-/** Кошелёк ещё не создан и не импортирован. */
 export class WalletNotInitializedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WalletNotInitialized
 
@@ -27,7 +26,6 @@ export class WalletNotInitializedError extends AppError {
   }
 }
 
-/** Попытка создать кошелёк поверх существующего. */
 export class WalletAlreadyInitializedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WalletAlreadyInitialized
 
@@ -39,9 +37,9 @@ export class WalletAlreadyInitializedError extends AppError {
 /**
  * Wrong password.
  *
- * Сообщение намеренно не уточняет, что именно не сошлось. Отличие
- * «неверный пароль» от «хранилище повреждено» — это информация для
- * подбирающего пароль, а не для пользователя.
+ * The message deliberately does not say what failed to match.
+ * Distinguishing "wrong password" from "vault corrupted" is
+ * information for a password-guesser, not for the user.
  */
 export class InvalidPasswordError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidPassword
@@ -52,17 +50,16 @@ export class InvalidPasswordError extends AppError {
 }
 
 /**
- * Попыток ввода пароля слишком много: ввод временно закрыт.
+ * Too many password attempts: input is temporarily closed.
  *
- * ОТДЕЛЬНАЯ ОШИБКА, А НЕ «НЕВЕРНЫЙ ПАРОЛЬ». Различие видно и без неё —
- * по тому, что форма перестала принимать ввод, — и скрывать его значит
- * оставить владельца в недоумении, почему верный пароль не подходит.
- * Подбирающему это ничего не даёт: он и так упирается в задержку.
+ * A SEPARATE ERROR, NOT "WRONG PASSWORD". The difference is visible
+ * without it — the form stopped accepting input — and hiding it leaves
+ * the owner wondering why the correct password does not work. A
+ * guesser gains nothing: they already hit the delay.
  */
 export class TooManyAttemptsError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.TooManyAttempts
 
-  /** Через сколько миллисекунд можно повторить. */
   readonly retryAfterMs: number
 
   constructor(retryAfterMs: number) {
@@ -71,7 +68,6 @@ export class TooManyAttemptsError extends AppError {
   }
 }
 
-/** Пароль не удовлетворяет политике сложности. */
 export class WeakPasswordError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.WeakPassword
 
@@ -81,24 +77,23 @@ export class WeakPasswordError extends AppError {
 }
 
 /**
- * Причина непригодности мнемонической фразы.
+ * Why a mnemonic is invalid.
  *
- * Различение обязательно для интерфейса: «в слове опечатка» и «не сходится
- * контрольная сумма» требуют разных действий пользователя. Единое сообщение
- * «фраза некорректна» оставляет его наедине с 24 словами и без подсказки,
- * где искать ошибку, — а цена нерешённой проблемы здесь равна потере доступа
- * к средствам.
+ * Distinguishing is required for the UI: "a typo in a word" and
+ * "checksum does not match" need different user actions. A single
+ * "phrase is invalid" leaves them with 24 words and no hint where to
+ * look — and the cost of an unsolved problem here is losing access
+ * to the funds.
  */
 export const MNEMONIC_INVALID_REASON = {
-  /** Пустой ввод. */
   Empty: 'empty',
-  /** Число слов не входит в набор 12, 15, 18, 21, 24. */
+  /** Word count is not in {12, 15, 18, 21, 24}. */
   WordCount: 'word-count',
-  /** Одно или несколько слов отсутствуют в словаре BIP-39. */
+  /** One or more words are missing from the BIP-39 word list. */
   UnknownWord: 'unknown-word',
   /**
-   * Слова корректны, но контрольная сумма не сходится.
-   * Практически всегда означает перепутанный порядок слов.
+   * The words are valid, but the checksum does not match.
+   * Almost always means the word order was mixed up.
    */
   Checksum: 'checksum',
 } as const
@@ -106,7 +101,6 @@ export const MNEMONIC_INVALID_REASON = {
 export type MnemonicInvalidReason =
   (typeof MNEMONIC_INVALID_REASON)[keyof typeof MNEMONIC_INVALID_REASON]
 
-/** Понятные пояснения к каждой причине. Секретов не содержат. */
 const MNEMONIC_REASON_MESSAGE: Readonly<Record<MnemonicInvalidReason, string>> = {
   [MNEMONIC_INVALID_REASON.Empty]: 'the phrase is empty',
   [MNEMONIC_INVALID_REASON.WordCount]: 'the number of words is not allowed',
@@ -115,16 +109,17 @@ const MNEMONIC_REASON_MESSAGE: Readonly<Record<MnemonicInvalidReason, string>> =
 }
 
 /**
- * Мнемоническая фраза не прошла проверку BIP-39.
+ * The mnemonic failed BIP-39 validation.
  *
- * Сообщение НЕ содержит ни самой фразы, ни отдельных её слов: текст ошибки
- * попадает в журнал и в отчёт о сбое. Позиции ошибочных слов возвращаются
- * отдельно, через результат валидации, и остаются в памяти вызывающего кода.
+ * The message contains neither the phrase nor any of its words: error
+ * text lands in the log and in a crash report. Positions of bad words
+ * are returned separately, through the validation result, and stay in
+ * the caller's memory.
  */
 export class InvalidMnemonicError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidMnemonic
 
-  /** Машиночитаемая причина. Именно по ней интерфейс подбирает подсказку. */
+  /** Machine-readable reason. The UI picks a hint from this. */
   readonly reason: MnemonicInvalidReason
 
   constructor(reason: MnemonicInvalidReason) {
@@ -133,7 +128,6 @@ export class InvalidMnemonicError extends AppError {
   }
 }
 
-/** Приватный ключ имеет неверный формат или лежит вне допустимого диапазона. */
 export class InvalidPrivateKeyError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidPrivateKey
 
@@ -142,7 +136,6 @@ export class InvalidPrivateKeyError extends AppError {
   }
 }
 
-/** Аккаунт с указанным идентификатором или адресом не найден. */
 export class AccountNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AccountNotFound
 
@@ -151,7 +144,6 @@ export class AccountNotFoundError extends AppError {
   }
 }
 
-/** Аккаунт с таким адресом уже присутствует в кошельке. */
 export class AccountAlreadyExistsError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AccountAlreadyExists
 
@@ -161,15 +153,15 @@ export class AccountAlreadyExistsError extends AppError {
 }
 
 /**
- * Аккаунт не может быть удалён.
+ * The account cannot be removed.
  *
- * Относится к аккаунтам, выведенным из seed-фразы. Их удаление невозможно
- * не по решению разработчика, а по устройству BIP-32: тот же аккаунт
- * появится снова при следующем восстановлении кошелька по той же фразе.
+ * Applies to accounts derived from the seed phrase. They cannot be
+ * deleted not by developer choice but by BIP-32: the same account
+ * will reappear on the next restore from the same phrase.
  *
- * Кнопка «удалить», которая на деле лишь прячет запись, вводит пользователя
- * в заблуждение относительно того, что происходит с его средствами.
- * Честное поведение — отказ с объяснением и предложение скрыть аккаунт.
+ * A "delete" button that only hides the record misleads the user
+ * about what happens to their funds. Honest behaviour is a refusal
+ * with an explanation and an offer to hide the account.
  */
 export class AccountNotRemovableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.AccountNotRemovable
@@ -179,7 +171,6 @@ export class AccountNotRemovableError extends AppError {
   }
 }
 
-/** Набор ключей не найден. */
 export class KeyringNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.KeyringNotFound
 
@@ -189,10 +180,10 @@ export class KeyringNotFoundError extends AppError {
 }
 
 /**
- * Набор ключей не способен подписывать.
+ * The keyring cannot sign.
  *
- * Штатная ситуация для watch-only аккаунтов и для аппаратного кошелька,
- * который не подключён физически.
+ * A normal situation for watch-only accounts and for a hardware
+ * wallet that is not physically connected.
  */
 export class KeyringCannotSignError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.KeyringCannotSign
@@ -203,10 +194,11 @@ export class KeyringCannotSignError extends AppError {
 }
 
 /**
- * Экспорт секрета запрещён.
+ * Secret export is forbidden.
  *
- * Возникает при попытке выгрузить приватный ключ из аппаратного кошелька
- * (физически невозможно) либо при отсутствии явного подтверждения операции.
+ * Arises when trying to dump a private key from a hardware wallet
+ * (physically impossible) or when the operation was not explicitly
+ * confirmed.
  */
 export class ExportNotPermittedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.ExportNotPermitted

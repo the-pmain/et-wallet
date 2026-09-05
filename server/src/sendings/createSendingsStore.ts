@@ -15,11 +15,11 @@ const MISSING_TABLE_WARNING =
   'Supabase table public.sendings is missing. In Supabase → SQL Editor, run server/supabase/allow-sendings-inserts.sql and server/supabase/sendings-rls.sql, then restart the server. Using in-memory sendings storage until then.'
 
 /**
- * Собирает хранилище переводов.
+ * Builds the sendings store.
  *
- * Есть `SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` — запись идёт в
- * `public.sendings` через REST service-role клиентом (обходит RLS) после
- * сверки в Node. Иначе мок живёт в памяти процесса.
+ * With `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — writes go to
+ * `public.sendings` via the REST service-role client (bypasses RLS)
+ * after the Node check. Otherwise the mock lives in process memory.
  */
 export async function createSendingsStore(config: IServerConfig): Promise<ISendingsStore> {
   if (config.supabaseUrl !== null && config.supabaseServiceRoleKey === null) {

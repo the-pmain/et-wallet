@@ -13,95 +13,92 @@ import type { BalanceEventMap, IAccountBalances, IBalance } from './types'
 const SERVICE_NAME = 'BalanceService'
 
 /**
- * Сколько балансов токенов запрашивается одновременно.
+ * How many token balances are requested at once.
  *
- * Четыре — значение, при котором обычный кошелёк с пятью-десятью
- * токенами обновляется за две-три задержки сети вместо десяти, а узел
- * не начинает отвечать отказом по превышению частоты.
+ * Four is the value at which an ordinary wallet with five to ten
+ * tokens refreshes in two or three network delays instead of ten,
+ * and the node does not start refusing for rate limits.
  */
 const TOKEN_BALANCE_CONCURRENCY = 4
 
 /**
- * Сколько значение считается свежим.
+ * How long a value is considered fresh.
  *
- * Блок в сетях EVM выходит за секунды, но опрос узла с той же частотой
- * бессмыслен: баланс меняется только от операций пользователя и входящих
- * переводов. Пятнадцать секунд — компромисс между заметностью изменения
- * и нагрузкой на публичный узел.
+ * A block on EVM networks lands in seconds, but polling the node at
+ * that rate is pointless: the balance changes only from the user's
+ * own operations and incoming transfers. Fifteen seconds is a
+ * compromise between noticing a change and load on a public node.
  */
 const DEFAULT_FRESHNESS_MS = 15_000
 
 /**
- * Период фонового опроса при активной подписке.
+ * Background-poll period while a subscription is active.
  *
- * Заметно больше срока свежести: подписка нужна, чтобы значение обновлялось
- * само, а не чтобы держать его максимально точным. Более частый опрос
- * публичного узла раскрывает активность пользователя и упирается в лимиты.
+ * Noticeably longer than the freshness window: a subscription is
+ * there so the value updates itself, not so it stays maximally
+ * exact. More frequent polling of a public node reveals the user's
+ * activity and hits the limits.
  */
 const DEFAULT_POLL_INTERVAL_MS = 30_000
 
-/** Ссылка на нативную валюту сети: контракта у неё нет. */
+/** Reference to the network native currency: it has no contract. */
 function nativeTokenRef(chainId: ChainId): ITokenRef {
   return { chainId, address: null }
 }
 
-/** Настройки сервиса. */
 export interface IBalanceServiceOptions {
   readonly freshnessMs?: number
   readonly pollIntervalMs?: number
 }
 
-/** Зависимости сервиса. */
 export interface IBalanceServiceDependencies {
-  /* Узкий контракт «дай соединение», а не конкретный кэш: сервису
-     безразлично, кто и как обеспечивает переиспользование соединений,
-     и зависимость от класса мешала бы заменить `ProviderPool`
-     на `RpcManager` с переключением на резервный узел. */
+  /* A narrow "give me a connection" contract, not a concrete cache:
+     the service does not care who reuses connections or how, and a
+     class dependency would block replacing `ProviderPool` with
+     `RpcManager` and failover. */
   readonly providers: IProviderResolver
   readonly networks: INetworkService
   readonly clock: IClock
   readonly logger: ILogger
 
   /**
-   * Сервис токенов.
+   * Token service.
    *
-   * Необязателен: балансом нативной валюты сервис занимается сам.
-   * Без него запрос баланса токена завершается отказом, а не нулём —
-   * ноль означал бы утверждение «токенов нет».
+   * Optional: the service handles the native-currency balance
+   * itself. Without it a token-balance request fails, it does not
+   * return zero — zero would claim "there are no tokens".
    */
   readonly tokens?: ITokenService
 
   readonly options?: IBalanceServiceOptions
 }
 
-/** Запись кэша. */
 interface ICacheEntry {
   readonly raw: Wei
   readonly updatedAt: Timestamp
 }
 
-/** Активная подписка на обновление. */
 interface ISubscription {
   count: number
   cancel: Unsubscribe
 }
 
 /**
- * Балансы нативной валюты с кэшированием и фоновым обновлением.
+ * Native-currency balances with caching and background refresh.
  *
- * ОБЪЁМ РЕАЛИЗАЦИИ. Нативная валюта читается и кэшируется здесь, балансы
- * токенов — через `ITokenService`, который умеет обращаться к контрактам.
- * Кэшируется пока только нативный баланс: список токенов меняется реже,
- * но его значения запрашиваются заново при каждом обновлении.
+ * SCOPE. The native currency is read and cached here; token
+ * balances go through `ITokenService`, which can talk to contracts.
+ * Only the native balance is cached for now: the token list changes
+ * less often, but its values are re-fetched on every refresh.
  *
- * `getToken` НЕ ВОЗВРАЩАЕТ НОЛЬ ПРИ ОТКАЗЕ. Нулевой баланс — это
- * утверждение «токенов нет», и пользователь, увидевший его вместо
- * отказа, решит, что средства пропали. Недоступность обязана выглядеть
- * как недоступность.
+ * `getToken` DOES NOT RETURN ZERO ON FAILURE. A zero balance is the
+ * claim "there are no tokens", and a user who sees it instead of a
+ * failure will decide the funds vanished. Unavailability must look
+ * like unavailability.
  *
- * УСТАРЕВШЕЕ ЗНАЧЕНИЕ ОТДАЁТСЯ, НО ПОМЕЧАЕТСЯ. Флаг `isStale` не украшение:
- * решение об отправке средств по сохранённому значению приводит к отказу
- * сети. Интерфейс обязан показывать признак устаревания.
+ * A STALE VALUE IS RETURNED, BUT MARKED. The `isStale` flag is not
+ * decoration: a send decision based on a stored value leads to the
+ * network refusing. The UI must show the stale mark.
  */
 export class BalanceService implements IBalanceService {
   readonly #providers: IProviderResolver
@@ -124,8 +121,8 @@ export class BalanceService implements IBalanceService {
   readonly #cache = new Map<string, ICacheEntry>()
   readonly #subscriptions = new Map<string, ISubscription>()
 
-  /* Незавершённые запросы к узлу. Два экрана, запросившие один баланс
-     одновременно, разделяют один сетевой вызов. */
+  /* In-flight node requests. Two screens that asked for the same
+     balance at once share one network call. */
   readonly #inFlight = new Map<string, Promise<Wei>>()
 
   constructor(dependencies: IBalanceServiceDependencies) {
@@ -146,8 +143,9 @@ export class BalanceService implements IBalanceService {
     }
 
     if (cached !== undefined) {
-      /* Устаревшее значение отдаётся немедленно, обновление идёт фоном.
-         Пустой экран вместо прежнего баланса выглядит как потеря средств. */
+      /* The stale value is returned immediately; the refresh runs
+         in the background. An empty screen instead of the previous
+         balance looks like a loss of funds. */
       void this.#refreshInBackground(owner, chainId)
 
       return this.#toBalance(owner, chainId, cached, true)
@@ -157,11 +155,11 @@ export class BalanceService implements IBalanceService {
   }
 
   /**
-   * Баланс токена.
+   * Token balance.
    *
-   * @throws NotImplementedError если сервис токенов не подключён:
-   *         возврат нуля означал бы утверждение «токенов нет», которое
-   *         кошелёк в этом состоянии проверить не может.
+   * @throws NotImplementedError if the token service is not wired:
+   *         returning zero would claim "there are no tokens", which
+   *         the wallet cannot check in this state.
    */
   async getToken(owner: Address, token: ITokenRef): Promise<IBalance> {
     if (token.address === null) {
@@ -179,9 +177,10 @@ export class BalanceService implements IBalanceService {
       chainId: token.chainId,
       token,
       raw: await this.#tokens.getBalance(token, owner),
-      /* Число знаков берётся из прочитанных метаданных. Отсутствие
-         токена в списке означает, что читать неоткуда: подставить
-         привычные восемнадцать значило бы исказить сумму на порядки. */
+      /* Decimals come from the metadata that was read. Absence from
+         the list means there is nowhere to read them: substituting
+         the usual eighteen would distort the amount by orders of
+         magnitude. */
       decimals:
         known?.decimals ??
         (await this.#tokens.fetchMetadata(token.chainId, token.address)).decimals,
@@ -191,11 +190,13 @@ export class BalanceService implements IBalanceService {
   }
 
   /**
-   * Все балансы адреса в сети: нативная валюта и отслеживаемые токены.
+   * Every balance of an address on a network: native currency and
+   * tracked tokens.
    *
-   * Отказ по одному токену не отменяет остальных: контракт мог быть
-   * удалён либо перестать отвечать, и потерять из-за него весь список
-   * хуже, чем показать неполный.
+   * A failure for one token does not cancel the rest: the contract
+   * may have been removed or stopped answering, and losing the
+   * whole list because of it is worse than showing an incomplete
+   * one.
    */
   async getAll(owner: Address, chainId: ChainId): Promise<IAccountBalances> {
     const native = await this.getNative(owner, chainId)
@@ -223,20 +224,20 @@ export class BalanceService implements IBalanceService {
   }
 
   /**
-   * Балансы отслеживаемых токенов.
+   * Balances of tracked tokens.
    *
-   * ПАРАЛЛЕЛЬНОСТЬ ОГРАНИЧЕНА, А НЕ СНЯТА. Раньше запросы шли строго
-   * по одному: десять токенов означали десять задержек сети подряд.
-   * `Promise.all` — другая крайность: публичные узлы ограничивают
-   * частоту обращений и отвечают отказом вместо баланса, а десяток
-   * одновременных вызовов ещё и выдаёт наблюдателю весь состав портфеля
-   * одним пакетом.
+   * CONCURRENCY IS CAPPED, NOT REMOVED. Requests used to go strictly
+   * one by one: ten tokens meant ten network delays in a row.
+   * `Promise.all` is the other extreme: public nodes rate-limit and
+   * refuse instead of returning a balance, and a dozen simultaneous
+   * calls also hands an observer the whole portfolio in one packet.
    *
-   * Пакетный вызов через multicall быстрее любого из вариантов,
-   * но требует доверия к отдельному контракту — это отдельное решение.
+   * A batched multicall is faster than either, but requires trust
+   * in a separate contract — that is a separate decision.
    *
-   * ОТКАЗ ПО ОДНОМУ ТОКЕНУ НЕ УБИРАЕТ С ЭКРАНА ОСТАЛЬНЫЕ: недоступный
-   * контракт не имеет права стереть балансы прочих токенов.
+   * A FAILURE FOR ONE TOKEN DOES NOT TAKE THE OTHERS OFF THE
+   * SCREEN: an unavailable contract has no right to erase the
+   * balances of the rest.
    */
   async #loadTokenBalances(owner: Address, chainId: ChainId): Promise<readonly IBalance[]> {
     const tokens = this.#tokens
@@ -289,8 +290,8 @@ export class BalanceService implements IBalanceService {
     const existing = this.#subscriptions.get(key)
 
     if (existing !== undefined) {
-      /* Подсчёт подписчиков, а не отдельный таймер на каждого: три виджета
-         на одном экране опрашивали бы узел втрое чаще. */
+      /* Count subscribers, do not give each a timer: three widgets
+         on one screen would poll the node three times as often. */
       existing.count += 1
 
       return () => {
@@ -344,7 +345,7 @@ export class BalanceService implements IBalanceService {
     this.#events.off(event, listener)
   }
 
-  /** Останавливает все опросы. Вызывается при блокировке кошелька. */
+  /** Stops every poll. Called when the wallet is locked. */
   stop(): void {
     for (const subscription of this.#subscriptions.values()) {
       subscription.cancel()
@@ -371,7 +372,6 @@ export class BalanceService implements IBalanceService {
     this.#subscriptions.delete(key)
   }
 
-  /** Запрашивает баланс у узла и обновляет кэш. */
   async #fetch(owner: Address, chainId: ChainId): Promise<ICacheEntry> {
     const key = cacheKey(owner, chainId)
     const pending = this.#inFlight.get(key)
@@ -413,11 +413,12 @@ export class BalanceService implements IBalanceService {
   }
 
   /**
-   * Обновляет баланс, не выбрасывая исключение наружу.
+   * Refreshes the balance without throwing outward.
    *
-   * Фоновое обновление запускается без ожидания результата. Необработанное
-   * отклонение здесь дошло бы до глобального обработчика и в service worker
-   * manifest v3 выглядело бы как отказ всего расширения.
+   * A background refresh is started without awaiting the result.
+   * An unhandled rejection here would reach the global handler and
+   * in a Manifest V3 service worker would look like a failure of
+   * the whole extension.
    */
   async #refreshInBackground(owner: Address, chainId: ChainId): Promise<void> {
     try {
@@ -454,9 +455,10 @@ export class BalanceService implements IBalanceService {
 }
 
 function cacheKey(owner: Address, chainId: ChainId): string {
-  /* Адрес приводится к нижнему регистру: один и тот же адрес приходит
-     и в контрольной сумме EIP-55, и в нижнем регистре из ответов RPC,
-     и два написания дали бы две записи кэша с расходящимися значениями. */
+  /* The address is forced to lower case: the same address arrives
+     both in EIP-55 checksum and in lower case from RPC responses,
+     and two spellings would give two cache entries with diverging
+     values. */
   return `${owner.toLowerCase()}:${String(chainId)}`
 }
 

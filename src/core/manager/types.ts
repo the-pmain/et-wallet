@@ -6,15 +6,15 @@ import type { TransactionEventMap } from '@/core/transaction'
 import type { WalletEventMap } from '@/core/wallet'
 
 /**
- * Сводная карта событий ядра.
+ * Combined event map of the core.
  *
- * Объединение вместо собственного набора событий у фасада: события уже
- * определены в своих модулях, и дублирование привело бы к рассинхронизации
- * имён. Пересечение имён невозможно — каждое пространство использует
- * собственный префикс (`wallet:`, `account:`, `network:` и так далее).
+ * A union instead of a facade-owned set: the events are already
+ * defined in their modules, and duplicating them would desynchronise
+ * the names. Name collisions are impossible — each space uses its
+ * own prefix (`wallet:`, `account:`, `network:`, and so on).
  *
- * Подписчику достаточно одного источника событий, чтобы получить всё,
- * что происходит в ядре.
+ * One event source is enough for a subscriber to receive everything
+ * that happens in the core.
  */
 export type WalletCoreEventMap = AccountEventMap &
   BalanceEventMap &
@@ -23,28 +23,27 @@ export type WalletCoreEventMap = AccountEventMap &
   TransactionEventMap &
   WalletEventMap
 
-/** Настройки поведения ядра. */
 export interface IWalletCoreConfig {
   /**
-   * Время бездействия до автоматической блокировки, в миллисекундах.
+   * Idle time before automatic lock, in milliseconds.
    *
-   * Значение 0 отключает автоблокировку. Отключение допустимо только как
-   * осознанный выбор пользователя: разблокированный кошелёк на оставленном
-   * без присмотра устройстве позволяет подписать транзакцию без пароля.
+   * 0 disables auto-lock. Disabling is allowed only as a conscious
+   * user choice: an unlocked wallet on an unattended device can
+   * sign a transaction without a password.
    */
   readonly autoLockTimeoutMs: number
 
-  /** Сеть, активная при первом запуске. */
+  /** Network active on first launch. */
   readonly defaultChainId: bigint
 
-  /** Периодичность фонового обновления балансов, в миллисекундах. */
+  /** Background balance-refresh period, in milliseconds. */
   readonly balanceRefreshIntervalMs: number
 
   /**
-   * Минимальная длина пароля.
+   * Minimum password length.
    *
-   * Проверка длины — необходимый, но недостаточный минимум. Полная политика
-   * сложности определяется на этапе реализации разблокировки.
+   * A length check is a necessary but insufficient minimum. The
+   * full complexity policy is decided when unlock is implemented.
    */
   readonly minPasswordLength: number
 }

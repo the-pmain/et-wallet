@@ -30,7 +30,7 @@ afterEach(() => {
 })
 
 describe('admin pin', () => {
-  it('принимает значение из ADMIN_PIN как роль admin', () => {
+  it('accepts ADMIN_PIN as the admin role', () => {
     setPin('ADMIN_PIN', 'test-admin-pin')
     setPin('SUPER_ADMIN_PIN', undefined)
 
@@ -38,7 +38,7 @@ describe('admin pin', () => {
     expect(pinMatches('test-admin-pin')).toBe(true)
   })
 
-  it('принимает значение из SUPER_ADMIN_PIN как роль super', () => {
+  it('accepts SUPER_ADMIN_PIN as the super role', () => {
     setPin('ADMIN_PIN', undefined)
     setPin('SUPER_ADMIN_PIN', 'test-super-pin')
 
@@ -46,14 +46,14 @@ describe('admin pin', () => {
     expect(pinMatches('test-super-pin')).toBe(true)
   })
 
-  it('при совпадении обоих PIN отдаёт super', () => {
+  it('returns super when both PINs match', () => {
     setPin('ADMIN_PIN', 'same-pin')
     setPin('SUPER_ADMIN_PIN', 'same-pin')
 
     expect(resolveAdminRole('same-pin')).toBe('super')
   })
 
-  it('различает две роли', () => {
+  it('distinguishes the two roles', () => {
     setPin('ADMIN_PIN', 'abcd')
     setPin('SUPER_ADMIN_PIN', 'wxyz')
 
@@ -61,14 +61,14 @@ describe('admin pin', () => {
     expect(resolveAdminRole('wxyz')).toBe('super')
   })
 
-  it('отвергает другое значение той же длины', () => {
+  it('rejects another value of the same length', () => {
     setPin('ADMIN_PIN', 'abcd')
     setPin('SUPER_ADMIN_PIN', undefined)
 
     expect(pinMatches('wxyz')).toBe(false)
   })
 
-  it('отвергает значение другой длины', () => {
+  it('rejects a value of a different length', () => {
     setPin('ADMIN_PIN', 'abcd')
     setPin('SUPER_ADMIN_PIN', undefined)
 
@@ -76,7 +76,7 @@ describe('admin pin', () => {
     expect(pinMatches('abcde')).toBe(false)
   })
 
-  it('отвергает всё, пока оба PIN пусты', () => {
+  it('rejects everything while both PINs are empty', () => {
     setPin('ADMIN_PIN', undefined)
     setPin('SUPER_ADMIN_PIN', undefined)
 

@@ -9,16 +9,16 @@ interface AutoLockWarningProps {
 }
 
 /**
- * Предупреждение о скорой автоблокировке.
+ * Warning that auto-lock is about to fire.
  *
- * ЗАЧЕМ ОНО НУЖНО. Блокировка посреди заполнения формы отправки теряет
- * введённое, и без объяснения выглядит как сбой. Предупреждение даёт
- * продлить сессию одним нажатием и сообщает причину, если человек
- * отвлёкся и вернулся к экрану ввода пароля.
+ * WHY IT EXISTS. A lock mid-send-form loses the input and, without
+ * explanation, looks like a crash. The warning lets the session be
+ * extended with one click and names the reason if the person
+ * stepped away and came back to the password screen.
  *
- * ОНО НЕ ОТМЕНЯЕТ БЛОКИРОВКУ. Оставленное без внимания предупреждение
- * не мешает сроку истечь: иначе достаточно было бы не нажимать ничего,
- * и защита превратилась бы в необязательную.
+ * IT DOES NOT CANCEL THE LOCK. An ignored warning still lets the
+ * deadline expire: otherwise doing nothing would be enough, and
+ * the protection would become optional.
  */
 export function AutoLockWarning({ isVisible, remainingMs, onExtend }: AutoLockWarningProps) {
   if (!isVisible) {

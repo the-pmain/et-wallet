@@ -21,33 +21,30 @@ import { PAYLOAD_VERSION } from './parameters'
 import { decodePayload, encodePayload, type IEncryptedPayloadRecord } from './payload-codec'
 import type { IEncryptedPayload, IKdfParams } from './types'
 
-/** Ключ заголовка хранилища в пространстве настроек. */
+/** Header key in the settings namespace. */
 const HEADER_KEY: StorageKey = toStorageKey('secure-storage.header')
 
 /**
- * Проверочная строка.
+ * Verifier string.
  *
- * Шифруется при инициализации и расшифровывается при разблокировке.
- * Позволяет отличить неверный пароль от повреждённых пользовательских
- * данных, не трогая сами данные.
+ * Encrypted at initialise and decrypted at unlock. Distinguishes a
+ * wrong password from corrupted user data without touching that data.
  *
- * Известный злоумышленнику открытый текст опасности не представляет:
- * AES-GCM устойчив к атаке на основе известного открытого текста,
- * а стойкость к перебору пароля определяется параметрами KDF, а не
- * секретностью проверочного значения.
+ * Known plaintext is not a risk: AES-GCM resists known-plaintext
+ * attacks, and password-guessing cost is set by the KDF, not by
+ * secrecy of the verifier.
  */
 const VERIFIER_PLAINTEXT = 'wallet.secure-storage.v1'
 
-/** Признак записи, зашифрованной этим слоем. */
+/** Marker for a record encrypted by this layer. */
 const ENVELOPE_MARKER = 'enc' as const
 
-/** Зашифрованная запись в нижележащем хранилище. */
 interface IEncryptedEnvelope {
   readonly __type: typeof ENVELOPE_MARKER
   readonly payload: IEncryptedPayloadRecord
 }
 
-/** Заголовок хранилища. Секретов не содержит. */
+/** Vault header. Holds no secrets. */
 interface ISecureStorageHeader {
   readonly version: number
   readonly kdf: IEncryptedPayloadRecord['kdf']
@@ -63,31 +60,29 @@ function isEncryptedEnvelope(value: unknown): value is IEncryptedEnvelope {
 }
 
 /**
- * Хранилище с прозрачным шифрованием записей.
+ * Store that encrypts records transparently.
  *
- * УСТРОЙСТВО. Соль одна на всё хранилище и лежит в заголовке; вектор
- * инициализации свой у каждой записи. Сессионный ключ выводится один раз
- * при разблокировке и живёт до блокировки.
+ * LAYOUT. One salt for the whole vault, in the header; each record has
+ * its own IV. The session key is derived once at unlock and lives until
+ * lock.
  *
- * Почему не выводить ключ на каждую операцию: PBKDF2 с 600 000 итераций
- * занимает сотни миллисекунд. Чтение списка аккаунтов при открытии экрана
- * заняло бы секунды, и пользователь получил бы неработоспособное приложение.
- * Стойкость от этого не страдает: перебор пароля всё равно упирается
- * в стоимость одного вывода ключа.
+ * Why not derive per operation: PBKDF2 at 600 000 iterations takes
+ * hundreds of milliseconds. Reading the account list on screen open
+ * would take seconds and the app would be unusable. Strength is not
+ * hurt: password guessing still pays the cost of one derivation.
  *
- * ГАРАНТИЯ. Значение, прошедшее через `set`, попадает в нижележащее
- * хранилище только внутри конверта с шифротекстом. Открытого представления
- * не сохраняется нигде и никогда.
+ * GUARANTEE. A value that passed through `set` reaches the backing
+ * store only inside a ciphertext envelope. A plaintext copy is never
+ * persisted.
  *
- * ЧЕГО СЛОЙ НЕ СКРЫВАЕТ: имена пространств и ключей, число записей
- * и приблизительный размер значений. Наблюдатель с доступом к хранилищу
- * узнает, сколько у пользователя аккаунтов, но не узнает ни адресов,
- * ни ключей.
+ * WHAT THE LAYER DOES NOT HIDE: namespace and key names, record count,
+ * and approximate value size. An observer with storage access learns
+ * how many accounts the user has, but not addresses or keys.
  *
- * ОГРАНИЧЕНИЕ ПО ТИПАМ. Значения сериализуются через JSON, поэтому
- * `bigint` напрямую не поддерживается: `JSON.stringify` на нём выбрасывает
- * исключение. Денежные величины преобразуются в строку на уровне
- * репозитория — так же, как это сделано для `chainId` в модуле сетей.
+ * TYPE LIMIT. Values are JSON-serialised, so `bigint` is not supported
+ * directly: `JSON.stringify` throws on it. Monetary amounts are turned
+ * into strings at the repository — same as `chainId` in the network
+ * module.
  */
 export class SecureStorage implements ISecureStorage {
   readonly #storage: IStorageService
@@ -152,9 +147,9 @@ export class SecureStorage implements ISecureStorage {
     } catch {
       key.destroy()
 
-      /* Расшифровка проверочного блока не удалась. Причина не уточняется:
-         отличие «неверный пароль» от «заголовок повреждён» — информация
-         для подбирающего пароль. */
+      /* Verifier decrypt failed. The reason is not detailed:
+         distinguishing "wrong password" from "header corrupted" is
+         information for a password guesser. */
       throw new InvalidPasswordError()
     }
 
@@ -181,8 +176,8 @@ export class SecureStorage implements ISecureStorage {
     } catch {
       return false
     } finally {
-      /* Проверочный ключ уничтожается в любом случае: он не должен
-         пережить проверку и остаться доступным вызывающему коду. */
+      /* The probe key is destroyed either way: it must not outlive the
+         check and stay available to the caller. */
       key.destroy()
     }
   }
@@ -202,9 +197,9 @@ export class SecureStorage implements ISecureStorage {
     }
 
     if (!isEncryptedEnvelope(stored)) {
-      /* Запись есть, но она не зашифрована этим слоем. Молча вернуть её
-         нельзя: это означало бы, что секрет когда-то был записан в обход
-         шифрования, и такое состояние обязано быть замечено. */
+      /* A record exists but was not encrypted by this layer. Returning
+         it silently would mean a secret was once written around
+         encryption, and that state must be noticed. */
       throw new VaultCorruptedError(`the record "${key}" is not encrypted`)
     }
 
@@ -254,9 +249,9 @@ export class SecureStorage implements ISecureStorage {
       try {
         await this.#reencryptAll(currentKey, nextKey, nextParams)
 
-        /* Ключ сессии подменяется только после успешной перезаписи:
-           при сбое хранилище остаётся под прежним паролем, а сессия —
-           в согласованном с ним состоянии. */
+        /* The session key is replaced only after a successful rewrite:
+           on failure the vault stays under the old password and the
+           session stays consistent with it. */
         this.#sessionKey?.destroy()
         this.#sessionKey = await this.#encryption.deriveKey(newPassword, nextParams)
         this.#kdfParams = nextParams
@@ -277,11 +272,11 @@ export class SecureStorage implements ISecureStorage {
   }
 
   /**
-   * Перешифровывает все записи и обновляет заголовок.
+   * Re-encrypts every record and updates the header.
    *
-   * Выполняется одной транзакцией. Частичная перезапись оставила бы часть
-   * записей под старым ключом, а часть под новым — такое хранилище
-   * не открылось бы ни одним паролем.
+   * Done in one transaction. A partial rewrite would leave some records
+   * under the old key and some under the new — that vault would open
+   * with neither password.
    */
   async #reencryptAll(
     currentKey: EncryptionKey,
@@ -290,9 +285,9 @@ export class SecureStorage implements ISecureStorage {
   ): Promise<void> {
     const namespaces = Object.values(STORAGE_NAMESPACE)
 
-    /* Перешифровка выполняется до открытия транзакции: криптографические
-       операции асинхронны, а транзакция IndexedDB закрывается при первом
-       же обороте цикла событий без обращения к ней. */
+    /* Re-encryption runs before the transaction opens: crypto is async,
+       and an IndexedDB transaction closes on the first event-loop turn
+       that does not touch it. */
     const rewritten: { namespace: StorageNamespace; key: StorageKey; value: unknown }[] = []
 
     for (const namespace of namespaces) {
@@ -367,8 +362,8 @@ export class SecureStorage implements ISecureStorage {
 
       return { __type: ENVELOPE_MARKER, payload: encodePayload(payload) }
     } finally {
-      /* Открытое представление значения затирается сразу: оно могло
-         содержать приватный ключ либо мнемоническую фразу. */
+      /* The plaintext copy is wiped immediately: it may have held a
+         private key or a mnemonic. */
       plaintext.fill(0)
     }
   }

@@ -53,7 +53,7 @@ function writeWalletDist(): string {
 }
 
 describe('isApiUrl', () => {
-  it('считает API только пути /v1', () => {
+  it('treats only /v1 paths as API', () => {
     expect(isApiUrl('/v1/health')).toBe(true)
     expect(isApiUrl('/v1/users?x=1')).toBe(true)
     expect(isApiUrl('/')).toBe(false)
@@ -62,7 +62,7 @@ describe('isApiUrl', () => {
 })
 
 describe('isStaticAssetUrl', () => {
-  it('отличает файл сборки от маршрута приложения', () => {
+  it('distinguishes a build file from an app route', () => {
     expect(isStaticAssetUrl('/assets/index-abc.js')).toBe(true)
     expect(isStaticAssetUrl('/assets/index-abc.css')).toBe(true)
     expect(isStaticAssetUrl('/robots.txt')).toBe(true)
@@ -72,7 +72,7 @@ describe('isStaticAssetUrl', () => {
 })
 
 describe('htmlForTransport', () => {
-  it('на HTTP убирает upgrade-insecure-requests', () => {
+  it('on HTTP strips upgrade-insecure-requests', () => {
     const html = "default-src 'self'; upgrade-insecure-requests"
 
     expect(htmlForTransport(html, false)).not.toContain('upgrade-insecure-requests')
@@ -80,7 +80,7 @@ describe('htmlForTransport', () => {
   })
 })
 
-describe('Раздача интерфейса', () => {
+describe('UI serving', () => {
   let app: FastifyInstance | undefined
 
   afterEach(async () => {
@@ -89,7 +89,7 @@ describe('Раздача интерфейса', () => {
     }
   })
 
-  it('без сборки оставляет GET / отказом JSON', async () => {
+  it('without a build leaves GET / as a JSON refusal', async () => {
     app = await buildApp({ config: configWithStatic(null) })
     const response = await app.inject({ method: 'GET', url: '/' })
 
@@ -97,7 +97,7 @@ describe('Раздача интерфейса', () => {
     expect(response.json<{ error: { code: string } }>().error.code).toBe('not_found')
   })
 
-  it('отдаёт индекс кошелька на GET /', async () => {
+  it('serves the wallet index on GET /', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const response = await app.inject({ method: 'GET', url: '/' })
 
@@ -111,10 +111,10 @@ describe('Раздача интерфейса', () => {
     expect(String(response.headers['content-security-policy'])).toContain("script-src 'self'")
   })
 
-  it('не подменяет JSON API статикой', async () => {
+  it('does not replace the JSON API with static files', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const health = await app.inject({ method: 'GET', url: '/v1/health' })
-    const missing = await app.inject({ method: 'GET', url: '/v1/нет-такого' })
+    const missing = await app.inject({ method: 'GET', url: '/v1/no-such-route' })
 
     expect(health.statusCode).toBe(200)
     expect(health.json<{ status: string }>().status).toBe('ok')
@@ -122,7 +122,7 @@ describe('Раздача интерфейса', () => {
     expect(missing.json<{ error: { code: string } }>().error.code).toBe('not_found')
   })
 
-  it('на неизвестный путь без /v1 отдаёт индекс', async () => {
+  it('on an unknown path without /v1 serves the index', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const response = await app.inject({ method: 'GET', url: '/unlock' })
 
@@ -130,7 +130,7 @@ describe('Раздача интерфейса', () => {
     expect(response.body).toContain('wallet')
   })
 
-  it('раздаёт файлы сборки', async () => {
+  it('serves build files', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const response = await app.inject({ method: 'GET', url: '/assets/app.js' })
 
@@ -140,10 +140,11 @@ describe('Раздача интерфейса', () => {
     expect(String(response.headers['content-type'])).not.toContain('text/html')
   })
 
-  it('отдаёт файл, появившийся после старта', async () => {
-    /* Сборка меняет имена с отпечатком, пока процесс уже слушает.
-       Снимок каталога при старте оставлял бы новые файлы без маршрута,
-       и вместо байт уходила бы HTML-страница. */
+  it('serves a file that appeared after start', async () => {
+    /* The build changes hashed names while the process is already
+       listening. A directory snapshot at start would leave new files
+       without a route, and an HTML page would go out instead of
+       the bytes. */
     const root = writeWalletDist()
     app = await buildApp({ config: configWithStatic(root) })
     writeFileSync(join(root, 'assets', 'late.js'), 'window.__late = 1')
@@ -155,7 +156,7 @@ describe('Раздача интерфейса', () => {
     expect(String(response.headers['content-type'])).not.toContain('text/html')
   })
 
-  it('на отсутствующий файл сборки отвечает отказом, а не HTML', async () => {
+  it('answers a missing build file with a refusal, not HTML', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const response = await app.inject({ method: 'GET', url: '/assets/missing-hash.js' })
 
@@ -163,7 +164,7 @@ describe('Раздача интерфейса', () => {
     expect(response.body).not.toContain('wallet')
   })
 
-  it('раздаёт robots.txt с запретом обхода', async () => {
+  it('serves robots.txt with a crawl ban', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const response = await app.inject({ method: 'GET', url: '/robots.txt' })
 
@@ -173,7 +174,7 @@ describe('Раздача интерфейса', () => {
     expect(response.headers['x-robots-tag']).toContain('noindex')
   })
 
-  it('запрещает индексирование HTML кошелька', async () => {
+  it('forbids indexing of wallet HTML', async () => {
     app = await buildApp({ config: configWithStatic(writeWalletDist()) })
     const response = await app.inject({ method: 'GET', url: '/' })
 

@@ -3,120 +3,127 @@ import type { ISecretBuffer } from '@/core/encryption'
 import type { IMnemonicValidationResult, MnemonicStrength } from './types'
 
 /**
- * Работа с мнемоническими фразами BIP-39.
+ * Work with BIP-39 mnemonic phrases.
  *
- * Сервис не хранит состояния. Хранением зашифрованной фразы занимается
- * `IWallet`; здесь только преобразования и проверки. Это позволяет вызвать
- * сервис из формы создания кошелька, не создавая промежуточного владельца
- * секрета, который пришлось бы отдельно затирать.
+ * The service holds no state. Storing the encrypted phrase is
+ * `IWallet`'s job; here there are only conversions and checks. That
+ * lets the service be called from the create-wallet form without
+ * creating an intermediate secret owner that would then have to be
+ * wiped separately.
  *
- * ГРАНИЦА ГАРАНТИЙ, ВАЖНАЯ ДЛЯ ВСЕХ ВЫЗЫВАЮЩИХ.
+ * BOUNDARY OF GUARANTEES, IMPORTANT FOR EVERY CALLER.
  *
- * Библиотека `@scure/bip39` работает со строками: фраза неизбежно существует
- * в куче в виде неочищаемой строки на время вызова. Обойти это можно только
- * собственной реализацией BIP-39, что недопустимо. Методы ниже сокращают
- * время жизни строки до одного выражения, но не устраняют её.
+ * `@scure/bip39` works with strings: the phrase inevitably exists
+ * on the heap as an unwipeable string for the duration of the call.
+ * The only way around that is a home-grown BIP-39, which is
+ * forbidden. The methods below shrink the string's lifetime to one
+ * expression, but they do not eliminate it.
  *
- * Все методы, возвращающие `ISecretBuffer`, передают владение вызывающему:
- * он обязан вызвать `wipe()` в блоке `finally`.
+ * Every method that returns an `ISecretBuffer` transfers ownership
+ * to the caller: they must call `wipe()` in a `finally` block.
  */
 export interface IMnemonicService {
   /**
-   * Создаёт новую фразу.
+   * Creates a new phrase.
    *
-   * Энтропия берётся исключительно из `crypto.getRandomValues`. Источник
-   * не подменяем: возможность заменить генератор случайных чисел означает
-   * возможность сделать все ключи предсказуемыми.
+   * Entropy comes exclusively from `crypto.getRandomValues`. The
+   * source is not swappable: the ability to replace the RNG is the
+   * ability to make every key predictable.
    *
-   * @param strength 128 бит (12 слов) либо 256 бит (24 слова).
-   * @returns Фраза в кодировке UTF-8. Владение переходит вызывающему.
-   * @throws RandomnessUnavailableError если Web Crypto недоступен либо
-   *         генератор вернул заведомо неисправный результат.
+   * @param strength 128 bits (12 words) or 256 bits (24 words).
+   * @returns The phrase in UTF-8. Ownership passes to the caller.
+   * @throws RandomnessUnavailableError if Web Crypto is unavailable
+   *         or the generator returned a known-bad result.
    */
   generate(strength?: MnemonicStrength): ISecretBuffer
 
   /**
-   * Проверяет введённую фразу, не выбрасывая исключений.
+   * Checks a typed phrase without throwing.
    *
-   * Предназначен для проверки по мере ввода: пользователь не должен видеть
-   * ошибку до того, как закончил печатать. Для импорта используйте
+   * Meant for checking as the user types: they must not see an
+   * error before they have finished typing. For import use
    * {@link IMnemonicService.fromPhrase}.
    */
   validate(phrase: string): IMnemonicValidationResult
 
   /**
-   * Импортирует существующую фразу.
+   * Imports an existing phrase.
    *
-   * Ввод нормализуется: NFKD, удаление невидимых символов, схлопывание
-   * пробелов, нижний регистр. Принимаются все допустимые BIP-39 длины
-   * (12, 15, 18, 21, 24 слова), а не только генерируемые приложением.
+   * The input is normalised: NFKD, removal of invisible characters,
+   * collapsing whitespace, lower case. Every BIP-39 length is
+   * accepted (12, 15, 18, 21, 24 words), not only those the app
+   * generates.
    *
-   * @returns Нормализованная фраза. Владение переходит вызывающему.
-   * @throws InvalidMnemonicError с указанием причины в поле `reason`.
+   * @returns The normalised phrase. Ownership passes to the caller.
+   * @throws InvalidMnemonicError with the reason in the `reason` field.
    */
   fromPhrase(phrase: string): ISecretBuffer
 
   /**
-   * Раскрывает фразу в виде строки.
+   * Reveals the phrase as a string.
    *
-   * ОПАСНАЯ ОПЕРАЦИЯ. Возвращаемая строка неочищаема и остаётся в куче
-   * до сборки мусора. Вызывать только там, где строка действительно нужна:
-   * копирование в буфер обмена, отображение при создании кошелька.
-   * Для показа фразы по словам используйте {@link IMnemonicService.toWords}.
+   * A DANGEROUS OPERATION. The returned string is unwipeable and
+   * stays on the heap until garbage collection. Call only where a
+   * string is actually needed: copying to the clipboard, display
+   * when creating a wallet. To show the phrase word by word use
+   * {@link IMnemonicService.toWords}.
    *
-   * @throws SecretBufferWipedError если буфер уже затёрт.
+   * @throws SecretBufferWipedError if the buffer is already wiped.
    */
   revealPhrase(mnemonic: ISecretBuffer): string
 
   /**
-   * Раскрывает фразу списком слов — для нумерованного показа в интерфейсе.
+   * Reveals the phrase as a list of words — for numbered display.
    *
-   * Так же опасна, как {@link IMnemonicService.revealPhrase}: слова остаются
-   * в куче неочищаемыми строками.
+   * As dangerous as {@link IMnemonicService.revealPhrase}: the words
+   * stay on the heap as unwipeable strings.
    */
   toWords(mnemonic: ISecretBuffer): readonly string[]
 
   /**
-   * Выводит двоичный seed по BIP-39.
+   * Derives the binary seed per BIP-39.
    *
-   * Именно это значение служит корнем HD-дерева на следующем этапе.
-   * Преобразование необратимо: восстановить фразу из seed нельзя.
+   * This is the value that becomes the HD-tree root on the next
+   * step. The conversion is irreversible: the phrase cannot be
+   * recovered from the seed.
    *
-   * @param passphrase Необязательная дополнительная парольная фраза
-   *        («25-е слово»). Меняет seed полностью: та же мнемоника с другой
-   *        парольной фразой даёт совершенно другой кошелёк. Утеря парольной
-   *        фразы равносильна утере seed-фразы — восстановление невозможно.
-   * @returns 64 байта. Владение переходит вызывающему.
+   * @param passphrase Optional extra passphrase ("25th word").
+   *        Changes the seed entirely: the same mnemonic with a
+   *        different passphrase yields a completely different
+   *        wallet. Losing the passphrase is equivalent to losing
+   *        the seed phrase — recovery is impossible.
+   * @returns 64 bytes. Ownership passes to the caller.
    */
   toSeed(mnemonic: ISecretBuffer, passphrase?: string): Promise<ISecretBuffer>
 
   /**
-   * Извлекает исходную энтропию.
+   * Extracts the original entropy.
    *
-   * Обратимая операция: {@link IMnemonicService.fromEntropy} восстановит
-   * ту же фразу. Нужна для резервных копий в компактных форматах
-   * и для проверки контрольной суммы.
+   * A reversible operation: {@link IMnemonicService.fromEntropy}
+   * will restore the same phrase. Needed for compact backups and
+   * for checking the checksum.
    *
    * @throws InvalidMnemonicError
    */
   toEntropy(mnemonic: ISecretBuffer): ISecretBuffer
 
   /**
-   * Восстанавливает фразу из энтропии.
+   * Restores a phrase from entropy.
    *
-   * @param entropy 16, 20, 24, 28 либо 32 байта.
-   * @throws InvalidArgumentError при недопустимой длине.
+   * @param entropy 16, 20, 24, 28, or 32 bytes.
+   * @throws InvalidArgumentError on an illegal length.
    */
   fromEntropy(entropy: Uint8Array): ISecretBuffer
 
   /**
-   * Слова словаря, начинающиеся с указанного префикса.
+   * Wordlist words that start with the given prefix.
    *
-   * Нужны автодополнению при вводе фразы. Опечатка в слове — реальный
-   * сценарий потери доступа к средствам, и подсказка снижает его вероятность.
+   * Needed for autocomplete while typing. A typo in a word is a
+   * real way to lose access to funds, and a suggestion lowers that
+   * chance.
    *
-   * Утечки не создаёт: словарь BIP-39 общедоступен, подсказки формируются
-   * локально и никуда не отправляются.
+   * Creates no leak: the BIP-39 wordlist is public, suggestions are
+   * built locally and sent nowhere.
    */
   findWordsByPrefix(prefix: string, limit?: number): readonly string[]
 }

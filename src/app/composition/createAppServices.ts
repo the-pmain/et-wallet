@@ -32,66 +32,62 @@ import { APP_CONFIG } from '@/shared/config'
 
 import { syncCreatedWalletsToDirectory } from './sync-wallets'
 
-/** Сервисы, живущие всё время работы приложения. */
+/** Services that live for the whole app lifetime. */
 export interface IAppServices {
   readonly onboarding: IOnboardingService
   readonly session: IWalletSession
 
   /**
-   * Канал оповещения между вкладками.
+   * Cross-tab notification channel.
    *
-   * Собирается здесь, а не внутри провайдера: сервис отправляет
-   * сообщения, провайдер их принимает, и канал у них обязан быть один.
+   * Built here, not inside the provider: the service sends messages,
+   * the provider receives them, and they must share one channel.
    */
   readonly broadcast: WalletBroadcast
 
   /**
-   * Источник времени.
+   * Time source.
    *
-   * Отдаётся наружу ради автоблокировки: она отсчитывает бездействие,
-   * и тест обязан уметь подставить управляемые часы вместо системных.
+   * Exposed for auto-lock: it counts idle time, and a test must be
+   * able to inject controllable clocks instead of the system clock.
    */
   readonly clock: IClock
 
-  /** Настройки безопасности: срок автоблокировки, подтверждение подписи. */
   readonly securitySettings: SecuritySettingsRepository
 
-  /** Подключения к приложениям. Транспорт поднимается по требованию. */
+  /** Dapp connections. Transport starts on demand. */
   readonly dappSessions: DappSessionService
 
   /**
-   * Хранилище приложения.
+   * App storage.
    *
-   * Отдаётся наружу ради одного вопроса: переживут ли данные закрытие
-   * вкладки и не вправе ли браузер их вытеснить. Ответ определяет,
-   * увидит ли владелец предупреждение о риске потерять кошелёк.
+   * Exposed for one question: will the data survive a tab close, and
+   * may the browser evict it. The answer decides whether the owner
+   * sees a warning about losing the wallet.
    */
   readonly storage: IStorageService
 }
 
 /**
- * Composition root приложения.
+ * App composition root.
  *
- * ЗДЕСЬ И ТОЛЬКО ЗДЕСЬ выбираются конкретные реализации. Ни один сервис
- * не создаёт свои зависимости сам: подмена хранилища при переходе
- * на IndexedDB либо на `chrome.storage` в расширении затронет этот файл
- * и больше ни один.
+ * HERE AND ONLY HERE are concrete implementations chosen. No service
+ * creates its own dependencies: swapping storage for IndexedDB or for
+ * `chrome.storage` in the extension touches this file and no other.
  *
- * ОДНО ЗАЩИЩЁННОЕ ХРАНИЛИЩЕ НА ВСЁ ПРИЛОЖЕНИЕ. `SecureStorage` владеет
- * сессионным ключом шифрования, полученным из пароля. Второй экземпляр
- * поверх того же хранилища имел бы собственный ключ и не смог бы прочитать
- * записанное первым — отсюда общий экземпляр для онбординга и для сессии
- * кошелька.
+ * ONE SECURE STORE FOR THE WHOLE APP. `SecureStorage` owns the session
+ * encryption key derived from the password. A second instance over the
+ * same store would have its own key and could not read what the first
+ * wrote — hence one instance for onboarding and for the wallet session.
  *
- * ХРАНИЛИЩЕ ПОСТОЯННОЕ. Данные лежат в IndexedDB и переживают
- * перезагрузку вкладки. Хранилище в памяти осталось в проекте
- * для тестов и для возможного режима «не оставлять следов
- * на этом устройстве».
+ * STORAGE IS PERSISTENT. Data lives in IndexedDB and survives a tab
+ * reload. In-memory storage remains in the project for tests and for
+ * a possible "leave no trace on this device" mode.
  *
- * БРАУЗЕР ВПРАВЕ ВЫТЕСНИТЬ ДАННЫЕ САЙТА при нехватке места, а для
- * кошелька это потеря зашифрованной seed-фразы. Хранилище просит
- * постоянного хранения при открытии; получено оно или нет, видно
- * через `IndexedDbStorageService.isPersistent`.
+ * THE BROWSER MAY EVICT SITE DATA when space is short, and for a
+ * wallet that is loss of the encrypted seed phrase. Storage requests
+ * persistent storage on open; whether it was granted is visible
+ * through `IndexedDbStorageService.isPersistent`.
  */
 export function createAppServices(): IAppServices {
   const storage = new IndexedDbStorageService()
@@ -138,16 +134,16 @@ export function createAppServices(): IAppServices {
 }
 
 /**
- * Уведомляет подключённые приложения при смене сети либо аккаунта.
+ * Notifies connected apps when the network or account changes.
  *
- * ПОДПИСКА НА СНИМОК, А НЕ ОТДЕЛЬНОЕ СОБЫТИЕ. Сессия кошелька публикует
- * снимок целиком; здесь запоминается прежняя пара «сеть — адрес»
- * и уведомление шлётся, лишь когда она изменилась. Без сравнения
- * приложения получали бы событие на каждое обновление баланса.
+ * SUBSCRIBE TO THE SNAPSHOT, NOT A SEPARATE EVENT. The wallet session
+ * publishes the snapshot as a whole; this remembers the previous
+ * "network — address" pair and notifies only when it changed. Without
+ * the comparison, apps would get an event on every balance refresh.
  *
- * СВЯЗЬ ЖИВЁТ, ПОКА ЖИВУТ СЕРВИСЫ. Оба создаются на весь срок работы
- * приложения и вместе с ним исчезают, поэтому отписка не нужна:
- * отписываться было бы не в какой момент.
+ * THE LINK LIVES AS LONG AS THE SERVICES. Both are created for the
+ * app lifetime and disappear with it, so there is nothing to
+ * unsubscribe from: there would be no moment to do it.
  */
 export function notifyDappsOnWalletChange(
   session: Pick<IWalletSession, 'subscribe' | 'getSnapshot'>,
@@ -169,16 +165,16 @@ export function notifyDappsOnWalletChange(
 }
 
 /**
- * Подключения к приложениям.
+ * Dapp connections.
  *
- * СЕРВИС СОБИРАЕТСЯ ВСЕГДА, ТРАНСПОРТ ПОДНИМАЕТСЯ ПО ТРЕБОВАНИЮ.
- * Библиотека WalletConnect весит около трёх мегабайт и загружается
- * динамически при заходе на экран подключений; без ключа проекта
- * раздел откроется и честно скажет, что не настроен.
+ * THE SERVICE IS ALWAYS BUILT; TRANSPORT STARTS ON DEMAND.
+ * The WalletConnect library is about three megabytes and is loaded
+ * dynamically when the connections screen is opened; without a project
+ * key the section opens and says it is not configured.
  *
- * АДРЕСА И СЕТИ ЧИТАЮТСЯ ИЗ СЕССИИ ФУНКЦИЯМИ, А НЕ КОПИРУЮТСЯ.
- * Пользователь меняет аккаунт и сеть на ходу; снимок, взятый при
- * сборке, выдал бы приложению устаревшие значения.
+ * ADDRESSES AND NETWORKS ARE READ FROM THE SESSION BY FUNCTIONS, NOT
+ * COPIED. The user changes account and network on the fly; a snapshot
+ * taken at construction would give the app stale values.
  */
 function createDappSessions(
   session: IWalletSession,
@@ -197,9 +193,8 @@ function createDappSessions(
         icons: [`${globalThis.location.origin}/icons/icon-128.png`],
       },
       logger,
-      /* Состояние подключений содержит ключи шифрования обмена
-         с приложениями, поэтому хранится зашифрованным и исчезает
-         вместе с кошельком. */
+      /* Connection state holds exchange encryption keys with apps,
+         so it is stored encrypted and disappears with the wallet. */
       storage: new SecureSessionStorage(secureStorage, logger),
     }),
     logger,
@@ -212,10 +207,11 @@ function createDappSessions(
 }
 
 /**
- * Справочник пользователей на Fastify.
+ * User directory on Fastify.
  *
- * В тестах не подключается: иначе `importWallet` ходил бы на живой сервер.
- * Пустой base URL шлёт `POST /v1/users` на тот же origin — Vite проксирует на 8080.
+ * Not wired in tests: otherwise `importWallet` would hit a live server.
+ * An empty base URL posts `POST /v1/users` to the same origin — Vite
+ * proxies to 8080.
  */
 function createUserDirectory(logger: ConsoleLogger) {
   if (import.meta.env.MODE === 'test') {
@@ -228,27 +224,26 @@ function createUserDirectory(logger: ConsoleLogger) {
 }
 
 /**
- * Учётные данные Tenderly из окружения сборки.
+ * Tenderly credentials from the build environment.
  *
- * ЧИТАЮТСЯ ЗДЕСЬ, А НЕ В ЯДРЕ. `import.meta.env` — особенность сборщика;
- * ядро обязано собираться и там, где его нет, — в тестах и в служебном
- * процессе расширения.
+ * READ HERE, NOT IN CORE. `import.meta.env` is a bundler peculiarity;
+ * core must compile where it does not exist — in tests and in the
+ * extension service worker.
  *
- * ЭТО ПУТЬ ДЛЯ ПРОВЕРКИ НА СВОЕЙ МАШИНЕ. Значение из `.env` попадает
- * в текст выложенной программы и достаётся каждому, кто её открыл;
- * ключ доступа при этом даёт право тратить квоту проекта. Поэтому
- * введённые владельцем данные из зашифрованного хранилища перекрывают
- * эти, а не наоборот.
+ * THIS PATH IS FOR CHECKS ON YOUR OWN MACHINE. A value from `.env`
+ * lands in the shipped program text and belongs to anyone who opened
+ * it; the access key can spend the project quota. Owner-entered data
+ * from encrypted storage therefore overrides these, not the reverse.
  *
- * `null` — рабочее состояние: следствия транзакции считает узел.
+ * `null` is a working state: the node computes transaction effects.
  */
 function readTenderlyCredentials(): ITenderlyCredentials | null {
   const account = import.meta.env.VITE_TENDERLY_ACCOUNT ?? ''
   const project = import.meta.env.VITE_TENDERLY_PROJECT ?? ''
   const accessKey = import.meta.env.VITE_TENDERLY_ACCESS_KEY ?? ''
 
-  /* Все три либо ничего: двух значений из трёх достаточно для запроса,
-     который заведомо получит отказ. */
+  /* All three or none: two of three is enough for a request that
+     is guaranteed to be rejected. */
   if (account === '' || project === '' || accessKey === '') {
     return null
   }
@@ -257,12 +252,12 @@ function readTenderlyCredentials(): ITenderlyCredentials | null {
 }
 
 /**
- * Источник курсов.
+ * Price source.
  *
- * ПУБЛИЧНЫЙ РЫНОК ЗАПРАШИВАЕТСЯ ОДИН РАЗ ПРИ ОТКРЫТИИ. `/coins/markets`
- * не называет адреса владельца — это тот же каталог, что таблица на
- * главном экране. Оценка портфеля и витрины читают этот снимок
- * и больше к CoinGecko не ходят.
+ * THE PUBLIC MARKET IS FETCHED ONCE ON OPEN. `/coins/markets` does
+ * not name the owner's addresses — it is the same catalog as the
+ * table on the home screen. Portfolio valuation and the showcase
+ * read this snapshot and do not call CoinGecko again.
  */
 function createPriceProvider(): CatalogPriceProvider {
   const apiKey = import.meta.env.VITE_COINGECKO_API_KEY ?? null
@@ -280,21 +275,21 @@ function createPriceProvider(): CatalogPriceProvider {
 }
 
 /**
- * Источники истории переводов в порядке предпочтения.
+ * Transfer-history sources in preference order.
  *
- * ИНДЕКСАТОР ПОДКЛЮЧАЕТСЯ ТОЛЬКО ПРИ НАЛИЧИИ КЛЮЧА, и это не техническое
- * следствие, а осознанный порядок.
+ * THE INDEXER IS WIRED ONLY WHEN A KEY IS PRESENT, and that is a
+ * deliberate policy, not a technical side effect.
  *
- * Индексатор — единственный способ увидеть переводы нативной валюты:
- * они не порождают событий, и в журналах узла их нет физически. Но за
- * это он получает адрес пользователя и возвращает всю его финансовую
- * историю разом — размер портфеля, контрагентов, время каждой операции.
- * Обычный RPC-узел видит только те запросы, которые ему шлют.
+ * The indexer is the only way to see native-currency transfers: they
+ * emit no events and are physically absent from node logs. In return
+ * it receives the user's address and returns their entire financial
+ * history at once — portfolio size, counterparties, time of every
+ * operation. A regular RPC node sees only the requests sent to it.
  *
- * Поэтому без явно указанного ключа кошелёк работает на разборе журналов:
- * история получается неполной, но ни один сторонний сервис не узнаёт,
- * чей это адрес и что на нём происходило. Неполнота при этом показывается
- * пользователю, а не замалчивается.
+ * So without an explicit key the wallet works from log scanning:
+ * history is incomplete, but no third-party service learns whose
+ * address it is or what happened on it. The incompleteness is shown
+ * to the user, not hidden.
  */
 function createHistoryProviders() {
   const apiKey = import.meta.env.VITE_ALCHEMY_API_KEY ?? null
@@ -306,23 +301,23 @@ function createHistoryProviders() {
 }
 
 /**
- * Источники RPC-адресов в порядке предпочтения.
+ * RPC address sources in preference order.
  *
- * ПОРЯДОК — ЭТО ПОЛИТИКА, И ОНА ЗАДАЁТСЯ ЗДЕСЬ, а не внутри механизма
- * перебора:
+ * ORDER IS POLICY, AND IT IS SET HERE, not inside the failover
+ * machinery:
  *
- * 1. Собственный узел пользователя. Выбран сознательно и единственный
- *    не раскрывает адреса постороннему оператору.
- * 2. Alchemy — значение по умолчанию, когда пользователь ничего не указал.
- * 3. Публичные узлы из конфигурации сети — работают без ключа.
+ * 1. The user's own node. Chosen deliberately and the only one that
+ *    does not disclose addresses to a third-party operator.
+ * 2. Alchemy — the default when the user specified nothing.
+ * 3. Public nodes from the network config — work without a key.
  *
- * КЛЮЧ ALCHEMY БЕРЁТСЯ ИЗ ОКРУЖЕНИЯ И ПУБЛИЧЕН. Vite подставляет значения
- * `VITE_*` прямо в бандл: ключ увидит каждый, кто откроет исходники
- * страницы. Ограничение по домену в панели Alchemy обязательно —
- * см. `.env.example`.
+ * THE ALCHEMY KEY COMES FROM THE ENVIRONMENT AND IS PUBLIC. Vite
+ * substitutes `VITE_*` values into the bundle: anyone who opens the
+ * page source will see the key. Domain restriction in the Alchemy
+ * dashboard is required — see `.env.example`.
  *
- * БЕЗ КЛЮЧА ALCHEMY НЕ ДАЁТ НИ ОДНОГО АДРЕСА, и кошелёк работает
- * на публичных узлах. Это рабочее состояние, а не отказ.
+ * WITHOUT A KEY ALCHEMY YIELDS NO ADDRESSES, and the wallet works
+ * on public nodes. That is a working state, not a failure.
  */
 function createRpcProviders(secureStorage: SecureStorage) {
   const apiKey = import.meta.env.VITE_ALCHEMY_API_KEY ?? null
@@ -335,16 +330,16 @@ function createRpcProviders(secureStorage: SecureStorage) {
 }
 
 /**
- * Подключение аппаратного кошелька.
+ * Hardware-wallet connection.
  *
- * СОЕДИНЕНИЕ ОТКРЫВАЕТСЯ НА КАЖДУЮ ОПЕРАЦИЮ И НЕ КЭШИРУЕТСЯ. Устройство
- * вынимают из разъёма когда угодно, а разрешение браузера действует
- * на выбранное устройство, а не навсегда: держать соединение открытым
- * значило бы обещать доступ, которого может уже не быть, и узнавать
- * об этом в середине подписи.
+ * THE CONNECTION OPENS PER OPERATION AND IS NOT CACHED. The device
+ * can be unplugged at any time, and the browser permission applies
+ * to the chosen device, not forever: keeping the connection open
+ * would promise access that may already be gone, and we would learn
+ * that in the middle of a signature.
  *
- * Библиотека соединения загружается отдельным модулем: она нужна
- * единицам, а весит достаточно, чтобы её не тащить всем.
+ * The connection library is loaded as a separate module: few people
+ * need it, and it is heavy enough not to ship to everyone.
  */
 async function connectLedger(): Promise<IHardwareDevice> {
   const { WebHidTransport } = await import('@/features/hardware')

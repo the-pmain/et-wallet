@@ -27,15 +27,15 @@ import {
 } from '@/shared/ui'
 
 /**
- * Импорт существующего кошелька.
+ * Import of an existing wallet.
  *
- * Фраза и пароль вводятся на одном экране, а не по шагам: пользователь
- * уже владеет фразой, и разбивать ввод на два экрана значит удлинять
- * время, в течение которого секрет находится в поле ввода.
+ * Phrase and password are entered on one screen, not in steps: the user
+ * already holds the phrase, and splitting the form would keep the secret
+ * in an input longer than needed.
  *
- * Валидация фразы выполняется по мере ввода, но сообщение об ошибке
- * появляется только когда введено достаточно слов: подсветка «некорректно»
- * после первого символа приучает не читать сообщения.
+ * Phrase validation runs as the user types, but the error appears only
+ * after enough words are entered: highlighting "invalid" after the first
+ * character trains people not to read messages.
  */
 export function ImportWalletPage() {
   const onboarding = useOnboarding()
@@ -51,10 +51,9 @@ export function ImportWalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
 
-  /* Валидация выполняется на каждое нажатие клавиши: для 24 слов это
-     построение множества и проверка контрольной суммы. Мемоизация
-     по строке избавляет от повторного счёта при перерисовках,
-     вызванных другими полями. */
+  /* Validation runs on every keystroke: for 24 words that is a set
+     build and a checksum. Memoizing on the string avoids repeating
+     the work on redraws caused by other fields. */
   const validation = useMemo(() => onboarding.checkMnemonic(phrase), [onboarding, phrase])
 
   const isEmailInvalid = username.trim() !== '' && !isValidEmail(username)
@@ -125,11 +124,11 @@ export function ImportWalletPage() {
             }}
           />
 
-          {/* Предупреждение, а не отказ: импорт тестовой фразы —
-              обычная работа разработчика, и запрещать её было бы
-              ошибкой. Но человек, взявший такую фразу из статьи
-              или примера, обязан узнать об этом до того, как переведёт
-              на её адрес средства. */}
+          {/* A warning, not a refusal: importing a test phrase is
+              ordinary developer work, and forbidding it would be a
+              mistake. Anyone who took such a phrase from an article
+              or example must still learn that before sending funds
+              to its address. */}
           {validation.isGuessable && (
             <Alert variant="danger">
               <AlertDescription>

@@ -10,7 +10,6 @@ import {
   type ITypedData,
 } from '@/core'
 
-/** Сырое обращение, пришедшее от транспорта. */
 export interface IRawRequest {
   readonly topic: string
   readonly id: number
@@ -21,17 +20,17 @@ export interface IRawRequest {
 }
 
 /**
- * Переводит обращение приложения в запрос, понятный кошельку.
+ * Turn an app call into a request the wallet understands.
  *
- * ВОЗВРАЩАЕТ `null` ДЛЯ ВСЕГО, ЧЕГО НЕ РАЗБИРАЕТ. Это не защитное
- * программирование, а суть: показать пользователю запрос, содержимое
- * которого мы не поняли, нельзя — он подтвердит непонятное. Ответом
- * на такой запрос будет отказ.
+ * RETURNS `null` FOR ANYTHING IT DOES NOT PARSE. That is not defensive
+ * programming, it is the point: showing a request whose contents we
+ * did not understand is not allowed — the user would confirm the
+ * unknown. The answer to such a request is a rejection.
  *
- * ПОРЯДОК АРГУМЕНТОВ У МЕТОДОВ ПОДПИСИ РАЗНЫЙ, И ЭТО НЕ ОПЕЧАТКА.
- * `personal_sign` присылает сначала сообщение, затем адрес;
- * `eth_signTypedData_v4` — наоборот. Перепутать их значит принять адрес
- * за сообщение и показать пользователю бессмыслицу.
+ * SIGN METHODS TAKE ARGUMENTS IN DIFFERENT ORDER, AND THAT IS NOT A
+ * TYPO. `personal_sign` sends the message first, then the address;
+ * `eth_signTypedData_v4` is the reverse. Mixing them up would treat
+ * the address as a message and show the user nonsense.
  */
 export function toDappRequest(raw: IRawRequest): IDappRequest | null {
   if (raw.chainId === null) {
@@ -54,11 +53,10 @@ export function toDappRequest(raw: IRawRequest): IDappRequest | null {
   }
 }
 
-/** Разбирает содержимое по имени метода. */
 function toPayload(method: string, params: readonly unknown[]): IDappRequest['payload'] | null {
   switch (method) {
     case 'personal_sign': {
-      /* Сначала сообщение, затем адрес. */
+      /* Message first, then address. */
       const message = readMessage(params[0])
       const address = readAddress(params[1])
 
@@ -67,12 +65,12 @@ function toPayload(method: string, params: readonly unknown[]): IDappRequest['pa
         : { kind: DAPP_REQUEST_KIND.SignMessage, address, message }
     }
 
-    /* `eth_sign` НЕ ПОДДЕРЖИВАЕТСЯ СОЗНАТЕЛЬНО, а не забыт.
-       Метод задуман как подпись произвольного 32-байтового значения
-       без префикса — то есть приложение может прислать хэш транзакции
-       и получить подпись под ней, ничего не показав пользователю.
-       MetaMask отключил метод по умолчанию, а затем удалил; остальные
-       кошельки последовали за ним. Приложению уходит отказ. */
+    /* `eth_sign` IS UNSUPPORTED ON PURPOSE, not forgotten.
+       The method is meant to sign an arbitrary 32-byte value without
+       a prefix — so an app can send a transaction hash and get a
+       signature under it without showing the user anything.
+       MetaMask disabled it by default and then removed it; other
+       wallets followed. The app is sent a rejection. */
 
     case 'eth_signTypedData':
     case 'eth_signTypedData_v4': {
@@ -105,13 +103,11 @@ function toPayload(method: string, params: readonly unknown[]): IDappRequest['pa
 }
 
 /**
- * Читает сообщение.
+ * Read the message.
  *
- * Приложения присылают его либо текстом, либо шестнадцатеричной
- * строкой. Второе переводится в текст: показывать пользователю байты
- * там, где есть читаемая фраза, — значит не показывать ничего.
- * Нечитаемое остаётся шестнадцатеричным, и об этом предупредит разбор
- * рисков.
+ * Apps send it as text or as a hex string. The latter is decoded:
+ * showing the user bytes where a readable phrase exists is showing
+ * nothing. Unreadable stays hex, and risk analysis will warn.
  */
 function readMessage(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -129,15 +125,14 @@ function readMessage(value: unknown): string | null {
   }
 
   try {
-    /* Строгий режим: испорченная последовательность оставляет строку
-       шестнадцатеричной, а не подменяет байты знаками вопроса. */
+    /* Fatal mode: a broken sequence leaves the string as hex instead
+       of replacing bytes with question marks. */
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {
     return value
   }
 }
 
-/** Читает адрес, отвергая всё, что адресом не является. */
 function readAddress(value: unknown): Address | null {
   if (typeof value !== 'string') {
     return null
@@ -150,7 +145,6 @@ function readAddress(value: unknown): Address | null {
   }
 }
 
-/** Читает структуру EIP-712, присланную объектом либо строкой JSON. */
 function readTypedData(value: unknown): ITypedData | null {
   const source: unknown = typeof value === 'string' ? safeParseJson(value) : value
 
@@ -174,8 +168,8 @@ function readTypedData(value: unknown): ITypedData | null {
     return null
   }
 
-  /* Домен необязателен по стандарту: его отсутствие — не ошибка разбора,
-     а повод для замечания, которое выдаст оценка рисков. */
+  /* Domain is optional in the spec: its absence is not a parse error,
+     but a finding that risk analysis will raise. */
   const safeDomain = typeof domain === 'object' && domain !== null ? domain : {}
 
   return {
@@ -186,7 +180,6 @@ function readTypedData(value: unknown): ITypedData | null {
   }
 }
 
-/** Разбирает JSON, не бросая исключения. */
 function safeParseJson(value: string): unknown {
   try {
     return JSON.parse(value)
@@ -196,11 +189,11 @@ function safeParseJson(value: string): unknown {
 }
 
 /**
- * Читает транзакцию, присланную приложением.
+ * Read a transaction sent by the app.
  *
- * Отсутствие отправителя — отказ, а не подстановка активного аккаунта:
- * подписать транзакцию, о владельце которой приложение умолчало,
- * значит решить за пользователя, с какого адреса уйдут средства.
+ * A missing sender is a rejection, not a fill-in of the active
+ * account: signing a transaction whose owner the app omitted is
+ * deciding for the user which address the funds leave from.
  */
 function readTransaction(value: unknown): IDappTransaction | null {
   if (typeof value !== 'object' || value === null) {
@@ -217,15 +210,14 @@ function readTransaction(value: unknown): IDappTransaction | null {
   return {
     from,
     to: readAddress(record['to']),
-    /* Отсутствие суммы означает ноль: перевод без явного значения —
-       это вызов контракта, а не подстановка неизвестной величины. */
+    /* A missing amount means zero: a transfer without an explicit
+       value is a contract call, not a fill-in of an unknown figure. */
     value: readQuantity(record['value']) ?? 0n,
     data: readHex(record['data']),
     gasLimit: readQuantity(record['gas']) ?? readQuantity(record['gasLimit']),
   }
 }
 
-/** Читает количество, присланное числом либо шестнадцатеричной строкой. */
 function readQuantity(value: unknown): bigint | null {
   if (typeof value === 'bigint') {
     return value
@@ -242,7 +234,6 @@ function readQuantity(value: unknown): bigint | null {
   return null
 }
 
-/** Читает шестнадцатеричные данные. */
 function readHex(value: unknown): HexString | null {
   return typeof value === 'string' && /^0x[0-9a-fA-F]*$/u.test(value) ? (value as HexString) : null
 }

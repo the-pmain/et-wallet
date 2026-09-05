@@ -1,65 +1,66 @@
 import type { MnemonicInvalidReason } from '@/core/errors'
 
 /**
- * Стойкость генерируемой фразы в битах энтропии.
+ * Strength of a generated phrase in bits of entropy.
  *
- * Генерация ограничена двумя вариантами сознательно, хотя BIP-39 допускает
- * также 160, 192 и 224 бита. Промежуточные длины (15, 18, 21 слово)
- * не дают практической выгоды, но усложняют интерфейс и восстановление:
- * пользователь, записавший 18 слов, чаще ошибается при вводе, чем владелец
- * привычных 12 или 24.
+ * Generation is limited to two options on purpose, even though
+ * BIP-39 also allows 160, 192, and 224 bits. Intermediate lengths
+ * (15, 18, 21 words) give no practical gain but complicate the UI
+ * and recovery: a user who wrote down 18 words mistypes more often
+ * than the owner of the familiar 12 or 24.
  *
- * При ИМПОРТЕ принимаются все допустимые BIP-39 длины — см. `VALID_WORD_COUNTS`.
- * Правило «консервативен в том, что производишь, либерален в том, что
- * принимаешь» здесь имеет прямое денежное выражение: отказ импортировать
- * 18-словную фразу из другого кошелька означает потерю доступа к средствам.
+ * On IMPORT every BIP-39 length is accepted — see `VALID_WORD_COUNTS`.
+ * "Be conservative in what you produce, liberal in what you accept"
+ * has a direct money meaning here: refusing to import an 18-word
+ * phrase from another wallet means losing access to the funds.
  */
 export const MNEMONIC_STRENGTH = {
-  /** 128 бит энтропии — 12 слов. */
+  /** 128 bits of entropy — 12 words. */
   Words12: 128,
-  /** 256 бит энтропии — 24 слова. */
+  /** 256 bits of entropy — 24 words. */
   Words24: 256,
 } as const
 
 export type MnemonicStrength = (typeof MNEMONIC_STRENGTH)[keyof typeof MNEMONIC_STRENGTH]
 
 /**
- * Допустимые при импорте длины фразы.
+ * Phrase lengths allowed on import.
  *
- * Соответствуют энтропии 128, 160, 192, 224 и 256 бит.
+ * They correspond to 128, 160, 192, 224, and 256 bits of entropy.
  */
 export const VALID_WORD_COUNTS: readonly number[] = [12, 15, 18, 21, 24]
 
 /**
- * Длина seed, выводимого из мнемоники по BIP-39.
+ * Length of the seed derived from a mnemonic per BIP-39.
  *
- * Ровно 64 байта независимо от числа слов: PBKDF2-HMAC-SHA512 всегда даёт
- * 512 бит. Значение зафиксировано стандартом и не подлежит настройке.
+ * Exactly 64 bytes regardless of word count: PBKDF2-HMAC-SHA512
+ * always yields 512 bits. The value is fixed by the standard and
+ * is not configurable.
  */
 export const BIP39_SEED_LENGTH = 64
 
 /**
- * Результат проверки введённой фразы.
+ * Result of checking a typed phrase.
  *
- * Отдельная структура вместо булева значения нужна интерфейсу: подсветить
- * конкретное слово с опечаткой намного полезнее, чем сообщить «фраза
- * некорректна» о наборе из 24 слов.
+ * A separate structure instead of a boolean is needed by the UI:
+ * highlighting the specific mistyped word is far more useful than
+ * saying "the phrase is invalid" about a set of 24 words.
  */
 export interface IMnemonicValidationResult {
   readonly isValid: boolean
 
-  /** Число слов после нормализации ввода. */
+  /** Word count after the input is normalised. */
   readonly wordCount: number
 
-  /** Причина непригодности. `null`, если фраза корректна. */
+  /** Why it is unusable. `null` if the phrase is valid. */
   readonly reason: MnemonicInvalidReason | null
 
   /**
-   * Позиции слов, отсутствующих в словаре, начиная с нуля.
+   * Positions of words that are not in the wordlist, starting at zero.
    *
-   * Возвращаются именно позиции, а не сами слова. Копирование слов
-   * в дополнительную структуру размножило бы секрет по памяти без всякой
-   * необходимости: исходный текст у вызывающего кода уже есть.
+   * Positions are returned, not the words themselves. Copying the
+   * words into another structure would multiply the secret in memory
+   * for no reason: the caller already has the original text.
    */
   readonly unknownWordIndexes: readonly number[]
 }

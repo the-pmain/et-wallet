@@ -5,20 +5,20 @@ import { SESSION_STATE } from '@/features/wallet'
 import { createAppServices } from './createAppServices'
 
 /**
- * Проверки composition root.
+ * Composition-root checks.
  *
- * ЗАЧЕМ ОНИ НУЖНЫ, ЕСЛИ ВСЕ СЕРВИСЫ ПРОВЕРЕНЫ ПО ОТДЕЛЬНОСТИ. Здесь
- * собирается боевая связка, и ровно здесь возможны ошибки, которых
- * не увидит ни один модульный тест: два защищённых хранилища вместо
- * одного, забытый источник курсов, разошедшиеся часы. На этапе 18 такое
- * уже случилось — боевая сборка использовала пустой источник курсов,
- * и заметить это удалось только живой проверкой.
+ * WHY THESE ARE NEEDED IF EVERY SERVICE IS TESTED ON ITS OWN. This
+ * is where the production wiring is assembled, and exactly here
+ * mistakes appear that no unit test will see: two secure stores
+ * instead of one, a forgotten price source, clocks that drifted
+ * apart. That already happened at stage 18 — the production build
+ * used an empty price source, and only a live check caught it.
  *
- * ЧЕГО ЗДЕСЬ НЕТ. Ни одного обращения к сети: сервисы создаются,
- * но не открываются. Проверяется состав связки, а не работа узлов.
+ * WHAT IS NOT HERE. No network call: services are created but not
+ * opened. The check is the wiring, not the nodes.
  */
-describe('createAppServices: состав связки', () => {
-  it('собирает все сервисы приложения', () => {
+describe('createAppServices: wiring', () => {
+  it('assembles every app service', () => {
     const services = createAppServices()
 
     expect(services.onboarding).toBeDefined()
@@ -28,12 +28,12 @@ describe('createAppServices: состав связки', () => {
     expect(services.dappSessions).toBeDefined()
   })
 
-  it('сессия начинается закрытой', () => {
-    /* Открытая сессия означала бы выведенные ключи до ввода пароля. */
+  it('starts the session closed', () => {
+    /* An open session would mean keys derived before a password. */
     expect(createAppServices().session.getSnapshot().state).toBe(SESSION_STATE.Closed)
   })
 
-  it('кошелёк считается несозданным на чистом хранилище', async () => {
+  it('treats a clean store as uninitialized', async () => {
     const services = createAppServices()
 
     await services.onboarding.initialize()
@@ -41,9 +41,9 @@ describe('createAppServices: состав связки', () => {
     expect(services.onboarding.getState()).toBe('uninitialized')
   })
 
-  it('каждый вызов даёт независимый набор', () => {
-    /* Общее состояние между вызовами превратило бы два окна кошелька
-       в одно: разблокировка в одном открывала бы второе. */
+  it('gives an independent set on every call', () => {
+    /* Shared state across calls would turn two wallet windows into
+       one: unlocking one would open the other. */
     const first = createAppServices()
     const second = createAppServices()
 
@@ -52,32 +52,32 @@ describe('createAppServices: состав связки', () => {
   })
 })
 
-describe('createAppServices: одно защищённое хранилище на всех', () => {
-  it('онбординг и сессия читают одно и то же', async () => {
+describe('createAppServices: one secure store for all', () => {
+  it('onboarding and session read the same store', async () => {
     /*
-      САМАЯ ВАЖНАЯ ПРОВЕРКА ЭТОГО ФАЙЛА. `SecureStorage` владеет
-      сессионным ключом, выведенным из пароля. Второй экземпляр поверх
-      того же хранилища имел бы собственный ключ и не смог бы прочитать
-      записанное первым: кошелёк создавался бы успешно и не открывался
-      никогда.
+      THE MOST IMPORTANT CHECK IN THIS FILE. `SecureStorage` owns the
+      session key derived from the password. A second instance over
+      the same store would have its own key and could not read what
+      the first wrote: the wallet would create successfully and never
+      open.
 
-      ПОЧЕМУ ЗДЕСЬ НЕ ОТКРЫВАЕТСЯ СЕССИЯ. Открытие доходит до опроса
-      узла, а боевая связка ходит к настоящим публичным RPC: проверка
-      стала бы зависеть от чужой доступности и сообщала бы адрес
-      кошелька постороннему оператору при каждом прогоне. Подставить
-      дублёр нельзя намеренно — `createAppServices` не принимает
-      аргументов, иначе подстановка была бы достижима и в боевой
-      сборке.
+      WHY THE SESSION IS NOT OPENED HERE. Opening reaches a node
+      poll, and the production wiring talks to real public RPCs: the
+      check would depend on someone else's availability and would
+      disclose the wallet address to a third-party operator on every
+      run. A stand-in cannot be injected on purpose — `createAppServices`
+      takes no arguments, otherwise the substitution would also be
+      reachable in the production build.
 
-      Признак общего экземпляра, наблюдаемый без сети: онбординг
-      переходит в разблокированное состояние, а повторное чтение
-      хранилища тем же ключом даёт записанное. Путь целиком — от
-      импорта до появления аккаунта на экране — закреплён сквозной
-      проверкой `e2e/wallet-flow.spec.ts`, где приложение работает
-      собранным и в настоящем браузере.
+      A sign of a shared instance, observed without the network:
+      onboarding moves to the unlocked state, and a second read of
+      the store with the same key yields what was written. The path
+      as a whole — from import to an account on screen — is pinned
+      by the end-to-end check `e2e/wallet-flow.spec.ts`, where the
+      app runs built and in a real browser.
 
-      Ключ шифрования здесь настоящий, а не ускоренный: проверяется
-      именно боевая связка.
+      The encryption key here is the real one, not a fast stand-in:
+      it is the production wiring that is being checked.
     */
     const services = createAppServices()
 
@@ -89,8 +89,8 @@ describe('createAppServices: одно защищённое хранилище н
 
     expect(services.onboarding.getState()).toBe('unlocked')
 
-    /* Блокировка и повторная разблокировка тем же паролем: расшифровка
-       удалась — значит заголовок хранилища один и тот же. */
+    /* Lock and unlock again with the same password: decryption
+       succeeded, so the store header is the same one. */
     services.onboarding.lock()
 
     expect(services.onboarding.getState()).toBe('locked')
@@ -101,10 +101,10 @@ describe('createAppServices: одно защищённое хранилище н
   }, 60_000)
 })
 
-describe('createAppServices: подключения приложений', () => {
-  it('сервис подключений собран и знает адреса кошелька', () => {
-    /* Адреса читаются функцией, а не копируются при сборке: снимок,
-       взятый один раз, выдал бы приложению устаревший аккаунт. */
+describe('createAppServices: dapp connections', () => {
+  it('assembles the dapp service and reads wallet addresses', () => {
+    /* Addresses are read by a function, not copied at construction:
+       a snapshot taken once would give the app a stale account. */
     const services = createAppServices()
     const snapshot = services.dappSessions.getSnapshot()
 

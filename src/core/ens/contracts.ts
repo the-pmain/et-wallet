@@ -1,94 +1,94 @@
 import type { Address, ChainId } from '@/core/types'
 
-/** Разрешённое имя вместе с адресом, на который оно указывает. */
+/** A resolved name together with the address it points at. */
 export interface IEnsResolution {
   /**
-   * Каноническое имя — ровно то, что было захэшировано.
+   * Canonical name — exactly what was hashed.
    *
-   * Годится для сравнения и повторного разрешения. Для показа
-   * пользователю предназначено {@link IEnsResolution.displayName}.
+   * Fit for comparison and re-resolution. For showing to the user
+   * use {@link IEnsResolution.displayName}.
    */
   readonly name: string
 
   /**
-   * Имя в виде, пригодном для показа.
+   * Name in a form fit for display.
    *
-   * Отличается от канонического обработкой эмодзи: нормализация снимает
-   * вариационные селекторы ради единственности узла, а на экране эмодзи
-   * должны выглядеть привычно. Хэшировать это значение нельзя.
+   * Differs from the canonical form in emoji handling: normalization
+   * strips variation selectors so the node is unique, but on screen
+   * emoji should look familiar. This value must not be hashed.
    */
   readonly displayName: string
 
   /**
-   * Имя записано только символами ASCII.
+   * The name is written in ASCII only.
    *
-   * ENSIP-15 запрещает смешивать письменности внутри метки, но имя,
-   * целиком записанное другой письменностью и похожее по начертанию
-   * на латинское, остаётся законным и принадлежит другому человеку.
-   * Интерфейс обязан сказать об этом, а не молчать.
+   * ENSIP-15 forbids mixing scripts inside a label, but a name
+   * written entirely in another script that looks Latin remains
+   * legitimate and belongs to someone else. The UI must say so,
+   * not stay silent.
    */
   readonly isAscii: boolean
 
-  /** Адрес из записи `addr`. Нулевой адрес сюда не попадает никогда. */
+  /** Address from the `addr` record. A zero address never lands here. */
   readonly address: Address
 }
 
 /**
- * Разрешение имён ENS.
+ * ENS name resolution.
  *
- * ОДНО СВОЙСТВО ВАЖНЕЕ ВСЕХ ОСТАЛЬНЫХ: обратная запись ничего не
- * доказывает сама по себе. Любой владелец адреса вправе объявить своим
- * именем `binance.eth`, и узел честно вернёт эту строку. Поэтому
- * {@link IEnsService.lookupAddress} обязан подтвердить полученное имя
- * прямым разрешением и вернуть `null` при несовпадении. Реализация,
- * показывающая обратную запись без сверки, превращает ENS в готовый
- * инструмент подмены получателя.
+ * ONE PROPERTY MATTERS MORE THAN THE REST: a reverse record proves
+ * nothing by itself. Any address owner may declare `binance.eth`
+ * as their name, and the node will honestly return that string.
+ * Therefore {@link IEnsService.lookupAddress} must confirm the
+ * received name with a forward resolve and return `null` on a
+ * mismatch. An implementation that shows a reverse record without
+ * that check turns ENS into a ready tool for recipient substitution.
  *
- * ГРАНИЦЫ. Поддерживается только сеть Ethereum: реестр существует
- * в единственном экземпляре и в единственной цепи. Оффчейн-резолверы
- * (EIP-3668, CCIP-Read) не поддержаны — следование за ними означало бы
- * запрос к произвольному адресу в интернете, названному контрактом.
- * Имена с такими резолверами честно считаются неразрешимыми.
+ * BOUNDS. Only the Ethereum network is supported: the registry
+ * exists in one instance and on one chain. Off-chain resolvers
+ * (EIP-3668, CCIP-Read) are not supported — following them would
+ * mean requesting an arbitrary internet address named by a
+ * contract. Names with such resolvers are honestly treated as
+ * unresolvable.
  */
 export interface IEnsService {
-  /** Работает ли ENS в указанной сети. */
   isSupported(chainId: ChainId): boolean
 
   /**
-   * Разрешает имя в адрес.
+   * Resolves a name to an address.
    *
-   * ОТКАЗ УЗЛА НЕ ПОДМЕНЯЕТСЯ ОТВЕТОМ «ЗАПИСИ НЕТ». Первое означает
-   * «неизвестно» и приводит к исключению, второе — «получателя нет»
-   * и возвращает `null`. Сведи их к одному значению — и пользователь,
-   * у которого просто не отвечает узел, увидит «имя не найдено»
-   * и введёт адрес вручную, полагая, что имени не существует.
+   * A NODE FAILURE IS NOT SUBSTITUTED WITH "NO RECORD". The first
+   * means "unknown" and throws; the second means "no recipient"
+   * and returns `null`. Collapse them to one value and a user
+   * whose node merely failed to answer will see "name not found"
+   * and type an address by hand, believing the name does not exist.
    *
-   * @param name Имя в любом регистре. Нормализуется перед хэшированием.
-   * @returns `null`, если имя вне поддерживаемого набора символов,
-   *          сеть не Ethereum либо записи не существует. «Записи нет»
-   *          и «адрес нулевой» не различаются намеренно: оба означают,
-   *          что получателя нет.
-   * @throws Ошибки транспорта — узел недоступен либо ответил отказом.
+   * @param name Name in any case. Normalized before hashing.
+   * @returns `null` if the name is outside the supported character
+   *          set, the network is not Ethereum, or the record does
+   *          not exist. "No record" and "zero address" are not
+   *          distinguished on purpose: both mean there is no recipient.
+   * @throws Transport errors — the node is unreachable or rejected the call.
    */
   resolveName(name: string): Promise<IEnsResolution | null>
 
   /**
-   * Ищет имя, объявленное владельцем адреса.
+   * Looks up the name declared by the address owner.
    *
-   * Результат ПОДТВЕРЖДЁН прямым разрешением: возвращается только имя,
-   * которое само указывает на этот же адрес.
+   * The result is CONFIRMED by a forward resolve: only a name that
+   * itself points at this same address is returned.
    *
-   * @returns `null`, если записи нет, имя не проходит нормализацию
-   *          ENSIP-15 либо сверка не сошлась.
-   * @throws Ошибки транспорта — по той же причине, что и выше.
+   * @returns `null` if there is no record, the name fails ENSIP-15
+   *          normalization, or the check did not match.
+   * @throws Transport errors — for the same reason as above.
    */
   lookupAddress(address: Address): Promise<IEnsResolution | null>
 
   /**
-   * Сбрасывает кэш.
+   * Clears the cache.
    *
-   * Вызывается при закрытии сессии: имена привязаны к адресам кошелька,
-   * и переживать блокировку они не должны.
+   * Called when the session closes: names are bound to wallet
+   * addresses and must not outlive the lock.
    */
   clearCache(): void
 }

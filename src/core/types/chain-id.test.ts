@@ -5,59 +5,59 @@ import { InvalidArgumentError } from '@/core/errors'
 import { MAX_CHAIN_ID, chainIdToHex, parseChainIdFromHex, toChainId } from './chain-id'
 
 describe('toChainId', () => {
-  it('принимает bigint, number и строку', () => {
+  it('accepts bigint, number, and string', () => {
     expect(toChainId(1n)).toBe(1n)
     expect(toChainId(137)).toBe(137n)
     expect(toChainId('42161')).toBe(42161n)
   })
 
-  it('отвергает ноль и отрицательные значения', () => {
+  it('rejects zero and negative values', () => {
     expect(() => toChainId(0)).toThrow(InvalidArgumentError)
     expect(() => toChainId(-1)).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает значения выше допустимого предела', () => {
+  it('rejects values above the allowed limit', () => {
     expect(() => toChainId(MAX_CHAIN_ID + 1n)).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает нечисловые строки', () => {
-    expect(() => toChainId('не число')).toThrow(InvalidArgumentError)
+  it('rejects non-numeric strings', () => {
+    expect(() => toChainId('not-a-number')).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает дробные значения', () => {
+  it('rejects fractional values', () => {
     expect(() => toChainId(1.5)).toThrow(InvalidArgumentError)
   })
 })
 
 describe('parseChainIdFromHex', () => {
-  it('разбирает ответ узла', () => {
+  it('parses a node response', () => {
     expect(parseChainIdFromHex('0x1')).toBe(1n)
     expect(parseChainIdFromHex('0xa4b1')).toBe(42161n)
   })
 
-  it('отвергает значения без префикса 0x', () => {
+  it('rejects values without a 0x prefix', () => {
     expect(() => parseChainIdFromHex('1')).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает нестроковые значения', () => {
+  it('rejects non-string values', () => {
     expect(() => parseChainIdFromHex(1)).toThrow(InvalidArgumentError)
     expect(() => parseChainIdFromHex(null)).toThrow(InvalidArgumentError)
     expect(() => parseChainIdFromHex(undefined)).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает мусор в шестнадцатеричной части', () => {
+  it('rejects garbage in the hex part', () => {
     expect(() => parseChainIdFromHex('0xzz')).toThrow(InvalidArgumentError)
   })
 })
 
 describe('chainIdToHex', () => {
-  it('преобразует в формат EIP-1193', () => {
+  it('converts to EIP-1193 form', () => {
     expect(chainIdToHex(toChainId(1))).toBe('0x1')
     expect(chainIdToHex(toChainId(137))).toBe('0x89')
     expect(chainIdToHex(toChainId(43114))).toBe('0xa86a')
   })
 
-  it('обратим относительно parseChainIdFromHex', () => {
+  it('is reversible relative to parseChainIdFromHex', () => {
     const original = toChainId(8453)
 
     expect(parseChainIdFromHex(chainIdToHex(original))).toBe(original)

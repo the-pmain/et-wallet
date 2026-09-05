@@ -1,9 +1,9 @@
 /**
- * Неподвижные данные для этюдов темы.
+ * Frozen data for the theme studies.
  *
- * Страницы вариантов не читают сессию и не ходят в сеть: сравнение
- * держится на одном и том же срезе, иначе разница в суммах читалась бы
- * как разница тем.
+ * Variant pages do not read the session or hit the network: comparison
+ * must sit on the same slice, or a difference in amounts would read as
+ * a difference in themes.
  */
 export const VARIANT_ACCOUNT = {
   name: 'Account 1',

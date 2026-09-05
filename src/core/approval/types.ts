@@ -2,75 +2,76 @@ import type { TokenStandard } from '@/core/token'
 import type { Address, ChainId } from '@/core/types'
 
 /**
- * Действующее разрешение распоряжаться средствами владельца.
+ * A live allowance to spend the owner's funds.
  *
- * ПОЧЕМУ ЭТО ВАЖНЕЕ, ЧЕМ КАЖЕТСЯ. Средства сегодня уводят не кражей
- * ключа, а забытым разрешением: пользователь однажды разрешил контракту
- * распоряжаться токенами без ограничения суммы, а через год этот
- * контракт оказался взломан либо изначально принадлежал мошеннику.
- * Ключ при этом цел, кошелёк «не взломан», а средств нет.
+ * WHY THIS MATTERS MORE THAN IT LOOKS. Funds today are taken not
+ * by stealing a key, but by a forgotten allowance: the user once
+ * let a contract spend tokens with no amount cap, and a year later
+ * that contract was hacked or belonged to a scammer from the start.
+ * The key is intact, the wallet is "not compromised", and the
+ * funds are gone.
  *
- * РАЗРЕШЕНИЕ ПРОВЕРЕНО НА МОМЕНТ ЗАПРОСА, а не выведено из журнала.
- * Журнал показывает историю выдач; отозванное разрешение остаётся
- * в нём навсегда. Показать его как действующее значило бы пугать
- * владельца тем, чего нет.
+ * THE ALLOWANCE IS CHECKED AT QUERY TIME, not inferred from the
+ * log. The log shows a history of grants; a revoked allowance
+ * stays there forever. Showing it as live would scare the owner
+ * with something that is not there.
  */
 export interface IApprovalRecord {
   readonly chainId: ChainId
 
-  /** Адрес контракта токена либо коллекции. */
+  /** Token or collection contract address. */
   readonly contract: Address
 
-  /** Кому разрешено распоряжаться. */
+  /** Who is allowed to spend. */
   readonly spender: Address
 
   readonly standard: TokenStandard
 
   /**
-   * Разрешённое количество в минимальных единицах.
+   * Allowed amount in the smallest units.
    *
-   * `null` для разрешения на всю коллекцию: там количества нет —
-   * распоряжаться можно всеми предметами, включая будущие.
+   * `null` for a whole-collection allowance: there is no amount —
+   * every item can be spent, including future ones.
    */
   readonly amount: bigint | null
 
   /**
-   * Разрешение не ограничено суммой.
+   * The allowance is not capped.
    *
-   * Приложения запрашивают такое по умолчанию: так не приходится
-   * просить подпись перед каждой операцией. Цена — доступ ко всему
-   * балансу токена навсегда.
+   * Apps request this by default so they need not ask for a
+   * signature before every operation. The price is access to
+   * the entire token balance forever.
    */
   readonly isUnlimited: boolean
 
-  /** Символ токена из контракта. `null`, если контракт его не отдаёт. */
+  /** Token symbol from the contract. `null` if the contract does not return one. */
   readonly symbol: string | null
 
-  /** Число знаков токена. `null` — величина показывается как есть. */
+  /** Token decimals. `null` — the raw amount is shown as-is. */
   readonly decimals: number | null
 }
 
-/** Чем ограничен показанный список разрешений. */
+/** How the shown allowance list is bounded. */
 export interface IApprovalLimits {
-  /** Сколько блоков просмотрено назад от последнего. */
+  /** How many blocks were scanned back from the latest. */
   readonly scannedBlocks: number | null
 
-  /** Источник не ответил. Пустой список тогда ничего не утверждает. */
+  /** The source did not answer. An empty list then asserts nothing. */
   readonly sourceUnavailable: boolean
 
-  /** Причина отказа дословно. `null`, если отказа не было. */
+  /** Rejection reason verbatim. `null` if there was no rejection. */
   readonly reason: string | null
 
   /**
-   * Сколько найденных выдач осталось непроверенными.
+   * How many found grants were left unchecked.
    *
-   * Проверка каждой требует отдельного обращения к контракту, и число
-   * проверок ограничено. Ноль означает «проверено всё».
+   * Checking each one needs a separate contract call, and the
+   * number of checks is capped. Zero means "everything was checked".
    */
   readonly skipped: number
 }
 
-/** Список разрешений вместе с границами выборки. */
+/** Allowance list together with the sample bounds. */
 export interface IApprovalPage {
   readonly items: readonly IApprovalRecord[]
   readonly limits: IApprovalLimits

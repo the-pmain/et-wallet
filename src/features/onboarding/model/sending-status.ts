@@ -1,6 +1,6 @@
 /**
- * Статусы перевода. Одно множество на кабинет и на экран отправки:
- * иначе выпадающий список и кадр SSE разойдутся по строкам.
+ * Transfer statuses. One set for the cabinet and the send screen:
+ * otherwise the dropdown and an SSE frame would disagree on labels.
  */
 export const SENDING_STATUS = {
   Pending: 'pending',

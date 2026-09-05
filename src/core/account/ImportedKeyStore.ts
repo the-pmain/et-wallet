@@ -6,26 +6,27 @@ import { AccountNotFoundError, VaultCorruptedError } from '@/core/errors'
 import { STORAGE_NAMESPACE, toStorageKey, type StorageKey } from '@/core/storage'
 import type { AccountId } from '@/core/types'
 
-/** Префикс ключей хранилища, отделяющий импортированные ключи от прочего. */
+/** Storage-key prefix that keeps imported keys apart from the rest. */
 const KEY_PREFIX = 'imported-key.'
 
 /**
- * Хранилище импортированных приватных ключей.
+ * Store of imported private keys.
  *
- * ОТЛИЧИЕ ОТ HD-АККАУНТОВ, определяющее всё поведение: ключ, попавший сюда,
- * существует в единственном экземпляре. Из seed-фразы он не выводится,
- * при восстановлении кошелька не появится. Его потеря окончательна.
+ * THE DIFFERENCE FROM HD ACCOUNTS that defines all behaviour: a key
+ * that lands here exists in a single copy. It is not derived from
+ * the seed phrase and will not appear on wallet restore. Losing it
+ * is final.
  *
- * Отсюда два следствия:
- * - удаление требует подтверждения паролем на уровне выше;
- * - запись выполняется только через `ISecureStorage`, то есть всегда
- *   в зашифрованном виде.
+ * Hence two consequences:
+ * - removal requires a password confirmation at the layer above;
+ * - writing is done only through `ISecureStorage`, i.e. always
+ *   encrypted.
  *
- * Ключ хранится шестнадцатеричной строкой: `SecureStorage` сериализует
- * значения через JSON, где `Uint8Array` превращается в объект с числовыми
- * ключами и молча портится. Строка на короткое время существует в куче
- * неочищаемой — ограничение, общее для всей работы с секретами
- * в JavaScript.
+ * The key is stored as a hex string: `SecureStorage` serialises
+ * values through JSON, where `Uint8Array` becomes an object with
+ * numeric keys and is silently corrupted. The string exists in the
+ * heap uncleared for a short time — a limit common to all secret
+ * handling in JavaScript.
  */
 export class ImportedKeyStore {
   readonly #storage: ISecureStorage
@@ -35,9 +36,10 @@ export class ImportedKeyStore {
   }
 
   /**
-   * Сохраняет ключ, привязав его к аккаунту.
+   * Saves the key bound to an account.
    *
-   * Владение переданным буфером НЕ принимается: вызывающий затирает его сам.
+   * Ownership of the passed buffer is NOT taken: the caller wipes
+   * it themselves.
    */
   async save(accountId: AccountId, privateKey: ISecretBuffer): Promise<void> {
     assertValidPrivateKey(privateKey.bytes)
@@ -50,11 +52,11 @@ export class ImportedKeyStore {
   }
 
   /**
-   * Читает ключ аккаунта.
+   * Reads an account key.
    *
-   * @returns Буфер, который вызывающий обязан затереть.
-   * @throws AccountNotFoundError если ключа нет.
-   * @throws VaultCorruptedError если запись повреждена.
+   * @returns A buffer the caller must wipe.
+   * @throws AccountNotFoundError if there is no key.
+   * @throws VaultCorruptedError if the record is corrupted.
    */
   async load(accountId: AccountId): Promise<ISecretBuffer> {
     const stored = await this.#storage.get<string>(
@@ -74,23 +76,22 @@ export class ImportedKeyStore {
       throw new VaultCorruptedError('the private key of the account is corrupted', { cause: error })
     }
 
-    /* Проверка диапазона выполняется и при чтении: запись могла быть
-       сделана более старой версией приложения без такой проверки,
-       а ключ вне 1..n-1 не задаёт точку на кривой. */
+    /* The range check is done on read as well: the record may have
+       been written by an older app version without that check, and
+       a key outside 1..n-1 does not define a curve point. */
     assertValidPrivateKey(bytes)
 
     return SecretBuffer.own(bytes)
   }
 
-  /** Есть ли сохранённый ключ для аккаунта. */
   async has(accountId: AccountId): Promise<boolean> {
     return await this.#storage.has(STORAGE_NAMESPACE.Vault, ImportedKeyStore.#keyOf(accountId))
   }
 
   /**
-   * Удаляет ключ.
+   * Removes the key.
    *
-   * НЕОБРАТИМО: восстановить его из seed-фразы невозможно.
+   * IRREVERSIBLE: it cannot be restored from the seed phrase.
    */
   async remove(accountId: AccountId): Promise<void> {
     await this.#storage.remove(STORAGE_NAMESPACE.Vault, ImportedKeyStore.#keyOf(accountId))

@@ -1,42 +1,39 @@
 import type { Address, ChainId, Timestamp } from '@/core/types'
 
-/** Поддерживаемые стандарты токенов. */
 export const TOKEN_STANDARD = {
-  /** Нативная валюта сети. Контракта не имеет. */
+  /** Network native currency. Has no contract. */
   Native: 'native',
-  /** Взаимозаменяемые токены. */
   Erc20: 'ERC-20',
-  /** Невзаимозаменяемые токены. */
   Erc721: 'ERC-721',
-  /** Смешанный стандарт: и взаимозаменяемые, и уникальные в одном контракте. */
+  /** Mixed standard: fungible and unique items in one contract. */
   Erc1155: 'ERC-1155',
 } as const
 
 export type TokenStandard = (typeof TOKEN_STANDARD)[keyof typeof TOKEN_STANDARD]
 
 /**
- * Ссылка на токен.
+ * A reference to a token.
  *
- * Минимальный набор для однозначной идентификации. Пара «сеть + адрес»
- * обязательна: один и тот же адрес контракта в разных сетях — разные токены.
- * Индексация только по адресу приводит к показу баланса из одной сети
- * в интерфейсе другой.
+ * The minimum set for an unambiguous identity. The pair
+ * "network + address" is required: the same contract address on
+ * different networks is different tokens. Indexing by address
+ * alone shows a balance from one network in another network's UI.
  */
 export interface ITokenRef {
   readonly chainId: ChainId
 
-  /** Адрес контракта. `null` для нативной валюты. */
+  /** Contract address. `null` for the native currency. */
   readonly address: Address | null
 }
 
 /**
- * Описание токена.
+ * Token description.
  *
- * Данные из контракта (`symbol`, `name`, `decimals`) считаются
- * НЕДОВЕРЕННЫМИ: их задаёт автор контракта, и ничто не мешает выпустить
- * токен с символом `USDC`. Интерфейс обязан отличать проверенные токены
- * из встроенного списка от добавленных вручную — иначе подделка неотличима
- * от оригинала.
+ * Data from the contract (`symbol`, `name`, `decimals`) is treated
+ * as UNTRUSTED: the contract author sets it, and nothing stops
+ * anyone from issuing a token with the symbol `USDC`. The UI must
+ * tell verified tokens from the built-in list apart from ones added
+ * by hand — otherwise a fake is indistinguishable from the original.
  */
 export interface IToken extends ITokenRef {
   readonly standard: TokenStandard
@@ -46,67 +43,68 @@ export interface IToken extends ITokenRef {
   readonly name: string
 
   /**
-   * Число десятичных знаков.
+   * Decimal count.
    *
-   * Критично для корректности сумм: у USDC их 6, у большинства токенов 18.
-   * Ошибка в этом поле меняет отображаемую сумму на двенадцать порядков.
-   * Значение обязано читаться из контракта, а не предполагаться.
+   * Critical for amount correctness: USDC has 6, most tokens have
+   * 18. An error in this field changes the displayed amount by
+   * twelve orders of magnitude. The value must be read from the
+   * contract, not assumed.
    *
-   * Для ERC-721 всегда 0: токен неделим.
+   * Always 0 for ERC-721: the token is indivisible.
    */
   readonly decimals: number
 
-  /** Ссылка на логотип. `null`, если изображение неизвестно. */
+  /** Logo URL. `null` if the image is unknown. */
   readonly logoUri: string | null
 
   /**
-   * Добавлен вручную пользователем.
+   * Added by the user by hand.
    *
-   * Отличие от встроенного списка обязано быть видно в интерфейсе:
-   * подмена символа известного токена — распространённый приём мошенничества.
+   * The difference from the built-in list must be visible in the
+   * UI: swapping the symbol of a known token is a common fraud.
    */
   readonly isCustom: boolean
 
   /**
-   * Адрес контракта совпал со встроенным списком проверенных.
+   * The contract address matched the built-in verified list.
    *
-   * ЭТО НЕ ХРАНИМОЕ СВОЙСТВО, А ВЫЧИСЛЯЕМОЕ. Список живёт в коде
-   * и меняется вместе с приложением; запись, помеченная проверенной
-   * год назад, осталась бы такой навсегда — в том числе после того,
-   * как контракт исключили бы из списка.
+   * THIS IS NOT A STORED PROPERTY, IT IS COMPUTED. The list lives
+   * in code and changes with the app; a record marked verified a
+   * year ago would stay that way forever — including after the
+   * contract was removed from the list.
    *
-   * ПОМЕТКА ОЗНАЧАЕТ ТОЛЬКО СОВПАДЕНИЕ АДРЕСА. Она не обещает, что
-   * проект надёжен и что токен чего-то стоит: обещать это кошелёк
-   * не может. Обратное тоже неверно — отсутствие пометки не означает
-   * подделку, список заведомо неполон.
+   * THE MARK MEANS ONLY AN ADDRESS MATCH. It does not promise that
+   * the project is sound or that the token is worth anything: the
+   * wallet cannot promise that. The converse is also false —
+   * absence of the mark does not mean a fake; the list is
+   * deliberately incomplete.
    */
   readonly isVerified: boolean
 
-  /** Момент добавления в отслеживаемые. */
+  /** Instant it was added to the tracked set. */
   readonly addedAt: Timestamp
 }
 
-/** Параметры добавления токена вручную. */
 export interface IAddTokenParams {
   readonly chainId: ChainId
   readonly address: Address
   readonly standard?: TokenStandard
 
-  /** Переопределение символа. По умолчанию читается из контракта. */
+  /** Symbol override. By default it is read from the contract. */
   readonly symbol?: string
   readonly decimals?: number
 
   /**
-   * Согласие добавить контракт, называющийся именем проверенного токена.
+   * Consent to add a contract that uses a verified token's name.
    *
-   * Отсутствие означает отказ: добавить подделку под `USDC` можно
-   * только осознанно. Умолчание выбрано в сторону запрета, потому что
-   * цена ошибки здесь — отправка средств не туда.
+   * Absence means refusal: adding a fake `USDC` is possible only
+   * on purpose. The default is a ban because the cost of a mistake
+   * here is sending funds to the wrong place.
    */
   readonly allowImpersonation?: boolean
 }
 
-/** Метаданные, прочитанные непосредственно из контракта. */
+/** Metadata read directly from the contract. */
 export interface ITokenMetadata {
   readonly symbol: string
   readonly name: string
@@ -114,7 +112,6 @@ export interface ITokenMetadata {
   readonly standard: TokenStandard
 }
 
-/** События слоя токенов. */
 export interface TokenEventMap {
   'token:listChanged': { readonly chainId: ChainId }
 }

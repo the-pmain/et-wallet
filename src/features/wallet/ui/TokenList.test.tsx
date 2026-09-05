@@ -44,7 +44,7 @@ const USDC = token('USDC', 6, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
 const ETHER = 10n ** 18n
 
-/** Сводка по заданным курсам. Токены без записи остаются без котировки. */
+/** Summary for the given rates. Tokens without an entry stay unquoted. */
 function portfolioWith(entries: readonly (readonly [IToken, number])[]): IPortfolioSummary {
   return buildPortfolio(
     [
@@ -82,8 +82,8 @@ function renderList(
   )
 }
 
-describe('TokenList: оценка в долларах', () => {
-  it('показывает оценку каждой строки с известным курсом', () => {
+describe('TokenList: dollar estimate', () => {
+  it('shows an estimate for each row with a known rate', () => {
     renderList(
       portfolioWith([
         [ETH, 3000],
@@ -95,9 +95,9 @@ describe('TokenList: оценка в долларах', () => {
     expect(screen.getByText('≈ $50.00')).toBeInTheDocument()
   })
 
-  it('строку без курса оставляет без оценки, а не с нулём', () => {
-    /* «$0.00» под непустым балансом читается как «этот актив ничего
-       не стоит», тогда как кошелёк просто не знает его курса. */
+  it('leaves a row without a rate unestimated, not as zero', () => {
+    /* "$0.00" under a non-empty balance reads as "this asset is
+       worthless", when the wallet simply does not know the rate. */
     renderList(portfolioWith([[ETH, 3000]]))
 
     expect(screen.getByText('≈ $6,000.00')).toBeInTheDocument()
@@ -105,16 +105,16 @@ describe('TokenList: оценка в долларах', () => {
     expect(screen.queryByText(/\$50/u)).not.toBeInTheDocument()
   })
 
-  it('без согласия на курсы оценки нет вовсе', () => {
+  it('shows no estimate at all without price consent', () => {
     renderList(null)
 
     expect(screen.queryByText(/≈/u)).not.toBeInTheDocument()
   })
 
-  it('не оценивает по курсам другой сети', () => {
-    /* Промежуток при переключении сети: список уже от новой сети,
-       сводка ещё от прежней. Без сверки два эфира были бы оценены
-       по курсу BNB. */
+  it('does not value against another chain\'s rates', () => {
+    /* Gap while switching chains: the list is already the new chain,
+       the summary is still the old one. Without a match, two ether
+       would be valued at the BNB rate. */
     const foreignEth: IToken = { ...ETH, chainId: OTHER_CHAIN_ID }
     const foreignUsdc: IToken = { ...USDC, chainId: OTHER_CHAIN_ID }
 
@@ -132,7 +132,7 @@ describe('TokenList: оценка в долларах', () => {
     expect(screen.queryByText(/≈/u)).not.toBeInTheDocument()
   })
 
-  it('оценивает каждую строку по своей сети, а не по одной общей', () => {
+  it('values each row on its own chain, not one shared rate', () => {
     const optimismUsdc: IToken = {
       ...USDC,
       chainId: toChainId(10n),
@@ -166,7 +166,7 @@ describe('TokenList: оценка в долларах', () => {
     expect(screen.getByText('≈ $50.00')).toBeInTheDocument()
   })
 
-  it('показывает нативную валюту двух сетей двумя строками', () => {
+  it('shows native currency of two chains as two rows', () => {
     const optimismEth: IToken = { ...ETH, chainId: toChainId(10n), name: 'Ether on Optimism' }
 
     renderList(null, [
@@ -179,15 +179,15 @@ describe('TokenList: оценка в долларах', () => {
     expect(screen.getByText('2 ETH')).toBeInTheDocument()
   })
 
-  it('без обработчика удаления не показывает кнопку', () => {
+  it('hides the remove button when there is no handler', () => {
     renderList(null, BALANCES, null)
 
     expect(screen.queryByRole('button', { name: /Remove token/i })).not.toBeInTheDocument()
   })
 
-  it('количество остаётся главным числом строки', () => {
-    /* Настоящая величина — та, что в монетах: она точна и она
-       подписывается. Оценка не должна её вытеснять. */
+  it('keeps the quantity as the row\'s primary figure', () => {
+    /* The real amount is the coin figure: it is exact and signed.
+       The estimate must not displace it. */
     renderList(portfolioWith([[ETH, 3000]]))
 
     const amount = screen.getByText('2 ETH')
@@ -198,8 +198,8 @@ describe('TokenList: оценка в долларах', () => {
   })
 })
 
-describe('TokenList: сведения об активе', () => {
-  it('раскрывает нативную валюту без адреса контракта', async () => {
+describe('TokenList: asset details', () => {
+  it('expands native currency without a contract address', async () => {
     const user = userEvent.setup()
 
     renderList(
@@ -228,7 +228,7 @@ describe('TokenList: сведения об активе', () => {
     expect(screen.queryByText(USDC.address as string)).not.toBeInTheDocument()
   })
 
-  it('раскрывает контракт ERC-20 с полным адресом и курсом', async () => {
+  it('expands an ERC-20 contract with the full address and rate', async () => {
     const user = userEvent.setup()
 
     renderList(
@@ -262,7 +262,7 @@ describe('TokenList: сведения об активе', () => {
     expect(screen.getByRole('button', { name: 'Copy USDC contract address' })).toBeInTheDocument()
   })
 
-  it('повторное нажатие закрывает панель', async () => {
+  it('a second click closes the panel', async () => {
     const user = userEvent.setup()
 
     renderList(null)
@@ -277,7 +277,7 @@ describe('TokenList: сведения об активе', () => {
     expect(screen.queryByText('Native currency')).not.toBeInTheDocument()
   })
 
-  it('удаление не раскрывает строку', async () => {
+  it('remove does not expand the row', async () => {
     const user = userEvent.setup()
     const onRemove = vi.fn()
 
@@ -293,7 +293,7 @@ describe('TokenList: сведения об активе', () => {
     )
   })
 
-  it('рисует график курса из каталожного ряда', async () => {
+  it('draws a price chart from the catalog series', async () => {
     const user = userEvent.setup()
 
     appMarketCatalog.hydrate([
@@ -324,7 +324,7 @@ describe('TokenList: сведения об активе', () => {
     expect(screen.getByRole('img', { name: /ETH price, last 7 days/i })).toBeInTheDocument()
   })
 
-  it('держит раскрытыми несколько строк сразу', async () => {
+  it('keeps several rows expanded at once', async () => {
     const user = userEvent.setup()
 
     renderList(null)

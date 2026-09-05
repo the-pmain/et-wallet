@@ -35,7 +35,7 @@ describe('createEmailsStore', () => {
     vi.unstubAllGlobals()
   })
 
-  it('использует память без ключей Cloudflare', async () => {
+  it('uses memory without Cloudflare keys', async () => {
     const store = await createEmailsStore({
       ...BASE_CONFIG,
       supabaseUrl: null,
@@ -46,7 +46,7 @@ describe('createEmailsStore', () => {
     expect(store.storageWarning).toBeNull()
   })
 
-  it('не использует Supabase для писем, если есть Cloudflare', async () => {
+  it('does not use Supabase for mail when Cloudflare is present', async () => {
     const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const url = String(input)
 

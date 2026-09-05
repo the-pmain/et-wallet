@@ -4,65 +4,67 @@ import type { Address, ChainId, Wei } from '@/core/types'
 import type { IAddTokenParams, IToken, ITokenMetadata, ITokenRef, TokenEventMap } from './types'
 
 /**
- * Управление списком отслеживаемых токенов.
+ * Managing the list of tracked tokens.
  *
- * Сервис читает метаданные и балансы токенов, но не кэширует их:
- * кэширование и фоновое обновление — обязанность `IBalanceService`.
- * Разделение позволяет менять список токенов, не перезапрашивая
- * балансы, и обновлять балансы, не трогая список.
+ * The service reads token metadata and balances, but does not cache
+ * them: caching and background refresh are `IBalanceService`'s job.
+ * The split lets the token list change without re-fetching
+ * balances, and balances refresh without touching the list.
  */
 export interface ITokenService extends IEventSource<TokenEventMap> {
-  /** Загружает пользовательские токены всех известных сетей. */
+  /** Loads user tokens of every known network. */
   init(): Promise<void>
 
-  /** Отслеживаемые токены сети, включая нативную валюту. */
+  /** Tracked tokens of a network, including the native currency. */
   list(chainId: ChainId): readonly IToken[]
 
   get(ref: ITokenRef): IToken | null
 
   /**
-   * Добавляет токен вручную.
+   * Adds a token by hand.
    *
-   * Реализация обязана прочитать метаданные из контракта и сверить их
-   * с переданными. Слепое доверие пользовательскому вводу `decimals`
-   * приводит к отображению суммы, отличающейся от реальной на порядки.
+   * The implementation must read metadata from the contract and
+   * check it against what was passed. Blind trust in the user's
+   * `decimals` input displays an amount that differs from the real
+   * one by orders of magnitude.
    *
    * @throws InvalidTokenContractError, UnsupportedTokenStandardError
    */
   add(params: IAddTokenParams): Promise<IToken>
 
-  /** Убирает токен из отслеживаемых. Нативную валюту убрать нельзя. */
+  /** Removes a token from the tracked set. The native currency cannot be removed. */
   remove(ref: ITokenRef): Promise<void>
 
   /**
-   * Читает метаданные контракта без добавления в список.
+   * Reads contract metadata without adding it to the list.
    *
-   * Нужен для предварительного показа в форме добавления: пользователь
-   * должен увидеть, что за токен он добавляет, до подтверждения.
+   * Needed for a preview in the add form: the user must see what
+   * token they are adding before they confirm.
    *
    * @throws InvalidTokenContractError
    */
   fetchMetadata(chainId: ChainId, address: Address): Promise<ITokenMetadata>
 
   /**
-   * Баланс токена на адресе, в минимальных единицах.
+   * Token balance of an address, in smallest units.
    *
    * @throws InvalidTokenContractError, UnsupportedTokenStandardError
    */
   getBalance(ref: ITokenRef, owner: Address): Promise<Wei>
 
   /**
-   * Обнаруживает токены, приходившие на адрес.
+   * Discovers tokens that have arrived at an address.
    *
-   * ВАЖНО: обнаруженные токены НЕ добавляются автоматически. Кто угодно
-   * может бесплатно прислать на адрес токен-приманку с именем, повторяющим
-   * известный проект. Автодобавление превращает кошелёк в площадку показа
-   * мошеннических названий. Решение о добавлении принимает пользователь.
+   * IMPORTANT: discovered tokens are NOT added automatically.
+   * Anyone can send a bait token to an address for free, with a
+   * name that copies a known project. Auto-adding turns the wallet
+   * into a billboard for fraudulent names. The user decides
+   * whether to add.
    */
   detect(chainId: ChainId, owner: Address): Promise<readonly ITokenMetadata[]>
 }
 
-/** Долговременное хранение пользовательского списка токенов. */
+/** Long-term storage of the user's token list. */
 export interface ITokenRepository {
   findAll(chainId: ChainId): Promise<readonly IToken[]>
   find(ref: ITokenRef): Promise<IToken | null>

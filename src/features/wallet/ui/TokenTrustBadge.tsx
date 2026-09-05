@@ -4,26 +4,26 @@ import type { IToken } from '@/core'
 import { Badge } from '@/shared/ui'
 
 /**
- * Пометка доверия к контракту токена.
+ * Trust mark for a token contract.
  *
- * ЗАЧЕМ ОНА. Символ токена задаёт автор контракта: выпустить `USDC`
- * может кто угодно, и в списке активов подделка выглядит как оригинал.
- * Отличает их только адрес, а сверять сорок два символа глазами человек
- * не станет.
+ * The ticker is set by the contract author: anyone can mint `USDC`,
+ * and in the asset list a fake looks like the original. Only the
+ * address distinguishes them, and nobody will check forty-two
+ * characters by eye.
  *
- * ТРИ СОСТОЯНИЯ, И КАЖДОЕ ЗНАЧИТ СВОЁ:
+ * Three states, each meaning something different:
  *
- * - `verified` — адрес совпал со встроенным списком. Это утверждение
- *   об АДРЕСЕ, а не о надёжности проекта: обещать второе кошелёк
- *   не может;
- * - `unverified` — адрес добавлен вручную и в списке его нет. Это НЕ
- *   обвинение в подделке: список заведомо неполон, и подавляющее
- *   большинство законных токенов в него не входит;
- * - пусто — нативная валюта сети, она часть конфигурации.
+ * - `verified` — the address matched the built-in list. A claim
+ *   about the ADDRESS, not about the project's reliability: the
+ *   wallet cannot promise the latter;
+ * - `unverified` — added by hand and not on the list. This is NOT
+ *   an accusation of fraud: the list is incomplete by design, and
+ *   most legitimate tokens are not on it;
+ * - empty — native currency, part of the network config.
  *
- * ПРОВЕРЕННОЕ ВЫДЕЛЕНО ЗНАЧКОМ, А НЕ ЦВЕТОМ. Зелёная метка на каждой
- * второй строке перестаёт читаться, а цвет как единственный признак
- * недоступен людям с нарушением цветовосприятия.
+ * Verified is marked with an icon, not color. A green chip on every
+ * other row stops being read, and color as the only cue is invisible
+ * to people with color-vision deficiency.
  */
 export function TokenTrustBadge({ token }: { readonly token: IToken }) {
   if (token.address === null) {

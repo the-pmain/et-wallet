@@ -3,54 +3,55 @@ import { BUILT_IN_CHAIN_ID } from '@/core/network'
 import type { Address, ChainId } from '@/core/types'
 
 /**
- * Встроенный список проверенных контрактов.
+ * Built-in list of verified contracts.
  *
- * ЗАЧЕМ ОН НУЖЕН. Символ и имя токена задаёт автор контракта: выпустить
- * токен с обозначением `USDC` может кто угодно, и в списке активов он
- * будет выглядеть настоящим. Единственное, что отличает подделку
- * от оригинала, — адрес контракта, а сверять сорок два символа глазами
- * человек не станет. Список переносит эту сверку в кошелёк.
+ * WHY IT EXISTS. The contract author chooses the token symbol and name:
+ * anyone can ship a token labelled `USDC`, and it will look genuine
+ * in the asset list. The only thing that distinguishes a fake from
+ * the original is the contract address, and nobody will compare
+ * forty-two characters by eye. The list moves that check into the wallet.
  *
- * ЧТО ОЗНАЧАЕТ ПОМЕТКА. Только одно: адрес совпал с известным.
- * Она не обещает, что проект надёжен, что токен чего-то стоит и что
- * с ним ничего не случится. Обещать это кошелёк не может.
+ * WHAT THE MARK MEANS. Only that the address matched a known one.
+ * It does not promise the project is sound, that the token is worth
+ * anything, or that nothing will happen to it. The wallet cannot
+ * promise that.
  *
- * ЗНАЧЕНИЯ ИЗМЕРЕНЫ, А НЕ ВПИСАНЫ ПО ПАМЯТИ. Каждый адрес опрошен
- * живым узлом: прочитаны `symbol`, `name` и `decimals`. Проверка
- * окупилась сразу — по памяти список содержал бы неверные значения:
+ * VALUES WERE MEASURED, NOT TYPED FROM MEMORY. Each address was queried
+ * on a live node: `symbol`, `name`, and `decimals` were read. The check
+ * paid off immediately — from memory the list would have held wrong values:
  *
- * - на Polygon мост Tether отвечает символом `USDT0`, а не `USDT`;
- * - на Arbitrum — `USD₮0` с типографским знаком тенге;
- * - на Avalanche — `USDt` со строчной буквой;
- * - на BNB Chain у USDT и USDC ВОСЕМНАДЦАТЬ знаков, а не шесть,
- *   как в Ethereum. Ошибка здесь исказила бы сумму в триллион раз.
+ * - on Polygon the Tether bridge answers with `USDT0`, not `USDT`;
+ * - on Arbitrum — `USD₮0` with a typographic tenge sign;
+ * - on Avalanche — `USDt` with a lowercase letter;
+ * - on BNB Chain, USDT and USDC have EIGHTEEN decimals, not six
+ *   as on Ethereum. An error here would distort the amount a trillionfold.
  *
- * СПИСОК НЕБОЛЬШОЙ СОЗНАТЕЛЬНО. Он содержит то, что реально проверено
- * и с чем работает большинство: стейблкоины и обёрнутые валюты сетей.
- * Раздувать его сотнями адресов «по спискам из интернета» значит
- * поручиться за то, чего никто не сверял.
+ * THE LIST IS SMALL ON PURPOSE. It holds what was actually verified
+ * and what most people use: stablecoins and the networks' wrapped coins.
+ * Inflating it with hundreds of addresses "from internet lists" would
+ * mean vouching for what nobody checked.
  */
 
-/** Проверенный контракт: адрес и то, чем он ответил при опросе. */
+/** Verified contract: address and what it answered when queried. */
 export interface IVerifiedToken {
   readonly chainId: ChainId
 
   readonly address: Address
 
-  /** Символ, прочитанный из контракта. */
+  /** Symbol read from the contract. */
   readonly symbol: string
 
-  /** Имя, прочитанное из контракта. */
+  /** Name read from the contract. */
   readonly name: string
 
-  /** Число знаков, прочитанное из контракта. */
+  /** Decimals read from the contract. */
   readonly decimals: number
 }
 
-/* Дата опроса контрактов: 3 августа 2026. Значения могут устареть —
-   контракт с обновляемой реализацией вправе изменить символ, как это
-   уже произошло с мостом Tether. Расхождение кошелёк показывает,
-   а не прячет: см. `TokenService.add`. */
+/* Contract query date: 3 August 2026. Values can go stale — a contract
+   with an updatable implementation is free to change its symbol, as the
+   Tether bridge already did. The wallet shows a mismatch instead of
+   hiding it: see `TokenService.add`. */
 const VERIFIED: readonly IVerifiedToken[] = [
   /* --- Ethereum --- */
   {
@@ -112,7 +113,7 @@ const VERIFIED: readonly IVerifiedToken[] = [
     decimals: 18,
   },
 
-  /* --- BNB Chain. Здесь у стейблкоинов восемнадцать знаков. --- */
+  /* --- BNB Chain. Stablecoins here have eighteen decimals. --- */
   {
     chainId: BUILT_IN_CHAIN_ID.BnbChain,
     address: toAddress('0x55d398326f99059fF775485246999027B3197955'),
@@ -222,31 +223,31 @@ const VERIFIED: readonly IVerifiedToken[] = [
 ]
 
 /**
- * Поиск по паре «сеть плюс адрес».
+ * Lookup by the pair "network plus address".
  *
- * Ключ в нижнем регистре: адрес приходит и с контрольной суммой,
- * и без неё, а контракт различается байтами, а не написанием.
+ * The key is lowercase: an address arrives with or without a checksum,
+ * and the contract is distinguished by bytes, not spelling.
  */
 const BY_KEY = new Map(
   VERIFIED.map((token) => [`${token.chainId.toString()}:${token.address.toLowerCase()}`, token]),
 )
 
-/** Проверенные контракты сети. Порядок совпадает с объявленным. */
+/** Verified contracts of the network. Order matches the declaration. */
 export function listVerifiedTokens(chainId: ChainId): readonly IVerifiedToken[] {
   return VERIFIED.filter((token) => token.chainId === chainId)
 }
 
 /**
- * Проверенный контракт по адресу.
+ * Verified contract by address.
  *
- * `null` означает «в списке нет», а не «подделка»: список заведомо
- * неполон, и подавляющее большинство законных токенов в него не входит.
+ * `null` means "not on the list", not "a fake": the list is deliberately
+ * incomplete, and the vast majority of legitimate tokens are not on it.
  */
 export function findVerifiedToken(chainId: ChainId, address: Address): IVerifiedToken | null {
   return BY_KEY.get(`${chainId.toString()}:${address.toLowerCase()}`) ?? null
 }
 
-/** Есть ли адрес в списке проверенных. */
+/** Whether the address is on the verified list. */
 export function isVerifiedToken(chainId: ChainId, address: Address): boolean {
   return findVerifiedToken(chainId, address) !== null
 }

@@ -1,13 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Проверки поведения в двух вкладках.
+ * Two-tab behavior checks.
  *
- * ЗАЧЕМ ОНИ. Кошелёк, открытый дважды, — обычный случай: вкладку
- * оставляют и открывают приложение заново. Обе вкладки работают
- * с одним хранилищем IndexedDB, но каждая держит собственный ключ
- * шифрования и собственный снимок состояния в памяти. Что при этом
- * происходит, до сих пор не проверялось ни разу.
+ * WHY THEY EXIST. A wallet opened twice is ordinary: a tab is left
+ * and the app is opened again. Both tabs share one IndexedDB store,
+ * but each holds its own encryption key and its own in-memory state
+ * snapshot. What happens then had never been checked.
  */
 
 const TEST_MNEMONIC =
@@ -34,11 +33,10 @@ async function unlockWallet(page: Page, password = PASSWORD): Promise<void> {
   await page.getByRole('button', { name: 'Unlock' }).click()
 }
 
-test.describe('Две вкладки', () => {
-  test('вторая вкладка видит созданный кошелёк и просит пароль', async ({ context }) => {
-    /* Хранилище общее: вкладка, открытая после создания кошелька,
-       обязана вести на разблокировку, а не предлагать создать второй
-       кошелёк поверх первого. */
+test.describe('Two tabs', () => {
+  test('the second tab sees the created wallet and asks for the password', async ({ context }) => {
+    /* Storage is shared: a tab opened after wallet create must go to
+       unlock, not offer to create a second wallet on top of the first. */
     const first = await context.newPage()
 
     await importWallet(first)
@@ -50,10 +48,10 @@ test.describe('Две вкладки', () => {
     await expect(second.getByRole('button', { name: 'Unlock' })).toBeVisible()
   })
 
-  test('разблокировка одной вкладки не открывает вторую', async ({ context }) => {
-    /* Ключ шифрования живёт в памяти вкладки и на диск не попадает.
-       Это и есть причина, по которой вторая вкладка остаётся закрытой:
-       иначе ключ пришлось бы куда-то положить. */
+  test('unlocking one tab does not open the second', async ({ context }) => {
+    /* The encryption key lives in tab memory and never hits disk.
+       That is why the second tab stays locked: otherwise the key
+       would have to be stored somewhere. */
     const first = await context.newPage()
 
     await importWallet(first)
@@ -66,7 +64,7 @@ test.describe('Две вкладки', () => {
     await expect(first.getByText(LOGIN_EMAIL)).toBeVisible()
   })
 
-  test('обе вкладки открываются одним паролем', async ({ context }) => {
+  test('both tabs unlock with the same password', async ({ context }) => {
     const first = await context.newPage()
 
     await importWallet(first)
@@ -80,11 +78,10 @@ test.describe('Две вкладки', () => {
     await expect(first.getByText(LOGIN_EMAIL)).toBeVisible()
   })
 
-  test('стирание в одной вкладке замечается второй', async ({ context }) => {
-    /* САМЫЙ ОПАСНЫЙ СЛУЧАЙ. Вкладка, пережившая стирание кошелька,
-       продолжает показывать балансы и предлагать отправку, хотя ключей
-       на диске уже нет. Владелец видит работающий кошелёк, которого
-       не существует. */
+  test('erase in one tab is noticed by the second', async ({ context }) => {
+    /* THE MOST DANGEROUS CASE. A tab that survived wallet erase still
+       shows balances and offers send, though keys are already gone
+       from disk. The owner sees a working wallet that does not exist. */
     const first = await context.newPage()
 
     await importWallet(first)
@@ -103,21 +100,20 @@ test.describe('Две вкладки', () => {
 
     await expect(first.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
 
-    /* Вторая вкладка обязана перестать выдавать себя за рабочий
-       кошелёк. Проверяется наблюдаемое поведение, а не внутреннее
-       состояние. */
+    /* The second tab must stop presenting itself as a working wallet.
+       Observable behavior is checked, not internal state. */
     await second.reload()
 
     await expect(second.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
   })
 })
 
-test.describe('Две вкладки: опасные случаи', () => {
-  test('вкладка не выдаёт себя за рабочий кошелёк после стирания', async ({ context }) => {
-    /* Без перезагрузки. Вторая вкладка держит ключи в памяти и снимок
-       состояния в дереве React: она продолжит показывать балансы
-       и предлагать отправку, хотя ключей на диске уже нет. Владелец
-       увидит работающий кошелёк, которого не существует. */
+test.describe('Two tabs: dangerous cases', () => {
+  test('a tab does not present itself as a working wallet after erase', async ({ context }) => {
+    /* No reload. The second tab holds keys in memory and a state
+       snapshot in the React tree: it will keep showing balances and
+       offering send, though keys are already gone from disk. The
+       owner would see a working wallet that does not exist. */
     const first = await context.newPage()
 
     await importWallet(first)
@@ -134,17 +130,17 @@ test.describe('Две вкладки: опасные случаи', () => {
     await first.getByRole('button', { name: 'Erase the wallet' }).click()
     await expect(first.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
 
-    /* Даём вкладке время заметить: хранилище общее, и о его очистке
-       можно узнать. */
+    /* Give the tab time to notice: storage is shared, and a wipe
+       can be observed. */
     await second.waitForTimeout(2000)
 
     await expect(second.getByText(LOGIN_EMAIL)).toBeHidden()
   })
 
-  test('вторая вкладка узнаёт об отправке из первой', async ({ context }) => {
-    /* Обе вкладки читают одну историю. Вкладка, не знающая
-       об отправленной транзакции, возьмёт тот же nonce — и вторая
-       отправка заменит первую вместо того, чтобы встать в очередь. */
+  test('the second tab learns of a send from the first', async ({ context }) => {
+    /* Both tabs read one history. A tab that does not know about a
+       sent transaction will take the same nonce — and the second
+       send will replace the first instead of queuing. */
     const first = await context.newPage()
 
     await importWallet(first)
@@ -155,9 +151,9 @@ test.describe('Две вкладки: опасные случаи', () => {
     await unlockWallet(second)
     await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
 
-    /* Отправить в тестовой среде нечего: узлов нет. Проверяется более
-       слабое, но проверяемое утверждение — вкладки не расходятся
-       в том, какой кошелёк открыт. */
+    /* There is nothing to send in the test environment: no nodes.
+       A weaker but checkable claim is tested — the tabs do not
+       disagree on which wallet is open. */
     await expect(first.getByText(LOGIN_EMAIL)).toBeVisible()
     await expect(second.getByText(LOGIN_EMAIL)).toBeVisible()
   })

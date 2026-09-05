@@ -1,8 +1,6 @@
 import type { IRemoteUser } from '@/features/onboarding/model/RemoteUserDirectory'
 
-/**
- * Отбор записей кабинета: почта, id или адрес из колонки `wallets`.
- */
+/** Match cabinet records by email, id, or an address from `wallets`. */
 export function userMatchesAdminQuery(user: IRemoteUser, query: string): boolean {
   const needle = query.trim().toLowerCase()
 

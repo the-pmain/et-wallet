@@ -1,49 +1,45 @@
 /**
- * Хранение зашифрованных настроек.
+ * Encrypted-settings storage.
  *
- * ЧТО ИМЕННО ХРАНИТСЯ. Непрозрачная строка, полученная от клиента.
- * Сервис не разбирает её, не проверяет её содержимое и не имеет кода,
- * способного её расшифровать. Ключ выводится на устройстве и наружу
- * не выходит.
+ * WHAT IS STORED. An opaque string from the client. The service does
+ * not parse it, does not inspect it, and has no code that can decrypt
+ * it. The key is derived on the device and never leaves.
  *
- * ИДЕНТИФИКАТОР СИНХРОНИЗАЦИИ — ЭТО КЛЮЧ-ПРЕДЪЯВИТЕЛЬ. Он случаен,
- * порождается на устройстве и не выводится ни из seed-фразы, ни
- * из адреса: связь «идентификатор — адрес» превратила бы сервис
- * в реестр «личность — портфель». Кто знает идентификатор — тот может
- * прочитать шифротекст (бесполезный без ключа) и перезаписать его.
- * Поэтому идентификатор обязан быть длинным и случайным, а не удобным.
+ * THE SYNC ID IS A BEARER KEY. It is random, generated on the device,
+ * and derived from neither the seed phrase nor the address: an
+ * "id — address" link would turn the service into an
+ * "identity — portfolio" registry. Whoever knows the id can read the
+ * ciphertext (useless without the key) and overwrite it. So the id
+ * must be long and random, not convenient.
  *
- * СИНХРОНИЗАЦИЯ — ЗЕРКАЛО, А НЕ ИСТОЧНИК ИСТИНЫ. Настройки живут
- * на устройстве; сервис лишь помогает перенести их на второе. Потеря
- * записи здесь не должна значить потерю настроек у пользователя.
+ * SYNC IS A MIRROR, NOT THE SOURCE OF TRUTH. Settings live on the
+ * device; the service only helps copy them to a second one. Losing
+ * a record here must not mean the user lost their settings.
  */
 
-/** Хранимая запись. */
 export interface ISettingsRecord {
   readonly ciphertext: string
 
-  /** Номер версии записи. Растёт при каждой успешной записи. */
+  /** Record revision. Grows on every successful write. */
   readonly revision: number
 
   readonly updatedAt: Date
 }
 
-/** Хранилище зашифрованных настроек. */
 export interface ISettingsRepository {
-  /** Возвращает запись либо `null`, если её нет. */
   get(syncId: string): Promise<ISettingsRecord | null>
 
   /**
-   * Записывает настройки.
+   * Writes settings.
    *
-   * @param expectedRevision Номер версии, которую клиент считает текущей.
-   *        `0` означает «записи ещё нет». Несовпадение — отказ:
-   *        два устройства, писавшие одновременно, иначе затёрли бы
-   *        изменения друг друга молча.
-   * @throws ConflictError при несовпадении номера версии.
+   * @param expectedRevision Revision the client believes is current.
+   *        `0` means "no record yet". A mismatch is a refusal: two
+   *        devices writing at once would otherwise silently overwrite
+   *        each other.
+   * @throws ConflictError on a revision mismatch.
    */
   put(syncId: string, ciphertext: string, expectedRevision: number): Promise<ISettingsRecord>
 
-  /** Удаляет запись. Повторное удаление отсутствующей записи — не ошибка. */
+  /** Removes the record. Deleting a missing record again is not an error. */
   remove(syncId: string): Promise<void>
 }

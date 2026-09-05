@@ -30,20 +30,18 @@ import {
 } from './types'
 
 /**
- * Шифрование поверх Web Crypto API.
+ * Encryption on top of the Web Crypto API.
  *
- * ЧТО ЗДЕСЬ НЕ РЕАЛИЗОВАНО САМОСТОЯТЕЛЬНО И НЕ БУДЕТ: ни AES, ни GCM,
- * ни PBKDF2, ни генератор случайных чисел. Всё это выполняет браузер
- * нативным кодом. Собственная реализация любого из этих примитивов
- * заведомо хуже: она медленнее, уязвима к атакам по времени и не проходила
- * стороннего аудита.
+ * WHAT IS NOT IMPLEMENTED HERE AND WILL NOT BE: AES, GCM, PBKDF2, or
+ * the RNG. The browser does all of that in native code. A homemade
+ * primitive would be worse: slower, timing-vulnerable, and unaudited.
  *
- * ПОЧЕМУ ПАРОЛЬ — СТРОКА. Он приходит из поля ввода, а значение поля
- * ввода в браузере это строка. Перевести её в буфер можно, но исходная
- * строка останется в куче неочищаемой — как и внутри самого поля ввода,
- * и в истории событий DOM. Притворяться, что пароль защищён от дампа
- * памяти, было бы обманом; реальная защита здесь — стойкость KDF
- * и короткое время жизни разблокированной сессии.
+ * WHY THE PASSWORD IS A STRING. It comes from an input field, and a
+ * browser input value is a string. Encoding it to a buffer is possible,
+ * but the original string stays on the heap unwipeable — as it does
+ * inside the field itself and in the DOM event history. Pretending the
+ * password is safe from a memory dump would be a lie; the real
+ * protection here is KDF cost and a short unlocked session.
  */
 export class EncryptionService implements IEncryptionService {
   async encrypt(plaintext: Uint8Array, password: string): Promise<IEncryptedPayload> {
@@ -76,9 +74,9 @@ export class EncryptionService implements IEncryptionService {
 
       return true
     } catch {
-      /* Отличие «неверный пароль» от «данные повреждены» не возвращается
-         сознательно: для подбирающего пароль это лишний сигнал, а для
-         вызывающего кода разница здесь не имеет значения. */
+      /* Distinguishing "wrong password" from "data corrupted" is
+         withheld on purpose: it is extra signal for a guesser, and the
+         caller does not need the distinction here. */
       return false
     }
   }
@@ -95,8 +93,8 @@ export class EncryptionService implements IEncryptionService {
     const passwordBytes = new TextEncoder().encode(password)
 
     try {
-      /* Пароль импортируется как неизвлекаемый материал ключа: даже
-         промежуточное представление не должно быть выгружаемым. */
+      /* Password is imported as non-extractable key material: even the
+         intermediate representation must not be exportable. */
       const baseKey = await subtle.importKey(
         'raw',
         EncryptionService.#toArrayBuffer(passwordBytes),
@@ -114,8 +112,8 @@ export class EncryptionService implements IEncryptionService {
         },
         baseKey,
         { name: AES_GCM, length: params.keyLength * 8 },
-        /* extractable: false — выгрузить байты ключа из JavaScript
-           невозможно ни отладчиком, ни сериализацией состояния. */
+        /* extractable: false — key bytes cannot be exported from
+           JavaScript by a debugger or by serialising state. */
         false,
         ['encrypt', 'decrypt'],
       )
@@ -133,9 +131,9 @@ export class EncryptionService implements IEncryptionService {
   ): Promise<IEncryptedPayload> {
     const subtle = EncryptionService.#requireSubtle()
 
-    /* Свежий IV на каждую операцию без исключений. Повтор пары
-       «ключ + IV» в AES-GCM раскрывает и содержимое, и ключ
-       аутентификации — это не деградация стойкости, а её потеря. */
+    /* Fresh IV on every operation, no exceptions. Reusing a key+IV
+       pair in AES-GCM leaks both the plaintext and the authentication
+       key — not a weakening of the mode, a total loss. */
     const iv = getRandomBytes(IV_LENGTH)
 
     const header = {
@@ -181,10 +179,10 @@ export class EncryptionService implements IEncryptionService {
 
       return SecretBuffer.own(new Uint8Array(plaintext))
     } catch (error) {
-      /* Web Crypto выбрасывает одинаковую ошибку и при неверном ключе,
-         и при повреждённых данных, и при изменённом заголовке: тег
-         аутентификации не сходится во всех трёх случаях. Различить их
-         невозможно, и это правильно. */
+      /* Web Crypto throws the same error for a wrong key, corrupted
+         data, and a tampered header: the authentication tag fails in
+         all three cases. Distinguishing them is impossible, and that
+         is correct. */
       throw new DecryptionFailedError({ cause: error })
     }
   }
@@ -202,11 +200,11 @@ export class EncryptionService implements IEncryptionService {
   }
 
   /**
-   * Отвергает контейнер, созданный более новой версией приложения.
+   * Rejects a container created by a newer app version.
    *
-   * Попытка прочитать неизвестный формат «как получится» с последующей
-   * перезаписью означает безвозвратную потерю ключей. Отказ в работе —
-   * единственное безопасное поведение.
+   * Reading an unknown format "as best we can" and then rewriting it
+   * means irreversible key loss. Failing closed is the only safe
+   * behaviour.
    */
   static #assertSupportedVersion(payload: IEncryptedPayload): void {
     if (payload.version > PAYLOAD_VERSION) {
@@ -218,9 +216,9 @@ export class EncryptionService implements IEncryptionService {
     const subtle = globalThis.crypto.subtle as SubtleCrypto | undefined
 
     if (subtle === undefined) {
-      /* Web Crypto недоступен в незащищённом контексте (обычный http).
-         Работать в таком режиме кошелёк не должен вовсе: без него
-         невозможны ни шифрование, ни криптостойкая случайность. */
+      /* Web Crypto is unavailable in an insecure context (plain http).
+         A wallet must not run there at all: without it neither
+         encryption nor CSPRNG is possible. */
       throw new RandomnessUnavailableError(
         'crypto.subtle is unavailable — a secure context is required (https or localhost)',
       )
@@ -230,12 +228,12 @@ export class EncryptionService implements IEncryptionService {
   }
 
   /**
-   * Приводит представление к `ArrayBuffer`.
+   * Copies bytes into a standalone `ArrayBuffer`.
    *
-   * Требуется потому, что `Uint8Array` может быть окном в больший буфер:
-   * передача такого массива напрямую скормила бы Web Crypto лишние байты
-   * либо, в другой реализации, вовсе не то содержимое. Явный срез
-   * исключает этот класс ошибок.
+   * Required because a `Uint8Array` may be a window into a larger
+   * buffer: passing that array through would feed Web Crypto extra
+   * bytes, or in another implementation the wrong contents. An explicit
+   * slice closes that class of bugs.
    */
   static #toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer

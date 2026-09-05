@@ -26,7 +26,7 @@ const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const PEER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 const USDC = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-/** Запись истории с заданными признаками. Остальные поля не влияют на отбор. */
+/** History record with the given traits. Other fields do not affect the filter. */
 function record(params: {
   id: string
   kind: TransferKind
@@ -67,39 +67,39 @@ const NFT_1155 = record({ id: 'd', kind: TRANSFER_KIND.Erc1155, tokenId: 7n, sym
 
 const ALL = [NATIVE, TOKEN, NFT_721, NFT_1155]
 
-/** Идентификаторы отобранных записей — читаемее сравнения объектов целиком. */
+/** Ids of the filtered records — easier to read than comparing whole objects. */
 function ids(transfers: readonly ITransferRecord[]): readonly string[] {
   return transfers.map((item) => item.id)
 }
 
 describe('isFilterActive', () => {
-  it('исходные условия ничего не отсеивают', () => {
+  it('default conditions filter nothing', () => {
     expect(isFilterActive(EMPTY_TRANSFER_FILTER)).toBe(false)
   })
 
-  it('запрос из одних пробелов не считается условием', () => {
-    /* Иначе пустое состояние сообщило бы «под условия ничего не подошло»
-       там, где условий на деле нет. */
+  it('a query of only spaces is not a condition', () => {
+    /* Otherwise the empty state would say "nothing matched" where
+       there are in fact no conditions. */
     expect(isFilterActive({ ...EMPTY_TRANSFER_FILTER, query: '   ' })).toBe(false)
   })
 
-  it('выбранная категория считается условием', () => {
+  it('a selected category counts as a condition', () => {
     expect(isFilterActive({ ...EMPTY_TRANSFER_FILTER, category: TRANSFER_CATEGORY.Nft })).toBe(true)
   })
 
-  it('выбранное направление считается условием', () => {
+  it('a selected direction counts as a condition', () => {
     expect(isFilterActive({ ...EMPTY_TRANSFER_FILTER, direction: DIRECTION_FILTER.Outgoing })).toBe(
       true,
     )
   })
 })
 
-describe('filterTransfers: категория', () => {
-  it('без условий возвращает всё', () => {
+describe('filterTransfers: category', () => {
+  it('returns everything when there are no conditions', () => {
     expect(ids(filterTransfers(ALL, EMPTY_TRANSFER_FILTER))).toEqual(['a', 'b', 'c', 'd'])
   })
 
-  it('отбирает переводы нативной валюты', () => {
+  it('selects native-currency transfers', () => {
     const result = filterTransfers(ALL, {
       ...EMPTY_TRANSFER_FILTER,
       category: TRANSFER_CATEGORY.Native,
@@ -108,7 +108,7 @@ describe('filterTransfers: категория', () => {
     expect(ids(result)).toEqual(['a'])
   })
 
-  it('отбирает переводы ERC-20', () => {
+  it('selects ERC-20 transfers', () => {
     const result = filterTransfers(ALL, {
       ...EMPTY_TRANSFER_FILTER,
       category: TRANSFER_CATEGORY.Erc20,
@@ -117,9 +117,10 @@ describe('filterTransfers: категория', () => {
     expect(ids(result)).toEqual(['b'])
   })
 
-  it('под категорию NFT попадают и ERC-721, и ERC-1155', () => {
-    /* Для владельца это один вид имущества; разделение по стандартам
-       заставило бы его знать, каким контрактом выпущен предмет. */
+  it('the NFT category includes both ERC-721 and ERC-1155', () => {
+    /* To the owner they are one kind of property; splitting by
+       standard would force them to know which contract minted the
+       item. */
     const result = filterTransfers(ALL, {
       ...EMPTY_TRANSFER_FILTER,
       category: TRANSFER_CATEGORY.Nft,
@@ -129,7 +130,7 @@ describe('filterTransfers: категория', () => {
   })
 })
 
-describe('filterTransfers: направление', () => {
+describe('filterTransfers: direction', () => {
   const outgoing = record({
     id: 'e',
     kind: TRANSFER_KIND.Erc20,
@@ -138,7 +139,7 @@ describe('filterTransfers: направление', () => {
   const self = record({ id: 'f', kind: TRANSFER_KIND.Native, direction: TRANSFER_DIRECTION.Self })
   const mixed = [TOKEN, outgoing, self]
 
-  it('отбирает входящие', () => {
+  it('selects incoming', () => {
     const result = filterTransfers(mixed, {
       ...EMPTY_TRANSFER_FILTER,
       direction: DIRECTION_FILTER.Incoming,
@@ -147,7 +148,7 @@ describe('filterTransfers: направление', () => {
     expect(ids(result)).toEqual(['b', 'f'])
   })
 
-  it('отбирает исходящие', () => {
+  it('selects outgoing', () => {
     const result = filterTransfers(mixed, {
       ...EMPTY_TRANSFER_FILTER,
       direction: DIRECTION_FILTER.Outgoing,
@@ -156,9 +157,9 @@ describe('filterTransfers: направление', () => {
     expect(ids(result)).toEqual(['e', 'f'])
   })
 
-  it('перевод самому себе попадает в оба направления', () => {
-    /* Он одновременно и приход, и расход. Исключение из обоих наборов
-       скрыло бы существующую операцию. */
+  it('a self-transfer matches both directions', () => {
+    /* It is both income and expense. Dropping it from both sets would
+       hide an existing operation. */
     for (const direction of [DIRECTION_FILTER.Incoming, DIRECTION_FILTER.Outgoing]) {
       const result = filterTransfers([self], { ...EMPTY_TRANSFER_FILTER, direction })
 
@@ -167,16 +168,16 @@ describe('filterTransfers: направление', () => {
   })
 })
 
-describe('filterTransfers: поиск', () => {
-  it('находит по адресу контрагента целиком', () => {
+describe('filterTransfers: search', () => {
+  it('finds by the full counterparty address', () => {
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: PEER })
 
     expect(ids(result)).toEqual(['a', 'b', 'c', 'd'])
   })
 
-  it('не учитывает регистр', () => {
-    /* Один и тот же адрес приходит и в нижнем регистре от узла,
-       и в записи с контрольной суммой EIP-55. */
+  it('ignores case', () => {
+    /* The same address arrives lowercase from the node and in
+       EIP-55 checksum form. */
     const result = filterTransfers(ALL, {
       ...EMPTY_TRANSFER_FILTER,
       query: PEER.toUpperCase(),
@@ -185,52 +186,52 @@ describe('filterTransfers: поиск', () => {
     expect(result).toHaveLength(4)
   })
 
-  it('находит по последним символам адреса', () => {
-    /* Именно они видны в усечённой записи адреса в списке; поиск
-       по началу строки такой запрос не нашёл бы. */
+  it('finds by the last characters of the address', () => {
+    /* Those are the ones visible in the truncated list form; a
+       prefix search would miss this query. */
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: PEER.slice(-6) })
 
     expect(result).toHaveLength(4)
   })
 
-  it('находит по адресу контракта', () => {
+  it('finds by contract address', () => {
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: USDC })
 
     expect(ids(result)).toEqual(['b', 'c', 'd'])
   })
 
-  it('находит по символу токена', () => {
+  it('finds by token symbol', () => {
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: 'usdc' })
 
     expect(ids(result)).toEqual(['b'])
   })
 
-  it('находит по идентификатору предмета', () => {
+  it('finds by item id', () => {
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: '#42' })
 
     expect(ids(result)).toEqual(['c'])
   })
 
-  it('находит по хэшу транзакции', () => {
+  it('finds by transaction hash', () => {
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: NFT_721.hash })
 
     expect(ids(result)).toEqual(['c'])
   })
 
-  it('не спотыкается о запись без символа и контракта', () => {
-    /* Перевод нативной валюты не имеет ни того, ни другого. */
+  it('does not stumble on a record without a symbol or contract', () => {
+    /* A native-currency transfer has neither. */
     const result = filterTransfers([NATIVE], { ...EMPTY_TRANSFER_FILTER, query: 'usdc' })
 
     expect(result).toEqual([])
   })
 
-  it('пробелы по краям запроса не влияют на результат', () => {
+  it('leading and trailing spaces in the query do not affect the result', () => {
     const result = filterTransfers(ALL, { ...EMPTY_TRANSFER_FILTER, query: '  usdc  ' })
 
     expect(ids(result)).toEqual(['b'])
   })
 
-  it('условия применяются вместе, а не по отдельности', () => {
+  it('conditions apply together, not separately', () => {
     const result = filterTransfers(ALL, {
       category: TRANSFER_CATEGORY.Nft,
       direction: DIRECTION_FILTER.Incoming,

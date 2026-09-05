@@ -2,10 +2,10 @@ import { APP_CONFIG } from '@/shared/config'
 import { LegalPageLayout, LegalSection } from '@/shared/ui/legal-page-layout'
 
 /**
- * Условия использования.
+ * Terms of use.
  *
- * Для некастодиального кошелька главное — отказ от ответственности за
- * восстановление доступа и предупреждение о рисках блокчейна.
+ * For a non-custodial wallet the core is the disclaimer on restoring
+ * access and the warning about blockchain risk.
  */
 export function TermsPage() {
   return (

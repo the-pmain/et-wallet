@@ -3,23 +3,23 @@ import { InvalidArgumentError } from '@/core/errors'
 import type { TokenUnits, Wei } from './primitives'
 
 /**
- * Верхняя граница величины в EVM: 2^256 - 1.
+ * Upper bound of a magnitude in the EVM: 2^256 - 1.
  *
- * Значения сверх неё не помещаются в слово виртуальной машины и будут
- * усечены при кодировании транзакции — то есть отправится сумма,
- * отличная от запрошенной.
+ * Values beyond it do not fit in a VM word and will be truncated
+ * when the transaction is encoded — i.e. an amount different from
+ * the one requested will be sent.
  */
 export const MAX_UINT256 = 2n ** 256n - 1n
 
 /**
- * Создаёт сумму в минимальных единицах нативной валюты.
+ * Creates an amount in the native currency's smallest units.
  *
- * Единственный допустимый способ получить значение типа `Wei`.
+ * The only allowed way to obtain a `Wei`.
  *
- * Отрицательные величины отвергаются: в EVM их не существует, а знак
- * при кодировании превратился бы в огромное положительное число.
- * Дробные — тоже: wei неделим, и округление здесь означало бы молчаливое
- * изменение суммы перевода.
+ * Negative values are rejected: they do not exist in the EVM, and
+ * the sign would become a huge positive number on encode. Fractions
+ * too: wei is indivisible, and rounding here would silently change
+ * the transfer amount.
  *
  * @throws InvalidArgumentError
  */
@@ -28,10 +28,11 @@ export function toWei(value: bigint | number | string): Wei {
 }
 
 /**
- * Создаёт сумму в минимальных единицах токена.
+ * Creates an amount in a token's smallest units.
  *
- * Отделена от {@link toWei} намеренно: 1000 единиц USDC (6 знаков)
- * и 1000 wei — разные величины, и компилятор обязан это различать.
+ * Separated from {@link toWei} on purpose: 1000 units of USDC (6
+ * decimals) and 1000 wei are different quantities, and the compiler
+ * must tell them apart.
  *
  * @throws InvalidArgumentError
  */
@@ -41,9 +42,10 @@ export function toTokenUnits(value: bigint | number | string): TokenUnits {
 
 function parseAmount(value: bigint | number | string, name: string): bigint {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
-    /* Отдельная проверка до преобразования: BigInt(1.5) выбрасывает
-       RangeError, а BigInt(2**53 + 1) молча даёт уже потерявшее
-       точность значение. Второй случай опаснее — он не заметен. */
+    /* Separate check before conversion: BigInt(1.5) throws
+       RangeError, while BigInt(2**53 + 1) silently yields an
+       already-imprecise value. The second case is more dangerous —
+       it is not visible. */
     throw new InvalidArgumentError(name, 'a number value must be an integer within the safe range')
   }
 

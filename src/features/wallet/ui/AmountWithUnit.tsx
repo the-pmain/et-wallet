@@ -8,10 +8,10 @@ interface AmountWithUnitProps {
 }
 
 /**
- * Сумма вместе с обозначением.
+ * Amount together with its unit.
  *
- * Голое число в списке читается как счётчик, не как деньги.
- * Обозначение рядом снимает двусмысленность: `2` — это `2 USDT`.
+ * A bare number in a list reads as a counter, not as money.
+ * The unit beside it removes the ambiguity: `2` is `2 USDT`.
  */
 export function AmountWithUnit({ amount, unit, className }: AmountWithUnitProps) {
   const symbol = unit.trim()

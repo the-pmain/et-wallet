@@ -2,14 +2,14 @@ import type { ComponentProps } from 'react'
 
 import { cn } from '@/shared/lib/utils'
 
-/** Контейнер карточки shadcn/ui (стиль new-york). */
 export function Card({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
       data-slot="card"
       className={cn(
-        /* Тень из шкалы глубины вместо `shadow-sm`: та была одинаковой
-           у всех карточек и не отделяла их от фона на тёмной теме. */
+        /* Shadow from the depth scale instead of `shadow-sm`: that
+           one was the same on every card and did not lift them off
+           the dark-theme background. */
         'flex flex-col gap-6 rounded-xl border border-border/70 bg-card py-6 text-card-foreground shadow-surface',
         className,
       )}
@@ -28,17 +28,16 @@ export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
   )
 }
 
-/** Допустимые уровни заголовка карточки. */
 type CardTitleLevel = 'h1' | 'h2' | 'h3'
 
 /**
- * Заголовок карточки.
+ * Card heading.
  *
- * УРОВЕНЬ ЗАДАЁТСЯ МЕСТОМ, А НЕ КОМПОНЕНТОМ. Жёсткий `h2` внутри общей
- * карточки означает, что порядок заголовков страницы определяет не автор
- * страницы, а библиотека: экран, где карточка несёт главный смысл,
- * оставался без заголовка первого уровня, и обход по заголовкам
- * начинался с середины иерархии.
+ * THE LEVEL IS SET BY THE PLACE, NOT THE COMPONENT. A hard-coded `h2`
+ * inside a shared card means the page heading order is decided by the
+ * library, not the page author: a screen where the card carries the
+ * main meaning stayed without an h1, and heading navigation started
+ * in the middle of the hierarchy.
  */
 export function CardTitle({
   className,

@@ -11,33 +11,33 @@ import {
 type NamespaceData = Map<StorageKey, unknown>
 
 /**
- * Хранилище в оперативной памяти.
+ * In-memory storage.
  *
- * ДВА НАЗНАЧЕНИЯ, оба законные:
+ * TWO PURPOSES, both legitimate:
  *
- * 1. **Тесты.** Заменяет IndexedDB, не требуя браузерного окружения.
+ * 1. **Tests.** Replaces IndexedDB without needing a browser environment.
  *
- * 2. **Сессионный режим.** Кошелёк, существующий до перезагрузки страницы.
- *    Применяется, пока постоянное хранилище не реализовано, и остаётся
- *    полезным как режим «не оставлять следов на этом устройстве».
+ * 2. **Session mode.** A wallet that exists until the page reloads.
+ *    Used while persistent storage is not implemented, and remains
+ *    useful as a "leave no traces on this device" mode.
  *
- * Два свойства делают его пригодной заменой настоящему хранилищу:
+ * Two properties make it a fit replacement for real storage:
  *
- * - **Копирование значений через `structuredClone`.** Реальное хранилище
- *   сериализует данные, поэтому вызывающий код никогда не получает ссылку
- *   на тот же объект, который записал. Реализация, возвращающая ту же
- *   ссылку, скрыла бы ошибки непреднамеренного разделения состояния.
+ * - **Copying values via `structuredClone`.** Real storage serializes
+ *   data, so the caller never gets a reference to the same object it
+ *   wrote. An implementation that returned the same reference would
+ *   hide accidental shared-state bugs.
  *
- * - **Настоящий откат транзакции.** Снимок делается до вызова обработчика
- *   и восстанавливается при исключении.
+ * - **A real transaction rollback.** A snapshot is taken before the
+ *   handler runs and is restored on exception.
  *
- * ЧЕГО ОНО НЕ ДАЁТ: сохранности между сессиями. Данные исчезают вместе
- * со вкладкой, включая зашифрованное хранилище ключей.
+ * WHAT IT DOES NOT GIVE: durability across sessions. Data vanishes
+ * with the tab, including the encrypted key vault.
  */
 export class MemoryStorageService implements IStorageService {
   readonly #data = new Map<StorageNamespace, NamespaceData>()
 
-  /** Счётчик операций записи. Позволяет проверять отсутствие лишних обращений. */
+  /** Write-operation counter. Lets tests check there are no extra calls. */
   writeCount = 0
 
   init(): Promise<void> {
@@ -102,7 +102,7 @@ export class MemoryStorageService implements IStorageService {
     return Promise.resolve(null)
   }
 
-  /** Данные исчезают вместе со вкладкой — и об этом надо говорить прямо. */
+  /** Data vanishes with the tab — and that must be said outright. */
   durability(): Promise<StorageDurability> {
     return Promise.resolve(STORAGE_DURABILITY.Session)
   }

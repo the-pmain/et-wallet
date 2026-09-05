@@ -8,11 +8,11 @@ import { App } from './App'
 import { AppProviders } from './providers'
 
 /**
- * Проверяется сборка приложения целиком: провайдеры, маршрутизация,
- * определение состояния кошелька.
+ * Checks the app assembly as a whole: providers, routing, wallet-state
+ * detection.
  *
- * Шифрование подменено ускоренным — боевые 600 000 итераций PBKDF2
- * не имеют отношения к тому, что здесь проверяется.
+ * Encryption is swapped for a fast stand-in — production's 600 000
+ * PBKDF2 iterations have nothing to do with what is checked here.
  */
 function renderApp() {
   const services = createTestAppServices()
@@ -27,25 +27,25 @@ function renderApp() {
 }
 
 describe('App', () => {
-  it('показывает экран приветствия для несозданного кошелька', async () => {
+  it('shows the welcome screen for an uncreated wallet', async () => {
     renderApp()
 
-    /* Признак — фирменный знак: узнаваемый вид приложения работает
-       как слабая преграда для фишинговой копии, поэтому его присутствие
-       на первом экране проверяется отдельно от текста заголовка. */
+    /* The tell is the brand mark: the recognisable look is a weak
+       barrier against a phishing copy, so its presence on the first
+       screen is checked separately from the heading text. */
     expect(await screen.findByRole('img', { name: 'ETWallet' })).toBeInTheDocument()
   })
 
-  it('предлагает создание кошелька', async () => {
+  it('offers wallet creation', async () => {
     renderApp()
 
     expect(await screen.findByRole('link', { name: /create a new wallet/i })).toBeInTheDocument()
   })
 
-  it('показывает вход по seed-фразе в соответствии с режимом', async () => {
-    /* Временное послабление снимает этот путь целиком. Проверка следует
-       за флагом, а не закрепляет одно из состояний: возврат защиты
-       обратно не должен ронять набор. */
+  it('shows seed-phrase import according to the mode flag', async () => {
+    /* A temporary relaxation removes this path entirely. The check
+       follows the flag instead of pinning one state: putting the
+       protection back must not break the suite. */
     renderApp()
 
     await screen.findByRole('link', { name: /create a new wallet/i })

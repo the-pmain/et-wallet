@@ -12,18 +12,18 @@ import { RpcClientFactory } from './RpcClientFactory'
 const CHAIN_ID = BUILT_IN_CHAIN_ID.Ethereum
 
 /**
- * Фабрика с подменённым подключением.
+ * Factory with a substituted connect.
  *
- * Правила перебора проверяются без обращения к сети: реальные запросы
- * сделали бы набор медленным и недетерминированным, а проверяется здесь
- * логика выбора узла, а не транспорт. Сам транспорт покрыт отдельно
- * в `RpcClient.test.ts`.
+ * Rotation rules are checked without talking to the network: real
+ * requests would make the suite slow and non-deterministic, and what
+ * is checked here is node-selection logic, not transport. Transport
+ * itself is covered separately in `RpcClient.test.ts`.
  */
 class TestableFactory extends RpcClientFactory {
-  /** Поведение каждого адреса: узел либо ошибка. */
+  /** Behaviour of each address: a node or an error. */
   readonly nodes = new Map<string, FakeJsonRpcNode | Error>()
 
-  /** Адреса в порядке фактических попыток подключения. */
+  /** Addresses in the order they were actually tried. */
   readonly attempts: string[] = []
 
   protected override async connect(rpcUrl: string, chainId: ChainId): Promise<IProvider> {
@@ -32,7 +32,7 @@ class TestableFactory extends RpcClientFactory {
     const entry = this.nodes.get(rpcUrl)
 
     if (entry === undefined || entry instanceof Error) {
-      throw entry ?? new Error(`узел ${rpcUrl} недоступен`)
+      throw entry ?? new Error(`node ${rpcUrl} is unavailable`)
     }
 
     return await RpcClient.attach(entry, chainId, rpcUrl)
@@ -60,8 +60,8 @@ beforeEach(() => {
   factory = new TestableFactory({ logger })
 })
 
-describe('RpcClientFactory: выбор узла', () => {
-  it('подключается к первому доступному адресу', async () => {
+describe('RpcClientFactory: node selection', () => {
+  it('connects to the first available address', async () => {
     factory.nodes.set('https://a.example.com', new FakeJsonRpcNode(Number(CHAIN_ID)))
 
     const provider = await factory.create(network(['https://a.example.com']))
@@ -74,7 +74,7 @@ describe('RpcClientFactory: выбор узла', () => {
     }
   })
 
-  it('соблюдает порядок приоритета', async () => {
+  it('honors priority order', async () => {
     factory.nodes.set('https://first.example.com', new FakeJsonRpcNode(Number(CHAIN_ID)))
     factory.nodes.set('https://second.example.com', new FakeJsonRpcNode(Number(CHAIN_ID)))
 
@@ -83,8 +83,8 @@ describe('RpcClientFactory: выбор узла', () => {
     )
 
     try {
-      /* Список задан в порядке приоритета: первым обычно стоит наиболее
-         надёжный оператор, поэтому перемешивать перебор нельзя. */
+      /* The list is in priority order: the most reliable operator is
+         usually first, so rotation must not be shuffled. */
       expect(provider.rpcUrl).toBe('https://first.example.com')
       expect(factory.attempts).toEqual(['https://first.example.com'])
     } finally {
@@ -92,8 +92,8 @@ describe('RpcClientFactory: выбор узла', () => {
     }
   })
 
-  it('переходит к резервному адресу при отказе основного', async () => {
-    factory.nodes.set('https://down.example.com', new Error('соединение отклонено'))
+  it('moves to a backup address when the primary fails', async () => {
+    factory.nodes.set('https://down.example.com', new Error('connection refused'))
     factory.nodes.set('https://backup.example.com', new FakeJsonRpcNode(Number(CHAIN_ID)))
 
     const provider = await factory.create(
@@ -108,9 +108,9 @@ describe('RpcClientFactory: выбор узла', () => {
     }
   })
 
-  it('пропускает узел, обслуживающий другую сеть', async () => {
-    /* Узел с чужим chainId исключается из перебора, но не приводит
-       к отказу целиком: резервный адрес может быть исправен. */
+  it('skips a node that serves another network', async () => {
+    /* A node with a foreign chainId is dropped from rotation but does
+       not fail the whole attempt: the backup may be healthy. */
     factory.nodes.set('https://wrong-chain.example.com', new FakeJsonRpcNode(137))
     factory.nodes.set('https://correct.example.com', new FakeJsonRpcNode(Number(CHAIN_ID)))
 
@@ -126,14 +126,14 @@ describe('RpcClientFactory: выбор узла', () => {
   })
 })
 
-describe('RpcClientFactory: отказ', () => {
-  it('отказывает при пустом списке адресов', async () => {
+describe('RpcClientFactory: failure', () => {
+  it('fails on an empty address list', async () => {
     await expect(factory.create(network([]))).rejects.toThrow(ProviderUnavailableError)
   })
 
-  it('отказывает, когда ни один узел не доступен', async () => {
-    factory.nodes.set('https://a.example.com', new Error('таймаут'))
-    factory.nodes.set('https://b.example.com', new Error('таймаут'))
+  it('fails when no node is available', async () => {
+    factory.nodes.set('https://a.example.com', new Error('timeout'))
+    factory.nodes.set('https://b.example.com', new Error('timeout'))
 
     await expect(
       factory.create(network(['https://a.example.com', 'https://b.example.com'])),
@@ -142,20 +142,20 @@ describe('RpcClientFactory: отказ', () => {
     expect(factory.attempts).toHaveLength(2)
   })
 
-  it('сохраняет причину последней попытки', async () => {
+  it('keeps the cause of the last attempt', async () => {
     factory.nodes.set('https://wrong-chain.example.com', new FakeJsonRpcNode(137))
 
-    /* При единственном узле с чужим chainId пользователь должен увидеть
-       именно эту причину, а не обобщённое «сеть недоступна». */
+    /* With a single node on a foreign chainId the user must see that
+       reason, not a generic "network unavailable". */
     await expect(
       factory.create(network(['https://wrong-chain.example.com'])),
     ).rejects.toMatchObject({ cause: expect.any(ChainIdMismatchError) as unknown })
   })
 })
 
-describe('RpcClientFactory: журнал', () => {
-  it('записывает предупреждение о недоступном узле', async () => {
-    factory.nodes.set('https://a.example.com', new Error('таймаут'))
+describe('RpcClientFactory: log', () => {
+  it('writes a warning about an unreachable node', async () => {
+    factory.nodes.set('https://a.example.com', new Error('timeout'))
 
     await expect(factory.create(network(['https://a.example.com']))).rejects.toThrow()
 
@@ -165,9 +165,10 @@ describe('RpcClientFactory: журнал', () => {
     expect(warnings[0]?.context?.['rpcUrl']).toBe('https://a.example.com')
   })
 
-  it('отдельно отмечает узел с чужим chainId', async () => {
-    /* Это либо ошибка конфигурации, либо попытка подмены — оба случая
-       заслуживают внимания и не должны теряться среди отказов сети. */
+  it('marks a node with a foreign chainId separately', async () => {
+    /* This is either a config error or an impersonation attempt —
+       both deserve attention and must not be lost among network
+       failures. */
     factory.nodes.set('https://a.example.com', new FakeJsonRpcNode(137))
 
     await expect(factory.create(network(['https://a.example.com']))).rejects.toThrow()
@@ -178,7 +179,7 @@ describe('RpcClientFactory: журнал', () => {
     expect(warning?.context?.['actual']).toBe('137')
   })
 
-  it('не пишет предупреждений при успешном подключении', async () => {
+  it('writes no warnings on a successful connect', async () => {
     factory.nodes.set('https://a.example.com', new FakeJsonRpcNode(Number(CHAIN_ID)))
 
     const provider = await factory.create(network(['https://a.example.com']))
@@ -190,7 +191,7 @@ describe('RpcClientFactory: журнал', () => {
     }
   })
 
-  it('работает с нестандартным идентификатором сети', async () => {
+  it('works with a non-standard network id', async () => {
     const custom = toChainId(31337)
     factory.nodes.set('https://local.example.com', new FakeJsonRpcNode(Number(custom)))
 

@@ -2,11 +2,11 @@ import type { TokenStandard } from '@/core/token'
 import type { Address, ChainId, HexString, Timestamp, TxHash, Wei } from '@/core/types'
 
 /**
- * Формат транзакции.
+ * Transaction format.
  *
- * `Eip1559` — основной для современных сетей: комиссия делится на базовую
- * (сжигается) и приоритетную (валидатору). `Legacy` сохраняется для сетей
- * без поддержки EIP-1559.
+ * `Eip1559` is the main one for modern networks: the fee splits into
+ * a base (burned) and a priority (to the validator). `Legacy` is kept
+ * for networks without EIP-1559.
  */
 export const TRANSACTION_TYPE = {
   Legacy: 'legacy',
@@ -16,26 +16,24 @@ export const TRANSACTION_TYPE = {
 
 export type TransactionType = (typeof TRANSACTION_TYPE)[keyof typeof TRANSACTION_TYPE]
 
-/** Состояние транзакции в жизненном цикле. */
 export const TRANSACTION_STATUS = {
-  /** Подписана и отправлена, в блок не включена. */
+  /** Signed and sent, not included in a block. */
   Pending: 'pending',
-  /** Включена в блок и выполнена успешно. */
+  /** Included in a block and executed successfully. */
   Confirmed: 'confirmed',
   /**
-   * Включена в блок, но выполнение откачено.
-   * Газ списан. Отображать как успешную нельзя.
+   * Included in a block, but execution reverted.
+   * Gas was spent. Must not be shown as successful.
    */
   Reverted: 'reverted',
-  /** Вытеснена из мемпула без включения в блок. */
+  /** Evicted from the mempool without inclusion in a block. */
   Dropped: 'dropped',
-  /** Замещена другой транзакцией с тем же nonce (ускорение или отмена). */
+  /** Replaced by another transaction with the same nonce (speed-up or cancel). */
   Replaced: 'replaced',
 } as const
 
 export type TransactionStatus = (typeof TRANSACTION_STATUS)[keyof typeof TRANSACTION_STATUS]
 
-/** Уровень срочности, влияющий на предлагаемую комиссию. */
 export const FEE_PRIORITY = {
   Low: 'low',
   Medium: 'medium',
@@ -46,107 +44,102 @@ export const FEE_PRIORITY = {
 export type FeePriority = (typeof FEE_PRIORITY)[keyof typeof FEE_PRIORITY]
 
 /**
- * Намерение пользователя отправить транзакцию.
+ * A user's intent to send a transaction.
  *
- * Неполный набор: параметры комиссии и nonce вычисляются сервисом.
- * Разделение на «намерение» и «готовая к подписи транзакция» существует
- * для того, чтобы вычисленные значения нельзя было подменить в обход
- * проверок — на подпись уходит только результат `prepare`.
+ * An incomplete set: fee parameters and nonce are computed by the
+ * service. The split into "intent" and "transaction ready to sign"
+ * exists so computed values cannot be substituted around the checks
+ * — only the result of `prepare` goes to the signature.
  */
 export interface ITransactionRequest {
   /**
-   * Сеть, в которой отправляется перевод.
+   * Network the transfer is sent on.
    *
-   * Не выводится из активной сети по умолчанию сознательно: намерение,
-   * не содержащее сети, становится двусмысленным, если пользователь
-   * переключит сеть между заполнением формы и подтверждением. Опущенное
-   * значение означает активную сеть на момент подготовки.
+   * Not defaulted from the active network on purpose: an intent
+   * that does not name a network becomes ambiguous if the user
+   * switches networks between filling the form and confirming.
+   * An omitted value means the active network at prepare time.
    */
   readonly chainId?: ChainId
 
   readonly from: Address
 
-  /** Получатель. `null` означает развёртывание контракта. */
+  /** Recipient. `null` means a contract deploy. */
   readonly to: Address | null
 
   readonly value: Wei
 
-  /** Данные вызова. Пустая строка для простого перевода. */
   readonly data?: HexString
 
-  /** Явно заданный nonce. Обычно не указывается — вычисляется сервисом. */
   readonly nonce?: number
 
-  /** Явно заданный лимит газа. Обычно не указывается — оценивается сервисом. */
   readonly gasLimit?: bigint
 
   readonly feePriority?: FeePriority
 }
 
 /**
- * Намерение отправить токен ERC-20.
+ * Intent to send an ERC-20 token.
  *
- * ОТДЕЛЬНЫЙ ТИП, А НЕ ПОЛЕ В `ITransactionRequest`. У перевода токена
- * получатель и сумма лежат не там, где у обычной транзакции: поле `to`
- * указывает на контракт, а настоящий получатель и количество — в данных
- * вызова. Свести оба намерения к одной форме значит позволить перепутать
- * адрес контракта с адресом человека.
+ * A SEPARATE TYPE, NOT A FIELD ON `ITransactionRequest`. On a token
+ * transfer the recipient and amount do not sit where they do on an
+ * ordinary transaction: `to` points at the contract, and the real
+ * recipient and quantity are in the call data. Collapsing both
+ * intents into one form would let a contract address be confused
+ * with a person's.
  *
- * ДАННЫЕ ВЫЗОВА СОБИРАЕТ ЯДРО. Интерфейс передаёт получателя и сумму
- * и не занимается кодированием ABI: ошибка в нём отправляет токены
- * не туда без возможности возврата.
+ * THE CORE ASSEMBLES THE CALL DATA. The UI passes the recipient
+ * and amount and does not encode ABI: an error there sends tokens
+ * elsewhere with no return.
  */
 export interface ITokenTransferRequest {
   readonly chainId?: ChainId
 
   readonly from: Address
 
-  /** Адрес контракта токена. */
   readonly token: Address
 
-  /** Настоящий получатель токена. */
   readonly to: Address
 
-  /** Количество в минимальных единицах токена. */
   readonly amount: bigint
 
   readonly feePriority?: FeePriority
 }
 
 /**
- * Намерение передать коллекционный предмет.
+ * Intent to transfer a collectible.
  *
- * ОТПРАВИТЕЛЬ ВХОДИТ В ДАННЫЕ ВЫЗОВА. У `safeTransferFrom` он задан
- * явным аргументом, а не выводится из подписи: контракт разрешает
- * передачу и доверенному лицу. Кошелёк передаёт свой адрес — иное
- * означало бы распоряжение чужим имуществом.
+ * THE SENDER IS PART OF THE CALL DATA. On `safeTransferFrom` it is
+ * an explicit argument, not inferred from the signature: the
+ * contract also allows a trusted party to transfer. The wallet
+ * passes its own address — anything else would be spending
+ * someone else's property.
  */
 export interface INftTransferRequest {
   readonly chainId?: ChainId
 
   readonly from: Address
 
-  /** Адрес контракта коллекции. */
   readonly contract: Address
 
-  /** Настоящий получатель предмета. */
   readonly to: Address
 
   readonly tokenId: bigint
 
   /**
-   * Стандарт коллекции.
+   * Collection standard.
    *
-   * Определяет вызов: у ERC-721 и ERC-1155 разные `safeTransferFrom`.
-   * Догадаться по контракту нельзя — ошибка означала бы вызов
-   * несуществующей функции.
+   * Decides the call: ERC-721 and ERC-1155 have different
+   * `safeTransferFrom`. Guessing from the contract is not allowed
+   * — an error would call a function that does not exist.
    */
   readonly standard: TokenStandard
 
   /**
-   * Сколько экземпляров передаётся. Только для ERC-1155.
+   * How many copies are transferred. ERC-1155 only.
    *
-   * У ERC-721 предмет неделим, и количество не участвует в вызове.
+   * For ERC-721 the item is indivisible, and the amount is not
+   * part of the call.
    */
   readonly amount?: bigint
 
@@ -154,29 +147,29 @@ export interface INftTransferRequest {
 }
 
 /**
- * Намерение отозвать выданное разрешение.
+ * Intent to revoke a granted allowance.
  *
- * ОТЗЫВ — ЭТО ТРАНЗАКЦИЯ, А НЕ НАСТРОЙКА КОШЕЛЬКА. Разрешение живёт
- * в контракте, а не у нас: убрать его можно только вызовом, который
- * стоит газа и требует подписи. Кошелёк, показывающий «отозвано» без
- * подтверждённой транзакции, лгал бы владельцу о состоянии его средств.
+ * A REVOKE IS A TRANSACTION, NOT A WALLET SETTING. The allowance
+ * lives in the contract, not here: removing it takes a call that
+ * costs gas and needs a signature. A wallet that shows "revoked"
+ * without a confirmed transaction would lie to the owner about
+ * the state of their funds.
  */
 export interface IRevokeApprovalRequest {
   readonly chainId?: ChainId
 
   readonly from: Address
 
-  /** Контракт токена либо коллекции. */
   readonly contract: Address
 
-  /** Кому разрешение было выдано. */
   readonly spender: Address
 
   /**
-   * Стандарт контракта.
+   * Contract standard.
    *
-   * Определяет вызов: у токенов разрешение перезаписывается нулём
-   * (`approve`), у коллекций снимается признаком (`setApprovalForAll`).
+   * Decides the call: for tokens the allowance is overwritten
+   * with zero (`approve`), for collections the flag is cleared
+   * (`setApprovalForAll`).
    */
   readonly standard: TokenStandard
 
@@ -184,12 +177,13 @@ export interface IRevokeApprovalRequest {
 }
 
 /**
- * Транзакция, полностью готовая к подписи.
+ * A transaction fully ready to sign.
  *
- * Все поля разрешены и проверены. Это ровно тот набор данных, который
- * подписывается и который обязан быть показан пользователю без каких-либо
- * промежуточных пересчётов «для удобства». Расхождение между показанным
- * и подписанным — основной класс атак на интерфейс кошелька.
+ * Every field is resolved and checked. This is exactly the data
+ * set that is signed and that must be shown to the user without
+ * any intermediate recalculation "for convenience". A mismatch
+ * between what is shown and what is signed is the main class of
+ * attacks on a wallet UI.
  */
 export interface ISignableTransaction {
   readonly type: TransactionType
@@ -201,27 +195,20 @@ export interface ISignableTransaction {
   readonly nonce: number
   readonly gasLimit: bigint
 
-  /** Заполняется для EIP-1559. */
   readonly maxFeePerGas: bigint | null
   readonly maxPriorityFeePerGas: bigint | null
 
-  /** Заполняется для транзакций прежнего формата. */
   readonly gasPrice: bigint | null
 }
 
-/** Результат подписи. */
 export interface ISignedTransaction {
-  /** Сериализованная подписанная транзакция для публикации в сети. */
   readonly raw: HexString
 
-  /** Хэш, вычисленный из подписанных данных. */
   readonly hash: TxHash
 
-  /** Исходные данные — для отображения и сохранения в истории. */
   readonly transaction: ISignableTransaction
 }
 
-/** Оценка комиссии для одного уровня срочности. */
 export interface IFeeEstimate {
   readonly priority: FeePriority
   readonly maxFeePerGas: bigint | null
@@ -229,14 +216,13 @@ export interface IFeeEstimate {
   readonly gasPrice: bigint | null
   readonly gasLimit: bigint
 
-  /** Верхняя граница списания: `gasLimit * maxFeePerGas`. */
+  /** Upper bound on the charge: `gasLimit * maxFeePerGas`. */
   readonly maxCost: Wei
 
-  /** Ожидаемое время подтверждения в секундах. `null`, если оценка недоступна. */
+  /** Expected confirmation time in seconds. `null` if no estimate is available. */
   readonly estimatedSeconds: number | null
 }
 
-/** Запись истории транзакций. */
 export interface ITransactionRecord {
   readonly hash: TxHash
   readonly chainId: ChainId
@@ -247,30 +233,28 @@ export interface ITransactionRecord {
   readonly status: TransactionStatus
   readonly type: TransactionType
 
-  /** Момент отправки из кошелька. */
   readonly submittedAt: Timestamp
 
-  /** Момент включения в блок. `null` пока транзакция не подтверждена. */
+  /** Time of inclusion in a block. `null` until the transaction is confirmed. */
   readonly confirmedAt: Timestamp | null
 
   readonly blockNumber: bigint | null
   readonly gasUsed: bigint | null
   readonly effectiveGasPrice: bigint | null
 
-  /** Хэш замещающей транзакции, если эта была вытеснена. */
   readonly replacedBy: TxHash | null
 
   /**
-   * Параметры исходной транзакции, нужные для её замены.
+   * Parameters of the original transaction, needed to replace it.
    *
-   * ЗАЧЕМ ХРАНИТЬ. Ускорение — это повторная отправка ТОЙ ЖЕ операции
-   * с тем же nonce и большей комиссией. Не сохранив данные вызова
-   * и лимит газа, кошелёк отправил бы вместо ускорения другую
-   * транзакцию — с тем же номером, но иным содержанием.
+   * WHY STORE THEM. A speed-up is a resend of THE SAME operation
+   * at the same nonce with a higher fee. Without the call data
+   * and gas limit the wallet would send a different transaction
+   * instead of a speed-up — same number, different contents.
    *
-   * `null` у записей, сделанных до появления замены: восстановить
-   * эти сведения задним числом неоткуда, и притворяться, что они
-   * известны, нельзя.
+   * `null` on records made before replacement existed: there is
+   * nowhere to restore those facts after the fact, and pretending
+   * they are known is not allowed.
    */
   readonly data: HexString | null
   readonly gasLimit: bigint | null
@@ -279,31 +263,32 @@ export interface ITransactionRecord {
   readonly gasPrice: bigint | null
 
   /**
-   * Сколько блоков подтвердило транзакцию.
+   * How many blocks have confirmed the transaction.
    *
-   * Ноль, пока она не включена в блок. Единица означает «включена
-   * в последний блок» — состояние, из которого реорганизация цепи
-   * ещё может её вернуть.
+   * Zero until it is included in a block. One means "included in
+   * the latest block" — a state from which a reorg can still
+   * return it.
    *
-   * ПОЧЕМУ ЭТО ОТДЕЛЬНОЕ ЧИСЛО, А НЕ ПРИЗНАК «ПОДТВЕРЖДЕНА».
-   * Включение в блок и невозвратность — разные вещи, и разница видна
-   * пользователю: «в блоке» показывается сразу, а глубина подтверждения
-   * растёт. Признак вместо числа заставил бы выбрать один порог
-   * и выдавать его за истину.
+   * WHY THIS IS A SEPARATE NUMBER, NOT A "CONFIRMED" FLAG.
+   * Inclusion in a block and finality are different things, and
+   * the user sees the difference: "in a block" is shown at once,
+   * and confirmation depth grows. A flag instead of a number
+   * would force one threshold and present it as the truth.
    */
   readonly confirmations: number
 }
 
 /**
- * Данные для подписи по EIP-712.
+ * Data for an EIP-712 signature.
  *
- * Подпись структурированных данных опаснее подписи транзакции: пользователь
- * подписывает не перевод, а произвольное сообщение, которое затем может быть
- * предъявлено контракту. Классический пример — разрешение `Permit`,
- * дающее право распоряжаться токенами без отдельной транзакции.
+ * Signing structured data is more dangerous than signing a
+ * transaction: the user signs not a transfer, but an arbitrary
+ * message that can then be presented to a contract. The classic
+ * example is a `Permit` allowance, giving the right to spend
+ * tokens without a separate transaction.
  *
- * Реализация обязана показывать разобранную структуру, а не сырой хэш,
- * и проверять, что `domain.chainId` совпадает с активной сетью.
+ * The implementation must show the parsed structure, not a raw
+ * hash, and check that `domain.chainId` matches the active network.
  */
 export interface ITypedData {
   readonly domain: ITypedDataDomain
@@ -325,7 +310,6 @@ export interface ITypedDataField {
   readonly type: string
 }
 
-/** События транзакционного слоя. */
 export interface TransactionEventMap {
   'transaction:submitted': { readonly record: ITransactionRecord }
   'transaction:statusChanged': {

@@ -1,12 +1,12 @@
 /**
- * Ставит адрес в тестовом окне так, как это делает настоящий переход.
+ * Sets the address in the test window the way a real navigation does.
  *
- * `BrowserRouter` читает `pathname`. Присвоение `location.hash` его
- * больше не двигает: это работало только с `HashRouter`.
+ * `BrowserRouter` reads `pathname`. Assigning `location.hash` no
+ * longer moves it: that only worked with `HashRouter`.
  *
- * History API сам `popstate` не шлёт — событие возникает лишь при
- * кнопках «назад» и «вперёд». Без него смонтированный маршрутизатор
- * не узнает, что путь сменился.
+ * The History API does not fire `popstate` on its own — the event
+ * only comes from the back and forward buttons. Without it a
+ * mounted router will not learn that the path changed.
  */
 export function openPath(path: string): void {
   window.history.replaceState(null, '', path)

@@ -2,19 +2,20 @@ import type { ITypedData } from '@/core/transaction'
 import { toChainId, type Address } from '@/core/types'
 
 /**
- * Эталонные данные для проверки подписи.
+ * Reference data for signature checks.
  *
- * Все значения взяты из текстов соответствующих стандартов, а не получены
- * прогоном собственного кода. Это принципиально: тест, ожидающий то,
- * что выдала реализация, проверяет лишь её неизменность, но не корректность.
+ * Every value is taken from the text of the relevant standard, not
+ * produced by running our own code. That is essential: a test that
+ * expects what the implementation emitted only checks that it did
+ * not change, not that it is correct.
  */
 
 /**
- * Официальный пример из текста EIP-155.
+ * Official example from the EIP-155 text.
  *
- * Приведён в самом стандарте как иллюстрация защиты от повторного
- * проигрывания. Проверяет всю цепочку: сериализацию RLP, включение
- * chainId в подписываемые данные и формирование `v`.
+ * Given in the standard itself as an illustration of replay
+ * protection. Checks the whole chain: RLP serialisation, inclusion of
+ * chainId in the signed data, and formation of `v`.
  */
 export const EIP155_VECTOR = {
   privateKeyHex: '4646464646464646464646464646464646464646464646464646464646464646',
@@ -30,10 +31,10 @@ export const EIP155_VECTOR = {
 } as const
 
 /**
- * Пример структуры из текста EIP-712.
+ * Structure example from the EIP-712 text.
  *
- * Стандарт приводит для него итоговый хэш, что позволяет проверить
- * кодирование независимо от реализации подписи.
+ * The standard gives a digest for it, which lets encoding be checked
+ * independently of the signature implementation.
  */
 export const EIP712_MAIL: ITypedData = {
   domain: {
@@ -61,16 +62,15 @@ export const EIP712_MAIL: ITypedData = {
   },
 }
 
-/** Итоговый хэш примера `Mail`, приведённый в тексте EIP-712. */
+/** Digest of the `Mail` example, given in the EIP-712 text. */
 export const EIP712_MAIL_HASH = '0xbe609aee343fb3c4b28e1df9e632fca64fcfaede20f02e86244efddf30957bd2'
 
-/** Приватный ключ, равный единице. Его адрес общеизвестен. */
+/** Private key equal to one. Its address is widely known. */
 export const KEY_ONE_HEX = '0000000000000000000000000000000000000000000000000000000000000001'
 
-/** Адрес приватного ключа, равного единице. */
 export const KEY_ONE_ADDRESS = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf' as Address
 
-/** Преобразует шестнадцатеричную строку в байты. Только для тестов. */
+/** Converts a hex string to bytes. Tests only. */
 export function fromHex(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2)
 

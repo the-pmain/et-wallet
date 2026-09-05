@@ -1,17 +1,16 @@
 import type { INetworkEntry } from './types.ts'
 
 /**
- * Каталог сетей.
+ * Network catalog.
  *
- * СОСТАВ СОВПАДАЕТ СО ВСТРОЕННЫМ СПИСКОМ РАСШИРЕНИЯ. Сервис здесь —
- * источник обновлений, а не единственный источник истины: кошелёк обязан
- * работать и без сети, опираясь на собственный встроенный список.
- * Каталог, ставший обязательным, превратил бы отказ сервера
- * в неработающий кошелёк.
+ * THE SET MATCHES THE EXTENSION'S BUILT-IN LIST. The service here is
+ * an update source, not the only source of truth: the wallet must
+ * work offline on its own built-in list. A catalog that became
+ * required would turn a server outage into a dead wallet.
  *
- * ИДЕНТИФИКАТОР СЕТИ КОШЕЛЁК ВСЁ РАВНО СВЕРЯЕТ С УЗЛОМ. Значение
- * отсюда — заявление, а не доказательство: узел, обслуживающий другую
- * цепь, обнаруживается только опросом.
+ * THE WALLET STILL CHECKS THE NETWORK ID WITH THE NODE. The value
+ * from here is a claim, not proof: a node serving another chain is
+ * found only by asking it.
  */
 export const NETWORKS: readonly INetworkEntry[] = [
   {
@@ -28,16 +27,16 @@ export const NETWORKS: readonly INetworkEntry[] = [
     nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
     blockExplorerUrls: ['https://bscscan.com'],
     isTestnet: false,
-    /* Сеть принимает транзакции второго типа, но базовая комиссия в ней
-       фактически фиксирована, а приоритетная надбавка не влияет на скорость
-       включения. Выбор срочности, ни на что не влияющий, — обман интерфейса. */
+    /* The network accepts type-2 transactions, but its base fee is
+       effectively fixed and the priority tip does not change inclusion
+       speed. An urgency picker that does nothing is a UI lie. */
     supportsEip1559: false,
   },
   {
     chainId: 137n,
     name: 'Polygon',
-    /* Нативная валюта — POL, а не MATIC: переименование состоялось
-       в сентябре 2024 года. */
+    /* Native currency is POL, not MATIC: the rename happened in
+       September 2024. */
     nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
     blockExplorerUrls: ['https://polygonscan.com'],
     isTestnet: false,

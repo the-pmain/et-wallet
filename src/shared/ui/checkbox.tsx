@@ -6,13 +6,12 @@ import { cn } from '@/shared/lib/utils'
 export type CheckboxProps = Omit<ComponentProps<'input'>, 'type'>
 
 /**
- * Флажок подтверждения.
+ * Confirmation checkbox.
  *
- * Реализован нативным `input[type=checkbox]`, скрытым визуально, но
- * доступным программам чтения с экрана и клавиатуре. Собственная
- * реализация на `div` с ролью потребовала бы вручную воспроизводить
- * поведение, которое браузер уже даёт бесплатно, — и неизбежно
- * воспроизвела бы его хуже.
+ * Built on a native `input[type=checkbox]`, hidden visually but
+ * available to screen readers and the keyboard. A custom `div` with
+ * a role would have to recreate behavior the browser already gives
+ * for free — and would inevitably recreate it worse.
  */
 export function Checkbox({ className, ...props }: CheckboxProps) {
   return (

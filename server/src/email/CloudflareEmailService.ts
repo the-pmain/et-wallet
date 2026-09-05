@@ -13,14 +13,14 @@ const MISSING_EMAIL_MESSAGE =
   'CLOUDFLARE_API_TOKEN is a Global API Key (cfk_). Set CLOUDFLARE_EMAIL to the Cloudflare login email, or replace it with an API token (cfut_ / cfat_) that has Email Sending: Edit.'
 
 /**
- * Отправка через REST Cloudflare Email Sending.
+ * Send via Cloudflare Email Sending REST.
  *
- * ТОкен НЕ ПОПАДАЕТ В ЖУРНАЛ И В ОТВЕТ. Сообщение об отказе берётся
- * из поля `errors[].message`, которое Cloudflare публикует как
- * машинный код, а не как секрет.
+ * THE TOKEN DOES NOT REACH THE LOG OR THE RESPONSE. The refusal
+ * message is taken from `errors[].message`, which Cloudflare
+ * publishes as a machine code, not a secret.
  *
- * Глобальный ключ (`cfk_`) и API-токен (`cfut_` / `cfat_`) — разные
- * секреты. Bearer принимает только токен. Ключ идёт парой
+ * A global key (`cfk_`) and an API token (`cfut_` / `cfat_`) are
+ * different secrets. Bearer accepts only a token. The key goes as
  * `X-Auth-Email` + `X-Auth-Key`.
  */
 

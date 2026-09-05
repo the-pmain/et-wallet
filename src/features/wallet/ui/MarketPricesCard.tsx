@@ -5,7 +5,7 @@ import { appMarketCatalog, type IMarketCoin } from '@/core'
 import { UntrustedText } from '@/features/security'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Skeleton } from '@/shared/ui'
+import { Button, CABINET_SHEET, Card, CardContent, CardHeader, CardTitle, EmptyState, Skeleton } from '@/shared/ui'
 
 import {
   formatMarketChange,
@@ -15,16 +15,16 @@ import {
 } from '../lib/market-display'
 import { MarketCoinAvatar } from './MarketCoinAvatar'
 
-/** Сколько строк видно до «Show more». */
+/** How many rows are visible before "Show more". */
 export const MARKET_PREVIEW_COUNT = 8
 
 export type MarketPricesLoader = (signal: AbortSignal) => Promise<readonly IMarketCoin[]>
 
 interface MarketPricesCardProps {
   /**
-   * Подмена запроса. Боевой код её не передаёт: таблица читает снимок
-   * рынка, загруженный при открытии приложения. Тест подставляет ответ,
-   * чтобы не зависеть от общего каталога.
+   * Request override. Production does not pass it: the table reads the
+   * market snapshot loaded at app open. Tests inject a response so they
+   * do not depend on the shared catalog.
    */
   readonly loadMarkets?: MarketPricesLoader
 }
@@ -35,15 +35,15 @@ type MarketState =
   | { readonly status: 'failed' }
 
 /**
- * Публичная таблица курсов на главном экране.
+ * Public price table on the home screen.
  *
- * ЗАПРОС УХОДИТ ОДИН РАЗ ПРИ ОТКРЫТИИ ПРИЛОЖЕНИЯ. Это каталог рынка,
- * а не оценка портфеля: в нём нет адресов владельца. Согласие с экрана
- * портфеля сюда не относится.
+ * The request fires once at app open. This is a market catalog, not a
+ * portfolio valuation: it contains no owner addresses. Portfolio-screen
+ * consent does not apply here.
  *
- * КОЛОНКИ ГРАФИКА НЕТ. Источник умеет отдать ряд за семь дней, но на
- * экране он не рисуется: пользователь просил таблицу чисел, и чужие
- * картинки всё равно запрещены политикой безопасности.
+ * No chart column. The source can return a seven-day series, but it is
+ * not drawn: the user asked for a table of numbers, and foreign images
+ * are forbidden by the security policy.
  */
 export function MarketPricesCard({ loadMarkets }: MarketPricesCardProps = {}) {
   const { t } = useTranslation()
@@ -74,9 +74,9 @@ export function MarketPricesCard({ loadMarkets }: MarketPricesCardProps = {}) {
   const canShowMore = coins.length > visibleCount
 
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">
+    <Card className={cn('min-w-0 overflow-hidden', CABINET_SHEET)}>
+      <CardHeader className="max-lg:border-b max-lg:border-border max-lg:px-1 max-lg:pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground max-lg:text-sm max-lg:font-semibold max-lg:text-foreground">
           {t('dashboard.prices')}
         </CardTitle>
       </CardHeader>

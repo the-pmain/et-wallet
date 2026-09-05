@@ -17,7 +17,7 @@ const BITCOIN = {
 }
 
 describe('parseMarketList', () => {
-  it('забирает поля таблицы и отбрасывает картинку', () => {
+  it('takes table fields and drops the picture', () => {
     const [coin] = parseMarketList([BITCOIN])
 
     expect(coin).toEqual({
@@ -36,7 +36,7 @@ describe('parseMarketList', () => {
     expect(coin).not.toHaveProperty('image')
   })
 
-  it('пропускает битую запись и сохраняет соседние', () => {
+  it('skips a broken record and keeps the neighbours', () => {
     const coins = parseMarketList([
       BITCOIN,
       { id: 1, name: 'Broken' },
@@ -54,7 +54,7 @@ describe('parseMarketList', () => {
     expect(coins[1]?.change1hPercent).toBeNull()
   })
 
-  it('ставит порядковый номер, если ранга нет', () => {
+  it('assigns an ordinal if there is no rank', () => {
     const coins = parseMarketList([
       { id: 'a', symbol: 'a', name: 'A' },
       { id: 'b', symbol: 'b', name: 'B', market_cap_rank: -1 },
@@ -63,7 +63,7 @@ describe('parseMarketList', () => {
     expect(coins.map((coin) => coin.rank)).toEqual([1, 2])
   })
 
-  it('забирает ряд за семь дней и отбрасывает короткий', () => {
+  it('takes the seven-day series and drops a short one', () => {
     const [withLine, withoutLine] = parseMarketList([
       {
         ...BITCOIN,
@@ -80,7 +80,7 @@ describe('parseMarketList', () => {
     expect(withoutLine?.sparkline7d).toBeNull()
   })
 
-  it('отказывается от ответа, который не список', () => {
+  it('rejects a response that is not a list', () => {
     expect(() => parseMarketList({ error_code: 10010 })).toThrow(
       'The price source returned an unexpected response.',
     )

@@ -28,36 +28,34 @@ import type { IApprovalPage, IApprovalRecord } from './types'
 const SERVICE_NAME = 'ApprovalService'
 
 /**
- * Глубина выборки в блоках.
+ * Sample depth in blocks.
  *
- * То же значение, что у истории и коллекционных токенов: публичные узлы
- * ограничивают диапазон `eth_getLogs`, и десять тысяч блоков принимают
- * почти все.
+ * The same value as history and collectibles: public nodes cap the
+ * `eth_getLogs` range, and ten thousand blocks are accepted by almost
+ * all of them.
  */
 const DEFAULT_SCAN_BLOCKS = 10_000
 
 /**
- * Сколько разрешений проверяется на действительность.
+ * How many allowances are checked for being live.
  *
- * Каждая проверка — обращение к контракту. У активного адреса выдач
- * могут быть сотни; полная проверка исчерпала бы лимиты узла.
+ * Each check is a contract call. An active address may have hundreds
+ * of grants; a full check would exhaust the node's limits.
  */
 const MAX_CHECKED_ITEMS = 60
 
-/** Сколько проверок выполняется одновременно. */
 const BATCH_SIZE = 8
 
 /**
- * Порог, начиная с которого разрешение считается неограниченным.
+ * Threshold from which an allowance is treated as unlimited.
  *
- * Приложения запрашивают либо `uint256` целиком, либо близкие к нему
- * значения вроде `2^255`. Сравнение на точное равенство пропустило бы
- * второе, а разница между «весь баланс» и «почти весь баланс»
- * для владельца отсутствует.
+ * Apps request either the full `uint256` or nearby values such as
+ * `2^255`. An exact-equality comparison would miss the latter, and
+ * the difference between "the whole balance" and "almost the whole
+ * balance" does not exist for the owner.
  */
 const UNLIMITED_THRESHOLD = 1n << 200n
 
-/** Зависимости сервиса. */
 export interface IApprovalServiceDependencies {
   readonly resolver: IProviderResolver
   readonly networks: INetworkService
@@ -65,14 +63,12 @@ export interface IApprovalServiceDependencies {
   readonly scanBlocks?: number
 }
 
-/** Найденная выдача до проверки действительности. */
 interface ICandidate {
   readonly contract: Address
   readonly spender: Address
   readonly standard: TokenStandard
 }
 
-/** Итог выборки журналов вместе с числом отказов. */
 interface IScanResult {
   readonly logs: readonly ILogEntry[]
   readonly failed: number
@@ -81,19 +77,20 @@ interface IScanResult {
 }
 
 /**
- * Разрешения, выданные адресом.
+ * Allowances granted by an address.
  *
- * КАК ЭТО РАБОТАЕТ. Узел не хранит списка «кому что разрешено»: сервис
- * находит события выдачи в журналах, а затем спрашивает у каждого
- * контракта, действует ли разрешение СЕЙЧАС — `allowance` для токенов,
- * `isApprovedForAll` для коллекций.
+ * HOW IT WORKS. The node does not keep a "who is allowed what" list:
+ * the service finds grant events in the logs, then asks each contract
+ * whether the allowance is live NOW — `allowance` for tokens,
+ * `isApprovedForAll` for collections.
  *
- * ДВА ШАГА ОБЯЗАТЕЛЬНЫ. Журнал хранит историю: отозванное разрешение
- * остаётся в нём навсегда. Список по одним журналам пугал бы владельца
- * тем, чего давно нет, и обесценивал бы настоящие находки.
+ * BOTH STEPS ARE REQUIRED. The log stores history: a revoked
+ * allowance stays there forever. A list from the logs alone would
+ * scare the owner with what has long been gone, and devalue real
+ * findings.
  *
- * СЕРВИС НИЧЕГО НЕ ОТЗЫВАЕТ. Отзыв — транзакция, которую подписывает
- * владелец; её готовит транзакционный слой. Здесь только чтение.
+ * THE SERVICE REVOKES NOTHING. A revoke is a transaction the owner
+ * signs; the transaction layer prepares it. This is read-only.
  */
 export class ApprovalService {
   readonly #resolver: IProviderResolver
@@ -101,9 +98,9 @@ export class ApprovalService {
   readonly #logger: ILogger
   readonly #scanBlocks: number
 
-  /* Метаданные токенов живут до конца сессии: они не меняются.
-     Хранится обещание, а не результат: проверки идут параллельно,
-     и кэш с готовым значением не успел бы заполниться. */
+  /* Token metadata lives until the session ends: it does not
+     change. A promise is stored, not a result: checks run in
+     parallel, and a cache of finished values would not fill in time. */
   readonly #tokens = new Map<string, Promise<{ symbol: string | null; decimals: number | null }>>()
 
   constructor(dependencies: IApprovalServiceDependencies) {
@@ -114,12 +111,12 @@ export class ApprovalService {
   }
 
   /**
-   * Возвращает действующие разрешения владельца.
+   * Returns the owner's live allowances.
    *
-   * Отказ узла не выбрасывается наружу: список остаётся пустым,
-   * а причина попадает в `limits`. Пустой список без объяснения читается
-   * как «вы никому ничего не разрешали» — утверждение, которого кошелёк
-   * в этом случае делать не вправе.
+   * A node rejection is not thrown outward: the list stays empty
+   * and the reason goes into `limits`. An empty list without an
+   * explanation reads as "you have allowed nothing to anyone" —
+   * a claim the wallet is not entitled to make in that case.
    */
   async list(owner: Address, chainId: ChainId): Promise<IApprovalPage> {
     const network = this.#networks.getByChainId(chainId)
@@ -176,16 +173,16 @@ export class ApprovalService {
     }
   }
 
-  /** Забывает метаданные токенов. Вызывается при закрытии сессии. */
+  /** Forgets token metadata. Called when the session closes. */
   clear(): void {
     this.#tokens.clear()
   }
 
   /**
-   * Журналы выдач, где владелец — заданный адрес.
+   * Grant logs where the owner is the given address.
    *
-   * ДВА ЗАПРОСА, потому что события разные: у токенов `Approval`,
-   * у коллекций `ApprovalForAll`. Владелец в обоих индексирован первым.
+   * TWO REQUESTS, because the events differ: tokens use `Approval`,
+   * collections use `ApprovalForAll`. The owner is indexed first in both.
    */
   async #fetchApprovals(
     provider: IProvider,
@@ -224,7 +221,6 @@ export class ApprovalService {
     }
   }
 
-  /** Оставляет разрешения, действующие сейчас. */
   async #keepActive(
     provider: IProvider,
     owner: Address,
@@ -247,11 +243,11 @@ export class ApprovalService {
   }
 
   /**
-   * Превращает найденную выдачу в запись, если она ещё действует.
+   * Turns a found grant into a record if it is still live.
    *
-   * Отказ контракта означает «проверить не удалось», и запись
-   * отбрасывается: показать непроверенное как действующее — то же,
-   * что выдумать его.
+   * A contract reject means "could not check", and the record is
+   * dropped: showing an unchecked grant as live is the same as
+   * inventing it.
    */
   async #toRecord(
     provider: IProvider,
@@ -268,8 +264,8 @@ export class ApprovalService {
           }),
         )
 
-        /* Ноль означает, что разрешение отозвано либо израсходовано:
-           показывать его как действующее нельзя. */
+        /* Zero means the allowance was revoked or spent:
+           it must not be shown as live. */
         if (amount === 0n) {
           return null
         }
@@ -306,8 +302,8 @@ export class ApprovalService {
         contract: candidate.contract,
         spender: candidate.spender,
         standard: TOKEN_STANDARD.Erc721,
-        /* У разрешения на коллекцию количества нет: распоряжаться можно
-           всеми предметами, включая те, которых ещё нет. */
+        /* A collection allowance has no amount: every item can be
+           spent, including those not yet held. */
         amount: null,
         isUnlimited: true,
         symbol: token.symbol,
@@ -322,7 +318,6 @@ export class ApprovalService {
     }
   }
 
-  /** Символ и число знаков контракта. Читаются один раз на адрес. */
   #token(
     provider: IProvider,
     chainId: ChainId,
@@ -347,18 +342,18 @@ export class ApprovalService {
 }
 
 /**
- * Собирает выдачи из журналов, оставляя по одной на пару
- * «контракт + получатель разрешения».
+ * Collects grants from the logs, keeping one per pair
+ * "contract + spender".
  *
- * ПОСЛЕДНЯЯ ВЫДАЧА ОТМЕНЯЕТ ПРЕДЫДУЩИЕ: разрешение перезаписывается,
- * а не складывается. Действующее значение всё равно читается
- * из контракта, поэтому здесь важно лишь не проверять одну и ту же пару
- * дважды.
+ * THE LAST GRANT CANCELS THE PREVIOUS ONES: the allowance is
+ * overwritten, not added. The live value is still read from the
+ * contract, so the only thing that matters here is not checking
+ * the same pair twice.
  *
- * СОБЫТИЕ `Approval` С ЧЕТЫРЬМЯ ТЕМАМИ — ЭТО ERC-721: там индексирован
- * ещё и номер предмета. Разрешение на один предмет исчезает при первой
- * же передаче и в списке не нужно; включить его значило бы показывать
- * владельцу давно неактуальные записи.
+ * AN `Approval` EVENT WITH FOUR TOPICS IS ERC-721: the item id
+ * is indexed too. A single-item allowance vanishes on the first
+ * transfer and is not needed in the list; including it would
+ * show the owner long-stale records.
  */
 function collectCandidates(logs: readonly ILogEntry[]): readonly ICandidate[] {
   const seen = new Map<string, ICandidate>()
@@ -401,11 +396,10 @@ function collectCandidates(logs: readonly ILogEntry[]): readonly ICandidate[] {
 }
 
 /**
- * Читает строковое поле контракта.
+ * Reads a string field of the contract.
  *
- * `null` вместо выдуманного значения: символ не обязателен, а подставить
- * сюда «Неизвестный токен» значило бы утверждать, что контракт так
- * ответил.
+ * `null` instead of an invented value: the symbol is optional, and
+ * putting "Unknown token" here would claim the contract answered so.
  */
 async function readText(
   provider: IProvider,
@@ -420,11 +414,12 @@ async function readText(
 }
 
 /**
- * Читает число знаков.
+ * Reads the decimal count.
  *
- * `null` означает «неизвестно»: показать разрешение на 1000000 единиц
- * как «1 000 000 токенов» при шести знаках — ошибка на шесть порядков
- * в вопросе, где важна величина риска.
+ * `null` means "unknown": showing an allowance of 1000000 units
+ * as "1 000 000 tokens" when there are six decimals is an error
+ * of six orders of magnitude in a question where the size of
+ * the risk matters.
  */
 async function readDecimals(provider: IProvider, contract: Address): Promise<number | null> {
   try {

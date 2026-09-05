@@ -3,11 +3,11 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 /**
- * Подпись к полю формы.
+ * Form-field label.
  *
- * Реализована нативным `label`, а не компонентом Radix: единственное,
- * что даёт обёртка Radix, — связывание с полем, и оно достигается
- * атрибутом `htmlFor` без дополнительной зависимости.
+ * Built on a native `label`, not a Radix component: the only thing
+ * the Radix wrapper adds is field association, and that is done by
+ * `htmlFor` without an extra dependency.
  */
 export function Label({ className, ...props }: ComponentProps<'label'>) {
   return (

@@ -5,10 +5,11 @@ import { appMarketCatalog } from '@/core'
 import { appFiatRates } from '@/features/wallet/model/fiat-rates-cache'
 
 /**
- * Поднимает курсы рынка и фиата один раз при открытии приложения.
+ * Loads market and fiat rates once when the app opens.
  *
- * Карточки экрана только читают снимок. Без этого запроса каждая из них
- * ходила бы к CoinGecko отдельно — и упиралась в лимит ещё до показа.
+ * Screen cards only read the snapshot. Without this request each of
+ * them would hit CoinGecko separately — and hit the limit before
+ * anything is shown.
  */
 export function MarketDataBootstrap({ children }: { readonly children: ReactNode }) {
   useEffect(() => {

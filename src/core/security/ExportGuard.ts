@@ -17,34 +17,34 @@ import {
 } from './types'
 
 /**
- * Индекс аккаунта, которым подписываются транзакции.
+ * Index of the account that signs transactions.
  *
- * Соответствует `m/44'/60'/0'` и совпадает с поведением MetaMask, Trust
- * и прочих кошельков: восстановление фразы в любом из них даст те же адреса.
+ * Matches `m/44'/60'/0'` and MetaMask, Trust, and other wallets:
+ * restoring the phrase in any of them yields the same addresses.
  */
 export const SIGNING_ACCOUNT_INDEX = 0
 
 /**
- * Индекс аккаунта, зарезервированного под режим наблюдения.
+ * Index of the account reserved for watch-only use.
  *
- * СТРУКТУРНАЯ МЕРА ЗАЩИТЫ, а не соглашение об именовании.
+ * A STRUCTURAL DEFENCE, not a naming convention.
  *
- * Уровень аккаунта в BIP-44 закалён: шаг `m/44'/60' -> m/44'/60'/n'`
- * использует приватный ключ родителя, поэтому из расширенного публичного
- * ключа одного аккаунта невозможно получить ничего об остальных.
+ * The BIP-44 account level is hardened: the step
+ * `m/44'/60' -> m/44'/60'/n'` uses the parent's private key, so an
+ * extended public key of one account yields nothing about the others.
  *
- * Следствие: xpub, выданный из `m/44'/60'/1'`, не создаёт никакого риска
- * для подписывающего аккаунта `m/44'/60'/0'` — даже если получателю
- * когда-либо достанется приватный ключ адреса из аккаунта наблюдения.
- * Компрометация остаётся запертой внутри одного аккаунта.
+ * Consequence: an xpub from `m/44'/60'/1'` creates no risk for the
+ * signing account `m/44'/60'/0'` — even if the recipient later gets a
+ * private key of a watch-only address. Compromise stays locked inside
+ * one account.
  */
 export const WATCH_ONLY_ACCOUNT_INDEX = 1
 
 /**
- * Индекс аккаунта из области экспорта: `m/44'/60'/1'` -> 1.
+ * Account index from an export scope: `m/44'/60'/1'` -> 1.
  *
- * Для областей импортированных ключей возвращает `null`: они не принадлежат
- * никакому дереву, и понятие индекса аккаунта к ним неприменимо.
+ * Returns `null` for imported-key scopes: they belong to no tree, and
+ * an account index does not apply.
  */
 function extractAccountIndex(scope: ExportScope): number | null {
   if (!scope.startsWith('m/')) {
@@ -64,29 +64,30 @@ function extractAccountIndex(scope: ExportScope): number | null {
 }
 
 /**
- * Оценка риска и выдача разрешений на экспорт секретов.
+ * Risk assessment and permits for secret export.
  *
- * ЗАКРЫВАЕМАЯ ПРОБЛЕМА. Несмягчённая деривация BIP-32 устроена так, что
+ * THE PROBLEM BEING CLOSED. BIP-32 non-hardened derivation is
  *
  *     k_child = (IL + k_parent) mod n,
  *     IL = HMAC-SHA512(chainCode_parent, pubKey_parent || index)
  *
- * а расширенный публичный ключ содержит и `chainCode_parent`,
- * и `pubKey_parent`. Значит, обладая xpub родителя и приватным ключом
- * любого потомка, злоумышленник вычисляет
+ * and the extended public key holds both `chainCode_parent` and
+ * `pubKey_parent`. So anyone with the parent's xpub and any child's
+ * private key computes
  *
  *     k_parent = (k_child − IL) mod n
  *
- * и получает все адреса аккаунта. Устранить это математически нельзя:
- * закалённая деривация на уровнях `change` и `addressIndex` сделала бы
- * xpub бесполезным и, что важнее, сломала бы совместимость с BIP-44 —
- * seed-фраза перестала бы восстанавливаться в других кошельках.
+ * and gets every address of the account. This cannot be fixed in
+ * maths: hardened derivation at the `change` and `addressIndex`
+ * levels would make the xpub useless and, worse, break BIP-44
+ * compatibility — the seed phrase would no longer restore in other
+ * wallets.
  *
- * ЧТО ДЕЛАЕТ ЭТОТ КЛАСС. Опасность возникает только когда ОБА артефакта
- * попадают к одному получателю. Это состояние отслеживается и делается
- * видимым: экспорт, замыкающий пару, помечается уровнем
- * `AccountCompromise`, и разрешение на него не выдаётся, пока интерфейс
- * не подтвердит, что показал предупреждение именно этого уровня.
+ * WHAT THIS CLASS DOES. The danger exists only when BOTH artefacts
+ * reach the same recipient. That state is tracked and made visible:
+ * an export that closes the pair is marked `AccountCompromise`, and
+ * a permit is not issued until the UI confirms it showed a warning
+ * of exactly that level.
  */
 export class ExportGuard implements IExportGuard {
   readonly #auditLog: IExportAuditLog
@@ -109,8 +110,9 @@ export class ExportGuard implements IExportGuard {
         )
 
       case EXPORT_KIND.Xprv:
-        /* Расширенный приватный ключ уже даёт весь аккаунт. Замыкать
-           здесь нечего: компрометация полная независимо от истории. */
+        /* An extended private key already gives the whole account.
+           There is nothing to close here: compromise is complete
+           regardless of history. */
         return ExportGuard.#assessment(
           request,
           EXPORT_RISK.Critical,
@@ -130,9 +132,10 @@ export class ExportGuard implements IExportGuard {
   async confirm(request: IExportRequest, acknowledgedRisk: ExportRisk): Promise<ExportPermit> {
     const assessment = await this.assess(request)
 
-    /* Ключевая проверка. Интерфейс, показавший мягкое предупреждение
-       там, где требуется объяснение необратимых последствий, разрешения
-       не получит. Без этого шага оценка риска осталась бы декоративной. */
+    /* The key check. A UI that showed a soft warning where
+       irreversible consequences must be explained will not get a
+       permit. Without this step the risk assessment would be
+       decorative. */
     if (riskLevel(acknowledgedRisk) < riskLevel(assessment.risk)) {
       throw new ExportNotPermittedError(
         `the acknowledged risk level is "${acknowledgedRisk}", actual: "${assessment.risk}"`,
@@ -147,9 +150,9 @@ export class ExportGuard implements IExportGuard {
       at: this.#clock.now(),
     }
 
-    /* Запись до выдачи разрешения, а не после успешной выгрузки.
-       Лишняя запись приведёт к более строгому предупреждению в будущем,
-       пропущенная — к отсутствию предупреждения там, где оно необходимо. */
+    /* Write before issuing the permit, not after a successful dump.
+       An extra record leads to a stricter warning later; a missed one
+       leads to no warning where one is required. */
     await this.#auditLog.record(record)
 
     return ExportPermit.issue(request, assessment.risk, record.at)
@@ -163,8 +166,9 @@ export class ExportGuard implements IExportGuard {
     const xpubExported = await this.#auditLog.hasExported(request.scope, EXPORT_KIND.Xpub)
 
     if (xpubExported) {
-      /* Пара замыкается: xpub уже выдан, приватный ключ потомка выдаётся
-         сейчас. Получатель обоих вычисляет весь аккаунт. */
+      /* The pair closes: the xpub is already out, the child private
+         key is leaving now. The holder of both computes the whole
+         account. */
       return ExportGuard.#assessment(
         request,
         EXPORT_RISK.AccountCompromise,
@@ -174,8 +178,8 @@ export class ExportGuard implements IExportGuard {
       )
     }
 
-    /* xpub не выдавался. Риск повышенный, но не критический: выдача
-       приватного ключа сама по себе открывает только один адрес. */
+    /* No xpub has been exported. Risk is elevated, not critical:
+       a private key by itself opens only one address. */
     return ExportGuard.#assessment(
       request,
       EXPORT_RISK.Elevated,
@@ -204,9 +208,9 @@ export class ExportGuard implements IExportGuard {
     const accountIndex = extractAccountIndex(request.scope)
 
     if (accountIndex === SIGNING_ACCOUNT_INDEX) {
-      /* Пара ещё не замкнута, но аккаунт подписывающий: любой будущий
-         экспорт приватного ключа из него приведёт к компрометации.
-         Правильный выход — выдать xpub из аккаунта наблюдения. */
+      /* The pair is not closed yet, but this is the signing account:
+         any later private-key export from it would compromise it.
+         The right move is to export an xpub from the watch account. */
       return ExportGuard.#assessment(
         request,
         EXPORT_RISK.Elevated,
@@ -216,9 +220,9 @@ export class ExportGuard implements IExportGuard {
       )
     }
 
-    /* Отдельный аккаунт, приватные ключи из него не выдавались.
-       Уровень аккаунта закалён, поэтому подписывающий аккаунт
-       не затрагивается ни при каких обстоятельствах. */
+    /* A separate account, no private keys exported from it.
+       The account level is hardened, so the signing account is
+       untouched in every case. */
     return ExportGuard.#assessment(request, EXPORT_RISK.Low, EXPORT_RISK_REASON.None, false, false)
   }
 
@@ -233,16 +237,15 @@ export class ExportGuard implements IExportGuard {
   }
 }
 
-/** Удобный конструктор запроса на экспорт уровня аккаунта. */
 export function accountExportRequest(kind: ExportKind, scope: ExportScope): IExportRequest {
   return { kind, scope, addressIndex: null }
 }
 
 /**
- * Удобный конструктор запроса на экспорт приватного ключа.
+ * Convenience constructor for a private-key export request.
  *
- * `addressIndex` равен `null` для импортированных ключей: они не имеют
- * позиции в HD-дереве.
+ * `addressIndex` is `null` for imported keys: they have no position
+ * in the HD tree.
  */
 export function privateKeyExportRequest(
   scope: ExportScope,

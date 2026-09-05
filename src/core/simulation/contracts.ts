@@ -2,40 +2,41 @@ import type { ISimulationRequest, ISimulationResult } from '@/core/transaction'
 import type { ChainId } from '@/core/types'
 
 /**
- * Источник симуляции.
+ * Simulation source.
  *
- * ВОЗВРАЩАЕТ `null`, А НЕ ПУСТОЙ РЕЗУЛЬТАТ, КОГДА НЕ МОЖЕТ ОТВЕТИТЬ.
- * Это главное в этом интерфейсе. `ISimulationResult` с исходом
- * «выполнено» и пустым списком перемещений означает «транзакция
- * не двигает средства» — утверждение, а не молчание. Источник, который
- * не разобрал ответ, обязан промолчать и уступить следующему,
- * а не выдать это утверждение от своего имени.
+ * RETURNS `null`, NOT AN EMPTY RESULT, WHEN IT CANNOT ANSWER. That
+ * is the main point of this interface. An `ISimulationResult` with
+ * outcome "succeeded" and an empty movement list means "the
+ * transaction does not move funds" — an assertion, not silence. A
+ * source that did not parse the reply must stay silent and yield to
+ * the next one, not issue that assertion in its own name.
  *
- * Исход `Unavailable` внутри результата остаётся для случая, когда
- * ответить не смог НИКТО: его показывает экран.
+ * The `Unavailable` outcome inside a result remains for the case
+ * when NO ONE could answer: the screen shows it.
  */
 export interface ISimulationSource {
-  /** Устойчивое имя для журналов и настроек. */
+  /** Stable name for logs and settings. */
   readonly id: string
 
-  /** Имя для показа. Пользователь вправе знать, кого спрашивают. */
+  /** Display name. The user is entitled to know who is being asked. */
   readonly name: string
 
   /**
-   * Готов ли источник отвечать вообще.
+   * Whether the source is ready to answer at all.
    *
-   * СЕТЬ СЮДА НЕ ПЕРЕДАЁТСЯ НАМЕРЕННО. Перечень поддерживаемых сетей
-   * у стороннего сервиса меняется без предупреждения, и зашитый список
-   * устаревал бы молча — отключая источник там, где он работает.
-   * Неподдерживаемая сеть распознаётся по ответу, а это обычный отказ,
-   * после которого спрашивается узел.
+   * THE NETWORK IS NOT PASSED HERE ON PURPOSE. The list of
+   * supported networks at a third-party service changes without
+   * notice, and a baked-in list would go stale silently — turning
+   * the source off where it works. An unsupported network is
+   * recognised from the reply, and that is an ordinary refusal
+   * after which the node is asked.
    *
-   * Проверка отвечает на другой вопрос: настроен ли источник вообще —
-   * есть ли ключ и дано ли согласие. Она дешёвая и без обращения
-   * к сети.
+   * The check answers a different question: is the source
+   * configured at all — is there a key and was consent given. It is
+   * cheap and does not hit the network.
    */
   isAvailable(): boolean
 
-  /** `null` — ответить не смог; спрашивать следующего. */
+  /** `null` — could not answer; ask the next one. */
   simulate(request: ISimulationRequest, chainId: ChainId): Promise<ISimulationResult | null>
 }

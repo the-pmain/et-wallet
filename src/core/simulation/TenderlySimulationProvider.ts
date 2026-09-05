@@ -17,10 +17,10 @@ const SOURCE_NAME = 'Tenderly'
 
 const DEFAULT_BASE_URL = 'https://api.tenderly.co/api/v1'
 
-/** Предел ожидания ответа. Симуляция стоит между нажатием и подписью. */
+/** Reply wait limit. Simulation sits between the press and the signature. */
 const DEFAULT_TIMEOUT_MS = 8000
 
-/** Учётные данные Tenderly. Без любого из трёх источник не работает. */
+/** Tenderly credentials. Without any of the three the source does not work. */
 export interface ITenderlyCredentials {
   readonly account: string
   readonly project: string
@@ -36,26 +36,29 @@ export interface ITenderlyOptions {
 }
 
 /**
- * Симуляция через Tenderly.
+ * Simulation via Tenderly.
  *
- * ЧТО ЭТОТ ИСТОЧНИК ДОБАВЛЯЕТ К УЗЛУ. Узел отвечает журналами событий,
- * и перемещения приходится собирать из них самим: перевод эфира событий
- * не порождает вовсе, а токен без события `Transfer` в списке
- * не появится. Tenderly отдаёт разобранные изменения балансов, включая
- * нативную валюту и внутренние вызовы. Плюс он не отказывает
- * по частоте: измерено, что публичные шлюзы отвечают на `eth_simulateV1`
- * отказом `-32005`, а половина публичных узлов метода не знает вовсе.
+ * WHAT THIS SOURCE ADDS TO THE NODE. The node replies with event
+ * logs, and movements have to be assembled from them: an ether
+ * transfer produces no events at all, and a token without a
+ * `Transfer` event will not appear in the list. Tenderly returns
+ * parsed balance changes, including native currency and internal
+ * calls. Plus it does not refuse on rate: it has been measured that
+ * public gateways reply to `eth_simulateV1` with `-32005`, and half
+ * of public nodes do not know the method at all.
  *
- * ЧЕГО ЭТОТ ИСТОЧНИК СТОИТ. Каждый запрос сообщает оператору адрес
- * владельца, получателя, сумму и данные вызова — то есть намерение
- * потратить, ДО подписи. Это больше, чем узнаёт узел: узел видит
- * транзакцию, уже ушедшую в сеть, а здесь видно и то, от чего владелец
- * в итоге отказался. Поэтому источник включается только по явному
- * согласию и никогда не бывает включён по умолчанию.
+ * WHAT THIS SOURCE COSTS. Every request tells the operator the
+ * owner's address, the recipient, the amount, and the call data —
+ * that is, the intent to spend, BEFORE the signature. That is more
+ * than the node learns: the node sees a transaction already gone
+ * to the network, and here even what the owner eventually declined
+ * is visible. Therefore the source is turned on only by explicit
+ * consent and is never on by default.
  *
- * `save` И `save_if_fails` ВСЕГДА ЛОЖНЫ. По умолчанию сервис сохраняет
- * симуляцию в панели проекта — то есть намерения владельца оседали бы
- * на чужих серверах навсегда. Отправляется явное «не сохранять».
+ * `save` AND `save_if_fails` ARE ALWAYS FALSE. By default the
+ * service stores the simulation in the project panel — that is,
+ * the owner's intents would sit on someone else's servers forever.
+ * An explicit "do not save" is sent.
  */
 export class TenderlySimulationProvider implements ISimulationSource {
   readonly id = SOURCE_ID
@@ -76,12 +79,13 @@ export class TenderlySimulationProvider implements ISimulationSource {
   }
 
   /**
-   * Сети не перечисляются списком намеренно.
+   * Networks are not listed on purpose.
    *
-   * Tenderly поддерживает десятки сетей и добавляет новые; зашитый
-   * перечень устарел бы молча и отключал бы источник там, где он
-   * работает. Неподдерживаемая сеть распознаётся по ответу, и это
-   * обычный отказ — запасной путь через узел остаётся.
+   * Tenderly supports dozens of networks and adds new ones; a
+   * baked-in list would go stale silently and turn the source off
+   * where it works. An unsupported network is recognised from the
+   * reply, and that is an ordinary refusal — the fallback through
+   * the node remains.
    */
   isAvailable(): boolean {
     return (
@@ -109,8 +113,8 @@ export class TenderlySimulationProvider implements ISimulationSource {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          /* Ключ уходит заголовком, а не в строке запроса: строка
-             запроса оседает в журналах промежуточных узлов. */
+          /* The key goes in a header, not the query string: the
+             query string settles in intermediate-node logs. */
           'X-Access-Key': accessKey,
         },
         body: JSON.stringify({
@@ -146,21 +150,24 @@ export class TenderlySimulationProvider implements ISimulationSource {
 }
 
 /**
- * Разбирает ответ Tenderly.
+ * Parses a Tenderly reply.
  *
- * ФОРМА ОТВЕТА НЕ ИЗМЕРЕНА НА ЖИВОМ СЕРВИСЕ. Она взята из описания,
- * и в этом проекте так уже обжигались: псевдоадрес нативной валюты
- * пришлось мерить на живом узле, потому что реализации разошлись
- * с соглашением. Поэтому разбор строгий и при любой неожиданности
- * возвращает `null` — «ответить не смог», после чего спрашивается узел.
+ * THE REPLY SHAPE HAS NOT BEEN MEASURED ON THE LIVE SERVICE. It is
+ * taken from the description, and this project has already been
+ * burned that way: the native-currency pseudo-address had to be
+ * measured on a live node because implementations diverged from
+ * the convention. Therefore parsing is strict and on any surprise
+ * returns `null` — "could not answer", after which the node is
+ * asked.
  *
- * ЭТО НЕ ПЕРЕСТРАХОВКА. Мягкий разбор, пропускающий непонятое, выдал бы
- * «выполнено, перемещений нет» — а пустой список при успехе означает
- * «транзакция не двигает средства». Владелец прочитал бы это как
- * подтверждение безопасности вызова, который на деле выносит кошелёк.
+ * THIS IS NOT OVER-CAUTION. Soft parsing that skips the
+ * unrecognised would issue "succeeded, no movements" — and an
+ * empty list on success means "the transaction does not move
+ * funds". The owner would read that as a safety confirmation of a
+ * call that in fact empties the wallet.
  *
- * ПЕРВЫЙ ЖИВОЙ ОТВЕТ ОБЯЗАН БЫТЬ СВЕРЕН с этим разбором, и до тех пор
- * источник следует считать непроверенным.
+ * THE FIRST LIVE REPLY MUST BE CHECKED against this parser, and
+ * until then the source should be treated as unverified.
  */
 export function parseSimulation(payload: unknown): ISimulationResult | null {
   if (!isRecord(payload)) {
@@ -184,8 +191,8 @@ export function parseSimulation(payload: unknown): ISimulationResult | null {
     typeof simulation['error_message'] === 'string' ? simulation['error_message'] : null
 
   if (!status) {
-    /* Откат: перемещений не будет, и пустой список здесь означает
-       именно это, а не «разобрать не удалось». */
+    /* Revert: there will be no movements, and an empty list here
+       means exactly that, not "could not parse". */
     return {
       outcome: SIMULATION_OUTCOME.Reverted,
       gasUsed,
@@ -209,12 +216,12 @@ export function parseSimulation(payload: unknown): ISimulationResult | null {
 }
 
 /**
- * Читает изменения балансов.
+ * Reads balance changes.
  *
- * `null` — поле отсутствует либо устроено не так, как здесь ожидается.
- * Отсутствие поля НЕ равнозначно отсутствию перемещений: сервис мог
- * не прислать его по десятку причин, и выдать это за «средства
- * не двигаются» нельзя.
+ * `null` — the field is missing or is not shaped as expected here.
+ * A missing field is NOT the same as no movements: the service may
+ * have omitted it for a dozen reasons, and presenting that as
+ * "funds do not move" is not allowed.
  */
 function readMovements(payload: Record<string, unknown>): readonly IAssetMovement[] | null {
   const transaction = payload['transaction']
@@ -231,8 +238,8 @@ function readMovements(payload: Record<string, unknown>): readonly IAssetMovemen
 
   const changes = info['asset_changes']
 
-  /* Пустой массив — законный ответ: транзакция ничего не двигает.
-     Отсутствие поля — нет, это молчание. */
+  /* An empty array is a lawful reply: the transaction moves
+     nothing. A missing field is not — that is silence. */
   if (changes === null || changes === undefined) {
     return null
   }
@@ -281,15 +288,15 @@ function readMovement(change: unknown): IAssetMovement | null {
     contract: kind === MOVEMENT_KIND.Native ? null : contract,
     from,
     to,
-    /* `raw_amount` — количество в наименьших единицах. Поле `amount`
-       у того же изменения приходит дробным числом и для показа
-       не годится: кошелёк считает суммы целыми. */
+    /* `raw_amount` is the quantity in smallest units. The `amount`
+       field on the same change arrives as a fractional number and
+       is unfit for display: the wallet counts amounts as integers. */
     amount: readBigInt(change['raw_amount']),
     tokenId: readBigInt(change['token_id']),
   }
 }
 
-/** Соответствие видов. Неизвестный вид — повод промолчать, а не гадать. */
+/** Kind mapping. An unknown kind is a reason to stay silent, not to guess. */
 function readKind(standard: unknown, contract: Address | null): MovementKind | null {
   if (contract === null) {
     return MOVEMENT_KIND.Native
@@ -327,7 +334,7 @@ function readAddress(value: unknown): Address | null {
   }
 }
 
-/** Число приходит строкой. `null` — поля нет либо оно не число. */
+/** The number arrives as a string. `null` — no field, or it is not a number. */
 function readBigInt(value: unknown): bigint | null {
   if (typeof value === 'number' && Number.isSafeInteger(value)) {
     return BigInt(value)

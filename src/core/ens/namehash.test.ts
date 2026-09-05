@@ -5,14 +5,14 @@ import { toAddress } from '@/core/address'
 import { namehash, reverseNode } from './namehash'
 
 /**
- * Эталонные значения из текста EIP-137.
+ * Reference values from the EIP-137 text.
  *
- * Стандарт приводит их как проверочные для реализации namehash. Это
- * единственные константы здесь, записанные строкой: всё остальное
- * вычисляется. Их правильность подтверждена живым запросом к реестру
- * ENS — вызов `resolver(namehash('vitalik.eth'))` возвращает
- * действующий резолвер, а тот даёт адрес, который обратным разрешением
- * возвращает то же имя.
+ * The standard gives them as checks for a namehash implementation.
+ * These are the only constants here written as a string: everything
+ * else is computed. Their correctness was confirmed by a live call
+ * to the ENS registry — `resolver(namehash('vitalik.eth'))` returns
+ * a live resolver, and that resolver yields an address whose reverse
+ * lookup returns the same name.
  */
 const VECTORS: readonly { name: string; node: string }[] = [
   { name: '', node: `0x${'0'.repeat(64)}` },
@@ -20,31 +20,31 @@ const VECTORS: readonly { name: string; node: string }[] = [
 ]
 
 describe('namehash', () => {
-  it.each(VECTORS)('соответствует эталону EIP-137 для "$name"', ({ name, node }) => {
+  it.each(VECTORS)('matches the EIP-137 reference for "$name"', ({ name, node }) => {
     expect(namehash(name)).toBe(node)
   })
 
-  it('различает имена, отличающиеся регистром', () => {
-    /* Нормализация — задача отдельной функции. Хэш обязан оставаться
-       чувствительным к байтам: скрыв здесь разницу регистра, мы
-       спрятали бы и разницу между латинской и кириллической буквой. */
+  it('distinguishes names that differ in case', () => {
+    /* Normalisation is a separate function's job. The hash must
+       stay byte-sensitive: hiding a case difference here would
+       also hide the difference between a Latin and a Cyrillic letter. */
     expect(namehash('Vitalik.eth')).not.toBe(namehash('vitalik.eth'))
   })
 
-  it('вложенное имя не совпадает с родительским', () => {
+  it('a nested name does not match its parent', () => {
     expect(namehash('a.eth')).not.toBe(namehash('eth'))
   })
 
-  it('порядок меток значим', () => {
+  it('label order matters', () => {
     expect(namehash('a.b')).not.toBe(namehash('b.a'))
   })
 })
 
 describe('reverseNode', () => {
-  it('не зависит от регистра адреса', () => {
-    /* EIP-181 требует нижнего регистра. Адрес в записи EIP-55 дал бы
-       другой узел — и «обратной записи нет» у адреса, у которого она
-       есть. */
+  it('does not depend on address case', () => {
+    /* EIP-181 requires lowercase. An EIP-55 writing would yield
+       a different node — and "no reverse record" for an address
+       that has one. */
     const checksummed = toAddress('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
 
     expect(reverseNode(checksummed)).toBe(
@@ -52,7 +52,7 @@ describe('reverseNode', () => {
     )
   })
 
-  it('разные адреса дают разные узлы', () => {
+  it('different addresses yield different nodes', () => {
     const first = toAddress(`0x${'11'.repeat(20)}`)
     const second = toAddress(`0x${'22'.repeat(20)}`)
 

@@ -58,20 +58,20 @@ beforeEach(async () => {
 })
 
 describe('BalanceService.getNative', () => {
-  it('возвращает значение от узла', async () => {
+  it('returns the value from the node', async () => {
     const balance = await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     expect(balance.raw).toBe(1_000n)
     expect(balance.isStale).toBe(false)
   })
 
-  it('подставляет число знаков из конфигурации сети', async () => {
+  it('fills decimals from the network config', async () => {
     const balance = await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     expect(balance.decimals).toBe(18)
   })
 
-  it('не обращается к узлу повторно, пока значение свежее', async () => {
+  it('does not talk to the node again while the value is fresh', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     const createdAfterFirst = factory.createdCount
@@ -81,19 +81,19 @@ describe('BalanceService.getNative', () => {
     expect(factory.createdCount).toBe(createdAfterFirst)
   })
 
-  it('помечает устаревшее значение', async () => {
+  it('marks a stale value', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     clock.advance(FRESHNESS_MS + 1)
 
     const balance = await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
-    /* Устаревшее значение отдаётся, но помечается: решение об отправке
-       по нему приводит к отказу сети. */
+    /* The stale value is returned, but marked: a send decision
+       based on it leads to the network refusing. */
     expect(balance.isStale).toBe(true)
   })
 
-  it('различает адреса, записанные в разном регистре', async () => {
+  it('treats the same address in different case as one', async () => {
     const first = await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
     const lowercase = toAddress(OWNER.toLowerCase())
 
@@ -101,24 +101,25 @@ describe('BalanceService.getNative', () => {
 
     const second = await service.getNative(lowercase, BUILT_IN_CHAIN_ID.Ethereum)
 
-    /* Один адрес в разном написании обязан попасть в одну запись кэша:
-       иначе два виджета показали бы разные балансы одного счёта. */
+    /* One address in different spellings must hit the same cache
+       entry: otherwise two widgets would show different balances
+       of the same account. */
     expect(second.raw).toBe(first.raw)
   })
 
-  it('сообщает об отказе узла, а не возвращает ноль', async () => {
+  it('reports a node failure instead of returning zero', async () => {
     factory.configure({ unavailable: true })
 
     await expect(service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)).rejects.toThrow()
   })
 
-  it('отказывает для незарегистрированной сети', async () => {
+  it('fails for an unregistered network', async () => {
     await expect(service.getNative(OWNER, 999_999n as never)).rejects.toThrow()
   })
 })
 
 describe('BalanceService.getToken', () => {
-  it('возвращает баланс нативной валюты по ссылке без контракта', async () => {
+  it('returns the native balance for a reference with no contract', async () => {
     const balance = await service.getToken(OWNER, {
       chainId: BUILT_IN_CHAIN_ID.Ethereum,
       address: null,
@@ -127,9 +128,10 @@ describe('BalanceService.getToken', () => {
     expect(balance.raw).toBe(1_000n)
   })
 
-  it('отказывает по токену, когда сервис токенов не подключён', async () => {
-    /* Нулевой баланс — утверждение «токенов нет». Без сервиса токенов
-       кошелёк проверить это не может, и отказ честнее нуля. */
+  it('fails for a token when the token service is not wired', async () => {
+    /* A zero balance is the claim "there are no tokens". Without a
+       token service the wallet cannot check that, and a failure is
+       more honest than zero. */
     await expect(
       service.getToken(OWNER, { chainId: BUILT_IN_CHAIN_ID.Ethereum, address: TOKEN_ADDRESS }),
     ).rejects.toBeInstanceOf(NotImplementedError)
@@ -137,7 +139,7 @@ describe('BalanceService.getToken', () => {
 })
 
 describe('BalanceService.getAll', () => {
-  it('возвращает нативный баланс и пустой список токенов', async () => {
+  it('returns the native balance and an empty token list', async () => {
     const balances = await service.getAll(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     expect(balances.native.raw).toBe(1_000n)
@@ -146,7 +148,7 @@ describe('BalanceService.getAll', () => {
 })
 
 describe('BalanceService.refresh', () => {
-  it('запрашивает значение заново, минуя кэш', async () => {
+  it('re-fetches the value, bypassing the cache', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     factory.configure({ balance: 5_000n as Wei })
@@ -158,7 +160,7 @@ describe('BalanceService.refresh', () => {
 })
 
 describe('BalanceService.invalidate', () => {
-  it('сбрасывает кэш целиком', async () => {
+  it('clears the whole cache', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     service.invalidate()
@@ -167,7 +169,7 @@ describe('BalanceService.invalidate', () => {
     expect((await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)).raw).toBe(7_000n)
   })
 
-  it('сбрасывает кэш только указанной сети', async () => {
+  it('clears the cache of only the given network', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Polygon)
 
@@ -180,7 +182,7 @@ describe('BalanceService.invalidate', () => {
 })
 
 describe('BalanceService.subscribe', () => {
-  it('опрашивает узел по расписанию', async () => {
+  it('polls the node on a schedule', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     let updates = 0
@@ -196,7 +198,7 @@ describe('BalanceService.subscribe', () => {
     })
   })
 
-  it('прекращает опрос после отписки', async () => {
+  it('stops polling after unsubscribe', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     const unsubscribe = service.subscribe(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
@@ -213,7 +215,7 @@ describe('BalanceService.subscribe', () => {
     expect(updates).toBe(0)
   })
 
-  it('держит один таймер на нескольких подписчиков', async () => {
+  it('keeps one timer for several subscribers', async () => {
     await service.getNative(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
 
     const first = service.subscribe(OWNER, BUILT_IN_CHAIN_ID.Ethereum)
@@ -228,7 +230,7 @@ describe('BalanceService.subscribe', () => {
 
     clock.advance(30_000)
 
-    /* Отписка одного из двух не должна гасить опрос для второго. */
+    /* Unsubscribing one of two must not stop the poll for the other. */
     await vi.waitFor(() => {
       expect(updates).toBeGreaterThan(0)
     })

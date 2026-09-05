@@ -12,24 +12,23 @@ import {
 
 import type { IRemoteAssetToken, IRemoteAssets } from '../model/RemoteUserDirectory'
 
-/** Балансы из витрины `assets` и сводка по переданным курсам. */
 export interface IMappedRemoteAssets {
   readonly tokens: readonly ITokenAmount[]
   readonly portfolio: IPortfolioSummary
 }
 
 /**
- * Переносит витрину `users.assets` в то, что рисует список активов.
+ * Maps the `users.assets` showcase into what the asset list renders.
  *
- * КУРСЫ СЮДА ПРИХОДЯТ СНАРУЖИ. В записи нет цены: оценка считается
- * на клиенте. Без словаря котировок список всё равно показывает
- * остатки, а столбец долларов пуст.
+ * QUOTES ARRIVE FROM OUTSIDE. The record has no price: valuation is
+ * computed on the client. Without a quote map the list still shows
+ * balances, and the dollar column is empty.
  *
- * ПОРЯДОК СТРОК СОХРАНЯЕТСЯ. Сводка портфеля внутри себя сортирует
- * позиции по оценке — это её дело. Список показывает ровно то, что
- * лежит в записи, в том же порядке.
+ * ROW ORDER IS PRESERVED. The portfolio summary sorts positions by
+ * valuation internally — that is its concern. The list shows exactly
+ * what the record holds, in the same order.
  *
- * БИТАЯ СТРОКА ПРОПУСКАЕТСЯ, А НЕ РОНЯЕТ СПИСОК.
+ * A BROKEN ROW IS SKIPPED, NOT A CRASH OF THE LIST.
  */
 export function mapRemoteAssets(
   assets: IRemoteAssets,

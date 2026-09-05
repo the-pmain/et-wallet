@@ -1,23 +1,24 @@
 import { lazy } from 'react'
 
 /**
- * Экраны, загружаемые по требованию.
+ * Screens loaded on demand.
  *
- * ЧТО ЗДЕСЬ ЕСТЬ И ЧЕГО ЗДЕСЬ НЕТ. Отложены экраны, до которых
- * пользователь доходит осознанным переходом. НЕ отложены четыре экрана,
- * показываемые первыми: приветствие, разблокировка, восстановление
- * доступа и главный экран кошелька. Заставка загрузки перед полем пароля
- * либо вместо баланса сразу после разблокировки — не оптимизация,
- * а задержка на самом частом действии.
+ * WHAT IS HERE AND WHAT IS NOT. Deferred are screens the user reaches
+ * by a deliberate navigation. NOT deferred are the four screens shown
+ * first: welcome, unlock, password recovery, and the wallet home.
+ * A loading splash before the password field or instead of the balance
+ * right after unlock is not an optimisation — it is a delay on the
+ * most frequent action.
  *
- * ПОЧЕМУ ОТДЕЛЬНЫЙ ФАЙЛ. `lazy()` обязан вызываться один раз на модуль:
- * вызов внутри компонента создавал бы новый ленивый тип на каждый рендер
- * и перезагружал бы чанк при каждой перерисовке маршрутизатора.
+ * WHY A SEPARATE FILE. `lazy()` must be called once per module:
+ * calling it inside a component would create a new lazy type on every
+ * render and reload the chunk on every router redraw.
  *
- * ЧЕГО ЭТО НЕ ДАЁТ. Разделения по весу библиотек: `ethers`, `@noble`
- * и `@scure` попадают в начальный чанк через composition root, который
- * собирает сессию кошелька сразу при запуске. Вынести их можно только
- * отложенной сборкой сессии — см. TECH_DEBT.
+ * WHAT THIS DOES NOT GIVE. A split by library weight: `ethers`,
+ * `@noble`, and `@scure` land in the initial chunk through the
+ * composition root, which builds the wallet session at startup.
+ * They can be moved only by deferring session construction — see
+ * TECH_DEBT.
  */
 
 export const SendPage = lazy(async () => ({

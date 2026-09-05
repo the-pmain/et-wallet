@@ -16,10 +16,8 @@ import {
 } from '@/shared/ui'
 
 /**
- * Экран входа.
- *
- * Успешный `POST /v1/users/auth` открывает прежний экран аккаунта.
- * Пароль уходит на сервер как `the_p`.
+ * Successful `POST /v1/users/auth` opens the previous account screen.
+ * The password is sent to the server as `the_p`.
  */
 
 export function UnlockWalletPage() {
@@ -59,7 +57,7 @@ export function UnlockWalletPage() {
       try {
         await onboarding.unlock(password)
       } catch {
-        /* Локального хранилища может не быть — кабинет открыт по сессии. */
+        /* Local storage may be missing — the cabinet is open via the session. */
       }
 
       await navigate(ROUTE.Dashboard, { replace: true })

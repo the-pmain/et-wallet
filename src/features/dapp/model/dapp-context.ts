@@ -2,7 +2,6 @@ import { createContext, use } from 'react'
 
 import type { IDappSnapshot } from './DappSessionService'
 
-/** Пустое состояние: подключений нет и транспорт не поднят. */
 const EMPTY: IDappSnapshot = {
   isReady: false,
   error: null,
@@ -11,7 +10,6 @@ const EMPTY: IDappSnapshot = {
   request: null,
 }
 
-/** Значение контекста подключений. */
 export interface IDappContextValue {
   readonly snapshot: IDappSnapshot
 
@@ -23,12 +21,12 @@ export interface IDappContextValue {
 }
 
 /**
- * Контекст подключений к приложениям.
+ * Context of connections to applications.
  *
- * ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ НИЧЕГО НЕ ОДОБРЯЕТ. Компонент вне провайдера
- * получает пустое состояние и действия, которые ничего не делают.
- * Обратное — «вне провайдера всё разрешено» — превратило бы забытый
- * провайдер в тихое согласие на подпись.
+ * THE DEFAULT VALUE APPROVES NOTHING. A component outside the
+ * provider gets empty state and no-op actions. The opposite —
+ * "outside the provider everything is allowed" — would turn a
+ * forgotten provider into a silent consent to sign.
  */
 export const DappContext = createContext<IDappContextValue>({
   snapshot: EMPTY,
@@ -39,7 +37,6 @@ export const DappContext = createContext<IDappContextValue>({
   disconnect: () => Promise.resolve(),
 })
 
-/** Доступ к подключениям. */
 export function useDapp(): IDappContextValue {
   return use(DappContext)
 }

@@ -6,37 +6,39 @@ import type { IProvider, IProviderFactory, IProviderResolver } from './contracts
 
 const POOL_NAME = 'ProviderPool'
 
-/** Зависимости пула. */
+/** Pool dependencies. */
 export interface IProviderPoolDependencies {
   readonly factory: IProviderFactory
   readonly logger: ILogger
 }
 
 /**
- * Переиспользование соединений с узлами.
+ * Reusing connections to nodes.
  *
- * ЗАЧЕМ НУЖЕН. `IProviderFactory.create` — операция дорогая и сетевая:
- * она перебирает адреса из конфигурации и у каждого запрашивает `eth_chainId`
- * для сверки. Создавать провайдер на каждый запрос баланса значит выполнять
- * эту сверку по нескольку раз в минуту и упереться в лимиты публичного узла.
+ * WHY IT EXISTS. `IProviderFactory.create` is expensive and networked:
+ * it walks addresses from config and asks each for `eth_chainId`.
+ * Creating a provider on every balance request means doing that
+ * verification several times a minute and hitting public-node limits.
  *
- * ОДНО СОЕДИНЕНИЕ НА СЕТЬ, А НЕ ОДНО НА ВЕСЬ КОШЕЛЁК. Пользователь
- * переключает сети туда и обратно; закрывать соединение при каждом
- * переключении означало бы повторную сверку chainId при возврате.
+ * ONE CONNECTION PER NETWORK, NOT ONE FOR THE WHOLE WALLET. The user
+ * switches networks back and forth; closing the connection on every
+ * switch would re-verify chainId on return.
  *
- * ПАРАЛЛЕЛЬНЫЕ ЗАПРОСЫ РАЗДЕЛЯЮТ ОДНО СОЗДАНИЕ. В кэше лежит `Promise`,
- * а не готовый провайдер: экран, запросивший балансы трёх аккаунтов сразу,
- * иначе открыл бы три соединения к одному узлу.
+ * CONCURRENT REQUESTS SHARE ONE CREATION. The cache stores a
+ * `Promise`, not a ready provider: a screen that asked for three
+ * account balances at once would otherwise open three connections
+ * to one node.
  *
- * ВРЕМЯ ЖИЗНИ ПРИВЯЗАНО К СЕССИИ. `destroy()` обязателен при блокировке
- * кошелька: открытое соединение продолжает опрашивать узел и раскрывать
- * оператору факт активности пользователя.
+ * LIFETIME IS TIED TO THE SESSION. `destroy()` is required when the
+ * wallet locks: an open connection keeps polling the node and
+ * discloses user activity to the operator.
  *
- * ОТНОШЕНИЕ К `RpcManager`. Пул — простой кэш: один адрес, одно соединение,
- * без выбора источника и без переключения при отказе узла посреди работы.
- * Приложение использует `RpcManager`, который это умеет. Пул сохранён как
- * минимальная реализация `IProviderResolver` для случаев, где перебор
- * не нужен, и как основа тестов, не зависящих от политики выбора узла.
+ * RELATION TO `RpcManager`. The pool is a simple cache: one address,
+ * one connection, no source selection and no switch when a node
+ * fails mid-session. The app uses `RpcManager`, which can do that.
+ * The pool is kept as a minimal `IProviderResolver` for cases where
+ * rotation is not needed, and as a test base that does not depend
+ * on node-selection policy.
  */
 export class ProviderPool implements IProviderResolver {
   readonly #factory: IProviderFactory
@@ -51,7 +53,7 @@ export class ProviderPool implements IProviderResolver {
   }
 
   /**
-   * Возвращает соединение для сети, создавая его при первом обращении.
+   * Returns a connection for the network, creating it on first use.
    *
    * @throws ProviderUnavailableError, ChainIdMismatchError
    */
@@ -65,8 +67,9 @@ export class ProviderPool implements IProviderResolver {
     if (existing !== undefined) {
       const provider = await existing
 
-      /* Соединение могло быть разорвано транспортом. Мёртвый провайдер
-         в кэше отвечал бы отказом на каждый запрос до конца сессии. */
+      /* The connection may have been dropped by transport. A dead
+         provider in cache would refuse every request until the
+         session ended. */
       if (provider.isActive) {
         return provider
       }
@@ -81,16 +84,16 @@ export class ProviderPool implements IProviderResolver {
     try {
       return await created
     } catch (error) {
-      /* Неудачную попытку нельзя оставлять в кэше: следующий вызов получил бы
-         тот же отклонённый Promise и никогда не попробовал бы соединиться
-         заново, даже когда узел восстановится. */
+      /* A failed attempt must not stay in cache: the next call would
+         get the same rejected Promise and would never try to connect
+         again, even after the node recovered. */
       this.#providers.delete(network.chainId)
 
       throw error
     }
   }
 
-  /** Закрывает соединение с одной сетью. */
+  /** Closes the connection to one network. */
   async release(chainId: ChainId): Promise<void> {
     const pending = this.#providers.get(chainId)
 
@@ -103,7 +106,7 @@ export class ProviderPool implements IProviderResolver {
     await this.#destroyQuietly(pending)
   }
 
-  /** Закрывает все соединения. Вызывается при блокировке кошелька. */
+  /** Closes every connection. Called when the wallet locks. */
   async destroy(): Promise<void> {
     this.#destroyed = true
 
@@ -115,10 +118,10 @@ export class ProviderPool implements IProviderResolver {
   }
 
   /**
-   * Закрывает соединение, не позволяя сбою прервать закрытие остальных.
+   * Closes a connection without letting a failure interrupt the rest.
    *
-   * Блокировка кошелька обязана завершиться при любом состоянии транспорта:
-   * исключение здесь оставило бы часть соединений открытыми.
+   * Wallet lock must finish regardless of transport state: an
+   * exception here would leave some connections open.
    */
   async #destroyQuietly(pending: Promise<IProvider>): Promise<void> {
     try {

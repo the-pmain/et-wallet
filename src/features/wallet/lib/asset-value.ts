@@ -8,24 +8,22 @@ import {
 } from '@/core'
 
 /**
- * Оценка показанных величин в долларах.
+ * Dollar estimates of displayed amounts.
  *
- * ВСЕ ВЕЛИЧИНЫ ЗДЕСЬ — ОЦЕНОЧНЫЕ И ИДУТ ТОЛЬКО НА ЭКРАН. Они получены
- * умножением баланса на курс стороннего сервиса. Ни одна из них
- * не участвует в формировании транзакции: суммы, которые подписываются,
- * считаются целыми числами в минимальных единицах.
+ * Every figure here is an estimate and is for the screen only. They
+ * come from balance × a third-party rate. None of them enter a
+ * transaction: signed amounts are integers in smallest units.
  */
 
 /**
- * Находит котировку актива в сводке портфеля.
+ * Find an asset quote in the portfolio summary.
  *
- * СЕТЬ СВЕРЯЕТСЯ. При переключении сети балансы и сводка обновляются
- * не одновременно, и есть промежуток, в котором сводка ещё от прежней
- * сети. Без сверки баланс в BNB оказался бы оценён по курсу эфира,
- * то есть завышен в сотни раз.
+ * The chain is matched. Balances and the summary do not update at the
+ * same time when switching networks, so there is a window where the
+ * summary is still the previous chain. Without a match, a BNB balance
+ * would be valued at the ether rate — hundreds of times too high.
  *
- * `null` в адресе означает нативную валюту: контракта у неё нет
- * по устройству сети.
+ * `null` address means native currency: it has no contract by design.
  */
 export function findQuote(
   portfolio: IPortfolioSummary | null,
@@ -44,25 +42,21 @@ export function findQuote(
 }
 
 /**
- * Оценка количества по котировке.
+ * Value a quantity from a quote.
  *
- * СЧИТАЕТСЯ ОТ ПОКАЗАННОГО КОЛИЧЕСТВА, А НЕ БЕРЁТСЯ ГОТОВОЙ ИЗ ПОЗИЦИИ.
- * В сводке портфеля у каждой позиции уже лежит `value`, и взять его
- * было бы короче. Но балансы обновляются отдельно от курсов: после
- * такого обновления готовая оценка описывала бы прежнее количество.
- * Рядом с числом стояла бы цена другого числа — и заметить это
- * неоткуда.
+ * Computed from the displayed quantity, not taken ready-made from the
+ * position. The summary already has `value` per position, but balances
+ * update separately from rates: after a refresh that ready value would
+ * describe the previous quantity sitting next to a new one.
  *
- * Поэтому из сводки берётся только курс, а умножается на него ровно
- * та величина, которая выведена на экран. Курс при этом может быть
- * устаревшим — это свойство любых курсов, оно оговорено словом
- * «примерно» и показано временем котировки. Несовпадение количества
- * с его ценой свойством не является.
+ * So only the rate is taken from the summary and multiplied by exactly
+ * the figure on screen. The rate may be stale — that is what "approx"
+ * and the quote time are for. A quantity priced as another quantity
+ * is not the same kind of property.
  *
- * `null` — оценки нет: неизвестно количество либо курс. Ноль сюда
- * не подставляется никогда: «стоимость неизвестна» и «стоит ноль» —
- * разные утверждения, и второе, показанное вместо первого, читается
- * владельцем как пропажа.
+ * `null` means no estimate: quantity or rate unknown. Zero is never
+ * substituted: "value unknown" and "worth zero" are different claims,
+ * and the second in place of the first reads as funds gone.
  */
 export function estimateValue(
   balance: bigint | null,
@@ -77,11 +71,10 @@ export function estimateValue(
 }
 
 /**
- * Оценка показанного баланса нативной валюты.
+ * Estimate of the displayed native-currency balance.
  *
- * Отдельная функция, потому что баланс нативной валюты приходит
- * не из списка токенов, а собственным полем снимка — со своей сетью
- * и своим числом знаков.
+ * Separate because native balance arrives as its own snapshot field,
+ * not from the token list — with its own chain and decimals.
  */
 export function estimateNativeValue(
   balance: IBalance | null,

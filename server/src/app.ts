@@ -26,10 +26,10 @@ import { USERS_STORE_KIND, type IUsersRepository, type UsersStoreKind } from './
 import { UsersDatabaseError } from './users/SupabaseRestUsersRepository.ts'
 
 /**
- * Зависимости приложения.
+ * Application dependencies.
  *
- * Внедряются, а не создаются внутри: тест обязан уметь подставить
- * свой каталог и своё хранилище, не поднимая ни сети, ни базы.
+ * Injected, not created inside: a test must be able to supply its own
+ * catalog and store without bringing up a network or a database.
  */
 export interface IAppDependencies {
   readonly config: IServerConfig
@@ -43,16 +43,15 @@ export interface IAppDependencies {
 }
 
 /**
- * Поля запроса, попадающие в журнал.
+ * Request fields that go into the log.
  *
- * ПЕРЕЧЕНЬ РАЗРЕШАЮЩИЙ, А НЕ ЗАПРЕЩАЮЩИЙ. Список того, что скрывать,
- * приходится пополнять при каждом новом поле, и однажды кто-нибудь
- * забудет. Список того, что записывать, при появлении нового поля
- * просто не растёт.
+ * ALLOW-LIST, NOT DENY-LIST. A hide-list must grow with every new field,
+ * and someone will forget. An allow-list does not grow when a new field
+ * appears.
  *
- * ТЕЛА ЗАПРОСОВ НЕ ЖУРНАЛИРУЮТСЯ ВООБЩЕ. Единственное тело в сервисе —
- * шифротекст настроек; журнал, полный чужих шифротекстов, ничем
- * не помогает и остаётся мишенью.
+ * REQUEST BODIES ARE NEVER LOGGED. The only body in the service is
+ * settings ciphertext; a log full of other people's ciphertext helps
+ * nobody and remains a target.
  */
 function requestSerializer(request: {
   readonly method: string
@@ -61,19 +60,19 @@ function requestSerializer(request: {
 }) {
   return {
     method: request.method,
-    /* Записывается шаблон маршрута, а не конкретный адрес: путь
-       синхронизации содержит идентификатор, а он — ключ-предъявитель.
-       Идентификатор в журнале равносилен розданному ключу. */
+    /* Log the route template, not the concrete URL: the sync path
+       contains an identifier, and that identifier is a bearer key.
+       An identifier in the log is a leaked key. */
     route: request.routeOptions?.url ?? request.url.split('?')[0],
   }
 }
 
 /**
- * Собирает приложение.
+ * Builds the application.
  *
- * ПОРЯДОК РЕГИСТРАЦИИ ЗНАЧИМ. Защитная обвязка и охранник входящих
- * данных встают до маршрутов: иначе запрос успел бы дойти до обработчика
- * раньше проверки.
+ * REGISTRATION ORDER MATTERS. Security wrapping and the inbound-data
+ * guard go on before routes: otherwise a request could reach a handler
+ * before the check.
  */
 export async function buildApp(dependencies: IAppDependencies): Promise<FastifyInstance> {
   const { config } = dependencies
@@ -86,22 +85,22 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
     bodyLimit: config.maxBodyBytes,
     ajv: {
       customOptions: {
-        /* Fastify по умолчанию ВЫРЕЗАЕТ поля, не описанные схемой,
-           и продолжает обработку. Для этого сервиса такое поведение
-           недопустимо: клиент, отправивший лишнее поле, получил бы
-           ответ «принято» и решил, что сервис его понял. Запрос,
-           не соответствующий схеме, обязан быть отвергнут целиком. */
+        /* Fastify by default STRIPS fields not described by the schema
+           and continues. That is unacceptable here: a client that sent
+           an extra field would get "accepted" and assume the service
+           understood it. A request that does not match the schema must
+           be rejected whole. */
         removeAdditional: false,
 
-        /* Приведение типов так же молча меняет смысл: строка «0»
-           превратилась бы в число, а номер версии записи — величина,
-           от которой зависит, будут ли затёрты чужие изменения. */
+        /* Type coercion also silently changes meaning: the string "0"
+           would become a number, and the record revision is the value
+           that decides whether someone else's changes get overwritten. */
         coerceTypes: false,
       },
     },
-    /* Идентификатор запроса не выводится из адреса клиента: он попадает
-       в ответ, а адрес пользователя в ответе — это сведения о нём,
-       разосланные всем, кто ответ увидит. */
+    /* Request id is not derived from the client address: it goes into
+       the response, and a user's address in the response is information
+       about them, sent to everyone who sees the response. */
     genReqId: () => crypto.randomUUID(),
     trustProxy: config.mode === RUNTIME_MODE.Production,
   })
@@ -109,8 +108,8 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   await registerSecurity(app, config)
   registerSecretGuard(app)
 
-  /* Каталог проверяется в конструкторе: сервис с испорченным каталогом
-     обязан не подняться, а не начать раздавать неверные адреса. */
+  /* The catalog is checked in the constructor: a service with a corrupt
+     catalog must not start, not begin serving wrong addresses. */
   const catalog = dependencies.catalog ?? new CatalogService()
   const settings = dependencies.settings ?? new MemorySettingsRepository()
   const users = dependencies.users ?? new MemoryUsersRepository()
@@ -139,8 +138,8 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
       return
     }
 
-    /* Отказ проверки схемы — ошибка клиента. В журнал — имена полей
-       и код Ajv, не значения: среди полей есть `the_p`. */
+    /* Schema rejection is a client error. Log field names and the Ajv
+       code, not values: `the_p` is among the fields. */
     if (error.validation !== undefined) {
       const keys = bodyKeys(request.body)
 
@@ -154,13 +153,13 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
             params: item.params,
           })),
         },
-        'Тело запроса не прошло схему',
+        'Request body failed the schema',
       )
 
       void reply.status(400).send({
         error: {
           code: 'invalid_request',
-          message: 'Запрос не соответствует схеме.',
+          message: 'The request does not match the schema.',
           ...(config.mode === RUNTIME_MODE.Development ? { receivedFields: keys } : {}),
         },
       })
@@ -168,13 +167,13 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
       return
     }
 
-    /* Всё остальное наружу не выходит. Сообщение неожиданной ошибки
-       содержит пути файлов и имена внутренних модулей: это помогает
-       нападающему и ничем не помогает пользователю. */
-    request.log.error({ err: error }, 'Необработанная ошибка')
+    /* Everything else stays inside. An unexpected error message contains
+       file paths and internal module names: that helps an attacker and
+       does not help the user. */
+    request.log.error({ err: error }, 'Unhandled error')
 
     void reply.status(500).send({
-      error: { code: 'internal_error', message: 'Внутренняя ошибка сервиса.' },
+      error: { code: 'internal_error', message: 'Internal service error.' },
     })
   })
 
@@ -209,17 +208,17 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
     }
 
     void reply.status(404).send({
-      error: { code: 'not_found', message: 'Маршрут не существует.' },
+      error: { code: 'not_found', message: 'The route does not exist.' },
     })
   })
 
-  /* Экземпляр Fastify — thenable: ожидание его завершает регистрацию
-     плагинов. Явное `await` делает это видимым, а не полагается на то,
-     что возврат из async-функции сделает то же самое неявно. */
+  /* A Fastify instance is thenable: awaiting it finishes plugin
+     registration. An explicit `await` makes that visible instead of
+     relying on returning from an async function to do the same implicitly. */
   return await app
 }
 
-/** Имена полей тела без значений — чтобы `the_p` не попал в ответ и журнал. */
+/** Body field names without values — so `the_p` does not reach the response or the log. */
 function bodyKeys(body: unknown): readonly string[] {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return []

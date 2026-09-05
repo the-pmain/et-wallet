@@ -17,10 +17,6 @@ import {
   CardTitle,
 } from '@/shared/ui'
 
-/**
- * Первый экран: вход в систему по `email` и `the_p`,
- * либо создание локального кошелька.
- */
 export function WelcomePage() {
   const { t } = useTranslation()
   const session = useDirectorySession()
@@ -51,7 +47,7 @@ export function WelcomePage() {
       try {
         await onboarding.unlock(password)
       } catch {
-        /* Локального хранилища может не быть — кабинет открыт по сессии. */
+        /* Local storage may be missing — the cabinet is open via the session. */
       }
 
       await navigate(ROUTE.Dashboard, { replace: true })

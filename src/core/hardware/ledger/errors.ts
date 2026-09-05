@@ -2,30 +2,29 @@ import { AppError, ERROR_CODE } from '@/core/errors'
 import type { ErrorCode } from '@/core/errors'
 
 /**
- * Отказ пользователя на экране устройства.
+ * User rejection on the device screen.
  *
- * Вынесен в постоянную, потому что сравнивается: отказ человека —
- * не сбой, и показывать его как ошибку неправильно.
+ * Lifted into a constant because it is compared: a person's refusal
+ * is not a fault, and showing it as an error is wrong.
  */
 export const USER_REJECTED_ON_DEVICE = 'the operation was rejected on the device'
 
 /**
- * Устройство не выполнило операцию.
+ * The device did not perform the operation.
  *
- * ПРИЧИНА ХРАНИТСЯ СЛОВАМИ, А НЕ КОДОМ. У отказов устройства разные
- * последствия: заблокированный экран требует ввести PIN, закрытое
- * приложение — открыть его, отказ человека — вообще ничего.
- * Свести их к «устройство недоступно» значит заставить искать причину
- * наугад.
+ * THE REASON IS STORED IN WORDS, NOT A CODE. Device refusals have
+ * different consequences: a locked screen needs a PIN, a closed
+ * application needs to be opened, a person's refusal needs nothing.
+ * Collapsing them to "device unavailable" forces guessing the cause.
  */
 export class HardwareDeviceError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.KeyringCannotSign
 
   /**
-   * Операция отклонена человеком, а не устройством.
+   * The operation was declined by a person, not by the device.
    *
-   * Различие видно в интерфейсе: отказ показывается спокойно,
-   * а не как поломка.
+   * The distinction is visible in the UI: a refusal is shown calmly,
+   * not as a breakage.
    */
   readonly isUserRejection: boolean
 

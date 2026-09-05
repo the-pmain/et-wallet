@@ -10,21 +10,20 @@ import {
 import type { Address, HexString, Wei } from '@/core/types'
 
 /**
- * Признак стандартной причины отката: `Error(string)`.
+ * Marker of the standard revert reason: `Error(string)`.
  *
- * Задан в Solidity и возвращается любым `require` со строкой.
+ * Defined in Solidity and returned by any `require` with a string.
  */
 const ERROR_STRING_SELECTOR = functionSelector('Error(string)')
 
-/** Признак внутренней ошибки времени выполнения: `Panic(uint256)`. */
 const PANIC_SELECTOR = functionSelector('Panic(uint256)')
 
 /**
- * Значения кода паники.
+ * Panic-code values.
  *
- * Взяты из документации Solidity. Переводятся в слова, потому что
- * «паника 0x11» не говорит владельцу средств ничего, а «переполнение
- * при вычислении» указывает на сумму, которую он ввёл.
+ * Taken from the Solidity docs. Translated into words, because
+ * "panic 0x11" tells the funds owner nothing, while "an arithmetic
+ * operation overflowed" points at the amount they typed.
  */
 const PANIC_REASONS: ReadonlyMap<bigint, string> = new Map([
   [0x01n, 'an assertion inside the contract failed'],
@@ -39,13 +38,13 @@ const PANIC_REASONS: ReadonlyMap<bigint, string> = new Map([
 ])
 
 /**
- * Вызовы, чей отказ выражается возвращённым значением, а не откатом.
+ * Calls whose rejection is a returned value, not a revert.
  *
- * ЭТО НЕ ТЕОРЕТИЧЕСКИЙ СЛУЧАЙ. Стандарт ERC-20 предписывает `transfer`
- * возвращать признак успеха, и часть контрактов при нехватке средств
- * либо запрете возвращает `false` вместо отката. Транзакция при этом
- * попадает в блок и выглядит выполненной: газ списан, состояние
- * не изменилось, а кошелёк рапортует об отправке.
+ * THIS IS NOT A THEORETICAL CASE. ERC-20 requires `transfer` to
+ * return a success flag, and some contracts return `false` on
+ * insufficient funds or a ban instead of reverting. The transaction
+ * then lands in a block and looks done: gas was spent, state did
+ * not change, and the wallet reports a send.
  */
 const BOOLEAN_RESULT_SELECTORS: ReadonlySet<string> = new Set([
   functionSelector('transfer(address,uint256)'),
@@ -53,60 +52,58 @@ const BOOLEAN_RESULT_SELECTORS: ReadonlySet<string> = new Set([
   functionSelector('approve(address,uint256)'),
 ])
 
-/** Чем закончился предварительный прогон. */
+/** How the preflight run ended. */
 export const PREFLIGHT_OUTCOME = {
-  /** Узел выполнил вызов на текущем состоянии без отката. */
+  /** The node ran the call on current state without a revert. */
   Passed: 'passed',
 
-  /** Вызов завершился откатом: отправлять его — сжечь газ впустую. */
+  /** The call reverted: sending it would burn gas for nothing. */
   Reverted: 'reverted',
 
   /**
-   * Контракт отказал возвращённым значением, не откатывая вызов.
+   * The contract rejected with a returned value, without reverting.
    *
-   * Опаснее отката: транзакция попадёт в блок и будет выглядеть
-   * выполненной.
+   * More dangerous than a revert: the transaction will land in a
+   * block and look done.
    */
   RejectedByContract: 'rejected-by-contract',
 
   /**
-   * Проверить не удалось.
+   * Could not check.
    *
-   * ОТЛИЧАТЬ ОТ УСПЕХА ОБЯЗАТЕЛЬНО. Недоступный узел не подтверждает
-   * ничего, и выдать его молчание за «проверено» значило бы поставить
-   * подпись под непроверенным вызовом.
+   * DISTINGUISHING FROM SUCCESS IS REQUIRED. An unreachable node
+   * confirms nothing, and treating its silence as "checked" would
+   * put a signature under an unchecked call.
    */
   Unavailable: 'unavailable',
 } as const
 
 export type PreflightOutcome = (typeof PREFLIGHT_OUTCOME)[keyof typeof PREFLIGHT_OUTCOME]
 
-/** Итог предварительного прогона. */
 export interface IPreflightResult {
   readonly outcome: PreflightOutcome
 
   /**
-   * Причина отказа словами. `null` — причина неизвестна.
+   * Rejection reason in words. `null` — the reason is unknown.
    *
-   * Приходит от контракта и показывается дословно.
+   * Comes from the contract and is shown verbatim.
    */
   readonly reason: string | null
 
   /**
-   * Сырые данные отката.
+   * Raw revert data.
    *
-   * Нужны, когда причину разобрать нельзя: собственная ошибка
-   * контракта — четырёхбайтовый признак, по которому можно найти
-   * описание, тогда как фраза «вызов отклонён» не даёт ничего.
+   * Needed when the reason cannot be parsed: a custom contract
+   * error is a four-byte marker that can be looked up, while
+   * "the call was rejected" says nothing.
    */
   readonly revertData: string | null
 }
 
-/** Что проверяется. */
 export interface IPreflightRequest {
   readonly from: Address
 
-  /** `null` — развёртывание контракта. */
+  /** `null` — a contract deploy. */
   readonly to: Address | null
 
   readonly data: HexString
@@ -114,26 +111,25 @@ export interface IPreflightRequest {
 }
 
 /**
- * Прогоняет транзакцию на узле до подписи.
+ * Runs the transaction on the node before signing.
  *
- * ЧТО ЭТО ЕСТЬ. Вызов `eth_call` с теми же полями, что уйдут в сеть:
- * узел выполняет его на текущем состоянии цепи и ничего не публикует.
- * Отказ здесь означает, что и настоящая транзакция откатится.
+ * WHAT THIS IS. An `eth_call` with the same fields that will go
+ * on-chain: the node runs it on current chain state and publishes
+ * nothing. A failure here means the real transaction will revert too.
  *
- * ЧЕМ ЭТО НЕ ЯВЛЯЕТСЯ. Это не предсказание изменений балансов: чтобы
- * получить их, нужна трассировка вызова либо подмена состояния,
- * а публичные узлы того и другого не предоставляют. Называть такую
- * проверку «симуляцией» значило бы обещать больше, чем сделано.
+ * WHAT THIS IS NOT. This is not a prediction of balance changes:
+ * those need a call trace or state override, and public nodes
+ * provide neither. Calling this check a "simulation" would promise
+ * more than was done.
  *
- * СОСТОЯНИЕ МЕНЯЕТСЯ МЕЖДУ ПРОВЕРКОЙ И ВКЛЮЧЕНИЕМ В БЛОК. Проверка
- * говорит о состоянии на момент вызова, а не о будущем: разрешение
- * может быть отозвано, а средства — потрачены другой транзакцией.
- * Пройденная проверка не обещает выполнения, и интерфейс обязан
- * говорить об этом так же прямо.
+ * STATE CHANGES BETWEEN THE CHECK AND INCLUSION. The check speaks
+ * of state at call time, not of the future: an allowance may be
+ * revoked, and funds spent by another transaction. A passed check
+ * does not promise execution, and the UI must say so just as plainly.
  *
- * РАЗВЁРТЫВАНИЕ КОНТРАКТА НЕ ПРОВЕРЯЕТСЯ: `eth_call` без получателя
- * возвращает байт-код будущего контракта, а не признак успеха, и
- * судить по нему не о чем.
+ * A CONTRACT DEPLOY IS NOT CHECKED: `eth_call` without a recipient
+ * returns the future contract's bytecode, not a success flag, and
+ * there is nothing to judge by.
  */
 export async function preflightCall(
   provider: IProvider,
@@ -160,10 +156,10 @@ export async function preflightCall(
 }
 
 /**
- * Толкует успешный ответ узла.
+ * Interprets a successful node response.
  *
- * Отсутствие отката ещё не означает согласия контракта: у вызовов
- * с булевым результатом отказ выражается значением `false`.
+ * Absence of a revert does not yet mean the contract agreed: for
+ * calls with a boolean result, rejection is the value `false`.
  */
 function interpretResult(data: HexString, result: HexString): IPreflightResult {
   const passed: IPreflightResult = {
@@ -178,10 +174,10 @@ function interpretResult(data: HexString, result: HexString): IPreflightResult {
 
   const body = strip(result)
 
-  /* Пустой ответ на вызов с объявленным булевым результатом —
-     обычное поведение контрактов, написанных до уточнения стандарта.
-     Отсутствие `false` здесь толкуется в пользу успеха: считать
-     такой вызов отказом значило бы запретить работу с ними. */
+  /* An empty answer to a call with a declared boolean result is
+     ordinary behaviour of contracts written before the standard
+     was tightened. Absence of `false` is read in favour of success:
+     treating such a call as a reject would forbid working with them. */
   if (body.length < WORD_LENGTH) {
     return passed
   }
@@ -198,12 +194,11 @@ function interpretResult(data: HexString, result: HexString): IPreflightResult {
   }
 }
 
-/** Толкует отказ узла. */
 function interpretFailure(error: unknown): IPreflightResult {
   if (!(error instanceof GasEstimationFailedError)) {
-    /* Узел недоступен либо ответил не по делу. Это не отказ вызова,
-       и выдавать его за откат нельзя: пользователь исправлял бы
-       несуществующую ошибку в своей транзакции. */
+    /* The node is unreachable or answered off-topic. That is not
+       a call reject, and must not be presented as a revert: the
+       user would be fixing a non-existent error in their transaction. */
     return { outcome: PREFLIGHT_OUTCOME.Unavailable, reason: null, revertData: null }
   }
 
@@ -217,11 +212,11 @@ function interpretFailure(error: unknown): IPreflightResult {
 }
 
 /**
- * Разбирает данные отката.
+ * Parses revert data.
  *
- * Три случая, и все три различимы: стандартная причина строкой,
- * внутренняя ошибка времени выполнения кодом и собственная ошибка
- * контракта, о которой без его описания сказать нечего.
+ * Three cases, and all three are distinguishable: a standard string
+ * reason, a runtime panic by code, and a custom contract error
+ * about which nothing can be said without its description.
  */
 export function decodeRevertReason(revertData: string | null): string | null {
   if (revertData === null) {
@@ -251,18 +246,18 @@ export function decodeRevertReason(revertData: string | null): string | null {
     return PANIC_REASONS.get(code) ?? `an internal contract error, code ${code.toString()}`
   }
 
-  /* Собственная ошибка контракта. Расшифровать её без описания
-     контракта нельзя, и придумывать толкование недопустимо: признак
-     показывается как есть, по нему причину можно найти. */
+  /* A custom contract error. It cannot be decoded without the
+     contract's description, and inventing a reading is not allowed:
+     the marker is shown as-is, and the reason can be looked up from it. */
   return `the contract rejected the call with its own error 0x${selector}`
 }
 
 /**
- * Читает строку причины из `Error(string)`.
+ * Reads the reason string from `Error(string)`.
  *
- * Данные недоверенные: узел мог вернуть обрезанный либо испорченный
- * ответ, и разбор обязан кончаться отсутствием причины, а не
- * исключением поверх уже случившегося отказа.
+ * The data is untrusted: the node may have returned a truncated
+ * or corrupted answer, and parsing must end in "no reason", not
+ * an exception on top of a revert that already happened.
  */
 function decodeErrorString(payload: string): string | null {
   const body = payload
@@ -286,8 +281,8 @@ function decodeErrorString(payload: string): string | null {
 
   const decoded = new TextDecoder().decode(bytes)
 
-  /* Управляющие символы в причине — признак либо испорченных данных,
-     либо попытки подделать вид сообщения кошелька. Такая строка
-     не показывается. */
+  /* Control characters in the reason are a sign of corrupted data
+     or an attempt to forge the look of a wallet message. Such a
+     string is not shown. */
   return /[\p{Cc}]/u.test(decoded) ? null : decoded
 }

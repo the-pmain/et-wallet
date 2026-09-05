@@ -1,18 +1,18 @@
 import { AppError } from './AppError'
 
 /**
- * Ошибка вызова нереализованной операции.
+ * A call to an unimplemented operation.
  *
- * Используется в сервисах-заготовках. Принципиально важно, что заглушка
- * бросает исключение, а не возвращает `undefined` или пустой массив:
- * молчаливая заглушка в кошельке способна создать видимость успешной
- * операции — например, «сохранённый» ключ, которого на самом деле нет.
+ * Used in stub services. It is essential that the stub throws, rather
+ * than returning `undefined` or an empty array: a silent stub in a
+ * wallet can look like a successful operation — for example a
+ * "saved" key that does not exist.
  */
 export class NotImplementedError extends AppError {
   readonly code = 'NOT_IMPLEMENTED'
 
   /**
-   * @param member Полное имя операции в формате `ServiceName.methodName`.
+   * @param member Full operation name in `ServiceName.methodName` form.
    */
   constructor(member: string) {
     super(`The operation "${member}" is not implemented at this stage of development.`)

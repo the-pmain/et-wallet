@@ -59,12 +59,13 @@ import {
 const SERVICE_NAME = 'TransactionService'
 
 /**
- * Надбавки к приоритетной комиссии по уровням срочности.
+ * Priority-fee markups by urgency level.
  *
- * Значения относительно предложенного узлом: узел уже учитывает текущую
- * загрузку сети, и назначать абсолютные величины значило бы игнорировать
- * её. Уровень «низкий» не опускается ниже предложенного — заниженная
- * комиссия оборачивается транзакцией, висящей в мемпуле часами.
+ * Values are relative to what the node proposed: the node already
+ * accounts for current network load, and assigning absolute amounts
+ * would ignore it. The "low" level does not go below the proposal —
+ * an understated fee becomes a transaction hanging in the mempool
+ * for hours.
  */
 const PRIORITY_MULTIPLIER: Readonly<Record<Exclude<FeePriority, 'custom'>, bigint>> = {
   [FEE_PRIORITY.Low]: 100n,
@@ -72,62 +73,59 @@ const PRIORITY_MULTIPLIER: Readonly<Record<Exclude<FeePriority, 'custom'>, bigin
   [FEE_PRIORITY.High]: 175n,
 }
 
-/** Делитель для процентных надбавок выше. */
 const MULTIPLIER_BASE = 100n
 
 /**
- * Запас лимита газа сверх оценки, в процентах.
+ * Gas-limit headroom above the estimate, in percent.
  *
- * Оценка выполняется на состоянии текущего блока, а транзакция попадёт
- * в следующий: состояние контракта успеет измениться, и точный лимит
- * может не хватить. Неизрасходованный газ возвращается, а нехватка
- * приводит к откату со списанием — запас дешевле.
+ * The estimate runs on the current block's state, and the
+ * transaction will land in the next: contract state can change,
+ * and an exact limit may not suffice. Unused gas is returned;
+ * a shortfall reverts with a charge — headroom is cheaper.
  */
 const GAS_LIMIT_HEADROOM = 120n
 
 /**
- * Как часто опрашиваются отправленные транзакции.
+ * How often sent transactions are polled.
  *
- * Близко ко времени блока Ethereum. Опрашивать чаще бессмысленно:
- * состояние меняется не быстрее блока, а лимиты публичного узла
- * расходуются на каждый вызов. В сетях с более быстрыми блоками
- * отставание составляет секунды и на решения пользователя не влияет.
+ * Close to Ethereum's block time. Polling faster is pointless:
+ * state does not change faster than a block, and public-node
+ * limits are spent on every call. On networks with faster blocks
+ * the lag is seconds and does not affect the user's decisions.
  */
 const TRACKING_INTERVAL_MS = 12_000
 
 /**
- * После скольких подтверждений слежение прекращается.
+ * After how many confirmations tracking stops.
  *
- * ЭТО НЕ ОКОНЧАТЕЛЬНОСТЬ, А ГРАНИЦА РАЗУМНОГО ОЖИДАНИЯ. Полной
- * невозвратности в сетях EVM нет вовсе: реорганизация возможна
- * на любой глубине, просто с быстро убывающей вероятностью. Три блока —
- * компромисс: реорганизации такой глубины после перехода Ethereum
- * на Proof-of-Stake наблюдаются исключительно редко, а бесконечный опрос
- * узла ради каждой давней транзакции стоил бы лимитов и раскрывал бы
- * активность кошелька.
+ * THIS IS NOT FINALITY, IT IS A BOUND OF REASONABLE WAITING.
+ * Complete irreversibility does not exist on EVM networks at all:
+ * a reorg is possible at any depth, just with a rapidly falling
+ * probability. Three blocks is the compromise: reorgs of that
+ * depth after Ethereum moved to Proof-of-Stake are exceptionally
+ * rare, and polling the node forever for every old transaction
+ * would cost limits and reveal wallet activity.
  */
 const CONFIRMATIONS_TO_STOP_TRACKING = 3
 
 /**
- * Надбавка к комиссии при замене транзакции, в процентах.
+ * Fee markup on a replacement transaction, in percent.
  *
- * Узел принимает замену только если новая комиссия ЗАМЕТНО выше
- * прежней: у geth порог задаётся `txpool.pricebump` и по умолчанию
- * равен десяти процентам. Ровно десять брать нельзя — целочисленное
- * округление вниз даёт значение на единицу меньше порога, и узел
- * отвечает отказом «замена недооценена». Пятнадцать проходит
- * и у узлов с повышенным порогом.
+ * The node accepts a replacement only if the new fee is NOTICEABLY
+ * higher than the old: on geth the threshold is `txpool.pricebump`
+ * and defaults to ten percent. Exactly ten must not be used —
+ * integer rounding down yields one less than the threshold, and
+ * the node answers "replacement underpriced". Fifteen also passes
+ * on nodes with a raised threshold.
  *
- * НАДБАВКА ПРИМЕНЯЕТСЯ К ОБЕИМ ЧАСТЯМ комиссии EIP-1559. Подняв
- * только предельную цену и оставив приоритетную, замену получить
- * не удастся: узел сравнивает обе.
+ * THE MARKUP APPLIES TO BOTH PARTS of an EIP-1559 fee. Raising
+ * only the max fee and leaving the priority fee would not get
+ * a replacement: the node compares both.
  */
 const REPLACEMENT_BUMP_PERCENT = 115n
 
-/** Стоимость простого перевода без данных вызова. Задана стандартом. */
 const SIMPLE_TRANSFER_GAS = 21_000n
 
-/** Зависимости сервиса. */
 export interface ITransactionServiceDependencies {
   readonly resolver: IProviderResolver
   readonly networks: INetworkService
@@ -137,17 +135,18 @@ export interface ITransactionServiceDependencies {
 }
 
 /**
- * Подготовка, отправка и хранение транзакций.
+ * Preparing, sending, and storing transactions.
  *
- * СЕРВИС НЕ ПОДПИСЫВАЕТ. Подпись выполняет владелец ключей —
- * `AccountManager`. Разделение обязательно: иначе транзакционный слой
- * получил бы доступ к секретам, и периметр их хранения расширился бы
- * на весь домен.
+ * THE SERVICE DOES NOT SIGN. Signing is done by the key owner —
+ * `AccountManager`. The split is required: otherwise the
+ * transaction layer would gain access to secrets, and the
+ * perimeter of their storage would expand across the domain.
  *
- * `prepare` ВОЗВРАЩАЕТ РОВНО ТО, ЧТО БУДЕТ ПОДПИСАНО. Экран подтверждения
- * показывает поля этого объекта, и он же уходит в подпись. Пересчёт
- * значений между показом и подписью недопустим: расхождение показанного
- * с подписанным — основной класс атак на интерфейс кошелька.
+ * `prepare` RETURNS EXACTLY WHAT WILL BE SIGNED. The confirmation
+ * screen shows this object's fields, and the same object goes to
+ * the signature. Recalculating values between show and sign is
+ * not allowed: a mismatch between what is shown and what is
+ * signed is the main class of attacks on a wallet UI.
  */
 export class TransactionService implements ITransactionService {
   readonly #resolver: IProviderResolver
@@ -156,11 +155,11 @@ export class TransactionService implements ITransactionService {
   readonly #clock: IClock
   readonly #logger: ILogger
 
-  /* Отмена периодического опроса. `null`, пока слежение не запущено. */
+  /* Cancel of the periodic poll. `null` until tracking is started. */
   #cancelTracking: Unsubscribe | null = null
 
-  /* Идёт проход опроса. Защищает от наложения проходов, когда узел
-     отвечает медленнее, чем наступает следующий период. */
+  /* A poll pass is in progress. Guards against overlapping passes
+     when the node answers slower than the next period arrives. */
   #isTracking = false
 
   readonly #events = new EventBus<TransactionEventMap>({
@@ -181,21 +180,23 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Превращает намерение пользователя в транзакцию, готовую к подписи.
+   * Turns a user intent into a transaction ready to sign.
    *
-   * ПОРЯДОК ДЕЙСТВИЙ ЗНАЧИМ.
+   * ORDER OF STEPS MATTERS.
    *
-   * 1. Nonce берётся с учётом мемпула. Значение без учёта ожидающих
-   *    транзакций заставило бы новую заменить собой предыдущую вместо
-   *    постановки в очередь — прежний перевод молча исчез бы.
+   * 1. The nonce is taken with the mempool in mind. A value that
+   *    ignores pending transactions would make the new one replace
+   *    the previous instead of queuing — the earlier transfer would
+   *    vanish silently.
    *
-   * 2. Лимит газа оценивается обращением к узлу. Отказ оценки означает,
-   *    что вызов завершится откатом: газ спишется, а операция не
-   *    выполнится. Назначать лимит произвольно в этом случае нельзя.
+   * 2. The gas limit is estimated by asking the node. A failed
+   *    estimate means the call will revert: gas is spent, the
+   *    operation does not run. Assigning a limit arbitrarily in
+   *    that case is not allowed.
    *
-   * 3. Достаточность средств проверяется здесь, а не в интерфейсе.
-   *    Проверка в форме забывается при появлении второго пути отправки;
-   *    здесь её не обойти.
+   * 3. Sufficiency of funds is checked here, not in the UI. A
+   *    check in the form is forgotten when a second send path
+   *    appears; here it cannot be bypassed.
    *
    * @throws GasEstimationFailedError, InsufficientFundsError,
    *         ProviderUnavailableError, NetworkNotFoundError
@@ -208,9 +209,10 @@ export class TransactionService implements ITransactionService {
     const gasLimit = request.gasLimit ?? (await this.#estimateGasLimit(provider, request))
     const feeData = await provider.getFeeData()
 
-    /* Тип определяется поддержкой сети И наличием данных у узла:
-       сеть может заявлять EIP-1559, а узел не сообщать базовую
-       комиссию — тогда транзакция второго типа будет отвергнута. */
+    /* The type is decided by network support AND by the node
+       having the data: a network may claim EIP-1559 while the
+       node does not report a base fee — then a type-2 transaction
+       would be rejected. */
     const useEip1559 = network.supportsEip1559 && feeData.maxFeePerGas !== null
 
     const transaction: ISignableTransaction = {
@@ -233,23 +235,24 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Превращает намерение отправить токен в транзакцию к подписи.
+   * Turns an intent to send a token into a transaction to sign.
    *
-   * ЧТО ПРОИСХОДИТ НА САМОМ ДЕЛЕ. Перевод токена — это вызов функции
-   * контракта. Поле `to` транзакции указывает на контракт токена,
-   * сумма перевода нативной валюты равна нулю, а настоящий получатель
-   * и количество лежат в данных вызова. Интерфейс обязан показать это
-   * так же прямо, иначе пользователь сверит адрес контракта с адресом
-   * получателя и не найдёт совпадения.
+   * WHAT ACTUALLY HAPPENS. A token transfer is a contract function
+   * call. The transaction's `to` points at the token contract, the
+   * native-currency amount is zero, and the real recipient and
+   * quantity sit in the call data. The UI must show that just as
+   * plainly, or the user will compare the contract address with
+   * the recipient and find no match.
    *
-   * БАЛАНС ТОКЕНА ПРОВЕРЯЕТСЯ ЗДЕСЬ. Нативных средств может хватать
-   * на комиссию, а токенов — нет; тогда контракт откатит вызов, газ
-   * спишется, а перевода не будет. Отказ узла в оценке газа сообщил бы
-   * лишь «вызов завершится откатом», не называя причину.
+   * THE TOKEN BALANCE IS CHECKED HERE. Native funds may cover the
+   * fee while tokens do not; then the contract reverts the call,
+   * gas is spent, and there is no transfer. A node reject on gas
+   * estimate would only say "the call will revert", without naming
+   * the reason.
    *
-   * @throws InsufficientTokenBalanceError если токенов меньше суммы,
-   *         GasEstimationFailedError если вызов завершится откатом,
-   *         InsufficientFundsError если не хватает на комиссию.
+   * @throws InsufficientTokenBalanceError if tokens are less than the amount,
+   *         GasEstimationFailedError if the call will revert,
+   *         InsufficientFundsError if the fee cannot be covered.
    */
   async prepareTokenTransfer(request: ITokenTransferRequest): Promise<ISignableTransaction> {
     const network = this.#requireNetwork(request)
@@ -261,33 +264,31 @@ export class TransactionService implements ITransactionService {
       ...(request.chainId === undefined ? {} : { chainId: request.chainId }),
       ...(request.feePriority === undefined ? {} : { feePriority: request.feePriority }),
       from: request.from,
-      /* Транзакция адресована контракту: именно он переводит токен. */
       to: request.token,
-      /* Нативная валюта не переводится вовсе. */
       value: toWei(0n),
       data: encodeTransfer(request.to, request.amount),
     })
   }
 
   /**
-   * Превращает намерение передать предмет в транзакцию к подписи.
+   * Turns an intent to transfer an item into a transaction to sign.
    *
-   * ВЫЗОВ ЗАВИСИТ ОТ СТАНДАРТА. У ERC-721 передаётся один неделимый
-   * предмет, у ERC-1155 — заданное количество экземпляров; функции
-   * называются одинаково, но принимают разные аргументы, и перепутать
-   * их значит вызвать несуществующую.
+   * THE CALL DEPENDS ON THE STANDARD. ERC-721 transfers one
+   * indivisible item, ERC-1155 a given number of copies; the
+   * functions share a name but take different arguments, and
+   * mixing them up calls one that does not exist.
    *
-   * ИСПОЛЬЗУЕТСЯ БЕЗОПАСНЫЙ ВАРИАНТ ПЕРЕДАЧИ. Обычный `transferFrom`
-   * отправит предмет и контракту, который не умеет их принимать, —
-   * оттуда он не вернётся никогда.
+   * THE SAFE TRANSFER VARIANT IS USED. Plain `transferFrom` will
+   * send the item to a contract that cannot accept it — from
+   * there it never comes back.
    *
-   * ПРИНАДЛЕЖНОСТЬ ПРОВЕРЯЕТСЯ ДО ПОДПИСИ. Контракт отверг бы такой
-   * вызов и сам, но газ при этом списался бы, а причина осталась бы
-   * невнятной.
+   * OWNERSHIP IS CHECKED BEFORE SIGNING. The contract would
+   * reject such a call itself, but gas would be spent and the
+   * reason would stay opaque.
    *
-   * @throws NftNotOwnedError если предмет не принадлежит отправителю,
-   *         GasEstimationFailedError если вызов завершится откатом,
-   *         InsufficientFundsError если не хватает на комиссию.
+   * @throws NftNotOwnedError if the item does not belong to the sender,
+   *         GasEstimationFailedError if the call will revert,
+   *         InsufficientFundsError if the fee cannot be covered.
    */
   async prepareNftTransfer(request: INftTransferRequest): Promise<ISignableTransaction> {
     const network = this.#requireNetwork(request)
@@ -305,8 +306,6 @@ export class TransactionService implements ITransactionService {
       ...(request.chainId === undefined ? {} : { chainId: request.chainId }),
       ...(request.feePriority === undefined ? {} : { feePriority: request.feePriority }),
       from: request.from,
-      /* Транзакция адресована контракту коллекции: именно он передаёт
-         предмет. */
       to: request.contract,
       value: toWei(0n),
       data,
@@ -314,17 +313,18 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Готовит отзыв выданного разрешения.
+   * Prepares a revoke of a granted allowance.
    *
-   * ЧТО ПРОИСХОДИТ. У токенов ERC-20 отдельной функции «отозвать»
-   * не существует: разрешение перезаписывается значением, и ноль
-   * означает «распоряжаться нечем». У коллекций снимается признак
-   * `setApprovalForAll`.
+   * WHAT HAPPENS. ERC-20 tokens have no separate "revoke"
+   * function: the allowance is overwritten, and zero means
+   * "nothing to spend". For collections the `setApprovalForAll`
+   * flag is cleared.
    *
-   * ПРОВЕРКИ ДЕЙСТВУЮЩЕГО ЗНАЧЕНИЯ ЗДЕСЬ НЕТ СОЗНАТЕЛЬНО. Отзыв
-   * уже отозванного разрешения безвреден — он лишь стоит газа, —
-   * а лишний запрос к узлу между показом списка и подписью создал бы
-   * окно, в котором ответ устарел бы точно так же.
+   * THERE IS DELIBERATELY NO CHECK OF THE LIVE VALUE HERE.
+   * Revoking an already-revoked allowance is harmless — it only
+   * costs gas — and an extra node request between showing the
+   * list and signing would open a window in which the answer
+   * would go stale just the same.
    */
   async prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<ISignableTransaction> {
     const data =
@@ -336,7 +336,6 @@ export class TransactionService implements ITransactionService {
       ...(request.chainId === undefined ? {} : { chainId: request.chainId }),
       ...(request.feePriority === undefined ? {} : { feePriority: request.feePriority }),
       from: request.from,
-      /* Транзакция адресована контракту: разрешение хранится в нём. */
       to: request.contract,
       value: toWei(0n),
       data,
@@ -344,12 +343,12 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Проверяет, что предмет принадлежит отправителю.
+   * Checks that the item belongs to the sender.
    *
-   * Недоступность контракта означает «проверить не удалось» и проходит
-   * дальше: отказать по неполученному значению значило бы не дать
-   * распорядиться своим имуществом из-за молчания узла. Такой случай
-   * поймает оценка газа.
+   * An unreachable contract means "could not check" and passes
+   * through: rejecting on a missing value would stop the owner
+   * spending their own property because the node was silent.
+   * Gas estimation will catch that case.
    */
   async #assertOwnsNft(
     provider: IProvider,
@@ -400,12 +399,12 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Проверяет, что токенов хватает на перевод.
+   * Checks that there are enough tokens for the transfer.
    *
-   * Отсутствие ответа контракта — это «проверить не удалось», а не
-   * «баланс нулевой»: отказать по неполученному значению значило бы
-   * не дать отправить перевод из-за недоступности узла. Такой случай
-   * проходит дальше, где его поймает оценка газа.
+   * No answer from the contract is "could not check", not "zero
+   * balance": rejecting on a missing value would stop a send
+   * because the node is down. That case passes through, where
+   * gas estimation will catch it.
    */
   async #assertSufficientTokens(
     provider: IProvider,
@@ -434,14 +433,14 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Варианты комиссии для показа пользователю.
+   * Fee options to show the user.
    *
-   * Возвращаются три уровня сразу: выбор между скоростью и стоимостью
-   * принимает пользователь, а не кошелёк.
+   * Three levels are returned at once: the choice between speed
+   * and cost is the user's, not the wallet's.
    *
-   * ОЖИДАЕМОЕ ВРЕМЯ НЕ СООБЩАЕТСЯ. Оно зависит от загрузки сети в момент
-   * включения в блок, которую предсказать нельзя. Показать выдуманное
-   * число значило бы дать обещание, за которое кошелёк не отвечает.
+   * EXPECTED TIME IS NOT REPORTED. It depends on network load at
+   * inclusion time, which cannot be predicted. Showing an invented
+   * number would make a promise the wallet does not stand behind.
    */
   estimateFees(transaction: ISignableTransaction): Promise<readonly IFeeEstimate[]> {
     const levels: Exclude<FeePriority, 'custom'>[] = [
@@ -453,7 +452,7 @@ export class TransactionService implements ITransactionService {
     return Promise.resolve(levels.map((priority) => this.#scaleFee(transaction, priority)))
   }
 
-  /** Применяет транзакции выбранный уровень комиссии. */
+  /** Applies the chosen fee level to the transaction. */
   applyFee(transaction: ISignableTransaction, fee: IFeeEstimate): ISignableTransaction {
     return {
       ...transaction,
@@ -465,15 +464,17 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Публикует подписанную транзакцию и заносит её в историю.
+   * Publishes a signed transaction and writes it to history.
    *
-   * ЗАПИСЬ СОХРАНЯЕТСЯ ПОСЛЕ УСПЕШНОЙ ПУБЛИКАЦИИ. Сохранение до неё
-   * оставило бы в истории транзакцию, которой в сети нет, и пользователь
-   * ждал бы подтверждения того, что никуда не отправлено.
+   * THE RECORD IS SAVED AFTER A SUCCESSFUL PUBLISH. Saving before
+   * that would leave in history a transaction that is not on the
+   * network, and the user would wait for a confirmation of something
+   * that was never sent.
    *
-   * ОТКАЗ ТРАНСПОРТА НЕ ПРЕВРАЩАЕТСЯ В ПОВТОР. Судьба отправки при таком
-   * отказе неизвестна: узел мог принять транзакцию и не успеть ответить.
-   * Решение принимает пользователь, увидев причину, а не кошелёк молча.
+   * A TRANSPORT FAILURE IS NOT TURNED INTO A RETRY. The fate of
+   * the send is then unknown: the node may have accepted the
+   * transaction and not answered in time. The user decides after
+   * seeing the reason, not the wallet in silence.
    */
   async send(signed: ISignedTransaction): Promise<TxHash> {
     const network = this.#requireNetwork({ chainId: signed.transaction.chainId })
@@ -496,9 +497,10 @@ export class TransactionService implements ITransactionService {
       effectiveGasPrice: null,
       replacedBy: null,
       confirmations: 0,
-      /* Параметры сохраняются ради ускорения: оно повторяет ТУ ЖЕ
-         операцию с тем же nonce. Без данных вызова и лимита газа
-         вместо ускорения ушла бы другая транзакция с тем же номером. */
+      /* Parameters are stored for a speed-up: it repeats THE SAME
+         operation at the same nonce. Without call data and a gas
+         limit a different transaction would go out under the same
+         number instead of a speed-up. */
       data: signed.transaction.data,
       gasLimit: signed.transaction.gasLimit,
       maxFeePerGas: signed.transaction.maxFeePerGas,
@@ -523,10 +525,10 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Обновляет состояние отправленной транзакции по квитанции.
+   * Updates the state of a sent transaction from a receipt.
    *
-   * Вызывается интерфейсом после отправки. Полноценное отслеживание
-   * с учётом реорганизации цепи — предмет отдельного этапа.
+   * Called by the UI after a send. Full tracking that accounts
+   * for a chain reorg is a later stage.
    */
   async refreshStatus(hash: TxHash): Promise<TransactionStatus | null> {
     const record = await this.#repository.findByHash(hash)
@@ -543,8 +545,8 @@ export class TransactionService implements ITransactionService {
       return TRANSACTION_STATUS.Pending
     }
 
-    /* Включённая в блок транзакция могла завершиться откатом: газ списан,
-       операция не выполнена. Показывать такую как успешную нельзя. */
+    /* A transaction included in a block may have reverted: gas was
+       spent, the operation did not run. It must not be shown as a success. */
     const status =
       receipt.status === 'success' ? TRANSACTION_STATUS.Confirmed : TRANSACTION_STATUS.Reverted
 
@@ -563,28 +565,30 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Готовит ускорение зависшей транзакции.
+   * Prepares a speed-up of a stuck transaction.
    *
-   * ЧТО ТАКОЕ УСКОРЕНИЕ. Повторная отправка ТОЙ ЖЕ операции с тем же
-   * nonce и большей комиссией. Узел заменяет прежнюю транзакцию новой,
-   * потому что две с одним номером существовать не могут.
+   * WHAT A SPEED-UP IS. A resend of THE SAME operation at the same
+   * nonce with a higher fee. The node replaces the previous
+   * transaction with the new one because two with one number cannot
+   * exist.
    *
-   * ПОВТОРЯЕТСЯ ИМЕННО ИСХОДНАЯ ОПЕРАЦИЯ: получатель, сумма, данные
-   * вызова и лимит газа берутся из сохранённой записи. Пересчитать их
-   * заново значило бы отправить под тем же номером другую транзакцию —
-   * пользователь ждал бы ускорения своего перевода, а получил бы
-   * неизвестно что.
+   * THE ORIGINAL OPERATION IS REPEATED: recipient, amount, call
+   * data, and gas limit come from the stored record. Recalculating
+   * them would send a different transaction under the same number —
+   * the user would wait for a speed-up of their transfer and get
+   * who-knows-what.
    *
-   * @throws TransactionNotReplaceableError если транзакция уже
-   *         в блоке, замещена либо её параметры не сохранены.
+   * @throws TransactionNotReplaceableError if the transaction is
+   *         already in a block, replaced, or its parameters were
+   *         not stored.
    */
   async prepareSpeedUp(hash: TxHash): Promise<ISignableTransaction> {
     const record = await this.#requireReplaceable(hash)
 
     if (record.data === null || record.gasLimit === null) {
-      /* Запись сделана версией без сохранения параметров.
-         Восстановить их неоткуда, а догадка означала бы отправку
-         другой операции под тем же номером. */
+      /* The record was made by a version that did not store
+         parameters. There is nowhere to restore them, and a guess
+         would send a different operation under the same number. */
       throw new TransactionNotReplaceableError(
         'the parameters of the original transaction were not stored; cancelling is still possible',
       )
@@ -606,23 +610,23 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Готовит отмену зависшей транзакции.
+   * Prepares a cancel of a stuck transaction.
    *
-   * ОТМЕНИТЬ ОТПРАВЛЕННУЮ ТРАНЗАКЦИЮ НЕЛЬЗЯ. Можно лишь занять её
-   * номер другой, более дорогой: перевод самому себе на нулевую сумму.
-   * Если узлы примут её первой, исходная операция не состоится.
+   * A SENT TRANSACTION CANNOT BE CANCELLED. Its number can only be
+   * taken by another, more expensive one: a zero-amount transfer
+   * to self. If nodes accept that first, the original will not run.
    *
-   * ГАРАНТИИ НЕТ, И ЭТО НУЖНО ГОВОРИТЬ ПРЯМО. Исходная транзакция
-   * может попасть в блок раньше отменяющей; тогда отмена окажется
-   * лишней и просто не будет принята — её номер уже израсходован.
-   * Комиссия в этом случае не списывается: невключённая транзакция
-   * ничего не стоит.
+   * THERE IS NO GUARANTEE, AND THAT MUST BE SAID PLAINLY. The
+   * original may land in a block before the cancel; then the cancel
+   * is surplus and simply will not be accepted — its number is
+   * already spent. The fee is not charged in that case: a
+   * transaction that was not included costs nothing.
    *
-   * ПАРАМЕТРЫ ИСХОДНОЙ ЗДЕСЬ НЕ НУЖНЫ, поэтому отмена доступна и для
-   * записей, сделанных до появления замены.
+   * THE ORIGINAL'S PARAMETERS ARE NOT NEEDED HERE, so cancel is
+   * available even for records made before replacement existed.
    *
-   * @throws TransactionNotReplaceableError если транзакция уже
-   *         в блоке либо замещена.
+   * @throws TransactionNotReplaceableError if the transaction is
+   *         already in a block or replaced.
    */
   async prepareCancel(hash: TxHash): Promise<ISignableTransaction> {
     const record = await this.#requireReplaceable(hash)
@@ -630,24 +634,24 @@ export class TransactionService implements ITransactionService {
     const provider = await this.#resolver.get(network)
 
     const transaction = await this.#buildReplacement(provider, network, record, {
-      /* Перевод самому себе: средства не уходят никуда, а номер
-         оказывается занят. */
+      /* A transfer to self: funds go nowhere, and the number is taken. */
       to: record.from,
       value: toWei(0n),
       data: '0x' as HexString,
-      /* Стоимость простого перевода. Оценивать нечего: операции нет. */
+      /* Cost of a simple transfer. Nothing to estimate: there is no operation. */
       gasLimit: SIMPLE_TRANSFER_GAS,
     })
 
-    /* Отмена ничего не переводит, но комиссию требует, а средства
-       заняты исходной транзакцией. Узел отверг бы её и сам, но по одной
-       фразе о недооценке владелец не понял бы, что дело в балансе. */
+    /* A cancel transfers nothing but needs a fee, and funds are
+       held by the original. The node would reject it itself, but
+       a lone "underpriced" phrase would not tell the owner the
+       issue is the balance. */
     await this.#assertSufficientFunds(provider, transaction)
 
     return transaction
   }
 
-  /** Проверяет, что транзакцию ещё можно заменить. */
+  /** Checks that the transaction can still be replaced. */
   async #requireReplaceable(hash: TxHash): Promise<ITransactionRecord> {
     const record = await this.#repository.findByHash(hash)
 
@@ -675,12 +679,13 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Собирает замещающую транзакцию с поднятой комиссией.
+   * Builds a replacement transaction with a raised fee.
    *
-   * Комиссия берётся как наибольшее из двух: прежняя с надбавкой
-   * и текущее предложение узла. Первое нужно, чтобы узел принял
-   * замену; второе — чтобы новая транзакция не зависла так же, как
-   * прежняя, если сеть подорожала.
+   * The fee is the greater of two: the previous with a markup,
+   * and the node's current proposal. The first is needed so the
+   * node accepts the replacement; the second so the new
+   * transaction does not stick the same way if the network got
+   * more expensive.
    */
   async #buildReplacement(
     provider: IProvider,
@@ -703,9 +708,9 @@ export class TransactionService implements ITransactionService {
       to: payload.to,
       value: payload.value,
       data: payload.data,
-      /* ТОТ ЖЕ НОМЕР — в нём весь смысл замены. Взяв следующий
-         свободный, кошелёк отправил бы вторую транзакцию вдобавок
-         к зависшей, а не вместо неё. */
+      /* THE SAME NUMBER — that is the whole point of a replacement.
+         Taking the next free one, the wallet would send a second
+         transaction in addition to the stuck one, not instead of it. */
       nonce: record.nonce,
       gasLimit: payload.gasLimit,
       maxFeePerGas: useEip1559 ? bumped(record.maxFeePerGas, feeData.maxFeePerGas) : null,
@@ -717,36 +722,36 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Начинает следить за отправленными транзакциями.
+   * Starts watching sent transactions.
    *
-   * ЧТО ИМЕННО ОТСЛЕЖИВАЕТСЯ. Каждая запись в состоянии ожидания
-   * опрашивается по квитанции. Возможны четыре исхода, и все четыре
-   * означают для пользователя разное:
+   * WHAT IS TRACKED. Every pending record is polled by receipt.
+   * Four outcomes are possible, and all four mean something
+   * different to the user:
    *
-   * - квитанции нет, nonce не израсходован — транзакция ещё в мемпуле;
-   * - квитанции нет, nonce уже израсходован — её место заняла другая
-   *   транзакция того же отправителя. Показывать её как ожидающую
-   *   значило бы обещать перевод, которого не будет;
-   * - квитанция есть, выполнение успешно — операция состоялась;
-   * - квитанция есть, выполнение откачено — газ списан, операция
-   *   не выполнена. Это НЕ успех, и показывать её как успех нельзя.
+   * - no receipt, nonce not spent — the transaction is still in the mempool;
+   * - no receipt, nonce already spent — another transaction of the
+   *   same sender took its place. Showing it as pending would
+   *   promise a transfer that will not happen;
+   * - a receipt, execution succeeded — the operation completed;
+   * - a receipt, execution reverted — gas was spent, the operation
+   *   did not run. That is NOT a success and must not be shown as one.
    *
-   * РЕОРГАНИЗАЦИЯ ЦЕПИ УЧТЕНА. Квитанция может исчезнуть после того,
-   * как была получена: блок, содержавший транзакцию, вытеснен другим.
-   * Такая запись возвращается в состояние ожидания, а не остаётся
-   * подтверждённой — иначе кошелёк утверждал бы состоявшимся то, чего
-   * в цепи нет.
+   * A CHAIN REORG IS ACCOUNTED FOR. A receipt can vanish after it
+   * was received: the block that held the transaction was evicted
+   * by another. Such a record returns to pending, and does not
+   * stay confirmed — otherwise the wallet would claim as done
+   * something that is not on the chain.
    *
-   * ОПРАШИВАЮТСЯ И УЖЕ ПОДТВЕРЖДЁННЫЕ ЗАПИСИ, пока их глубина меньше
-   * порога: иначе обработка реорганизации была бы мёртвым кодом —
-   * подтверждённая запись просто не попадала бы в выборку.
+   * ALREADY-CONFIRMED RECORDS ARE POLLED TOO, while their depth is
+   * below the threshold: otherwise reorg handling would be dead
+   * code — a confirmed record would simply not enter the sample.
    *
-   * ОПРАШИВАЮТСЯ ВСЕ СЕТИ, а не только активная:
-   * транзакция не перестаёт существовать оттого, что пользователь
-   * переключил сеть. Обычно таких сетей ноль или одна, и стоимость
-   * опроса пропорциональна действительной работе.
+   * EVERY NETWORK IS POLLED, not only the active one: a
+   * transaction does not cease to exist because the user switched
+   * networks. Usually there are zero or one such networks, and the
+   * poll cost is proportional to the actual work.
    *
-   * ПОВТОРНЫЙ ВЫЗОВ БЕЗВРЕДЕН: второй таймер не создаётся.
+   * A REPEAT CALL IS HARMLESS: a second timer is not created.
    */
   startTracking(): void {
     if (this.#cancelTracking !== null) {
@@ -757,9 +762,9 @@ export class TransactionService implements ITransactionService {
       void this.#trackPending()
     }, TRACKING_INTERVAL_MS)
 
-    /* Первый проход выполняется сразу: приложение могло быть закрыто
-       на час, и ждать ещё период опроса, чтобы узнать судьбу перевода,
-       незачем. */
+    /* The first pass runs at once: the app may have been closed
+       for an hour, and waiting another poll period to learn the
+       transfer's fate is unnecessary. */
     void this.#trackPending()
   }
 
@@ -768,12 +773,11 @@ export class TransactionService implements ITransactionService {
     this.#cancelTracking = null
   }
 
-  /** Опрашивает все ожидающие записи по всем сетям. */
   async #trackPending(): Promise<void> {
     if (this.#isTracking) {
-      /* Предыдущий проход не завершился: узел отвечает медленнее, чем
-         идёт опрос. Наложение проходов удвоило бы нагрузку и могло бы
-         записать устаревший результат поверх свежего. */
+      /* The previous pass has not finished: the node answers
+         slower than the poll. Overlapping passes would double
+         the load and could write a stale result over a fresh one. */
       return
     }
 
@@ -786,8 +790,7 @@ export class TransactionService implements ITransactionService {
         try {
           await this.#refreshTracked(record)
         } catch (error) {
-          /* Недоступность одной сети не имеет права остановить слежение
-             за остальными. */
+          /* One network being down must not stop watching the others. */
           this.#logger.warn('The transaction status could not be read', {
             chainId: record.chainId,
             reason: error instanceof Error ? error.message : String(error),
@@ -799,13 +802,13 @@ export class TransactionService implements ITransactionService {
     }
   }
 
-  /** Обновляет одну запись по данным сети. */
   async #refreshTracked(record: ITransactionRecord): Promise<void> {
     const network = this.#networks.getByChainId(record.chainId)
 
     if (network === null) {
-      /* Сеть удалена из списка. Судить о транзакции нечем, и молча
-         объявлять её потерянной нельзя. */
+      /* The network was removed from the list. There is nothing
+         to judge the transaction by, and silently calling it lost
+         is not allowed. */
       return
     }
 
@@ -839,8 +842,8 @@ export class TransactionService implements ITransactionService {
     }
 
     if (confirmations >= CONFIRMATIONS_TO_STOP_TRACKING) {
-      /* Глубина достаточна: в следующую выборку запись не попадёт,
-         и опрос по ней прекратится сам. */
+      /* Depth is enough: the record will not enter the next sample,
+         and polling it will stop on its own. */
       this.#logger.info('Transaction settled', {
         chainId: record.chainId,
         confirmations,
@@ -849,16 +852,17 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Разбирает случай, когда квитанции нет.
+   * Handles the case where there is no receipt.
    *
-   * Отличить «ещё летит» от «место занято другой транзакцией» можно
-   * по числу отправленных с адреса транзакций: если оно превысило nonce
-   * нашей, значит этот nonce уже израсходован, а квитанции нет —
-   * израсходован не нами.
+   * Distinguishing "still in flight" from "the slot was taken by
+   * another transaction" is done by the count of transactions sent
+   * from the address: if it exceeded our nonce, that nonce is
+   * already spent, and there is no receipt — spent by someone else.
    *
-   * ХЭШ ЗАМЕЩАЮЩЕЙ ТРАНЗАКЦИИ НЕИЗВЕСТЕН, и выдумывать его нельзя:
-   * найти его можно только обходом блоков, а это работа индексатора.
-   * Поле остаётся пустым — пользователю сообщается сам факт.
+   * THE REPLACEMENT TRANSACTION HASH IS UNKNOWN, and inventing it
+   * is not allowed: finding it takes a walk of blocks, which is
+   * an indexer's job. The field stays empty — the user is told
+   * the fact itself.
    */
   async #handleMissingReceipt(record: ITransactionRecord, provider: IProvider): Promise<void> {
     const confirmedCount = await provider.getTransactionCount(record.from, 'latest')
@@ -870,13 +874,13 @@ export class TransactionService implements ITransactionService {
     }
 
     if (record.confirmations === 0) {
-      /* Обычное ожидание: ничего не изменилось. */
+      /* Ordinary wait: nothing changed. */
       return
     }
 
-    /* Запись была подтверждена, а квитанции больше нет: блок вытеснен
-       реорганизацией цепи. Оставить её подтверждённой значило бы
-       утверждать состоявшимся то, чего в цепи нет. */
+    /* The record was confirmed and the receipt is gone: the block
+       was evicted by a reorg. Leaving it confirmed would claim as
+       done something that is not on the chain. */
     this.#logger.warn('Transaction returned to pending: its block was reorganised away', {
       chainId: record.chainId,
     })
@@ -884,7 +888,6 @@ export class TransactionService implements ITransactionService {
     await this.#applyRollback(record, TRANSACTION_STATUS.Pending)
   }
 
-  /** Сбрасывает сведения о включении в блок и сообщает о смене состояния. */
   async #applyRollback(record: ITransactionRecord, status: TransactionStatus): Promise<void> {
     await this.#repository.save({
       ...record,
@@ -919,18 +922,18 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Оценивает лимит газа с запасом.
+   * Estimates the gas limit with headroom.
    *
-   * Отказ оценки не перехватывается: он означает, что вызов завершится
-   * откатом, и отправлять транзакцию нельзя. Подставить произвольный
-   * лимит значило бы гарантированно сжечь газ впустую.
+   * A failed estimate is not caught: it means the call will revert,
+   * and the transaction must not be sent. Substituting an arbitrary
+   * limit would guarantee burning gas for nothing.
    */
   async #estimateGasLimit(provider: IProvider, request: ITransactionRequest): Promise<bigint> {
-    /* ОТСУТСТВИЕ ПОЛУЧАТЕЛЯ ПЕРЕДАЁТСЯ УЗЛУ КАК ЕСТЬ. Именно так узел
-       узнаёт, что оценивается развёртывание контракта. Прежде сюда
-       подставлялся адрес отправителя, и узел оценивал стоимость
-       перевода самому себе — величину, которой на развёртывание
-       не хватает: транзакция завершилась бы откатом со списанием газа. */
+    /* ABSENCE OF A RECIPIENT IS PASSED TO THE NODE AS-IS. That is
+       how the node learns a contract deploy is being estimated.
+       The sender address used to be substituted here, and the node
+       estimated a transfer to self — an amount that is not enough
+       for a deploy: the transaction would revert with gas spent. */
     const estimate = await provider.estimateGas({
       to: request.to,
       from: request.from,
@@ -942,11 +945,11 @@ export class TransactionService implements ITransactionService {
   }
 
   /**
-   * Проверяет, хватит ли средств на перевод вместе с комиссией.
+   * Checks that funds cover the transfer together with the fee.
    *
-   * Считается по ВЕРХНЕЙ границе комиссии, а не по ожидаемой: списано
-   * будет меньше, но узел проверяет именно верхнюю границу и отвергнет
-   * транзакцию, если её не покрывает баланс.
+   * Counted by the UPPER bound of the fee, not the expected one:
+   * less will be charged, but the node checks the upper bound and
+   * will reject the transaction if the balance does not cover it.
    */
   async #assertSufficientFunds(
     provider: IProvider,
@@ -961,7 +964,6 @@ export class TransactionService implements ITransactionService {
     }
   }
 
-  /** Пересчитывает комиссию под уровень срочности. */
   #scaleFee(
     transaction: ISignableTransaction,
     priority: Exclude<FeePriority, 'custom'>,
@@ -1010,15 +1012,16 @@ export class TransactionService implements ITransactionService {
 }
 
 /**
- * Комиссия замещающей транзакции.
+ * Fee of a replacement transaction.
  *
- * Наибольшее из двух: прежнее значение с надбавкой и текущее
- * предложение узла. Прежнее нужно, чтобы узел принял замену, текущее —
- * чтобы новая транзакция не зависла так же, если сеть подорожала.
+ * The greater of two: the previous value with a markup, and the
+ * node's current proposal. The previous is needed so the node
+ * accepts the replacement; the current so the new transaction
+ * does not stick the same way if the network got more expensive.
  *
- * Отсутствие прежнего значения не повод отказаться от замены: берётся
- * предложение узла. Ноль означал бы транзакцию, которую не примет
- * никто.
+ * Absence of a previous value is not a reason to refuse the
+ * replacement: the node's proposal is taken. Zero would mean a
+ * transaction nobody will accept.
  */
 function bumped(previous: bigint | null, current: bigint | null): bigint {
   const raised = previous === null ? 0n : (previous * REPLACEMENT_BUMP_PERCENT) / MULTIPLIER_BASE

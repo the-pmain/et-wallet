@@ -36,17 +36,17 @@ import {
 import { AccountManager } from './AccountManager'
 import { MAX_ACCOUNT_NAME_LENGTH } from './identity'
 
-const PASSWORD = 'правильный-пароль-1234'
+const PASSWORD = 'correct-password-1234'
 
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
-/** Приватный ключ, равный единице. Его адрес общеизвестен. */
+/** Private key equal to one. Its address is well known. */
 const IMPORTED_KEY = new Uint8Array(32)
 IMPORTED_KEY[31] = 1
 const IMPORTED_ADDRESS = toAddress('0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf')
 
-/** Второй ключ для проверки повторного импорта другого адреса. */
+/** Second key to check re-import of another address. */
 const OTHER_KEY = new Uint8Array(32)
 OTHER_KEY[31] = 2
 
@@ -66,11 +66,11 @@ async function createManager(): Promise<AccountManager> {
 }
 
 /**
- * Разрешение на экспорт импортированного ключа.
+ * Permit to export an imported key.
  *
- * Область — собственная для каждого импортированного ключа, а не путь
- * HD-аккаунта. Иначе выдача импортированного ключа помечала бы HD-аккаунт
- * скомпрометированным, хотя эти два секрета никак не связаны.
+ * The scope is own to each imported key, not the HD-account path.
+ * Otherwise revealing an imported key would mark the HD account
+ * compromised, though the two secrets are not related.
  */
 async function permitForImported(keyringId: KeyringId): Promise<ExportPermit> {
   return await guard.confirm(
@@ -106,38 +106,38 @@ beforeEach(async () => {
   manager = await createManager()
 })
 
-describe('AccountManager: инициализация', () => {
-  it('до init() отказывает в доступе к списку', () => {
+describe('AccountManager: initialisation', () => {
+  it('refuses list access before init()', () => {
     const fresh = AccountManager.create({ hdWallet, secureStorage: secure, clock, logger })
 
     expect(() => fresh.list()).toThrow(NotInitializedError)
   })
 
-  it('начинает с пустого списка', () => {
+  it('starts with an empty list', () => {
     expect(manager.list()).toHaveLength(0)
     expect(manager.getActive()).toBeNull()
   })
 
-  it('идемпотентен при повторном вызове', async () => {
+  it('is idempotent on a second call', async () => {
     await manager.create()
     await manager.init()
 
     expect(manager.list()).toHaveLength(1)
   })
 
-  it('восстанавливает аккаунты после пересоздания', async () => {
+  it('restores accounts after recreation', async () => {
     await manager.create()
-    await manager.create({ name: 'Второй' })
+    await manager.create({ name: 'Second' })
 
     const restored = await createManager()
 
     expect(restored.list()).toHaveLength(2)
-    expect(restored.list()[1]?.name).toBe('Второй')
+    expect(restored.list()[1]?.name).toBe('Second')
   })
 })
 
-describe('AccountManager: создание аккаунтов', () => {
-  it('создаёт аккаунт с адресом из HD-дерева', async () => {
+describe('AccountManager: creating accounts', () => {
+  it('creates an account with an address from the HD tree', async () => {
     const account = await manager.create()
 
     expect(account.address).toBe(hdWallet.getAddress(0))
@@ -146,16 +146,16 @@ describe('AccountManager: создание аккаунтов', () => {
     expect(account.derivationPath).toBe("m/44'/60'/0'/0/0")
   })
 
-  it('назначает имя по умолчанию', async () => {
+  it('assigns a default name', async () => {
     expect((await manager.create()).name).toBe('Account 1')
     expect((await manager.create()).name).toBe('Account 2')
   })
 
-  it('принимает заданное имя', async () => {
-    expect((await manager.create({ name: '  Зарплата  ' })).name).toBe('Зарплата')
+  it('accepts a given name', async () => {
+    expect((await manager.create({ name: '  Payroll  ' })).name).toBe('Payroll')
   })
 
-  it('наращивает индекс адреса', async () => {
+  it('increments the address index', async () => {
     await manager.create()
     const second = await manager.create()
 
@@ -163,10 +163,10 @@ describe('AccountManager: создание аккаунтов', () => {
     expect(second.address).toBe(hdWallet.getAddress(1))
   })
 
-  it('не повторяет индекс после скрытия аккаунта', async () => {
-    /* Индекс берётся как максимальный плюс один, а не как число
-       аккаунтов: подсчёт по количеству после скрытия дал бы повторный
-       индекс, то есть два аккаунта с одним адресом. */
+  it('does not reuse an index after hiding an account', async () => {
+    /* The index is taken as the maximum plus one, not as the
+       account count: counting by quantity after hiding would reuse
+       an index, i.e. two accounts with one address. */
     const first = await manager.create()
     await manager.create()
     await manager.setHidden(first.id, false)
@@ -176,20 +176,20 @@ describe('AccountManager: создание аккаунтов', () => {
     expect((await manager.create()).addressIndex).toBe(2)
   })
 
-  it('назначает первый созданный аккаунт активным', async () => {
+  it('makes the first created account active', async () => {
     const account = await manager.create()
 
     expect(manager.getActive()?.id).toBe(account.id)
   })
 
-  it('не меняет активный при создании последующих', async () => {
+  it('does not change the active one when later ones are created', async () => {
     const first = await manager.create()
     await manager.create()
 
     expect(manager.getActive()?.id).toBe(first.id)
   })
 
-  it('порождает событие изменения списка', async () => {
+  it('emits a list-changed event', async () => {
     const listener = vi.fn()
     manager.on('account:listChanged', listener)
 
@@ -198,15 +198,15 @@ describe('AccountManager: создание аккаунтов', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
-  it('не содержит приватного ключа в структуре аккаунта', async () => {
+  it('does not contain a private key in the account structure', async () => {
     const account = await manager.create()
 
     expect(JSON.stringify(account)).not.toContain('privateKey')
   })
 })
 
-describe('AccountManager: импорт приватного ключа', () => {
-  it('импортирует ключ и выводит адрес', async () => {
+describe('AccountManager: private-key import', () => {
+  it('imports a key and derives the address', async () => {
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
     try {
@@ -221,7 +221,7 @@ describe('AccountManager: импорт приватного ключа', () => {
     }
   })
 
-  it('не затирает переданный буфер', async () => {
+  it('does not wipe the passed buffer', async () => {
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
     try {
@@ -233,7 +233,7 @@ describe('AccountManager: импорт приватного ключа', () => {
     }
   })
 
-  it('отвергает повторный импорт того же адреса', async () => {
+  it('rejects a second import of the same address', async () => {
     const first = SecretBuffer.copyOf(IMPORTED_KEY)
     const second = SecretBuffer.copyOf(IMPORTED_KEY)
 
@@ -249,7 +249,7 @@ describe('AccountManager: импорт приватного ключа', () => {
     }
   })
 
-  it('отвергает непригодный ключ', async () => {
+  it('rejects an unfit key', async () => {
     const zero = SecretBuffer.allocate(32)
 
     try {
@@ -261,7 +261,7 @@ describe('AccountManager: импорт приватного ключа', () => {
     }
   })
 
-  it('не сохраняет непригодный ключ в хранилище', async () => {
+  it('does not save an unfit key in storage', async () => {
     const zero = SecretBuffer.allocate(32)
 
     try {
@@ -273,7 +273,7 @@ describe('AccountManager: импорт приватного ключа', () => {
     }
   })
 
-  it('не хранит импортированный ключ в открытом виде', async () => {
+  it('does not store an imported key in the clear', async () => {
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
     try {
@@ -296,7 +296,7 @@ describe('AccountManager: импорт приватного ключа', () => {
     }
   })
 
-  it('даёт импортированным аккаунтам разные наборы ключей', async () => {
+  it('gives imported accounts different key sets', async () => {
     const first = SecretBuffer.copyOf(IMPORTED_KEY)
     const second = SecretBuffer.copyOf(OTHER_KEY)
 
@@ -312,58 +312,58 @@ describe('AccountManager: импорт приватного ключа', () => {
   })
 })
 
-describe('AccountManager: переименование', () => {
+describe('AccountManager: renaming', () => {
   let accountId: AccountId
 
   beforeEach(async () => {
     accountId = (await manager.create()).id
   })
 
-  it('меняет имя', async () => {
-    await manager.rename(accountId, 'Основной')
+  it('changes the name', async () => {
+    await manager.rename(accountId, 'Primary')
 
-    expect(manager.getById(accountId)?.name).toBe('Основной')
+    expect(manager.getById(accountId)?.name).toBe('Primary')
   })
 
-  it('обрезает пробелы и схлопывает повторяющиеся', async () => {
-    await manager.rename(accountId, '  Мой   аккаунт  ')
+  it('trims spaces and collapses repeats', async () => {
+    await manager.rename(accountId, '  My   account   ')
 
-    expect(manager.getById(accountId)?.name).toBe('Мой аккаунт')
+    expect(manager.getById(accountId)?.name).toBe('My account')
   })
 
-  it('удаляет управляющие символы', async () => {
-    /* Перевод строки в имени ломает вёрстку списка и позволяет визуально
-       подделать соседнюю строку. */
-    await manager.rename(accountId, 'Имя\nПоддельная строка')
+  it('strips control characters', async () => {
+    /* A newline in the name breaks the list layout and lets a
+       neighbouring row be visually forged. */
+    await manager.rename(accountId, 'Name\nFake string')
 
-    expect(manager.getById(accountId)?.name).toBe('ИмяПоддельная строка')
+    expect(manager.getById(accountId)?.name).toBe('NameFake string')
   })
 
-  it('отвергает пустое имя', async () => {
+  it('rejects an empty name', async () => {
     await expect(manager.rename(accountId, '   ')).rejects.toThrow(InvalidArgumentError)
   })
 
-  it('отвергает слишком длинное имя', async () => {
+  it('rejects a too-long name', async () => {
     await expect(
-      manager.rename(accountId, 'а'.repeat(MAX_ACCOUNT_NAME_LENGTH + 1)),
+      manager.rename(accountId, 'a'.repeat(MAX_ACCOUNT_NAME_LENGTH + 1)),
     ).rejects.toThrow(InvalidArgumentError)
   })
 
-  it('отвергает несуществующий аккаунт', async () => {
-    await expect(manager.rename('0'.repeat(32) as AccountId, 'Имя')).rejects.toThrow(
+  it('rejects a missing account', async () => {
+    await expect(manager.rename('0'.repeat(32) as AccountId, 'Name')).rejects.toThrow(
       AccountNotFoundError,
     )
   })
 
-  it('сохраняет имя между сессиями', async () => {
-    await manager.rename(accountId, 'Сохранённое')
+  it('keeps the name across sessions', async () => {
+    await manager.rename(accountId, 'Saved')
 
-    expect((await createManager()).getById(accountId)?.name).toBe('Сохранённое')
+    expect((await createManager()).getById(accountId)?.name).toBe('Saved')
   })
 })
 
-describe('AccountManager: выбор активного', () => {
-  it('меняет активный аккаунт', async () => {
+describe('AccountManager: choosing the active one', () => {
+  it('changes the active account', async () => {
     await manager.create()
     const second = await manager.create()
 
@@ -372,7 +372,7 @@ describe('AccountManager: выбор активного', () => {
     expect(manager.getActive()?.id).toBe(second.id)
   })
 
-  it('порождает событие смены активного', async () => {
+  it('emits an active-changed event', async () => {
     await manager.create()
     const second = await manager.create()
 
@@ -383,7 +383,7 @@ describe('AccountManager: выбор активного', () => {
     expect(listener).toHaveBeenCalledExactlyOnceWith({ address: second.address })
   })
 
-  it('не порождает событие при выборе уже активного', async () => {
+  it('does not emit an event when the already active one is chosen', async () => {
     const first = await manager.create()
 
     const listener = vi.fn()
@@ -393,7 +393,7 @@ describe('AccountManager: выбор активного', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('отказывает в выборе скрытого аккаунта', async () => {
+  it('refuses choosing a hidden account', async () => {
     await manager.create()
     const second = await manager.create()
     await manager.setHidden(second.id, true)
@@ -401,7 +401,7 @@ describe('AccountManager: выбор активного', () => {
     await expect(manager.setActive(second.id)).rejects.toThrow(InvalidArgumentError)
   })
 
-  it('восстанавливает выбор между сессиями', async () => {
+  it('restores the choice across sessions', async () => {
     await manager.create()
     const second = await manager.create()
     await manager.setActive(second.id)
@@ -410,8 +410,8 @@ describe('AccountManager: выбор активного', () => {
   })
 })
 
-describe('AccountManager: скрытие', () => {
-  it('скрывает аккаунт', async () => {
+describe('AccountManager: hiding', () => {
+  it('hides an account', async () => {
     await manager.create()
     const second = await manager.create()
 
@@ -421,7 +421,7 @@ describe('AccountManager: скрытие', () => {
     expect(manager.list()).toHaveLength(2)
   })
 
-  it('возвращает скрытый аккаунт', async () => {
+  it('restores a hidden account', async () => {
     await manager.create()
     const second = await manager.create()
     await manager.setHidden(second.id, true)
@@ -430,31 +430,31 @@ describe('AccountManager: скрытие', () => {
     expect(manager.listVisible()).toHaveLength(2)
   })
 
-  it('отказывает в скрытии активного аккаунта', async () => {
+  it('refuses hiding the active account', async () => {
     const first = await manager.create()
     await manager.create()
 
     await expect(manager.setHidden(first.id, true)).rejects.toThrow(InvalidArgumentError)
   })
 
-  it('отказывает в скрытии последнего видимого', async () => {
+  it('refuses hiding the last visible one', async () => {
     const only = await manager.create()
 
     await expect(manager.setHidden(only.id, true)).rejects.toThrow(InvalidArgumentError)
   })
 })
 
-describe('AccountManager: удаление', () => {
-  it('отказывает в удалении аккаунта из HD-дерева', async () => {
-    /* Аккаунт, выведенный из seed-фразы, появится снова при следующем
-       восстановлении кошелька. Кнопка «удалить», которая лишь прячет
-       запись, вводит пользователя в заблуждение. */
+describe('AccountManager: removal', () => {
+  it('refuses removing an account from the HD tree', async () => {
+    /* An account derived from the seed phrase will reappear on
+       the next wallet restore. A “delete” button that only hides
+       the record misleads the user. */
     const account = await manager.create()
 
     await expect(manager.remove(account.id, PASSWORD)).rejects.toThrow(AccountNotRemovableError)
   })
 
-  it('удаляет импортированный аккаунт', async () => {
+  it('removes an imported account', async () => {
     await manager.create()
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
@@ -468,7 +468,7 @@ describe('AccountManager: удаление', () => {
     }
   })
 
-  it('удаляет вместе с ним приватный ключ', async () => {
+  it('removes the private key with it', async () => {
     await manager.create()
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
@@ -484,21 +484,21 @@ describe('AccountManager: удаление', () => {
     }
   })
 
-  it('требует пароль', async () => {
+  it('requires a password', async () => {
     await manager.create()
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
     try {
       const imported = await manager.importPrivateKey({ privateKey: key })
 
-      await expect(manager.remove(imported.id, 'неверный')).rejects.toThrow(InvalidPasswordError)
+      await expect(manager.remove(imported.id, 'wrong')).rejects.toThrow(InvalidPasswordError)
       expect(manager.getById(imported.id)).not.toBeNull()
     } finally {
       key.wipe()
     }
   })
 
-  it('переключает активный аккаунт при удалении активного', async () => {
+  it('switches the active account when the active one is removed', async () => {
     const hd = await manager.create()
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
@@ -513,7 +513,7 @@ describe('AccountManager: удаление', () => {
     }
   })
 
-  it('отказывает в удалении единственного аккаунта', async () => {
+  it('refuses removing the only account', async () => {
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
 
     try {
@@ -526,8 +526,8 @@ describe('AccountManager: удаление', () => {
   })
 })
 
-describe('AccountManager: порядок отображения', () => {
-  it('меняет порядок', async () => {
+describe('AccountManager: display order', () => {
+  it('changes the order', async () => {
     const first = await manager.create()
     const second = await manager.create()
 
@@ -536,14 +536,14 @@ describe('AccountManager: порядок отображения', () => {
     expect(manager.list().map((account) => account.id)).toEqual([second.id, first.id])
   })
 
-  it('отвергает неполный список', async () => {
+  it('rejects an incomplete list', async () => {
     const first = await manager.create()
     await manager.create()
 
     await expect(manager.reorder([first.id])).rejects.toThrow(InvalidArgumentError)
   })
 
-  it('сохраняет порядок между сессиями', async () => {
+  it('keeps the order across sessions', async () => {
     const first = await manager.create()
     const second = await manager.create()
     await manager.reorder([second.id, first.id])
@@ -552,8 +552,8 @@ describe('AccountManager: порядок отображения', () => {
   })
 })
 
-describe('AccountManager: экспорт приватного ключа', () => {
-  it('выдаёт ключ HD-аккаунта', async () => {
+describe('AccountManager: private-key export', () => {
+  it('reveals an HD-account key', async () => {
     const account = await manager.create()
     const key = await manager.exportPrivateKey(account.id, PASSWORD, await permitForHd(0))
 
@@ -564,7 +564,7 @@ describe('AccountManager: экспорт приватного ключа', () =>
     }
   })
 
-  it('выдаёт ключ импортированного аккаунта без изменений', async () => {
+  it('reveals an imported-account key unchanged', async () => {
     const source = SecretBuffer.copyOf(IMPORTED_KEY)
 
     try {
@@ -585,17 +585,17 @@ describe('AccountManager: экспорт приватного ключа', () =>
     }
   })
 
-  it('требует пароль даже при снятой блокировке', async () => {
-    /* Снятая блокировка означает лишь, что пароль вводили когда-то,
-       а не что за устройством сейчас владелец. */
+  it('requires a password even when the lock is off', async () => {
+    /* An unlocked lock only means the password was entered at
+       some point, not that the owner is at the device now. */
     const account = await manager.create()
 
     await expect(
-      manager.exportPrivateKey(account.id, 'неверный', await permitForHd(0)),
+      manager.exportPrivateKey(account.id, 'wrong', await permitForHd(0)),
     ).rejects.toThrow(InvalidPasswordError)
   })
 
-  it('требует разрешение, соответствующее операции', async () => {
+  it('requires a permit that matches the operation', async () => {
     const account = await manager.create()
     const wrongPermit = await guard.confirm(
       privateKeyExportRequest(hdAccountScope(hdWallet.accountPath), 5),
@@ -607,7 +607,7 @@ describe('AccountManager: экспорт приватного ключа', () =>
     )
   })
 
-  it('гасит разрешение после использования', async () => {
+  it('consumes the permit after use', async () => {
     const account = await manager.create()
     const permit = await permitForHd(0)
 
@@ -616,7 +616,7 @@ describe('AccountManager: экспорт приватного ключа', () =>
     expect(permit.isConsumed).toBe(true)
   })
 
-  it('записывает экспорт в журнал', async () => {
+  it('records the export in the log', async () => {
     const account = await manager.create()
 
     ;(await manager.exportPrivateKey(account.id, PASSWORD, await permitForHd(0))).wipe()
@@ -624,9 +624,10 @@ describe('AccountManager: экспорт приватного ключа', () =>
     await expect(guard.getHistory(hdAccountScope(hdWallet.accountPath))).resolves.toHaveLength(1)
   })
 
-  it('обнаруживает опасное сочетание с ранее выданным xpub', async () => {
-    /* xpub плюс приватный ключ любого потомка раскрывают весь аккаунт.
-       Второй экспорт обязан получить уровень «компрометация аккаунта». */
+  it('detects a dangerous combination with a previously issued xpub', async () => {
+    /* An xpub plus the private key of any descendant disclose the
+       whole account. The second export must get the “account
+       compromise” level. */
     await manager.create()
     await guard.confirm(
       { kind: EXPORT_KIND.Xpub, scope: hdAccountScope(hdWallet.accountPath), addressIndex: null },
@@ -640,15 +641,15 @@ describe('AccountManager: экспорт приватного ключа', () =>
     expect(assessment.risk).toBe(EXPORT_RISK.AccountCompromise)
   })
 
-  it('отвергает несуществующий аккаунт', async () => {
+  it('rejects a missing account', async () => {
     await expect(
       manager.exportPrivateKey('0'.repeat(32) as AccountId, PASSWORD, await permitForHd(0)),
     ).rejects.toThrow(AccountNotFoundError)
   })
 })
 
-describe('AccountManager: поиск', () => {
-  it('находит аккаунт по адресу без учёта регистра', async () => {
+describe('AccountManager: lookup', () => {
+  it('finds an account by address case-insensitively', async () => {
     const account = await manager.create()
 
     expect(manager.getByAddress(account.address.toLowerCase() as typeof account.address)?.id).toBe(
@@ -656,7 +657,7 @@ describe('AccountManager: поиск', () => {
     )
   })
 
-  it('возвращает null для чужого адреса', async () => {
+  it('returns null for a foreign address', async () => {
     await manager.create()
 
     expect(manager.getByAddress(IMPORTED_ADDRESS)).toBeNull()

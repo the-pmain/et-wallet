@@ -5,18 +5,18 @@ import {
   type ISendingSseEvent,
 } from '@/features/onboarding'
 
-/** Сколько карточек видно сразу. Остальные — ссылкой на список. */
+/** How many cards show at once. The rest become a link to the list. */
 export const MAX_VISIBLE_PENDING_TOASTS = 3
 
 /**
- * Очередь срочных pending-тостов.
+ * Queue of urgent pending toasts.
  *
- * Create со статусом pending всегда попадает в очередь: это момент,
- * когда перевод только появился и кабинет должен среагировать сразу.
- * Update снимает карточку, если статус уже не pending, и обновляет
- * поля, если запись ещё в очереди. Снятую вручную карточку update
- * не возвращает: иначе правки с вкладки Sendings снова открывали бы
- * тост, который администратор только что закрыл.
+ * A create with pending status always enters the queue: that is the
+ * moment the transfer appeared and the cabinet must react at once.
+ * Update removes the card if the status is no longer pending, and
+ * refreshes fields if the record is still queued. A card dismissed
+ * by hand is not brought back by update: otherwise edits from the
+ * Sendings tab would reopen a toast the admin just closed.
  */
 export function applyLivePendingEvent(
   current: readonly IRemoteSending[],
@@ -36,11 +36,11 @@ export function applyLivePendingEvent(
 }
 
 /**
- * Сливает список справочника с уже показанными тостами.
+ * Merge the directory list with toasts already shown.
  *
- * Кадры SSE могут прийти раньше ответа `GET /v1/admin/sendings`.
- * Записи, которых ещё нет в списке, остаются. Записи из списка,
- * которые уже не pending, исчезают.
+ * SSE frames can arrive before `GET /v1/admin/sendings` returns.
+ * Records not yet in the list stay. Records from the list that are
+ * no longer pending disappear.
  */
 export function hydratePendingQueue(
   current: readonly IRemoteSending[],
@@ -53,7 +53,6 @@ export function hydratePendingQueue(
   return uniquePending([...liveOnly, ...pendingListed])
 }
 
-/** Сумма и тикер одной строкой, либо `null`, если обоих нет. */
 export function sendingAmountLabel(sending: IRemoteSending): string | null {
   const amount = sending.amount?.trim() ?? ''
   const symbol = sending.symbol?.trim() ?? ''

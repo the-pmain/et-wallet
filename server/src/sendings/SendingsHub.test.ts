@@ -17,7 +17,7 @@ const EVENT = {
 }
 
 describe('SendingsHub', () => {
-  it('шлёт событие подписчику того же user_id', () => {
+  it('sends an event to a subscriber of the same user_id', () => {
     const hub = new SendingsHub()
     const send = vi.fn()
     hub.subscribe('70', send)
@@ -26,7 +26,7 @@ describe('SendingsHub', () => {
     expect(send).toHaveBeenCalledWith(EVENT)
   })
 
-  it('не шлёт событие чужому user_id', () => {
+  it('does not send an event to another user_id', () => {
     const hub = new SendingsHub()
     const send = vi.fn()
     hub.subscribe('60', send)
@@ -34,7 +34,7 @@ describe('SendingsHub', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('не шлёт событие подписке без user_id', () => {
+  it('does not send an event to a subscription without user_id', () => {
     const hub = new SendingsHub()
     const send = vi.fn()
     hub.subscribe(null, send)
@@ -42,7 +42,7 @@ describe('SendingsHub', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('шлёт все события подписке subscribeAll', () => {
+  it('sends every event to a subscribeAll subscription', () => {
     const hub = new SendingsHub()
     const send = vi.fn()
     hub.subscribeAll(send)
@@ -51,7 +51,7 @@ describe('SendingsHub', () => {
     expect(send).toHaveBeenCalledWith(EVENT)
   })
 
-  it('после отписки больше не вызывает слушателя', () => {
+  it('after unsubscribe no longer calls the listener', () => {
     const hub = new SendingsHub()
     const send = vi.fn()
     const unsubscribe = hub.subscribe('70', send)
@@ -61,7 +61,7 @@ describe('SendingsHub', () => {
     expect(hub.size).toBe(0)
   })
 
-  it('форматирует кадр SSE с именем sendings и type_send', () => {
+  it('formats an SSE frame with name sendings and type_send', () => {
     expect(formatSendingsSseFrame(EVENT)).toBe(
       `event: sendings\ndata: ${JSON.stringify(EVENT)}\n\n`,
     )

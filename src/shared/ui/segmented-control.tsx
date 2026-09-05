@@ -2,26 +2,27 @@ import type { ComponentType } from 'react'
 
 import { cn } from '@/shared/lib/utils'
 
-/** Один вариант выбора. */
 export interface ISegmentedOption<TValue extends string | number> {
   readonly value: TValue
   readonly label: string
 
   /**
-   * Значок рядом с надписью.
+   * Icon next to the label.
    *
-   * Необязателен: у отбора истории значка нет, у выбора темы есть.
-   * Значок дополняет надпись, но не заменяет её — набор из одних
-   * значков заставляет угадывать, а угадывать в кошельке нечего.
+   * Optional: history filters have none, theme choice has one.
+   * The icon supplements the label and does not replace it — a
+   * set of icons alone forces guessing, and a wallet has nothing
+   * to guess about.
    */
   readonly icon?: ComponentType<{ className?: string }> | undefined
 
   /**
-   * Доступное имя, если видимой надписи для различения недостаточно.
+   * Accessible name when the visible label is not enough to tell
+   * options apart.
    *
-   * Нужно там, где короткая надпись повторяется в соседнем наборе:
-   * две кнопки с именем «All» неразличимы для того, кто слушает
-   * страницу, а не смотрит на неё.
+   * Needed where a short label repeats in a neighboring set: two
+   * buttons named “All” are indistinguishable to someone who hears
+   * the page rather than looks at it.
    */
   readonly name?: string | undefined
 }
@@ -32,11 +33,11 @@ export interface SegmentedControlProps<TValue extends string | number> {
   readonly onChange: (value: TValue) => void
 
   /**
-   * Видимая подпись набора.
+   * Visible name of the set.
    *
-   * Обязательная, а не необязательная. Набор кнопок без имени
-   * заставляет угадывать, чем он управляет, а угадывание в кошельке
-   * оканчивается неверно выбранной скоростью или отбором.
+   * Required, not optional. A button set with no name forces
+   * guessing what it controls, and guessing in a wallet ends in
+   * the wrong speed or the wrong filter.
    */
   readonly legend: string
 
@@ -44,21 +45,22 @@ export interface SegmentedControlProps<TValue extends string | number> {
 }
 
 /**
- * Выбор одного значения из набора.
+ * Choose one value from a set.
  *
- * ОБЩИЙ ПРИМИТИВ, А НЕ ПОВТОР В КАЖДОМ ЭКРАНЕ. Такой переключатель
- * появился независимо на отборе истории и на выборе скорости отправки,
- * и наборы уже начали расходиться в мелочах — разная высота, разный
- * вид выбранного. Одинаковые по смыслу органы управления, выглядящие
- * по-разному, читаются как разные по назначению.
+ * A SHARED PRIMITIVE, NOT A COPY ON EACH SCREEN. This switch
+ * appeared independently on history filters and on send speed,
+ * and the sets were already drifting — different height, different
+ * selected look. Controls that mean the same thing but look
+ * different read as different in purpose.
  *
- * ВЫБРАННОЕ ОТМЕЧЕНО ТРЕМЯ ПРИЗНАКАМИ СРАЗУ: цветом, поднятием и
- * `aria-pressed`. Цвет как единственный признак недоступен людям
- * с нарушением цветовосприятия и не читается вспомогательными
- * технологиями.
+ * THE SELECTION IS MARKED THREE WAYS AT ONCE: color, elevation,
+ * and `aria-pressed`. Color as the only cue is unavailable to
+ * people with impaired color vision and is not read by assistive
+ * technology.
  *
- * ВЫСОТА 44 ПИКСЕЛЯ — нижний предел прицеливания пальцем. И отбор,
- * и скорость отправки нажимают на телефоне не реже, чем мышью.
+ * HEIGHT 44 PIXELS — the lower bound for a finger tap. Both
+ * filters and send speed are pressed on a phone at least as often
+ * as with a mouse.
  */
 export function SegmentedControl<TValue extends string | number>({
   options,
@@ -73,8 +75,9 @@ export function SegmentedControl<TValue extends string | number>({
         {legend}
       </legend>
 
-      {/* Общая дорожка под всем набором. Без неё кнопки читаются как
-          отдельные действия, а не как выбор одного значения из ряда. */}
+      {/* Shared track under the whole set. Without it the buttons
+          read as separate actions, not as choosing one value from
+          a row. */}
       <div
         className="grid gap-1 rounded-xl bg-muted/60 p-1"
         style={{ gridTemplateColumns: `repeat(${String(options.length)}, minmax(0, 1fr))` }}
@@ -93,8 +96,8 @@ export function SegmentedControl<TValue extends string | number>({
                 onChange(option.value)
               }}
               className={cn(
-                /* Рамок нет: внутри дорожки они рисовали бы вторую
-                   сетку поверх первой. */
+                /* No borders: inside the track they would draw a
+                   second grid on top of the first. */
                 'focus-ring flex min-h-11 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg px-2 text-xs font-medium transition-all',
                 isSelected
                   ? 'bg-primary/15 text-primary-emphasis shadow-surface'

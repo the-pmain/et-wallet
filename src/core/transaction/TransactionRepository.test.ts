@@ -17,7 +17,7 @@ const OTHER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 const ETHEREUM = toChainId(1n)
 const POLYGON = toChainId(137n)
 
-/** Сумма за пределами `Number.MAX_SAFE_INTEGER`. */
+/** An amount beyond `Number.MAX_SAFE_INTEGER`. */
 const LARGE_VALUE = 123_456_789_123_456_789_123n as Wei
 
 let storage: SecureStorage
@@ -56,18 +56,18 @@ beforeEach(async () => {
   repository = new TransactionRepository(storage)
 })
 
-describe('TransactionRepository: сохранение', () => {
-  it('возвращает запись без потери точности крупных чисел', async () => {
+describe('TransactionRepository: persistence', () => {
+  it('returns a record without losing precision on large numbers', async () => {
     await repository.save(record())
 
     const found = await repository.findByHash(record().hash)
 
-    /* Перевод через `number` округлил бы значение: 2^53 меньше типичной
-       суммы в wei. Проверяется именно точное совпадение. */
+    /* Passing through `number` would round the value: 2^53 is less
+       than a typical amount in wei. Exact equality is what is checked. */
     expect(found?.value).toBe(LARGE_VALUE)
   })
 
-  it('сохраняет все денежные поля как bigint', async () => {
+  it('stores every monetary field as bigint', async () => {
     await repository.save(
       record({
         blockNumber: 18_000_000n,
@@ -86,13 +86,13 @@ describe('TransactionRepository: сохранение', () => {
     expect(found?.confirmedAt).toBe(1_700_000_100_000)
   })
 
-  it('восстанавливает chainId как bigint', async () => {
+  it('restores chainId as bigint', async () => {
     await repository.save(record({ chainId: POLYGON }))
 
     expect((await repository.findByHash(record().hash))?.chainId).toBe(POLYGON)
   })
 
-  it('перезаписывает запись с тем же хэшем, а не создаёт вторую', async () => {
+  it('overwrites a record with the same hash instead of creating a second', async () => {
     await repository.save(record())
     await repository.save(record({ status: TRANSACTION_STATUS.Confirmed }))
 
@@ -102,19 +102,19 @@ describe('TransactionRepository: сохранение', () => {
     expect(all[0]?.status).toBe(TRANSACTION_STATUS.Confirmed)
   })
 
-  it('сохраняет развёртывание контракта с пустым получателем', async () => {
+  it('stores a contract deployment with an empty recipient', async () => {
     await repository.save(record({ to: null }))
 
     expect((await repository.findByHash(record().hash))?.to).toBeNull()
   })
 })
 
-describe('TransactionRepository: поиск', () => {
-  it('возвращает null для неизвестного хэша', async () => {
+describe('TransactionRepository: lookup', () => {
+  it('returns null for an unknown hash', async () => {
     expect(await repository.findByHash('0xabc' as TxHash)).toBeNull()
   })
 
-  it('отбирает записи по адресу и сети', async () => {
+  it('selects records by address and network', async () => {
     await repository.save(record())
     await repository.save(
       record({
@@ -127,17 +127,17 @@ describe('TransactionRepository: поиск', () => {
     expect(await repository.findByAddress(OWNER, POLYGON)).toHaveLength(1)
   })
 
-  it('не путает адреса, записанные в разном регистре', async () => {
+  it('does not confuse addresses written in different case', async () => {
     await repository.save(record())
 
     const lowercase = OWNER.toLowerCase() as Address
 
-    /* Один адрес приходит и в контрольной сумме EIP-55, и в нижнем регистре
-       из ответов RPC. Прямое сравнение строк потеряло бы историю. */
+    /* The same address arrives both in EIP-55 checksum and in lowercase
+       from RPC replies. A direct string compare would lose the history. */
     expect(await repository.findByAddress(lowercase, ETHEREUM)).toHaveLength(1)
   })
 
-  it('сортирует от новых к старым', async () => {
+  it('sorts from newest to oldest', async () => {
     await repository.save(record({ submittedAt: 1_000 as Timestamp }))
     await repository.save(
       record({
@@ -151,7 +151,7 @@ describe('TransactionRepository: поиск', () => {
     expect(all[0]?.submittedAt).toBe(2_000)
   })
 
-  it('находит только ожидающие подтверждения', async () => {
+  it('finds only those awaiting confirmation', async () => {
     await repository.save(record())
     await repository.save(
       record({
@@ -167,21 +167,21 @@ describe('TransactionRepository: поиск', () => {
   })
 })
 
-describe('TransactionRepository: изменение', () => {
-  it('обновляет состояние записи', async () => {
+describe('TransactionRepository: mutation', () => {
+  it('updates the record status', async () => {
     await repository.save(record())
     await repository.updateStatus(record().hash, TRANSACTION_STATUS.Reverted)
 
     expect((await repository.findByHash(record().hash))?.status).toBe(TRANSACTION_STATUS.Reverted)
   })
 
-  it('молча пропускает обновление неизвестной записи', async () => {
+  it('silently skips an update of an unknown record', async () => {
     await expect(
       repository.updateStatus('0xdead' as TxHash, TRANSACTION_STATUS.Confirmed),
     ).resolves.toBeUndefined()
   })
 
-  it('удаляет историю адреса', async () => {
+  it('deletes the address history', async () => {
     await repository.save(record())
     await repository.deleteByAddress(OWNER)
 
@@ -189,8 +189,8 @@ describe('TransactionRepository: изменение', () => {
   })
 })
 
-describe('TransactionRepository: шифрование', () => {
-  it('не оставляет адрес в открытом виде', async () => {
+describe('TransactionRepository: encryption', () => {
+  it('does not leave the address in the clear', async () => {
     const plain = new MemoryStorageService()
     const secure = new SecureStorage(plain, new FastEncryptionService())
 
@@ -200,18 +200,18 @@ describe('TransactionRepository: шифрование', () => {
     const keys = await plain.keys('transactions')
     const stored = await plain.get('transactions', keys[0]!)
 
-    /* Список операций связывает адреса пользователя и раскрывает
-       контрагентов. Заблокированный кошелёк не должен этого сообщать. */
+    /* The operation list ties the user's addresses together and
+       reveals counterparties. A locked wallet must not disclose that. */
     expect(JSON.stringify(stored)).not.toContain(OWNER)
     expect(JSON.stringify(stored)).not.toContain(OTHER)
   })
 })
 
-describe('TransactionRepository: индекс', () => {
-  it('запись, сохранённая в обход индекса, всё равно находится', async () => {
-    /* Индекс — ускоритель, а не источник истины. Записи, сделанные
-       прежней версией приложения, лежат в хранилище без него,
-       и потерять их нельзя. */
+describe('TransactionRepository: index', () => {
+  it('a record saved outside the index is still found', async () => {
+    /* The index is an accelerator, not the source of truth. Records
+       written by an older app version sit in storage without it,
+       and they must not be lost. */
     const stored = { ...record(), hash: `0x${'ab'.repeat(32)}` as TxHash }
 
     await storage.set(
@@ -238,11 +238,11 @@ describe('TransactionRepository: индекс', () => {
     expect(await repository.findByAddress(stored.from, stored.chainId)).toHaveLength(1)
   })
 
-  it('повреждённый индекс перестраивается, а не роняет чтение', async () => {
+  it('a corrupted index is rebuilt instead of breaking the read', async () => {
     await repository.save(record())
 
-    /* Формат сменился либо запись испорчена: единственный правильный
-       ответ — перестроить её полным чтением. */
+    /* The format changed or the record is corrupt: the only correct
+       answer is to rebuild it by a full read. */
     await storage.set(STORAGE_NAMESPACE.Transactions, toStorageKey('index.v1'), {
       version: 999,
       byOwner: {},
@@ -252,10 +252,10 @@ describe('TransactionRepository: индекс', () => {
     expect(await repository.findByAddress(record().from, record().chainId)).toHaveLength(1)
   })
 
-  it('сама запись индекса не попадает в историю', async () => {
-    /* Индекс лежит в том же пространстве и записью транзакции
-       не является: попав в выборку, он превратился бы в строку
-       с пустыми полями. */
+  it('the index record itself does not appear in history', async () => {
+    /* The index lives in the same namespace and is not a transaction
+       record: if it entered the sample it would become a row with
+       empty fields. */
     await repository.save(record())
 
     const history = await repository.findByAddress(record().from, record().chainId)
@@ -264,7 +264,7 @@ describe('TransactionRepository: индекс', () => {
     expect(history[0]?.hash).toBe(record().hash)
   })
 
-  it('удаление адреса вычищает его из индекса', async () => {
+  it('deleting an address clears it from the index', async () => {
     await repository.save(record())
     await repository.deleteByAddress(record().from)
 
@@ -272,9 +272,9 @@ describe('TransactionRepository: индекс', () => {
     expect(await repository.findUnsettled(3)).toHaveLength(0)
   })
 
-  it('глубоко подтверждённая запись уходит из слежения', async () => {
-    /* Иначе индекс слежения совпал бы со всей историей, и выигрыш
-       от него исчез бы. */
+  it('a deeply confirmed record leaves tracking', async () => {
+    /* Otherwise the tracking index would match the whole history,
+       and its gain would vanish. */
     await repository.save({
       ...record(),
       status: TRANSACTION_STATUS.Confirmed,
@@ -284,8 +284,8 @@ describe('TransactionRepository: индекс', () => {
     expect(await repository.findUnsettled(3)).toHaveLength(0)
   })
 
-  it('неглубоко подтверждённая остаётся под наблюдением', async () => {
-    /* Блок с ней может быть вытеснен реорганизацией цепи. */
+  it('a shallowly confirmed one stays under watch', async () => {
+    /* The block that holds it can still be displaced by a reorg. */
     await repository.save({
       ...record(),
       status: TRANSACTION_STATUS.Confirmed,
@@ -295,13 +295,13 @@ describe('TransactionRepository: индекс', () => {
     expect(await repository.findUnsettled(3)).toHaveLength(1)
   })
 
-  it('замещённая уходит из слежения сразу', async () => {
+  it('a replaced one leaves tracking at once', async () => {
     await repository.save({ ...record(), status: TRANSACTION_STATUS.Replaced })
 
     expect(await repository.findUnsettled(3)).toHaveLength(0)
   })
 
-  it('смена статуса убирает запись из слежения', async () => {
+  it('a status change removes the record from tracking', async () => {
     const initial = record()
 
     await repository.save(initial)
@@ -312,7 +312,7 @@ describe('TransactionRepository: индекс', () => {
     expect(await repository.findUnsettled(3)).toHaveLength(0)
   })
 
-  it('история одного адреса не содержит чужих записей', async () => {
+  it('one address history does not contain foreign records', async () => {
     await repository.save(record())
     await repository.save({ ...record(), hash: `0x${'cd'.repeat(32)}` as TxHash, from: OTHER })
 

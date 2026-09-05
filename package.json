@@ -6,7 +6,7 @@
   "sideEffects": [
     "**/*.css"
   ],
-  "description": "Некастодиальный криптовалютный кошелёк",
+  "description": "Non-custodial cryptocurrency wallet",
   "engines": {
     "node": ">=22.12.0"
   },

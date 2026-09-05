@@ -2,16 +2,17 @@ import type { ITokenRef } from '@/core/token'
 import type { Address, ChainId, Timestamp } from '@/core/types'
 
 /**
- * Баланс одного токена на одном адресе.
+ * Balance of one token on one address.
  *
- * СОЗНАТЕЛЬНО НЕ СОДЕРЖИТ отформатированной строки вида `1.234 ETH`.
+ * DELIBERATELY CONTAINS NO formatted string like `1.234 ETH`.
  *
- * Форматирование зависит от локали, числа отображаемых знаков и настроек
- * пользователя — то есть относится к слою представления. Поле `formatted`
- * в доменной модели означало бы, что ядро принимает решения об отображении
- * и что при смене языка потребуется пересчитать все балансы.
+ * Formatting depends on locale, the number of displayed decimals,
+ * and user settings — i.e. it belongs to the presentation layer. A
+ * `formatted` field in the domain model would mean the core decides
+ * display and that a language change would require recomputing every
+ * balance.
  *
- * Ядро отдаёт `raw` и `decimals`. Преобразование выполняет UI.
+ * The core returns `raw` and `decimals`. The UI does the conversion.
  */
 export interface IBalance {
   readonly owner: Address
@@ -19,31 +20,31 @@ export interface IBalance {
   readonly token: ITokenRef
 
   /**
-   * Значение в минимальных единицах токена.
+   * Value in the token's smallest units.
    *
-   * Только `bigint`. Перевод в `number` при `decimals = 18` теряет точность
-   * уже на суммах порядка десятых долей токена.
+   * Only `bigint`. Conversion to `number` at `decimals = 18` loses
+   * precision already at amounts on the order of tenths of a token.
    */
   readonly raw: bigint
 
-  /** Число десятичных знаков токена. Дублируется здесь, чтобы UI мог
-      отформатировать значение, не разрешая ссылку на токен. */
+  /** Token decimal count. Duplicated here so the UI can format
+      the value without resolving the token reference. */
   readonly decimals: number
 
-  /** Момент получения значения. Нужен для показа устаревших данных. */
+  /** Instant the value was obtained. Needed to show stale data. */
   readonly updatedAt: Timestamp
 
   /**
-   * Значение получено из кэша, а не из сети.
+   * The value came from the cache, not from the network.
    *
-   * Интерфейс обязан отличать актуальный баланс от сохранённого:
-   * решение об отправке средств на основании устаревшего значения
-   * приводит к отклонению транзакции сетью.
+   * The UI must tell a current balance from a stored one: a send
+   * decision based on a stale value leads to the network rejecting
+   * the transaction.
    */
   readonly isStale: boolean
 }
 
-/** Совокупность балансов адреса в одной сети. */
+/** All balances of an address on one network. */
 export interface IAccountBalances {
   readonly owner: Address
   readonly chainId: ChainId
@@ -52,7 +53,6 @@ export interface IAccountBalances {
   readonly updatedAt: Timestamp
 }
 
-/** События слоя балансов. */
 export interface BalanceEventMap {
   'balance:updated': {
     readonly owner: Address

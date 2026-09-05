@@ -27,9 +27,9 @@ interface AdminPinFormProps {
 }
 
 /**
- * Первый экран кабинета: только PIN.
+ * First cabinet screen: PIN only.
  *
- * Значение сверяет сервер. Форма не знает правильного кода.
+ * The server checks the value. The form does not know the correct code.
  */
 export function AdminPinForm({
   title = 'Admin',

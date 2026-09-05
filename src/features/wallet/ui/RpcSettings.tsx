@@ -25,18 +25,19 @@ interface RpcSettingsProps {
 }
 
 /**
- * Управление RPC-узлами активной сети.
+ * RPC-node settings for the active network.
  *
- * ПОЛЬЗОВАТЕЛЬ ОБЯЗАН ВИДЕТЬ, К ЧЬЕМУ УЗЛУ ОБРАЩАЕТСЯ КОШЕЛЁК. Оператор
- * узла видит IP-адрес и каждый запрашиваемый адрес — этого достаточно,
- * чтобы связать личность с портфелем. Скрывать выбор оператора означало
- * бы скрывать, кому передаются эти данные.
+ * The user must see whose node the wallet talks to. The operator
+ * sees the IP and every requested address — enough to tie a person
+ * to a portfolio. Hiding the operator choice would hide who gets
+ * that data.
  *
- * ПОКАЗЫВАЕТСЯ ХОСТ, А НЕ ПОЛНЫЙ АДРЕС: путь содержит ключ доступа.
+ * The host is shown, not the full URL: the path holds an access key.
  *
- * ДОБАВЛЕНИЕ АДРЕСА — ОПЕРАЦИЯ ДОВЕРИЯ, И ОБ ЭТОМ СКАЗАНО ПРЯМО. Узел
- * сообщает баланс, цену газа и результаты вызовов; узел, которому нельзя
- * доверять, покажет пользователю не то, что он подписывает.
+ * Adding a URL is a trust operation, and that is said plainly. The
+ * node reports balance, gas price, and call results; a node that
+ * cannot be trusted will show the user something other than what
+ * they sign.
  */
 export function RpcSettings({
   endpoints,
@@ -59,8 +60,8 @@ export function RpcSettings({
       await onAdd(url.trim())
       setUrl('')
     } catch (cause) {
-      /* Причина показывается как есть: «узел обслуживает другую сеть»
-         и «узел не отвечает» требуют разных действий пользователя. */
+      /* The reason is shown as-is: "the node serves another chain"
+         and "the node does not answer" need different actions. */
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setBusy(false)

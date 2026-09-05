@@ -3,16 +3,16 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 /**
- * Заполнитель на время загрузки.
+ * Placeholder while loading.
  *
- * ПОЧЕМУ НЕ ПОКАЗЫВАЕТСЯ ВМЕСТО ЧИСЛОВЫХ ЗНАЧЕНИЙ. Заполнитель на месте
- * баланса выглядит как «сейчас будет число» и подталкивает дождаться его,
- * не заметив, что данные так и не пришли. Для сумм используется явное
- * состояние с текстом. Заполнитель уместен там, где отсутствие данных
- * ничего не решает: списки, заголовки, оформление.
+ * WHY IT IS NOT SHOWN IN PLACE OF NUMERIC VALUES. A placeholder where
+ * a balance sits looks like “a number is coming” and pushes the user
+ * to wait for it, missing that the data never arrived. Amounts use an
+ * explicit text state. A placeholder belongs where missing data
+ * decides nothing: lists, headings, chrome.
  *
- * `aria-hidden`: экранному диктору нечего зачитывать, а состояние загрузки
- * сообщается текстом рядом.
+ * `aria-hidden`: a screen reader has nothing to announce, and the
+ * loading state is spoken by nearby text.
  */
 export function Skeleton({ className, ...props }: ComponentProps<'div'>) {
   return (

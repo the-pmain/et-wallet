@@ -1,8 +1,8 @@
 /**
- * Страницы журнала писем.
+ * Mail-journal pages.
  *
- * Cloudflare отдаёт смешанный список (GraphQL + KV). Курсор — непрозрачная
- * отметка «создано + id», чтобы следующая страница брала более старые письма.
+ * Cloudflare returns a mixed list (GraphQL + KV). The cursor is an
+ * opaque "created + id" mark so the next page takes older mail.
  */
 
 export const MAILBOX_PAGE_DEFAULT = 20

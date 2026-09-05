@@ -52,13 +52,13 @@ function prices(entries: readonly (readonly [IToken, IPriceQuote])[]): PriceMap 
   )
 }
 
-/** Баланс нативной валюты заданной сети. */
+/** Native-currency balance of the given chain. */
 function balanceOf(raw: bigint, chainId = ETHEREUM): IBalance {
   return { raw, decimals: 18, chainId, isStale: false } as unknown as IBalance
 }
 
-describe('estimateNativeValue: цена ровно того числа, что показано', () => {
-  it('умножает показанный баланс на курс нативной валюты', () => {
+describe('estimateNativeValue: the price of exactly the figure shown', () => {
+  it('multiplies the displayed balance by the native-currency rate', () => {
     const portfolio = buildPortfolio(
       [{ token: ETH, balance: 2n * 10n ** 18n }],
       prices([[ETH, quote(3000)]]),
@@ -67,10 +67,11 @@ describe('estimateNativeValue: цена ровно того числа, что �
     expect(estimateNativeValue(balanceOf(2n * 10n ** 18n), portfolio)).toBe(6000)
   })
 
-  it('считает от свежего баланса, а не от оценки в сводке', () => {
-    /* ГЛАВНАЯ ПРОВЕРКА МОДУЛЯ. Кнопка обновления баланса портфель
-       не пересчитывает, поэтому сводка законно отстаёт. Готовое
-       `value` позиции описывало бы прежнюю сумму — рядом с новой. */
+  it('computes from the fresh balance, not from the summary estimate', () => {
+    /* Main check of this module. Refreshing the balance does not
+       recompute the portfolio, so the summary is allowed to lag.
+       A ready position `value` would describe the previous amount
+       next to the new one. */
     const portfolio = buildPortfolio(
       [{ token: ETH, balance: 2n * 10n ** 18n }],
       prices([[ETH, quote(3000)]]),
@@ -80,9 +81,9 @@ describe('estimateNativeValue: цена ровно того числа, что �
     expect(estimateNativeValue(balanceOf(5n * 10n ** 18n), portfolio)).toBe(15_000)
   })
 
-  it('молчит, когда курс нативной валюты неизвестен', () => {
-    /* Курс есть только у токена. Подставить сюда ноль значило бы
-       объявить эфир ничего не стоящим. */
+  it('stays silent when the native-currency rate is unknown', () => {
+    /* Only the token has a rate. Substituting zero would claim ether
+       is worthless. */
     const portfolio = buildPortfolio(
       [
         { token: ETH, balance: 2n * 10n ** 18n },
@@ -94,9 +95,10 @@ describe('estimateNativeValue: цена ровно того числа, что �
     expect(estimateNativeValue(balanceOf(2n * 10n ** 18n), portfolio)).toBeNull()
   })
 
-  it('молчит, когда сводка от другой сети', () => {
-    /* Промежуток при переключении сети: баланс уже в BNB, сводка ещё
-       эфирная. Без сверки полтора BNB были бы оценены в 4500 $. */
+  it('stays silent when the summary is from another chain', () => {
+    /* Gap while switching chains: the balance is already BNB, the
+       summary is still ether. Without a match, 1.5 BNB would be
+       valued at $4500. */
     const portfolio = buildPortfolio(
       [{ token: ETH, balance: 2n * 10n ** 18n }],
       prices([[ETH, quote(3000)]]),
@@ -105,7 +107,7 @@ describe('estimateNativeValue: цена ровно того числа, что �
     expect(estimateNativeValue(balanceOf(15n * 10n ** 17n, BNB_CHAIN), portfolio)).toBeNull()
   })
 
-  it('оценивает нативную валюту другой сети по её собственному курсу', () => {
+  it('values another chain\'s native currency at its own rate', () => {
     const portfolio = buildPortfolio(
       [{ token: BNB, balance: 15n * 10n ** 17n }],
       prices([[BNB, quote(600)]]),
@@ -114,7 +116,7 @@ describe('estimateNativeValue: цена ровно того числа, что �
     expect(estimateNativeValue(balanceOf(15n * 10n ** 17n, BNB_CHAIN), portfolio)).toBe(900)
   })
 
-  it('молчит без баланса и без сводки', () => {
+  it('stays silent without a balance and without a summary', () => {
     const portfolio = buildPortfolio(
       [{ token: ETH, balance: 2n * 10n ** 18n }],
       prices([[ETH, quote(3000)]]),
@@ -124,9 +126,10 @@ describe('estimateNativeValue: цена ровно того числа, что �
     expect(estimateNativeValue(balanceOf(2n * 10n ** 18n), null)).toBeNull()
   })
 
-  it('нулевой баланс оценивается в ноль, а не в неизвестность', () => {
-    /* Законный ноль: баланс известен и равен нулю, курс получен.
-       Прочерк здесь был бы такой же ложью, как ноль вместо прочерка. */
+  it('values a zero balance as zero, not as unknown', () => {
+    /* A legitimate zero: the balance is known to be zero and a rate
+       was received. A dash here would be the same lie as zero in
+       place of a dash. */
     const portfolio = buildPortfolio([{ token: ETH, balance: 0n }], prices([[ETH, quote(3000)]]))
 
     expect(estimateNativeValue(balanceOf(0n), portfolio)).toBe(0)

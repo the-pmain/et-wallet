@@ -19,15 +19,14 @@ const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 const PEER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
-/** Данные вызова `transfer(address,uint256)`. */
+/** Call data of `transfer(address,uint256)`. */
 const TRANSFER_DATA =
   `0x${functionSelector('transfer(address,uint256)')}${'0'.repeat(24)}${PEER.slice(2)}${encodeUintWord(1n)}` as HexString
 
-/** Слово, кодирующее `true`, и слово, кодирующее `false`. */
 const TRUE_WORD = `0x${encodeUintWord(1n)}` as HexString
 const FALSE_WORD = `0x${encodeUintWord(0n)}` as HexString
 
-/** Кодирует `Error(string)` так, как это делает виртуальная машина. */
+/** Encodes `Error(string)` the way the virtual machine does. */
 function encodeErrorString(text: string): string {
   const bytes = new TextEncoder().encode(text)
   const body = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -35,24 +34,21 @@ function encodeErrorString(text: string): string {
   return `0x${functionSelector('Error(string)')}${encodeUintWord(32n)}${encodeUintWord(BigInt(bytes.length))}${body.padEnd(Math.ceil(body.length / 64) * 64, '0')}`
 }
 
-/** Кодирует `Panic(uint256)`. */
 function encodePanic(code: bigint): string {
   return `0x${functionSelector('Panic(uint256)')}${encodeUintWord(code)}`
 }
 
-/** Узел, отвечающий на `eth_call` заданным образом. */
+/** A node that replies to `eth_call` in a prescribed way. */
 class CallNode implements IProvider {
   readonly chainId = 1n as ChainId
   readonly rpcUrl = 'https://stub.example'
   readonly isActive = true
 
-  /** Что вернуть на вызов. */
   result: HexString = '0x' as HexString
 
-  /** Чем отказать вместо ответа. */
   failure: Error | null = null
 
-  /** Последний полученный запрос: проверяется его состав. */
+  /** Last request received: its contents are checked. */
   lastRequest: ICallRequest | null = null
 
   readonly #events = new EventBus<ProviderEventMap>()
@@ -117,7 +113,7 @@ class CallNode implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -139,16 +135,16 @@ const tokenSend = {
   value: toWei(0n),
 }
 
-describe('Предварительный прогон: успех', () => {
-  it('вызов, прошедший на узле, считается пройденным', async () => {
+describe('Preflight: success', () => {
+  it('a call that passed on the node is treated as passed', async () => {
     const node = new CallNode()
 
     expect((await preflightCall(node, nativeSend)).outcome).toBe(PREFLIGHT_OUTCOME.Passed)
   })
 
-  it('узлу уходят те же поля, что уйдут в сеть', async () => {
-    /* Проверка отличающейся транзакции ничего не проверяет. Сумма
-       и данные вызова обязаны совпадать с подписываемыми. */
+  it('the node receives the same fields that will go on-chain', async () => {
+    /* Checking a different transaction checks nothing. The amount
+       and call data must match what will be signed. */
     const node = new CallNode()
 
     node.result = TRUE_WORD
@@ -164,11 +160,11 @@ describe('Предварительный прогон: успех', () => {
   })
 })
 
-describe('Предварительный прогон: отказ значением', () => {
-  it('`transfer`, вернувший false, признаётся отказом', async () => {
-    /* Опаснее отката: транзакция попадёт в блок, газ спишется,
-       а средства не сдвинутся. Кошелёк, промолчавший здесь,
-       отрапортует об отправке, которой не было. */
+describe('Preflight: rejection by value', () => {
+  it('`transfer` that returned false is treated as a rejection', async () => {
+    /* Worse than a revert: the transaction lands in a block, gas
+       is charged, and the funds do not move. A wallet that stays
+       silent here would report a send that never happened. */
     const node = new CallNode()
 
     node.result = FALSE_WORD
@@ -179,7 +175,7 @@ describe('Предварительный прогон: отказ значени
     expect(result.reason).toMatch(/false/i)
   })
 
-  it('`transfer`, вернувший true, проходит', async () => {
+  it('`transfer` that returned true passes', async () => {
     const node = new CallNode()
 
     node.result = TRUE_WORD
@@ -187,10 +183,10 @@ describe('Предварительный прогон: отказ значени
     expect((await preflightCall(node, tokenSend)).outcome).toBe(PREFLIGHT_OUTCOME.Passed)
   })
 
-  it('пустой ответ на `transfer` отказом не считается', async () => {
-    /* Контракты, написанные до уточнения стандарта, не возвращают
-       ничего. Счесть их отказавшими значило бы запретить работу
-       с ними — среди них есть крупнейшие. */
+  it('an empty `transfer` reply is not treated as a rejection', async () => {
+    /* Contracts written before the standard was clarified return
+       nothing. Treating them as rejected would ban working with
+       them — some of the largest are among them. */
     const node = new CallNode()
 
     node.result = '0x' as HexString
@@ -198,9 +194,9 @@ describe('Предварительный прогон: отказ значени
     expect((await preflightCall(node, tokenSend)).outcome).toBe(PREFLIGHT_OUTCOME.Passed)
   })
 
-  it('нулевой ответ на вызов без булевого результата отказом не считается', async () => {
-    /* Ноль — законный результат множества функций. Толковать его как
-       отказ у всех подряд значило бы поднимать тревогу без причины. */
+  it('a zero reply from a call with no boolean result is not a rejection', async () => {
+    /* Zero is a lawful result of many functions. Reading it as a
+       rejection on every call would raise an alarm without cause. */
     const node = new CallNode()
 
     node.result = FALSE_WORD
@@ -209,8 +205,8 @@ describe('Предварительный прогон: отказ значени
   })
 })
 
-describe('Предварительный прогон: откат', () => {
-  it('откат распознаётся и не выдаётся за недоступность', async () => {
+describe('Preflight: revert', () => {
+  it('a revert is recognised and not treated as unavailability', async () => {
     const node = new CallNode()
 
     node.failure = new GasEstimationFailedError('the call reverted')
@@ -218,7 +214,7 @@ describe('Предварительный прогон: откат', () => {
     expect((await preflightCall(node, tokenSend)).outcome).toBe(PREFLIGHT_OUTCOME.Reverted)
   })
 
-  it('причина контракта доходит дословно', async () => {
+  it('the contract reason arrives verbatim', async () => {
     const node = new CallNode()
 
     node.failure = new GasEstimationFailedError('the call reverted', {
@@ -230,9 +226,9 @@ describe('Предварительный прогон: откат', () => {
     )
   })
 
-  it('сырые данные отката сохраняются', async () => {
-    /* По четырёхбайтовому признаку собственной ошибки причину можно
-       найти. Потеряв его, сказать было бы нечего. */
+  it('the raw revert data is kept', async () => {
+    /* The four-byte selector of a custom error is how the reason
+       can be found. Losing it would leave nothing to say. */
     const node = new CallNode()
     const data = '0xdeadbeef'
 
@@ -241,10 +237,10 @@ describe('Предварительный прогон: откат', () => {
     expect((await preflightCall(node, tokenSend)).revertData).toBe(data)
   })
 
-  it('недоступный узел не выдаётся за откат', async () => {
-    /* Молчание узла не подтверждает ничего. Показать его как отказ
-       вызова значило бы заставить человека искать ошибку в своей
-       транзакции. */
+  it('an unavailable node is not treated as a revert', async () => {
+    /* Silence from the node confirms nothing. Showing it as a call
+       rejection would send the person looking for a fault in their
+       own transaction. */
     const node = new CallNode()
 
     node.failure = new Error('the node did not answer')
@@ -252,9 +248,9 @@ describe('Предварительный прогон: откат', () => {
     expect((await preflightCall(node, tokenSend)).outcome).toBe(PREFLIGHT_OUTCOME.Unavailable)
   })
 
-  it('развёртывание контракта не проверяется и не объявляется проверенным', async () => {
-    /* Вызов без получателя возвращает байт-код будущего контракта,
-       а не признак успеха: судить по нему не о чем. */
+  it('a contract deployment is not checked and not declared checked', async () => {
+    /* A call with no recipient returns the future contract's
+       bytecode, not a success flag: there is nothing to judge by. */
     const node = new CallNode()
 
     const result = await preflightCall(node, {
@@ -269,42 +265,42 @@ describe('Предварительный прогон: откат', () => {
   })
 })
 
-describe('Разбор данных отката', () => {
-  it('стандартная причина читается строкой', () => {
+describe('Parsing revert data', () => {
+  it('a standard reason is read as a string', () => {
     expect(decodeRevertReason(encodeErrorString('not enough allowance'))).toBe(
       'not enough allowance',
     )
   })
 
-  it('код паники переводится в слова', () => {
-    /* «Паника 0x11» не говорит владельцу средств ничего. */
+  it('a panic code is translated into words', () => {
+    /* "Panic 0x11" tells the funds' owner nothing. */
     expect(decodeRevertReason(encodePanic(0x11n))).toMatch(/overflow/i)
   })
 
-  it('неизвестный код паники называется числом, а не выдумкой', () => {
+  it('an unknown panic code is named as a number, not invented', () => {
     expect(decodeRevertReason(encodePanic(0x99n))).toMatch(/153/)
   })
 
-  it('собственная ошибка контракта показывается признаком', () => {
-    /* Расшифровать её без описания контракта нельзя, а придумать
-       толкование недопустимо. */
+  it('a custom contract error is shown by its selector', () => {
+    /* It cannot be decoded without the contract's description, and
+       inventing a reading is not allowed. */
     expect(decodeRevertReason('0xdeadbeef')).toMatch(/0xdeadbeef/)
   })
 
-  it('пустые данные причины не дают', () => {
+  it('empty data yields no reason', () => {
     expect(decodeRevertReason(null)).toBeNull()
     expect(decodeRevertReason('0x')).toBeNull()
   })
 
-  it('обрезанные данные причины не дают вместо исключения', () => {
-    /* Испорченный ответ узла не должен добавлять исключение поверх
-       уже случившегося отказа. */
+  it('truncated data yields no reason instead of throwing', () => {
+    /* A corrupted node reply must not add an exception on top of
+       a refusal that already happened. */
     expect(decodeRevertReason(`0x${functionSelector('Error(string)')}00`)).toBeNull()
   })
 
-  it('управляющие символы в причине её отменяют', () => {
-    /* Строка с переводами строк и возвратом каретки позволяет
-       нарисовать поверх сообщения кошелька собственный текст. */
+  it('control characters in the reason cancel it', () => {
+    /* A string with newlines and a carriage return can paint its
+       own text over the wallet's message. */
     expect(decodeRevertReason(encodeErrorString('ok\n\n\rApproved by the wallet'))).toBeNull()
   })
 })

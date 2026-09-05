@@ -1,84 +1,86 @@
 import type { Brand } from '@/shared/types'
 
 /**
- * Примитивы предметной области.
+ * Domain primitives.
  *
- * Все они — брендированные обёртки над базовыми типами. Система типов
- * TypeScript структурная: без брендирования `Address`, `TxHash` и приватный
- * ключ неразличимы, поскольку все являются `string`. Компилятор молча
- * пропустит передачу одного вместо другого.
+ * All of them are branded wrappers over base types. TypeScript's type
+ * system is structural: without branding, `Address`, `TxHash`, and a
+ * private key are indistinguishable, because all are `string`. The
+ * compiler would silently allow passing one in place of another.
  *
- * Значения этих типов создаются ТОЛЬКО через валидирующие конструкторы,
- * которые появятся вместе с реализацией. Приведение типом (`as Address`)
- * в прикладном коде недопустимо: оно обходит валидацию и лишает смысла
- * весь механизм.
+ * Values of these types are created ONLY through validating
+ * constructors. A type assertion (`as Address`) in application code
+ * is forbidden: it bypasses validation and makes the whole mechanism
+ * pointless.
  */
 
-/** Произвольная шестнадцатеричная строка с префиксом `0x`. */
+/** Arbitrary hex string with a `0x` prefix. */
 export type HexString = Brand<string, 'HexString'>
 
 /**
- * Адрес EVM-аккаунта в контрольной сумме EIP-55.
+ * EVM account address in EIP-55 checksum form.
  *
- * Хранится и сравнивается только в checksum-виде. Регистр букв в EIP-55
- * несёт контрольную сумму: сравнение адресов без нормализации приводит
- * к тому, что один и тот же аккаунт считается двумя разными.
+ * Stored and compared only in checksum form. Letter case in EIP-55
+ * carries the checksum: comparing addresses without normalisation
+ * treats the same account as two different ones.
  */
 export type Address = Brand<string, 'Address'>
 
-/** Хэш транзакции: 32 байта в hex. */
+/** Transaction hash: 32 bytes in hex. */
 export type TxHash = Brand<string, 'TxHash'>
 
-/** Хэш блока: 32 байта в hex. */
+/** Block hash: 32 bytes in hex. */
 export type BlockHash = Brand<string, 'BlockHash'>
 
 /**
- * Идентификатор сети по EIP-155.
+ * Network identifier per EIP-155.
  *
- * Тип `bigint`, а не `number`, сознательно. EIP-155 не задаёт верхней границы
- * для chainId. Все существующие сети укладываются в `number`, но опираться
- * на это нельзя: молчаливое усечение идентификатора означает, что кошелёк
- * подпишет транзакцию для сети, отличной от показанной пользователю.
- * Такая подпись пригодна для повторного проигрывания в другой сети.
+ * `bigint`, not `number`, on purpose. EIP-155 sets no upper bound
+ * for chainId. Every existing network fits in `number`, but relying
+ * on that is forbidden: silent truncation means the wallet signs a
+ * transaction for a network other than the one shown to the user.
+ * That signature can be replayed on another network.
  */
 export type ChainId = Brand<bigint, 'ChainId'>
 
 /**
- * Сумма в минимальных единицах нативной валюты сети (wei для Ethereum).
+ * Amount in the network native currency's smallest units (wei on Ethereum).
  *
- * Только `bigint`. Тип `number` гарантирует точность до 2^53-1, тогда как
- * значения в wei доходят до 2^256-1. Использование `number` даёт молчаливую
- * потерю точности — то есть отправку суммы, отличной от запрошенной.
+ * Only `bigint`. `number` is exact up to 2^53-1, while wei values
+ * reach 2^256-1. Using `number` silently loses precision — i.e.
+ * sends an amount different from the one requested.
  */
 export type Wei = Brand<bigint, 'Wei'>
 
 /**
- * Сумма в минимальных единицах токена.
+ * Amount in a token's smallest units.
  *
- * Отделена от {@link Wei} намеренно: 1000 единиц USDC (6 знаков) и
- * 1000 wei — совершенно разные величины, и компилятор обязан это различать.
- * Интерпретация требует знания `decimals` соответствующего токена.
+ * Separated from {@link Wei} on purpose: 1000 units of USDC (6
+ * decimals) and 1000 wei are completely different quantities, and
+ * the compiler must tell them apart. Interpretation requires the
+ * token's `decimals`.
  */
 export type TokenUnits = Brand<bigint, 'TokenUnits'>
 
-/** Путь деривации BIP-32, например `m/44'/60'/0'/0/0`. */
+/** BIP-32 derivation path, e.g. `m/44'/60'/0'/0/0`. */
 export type DerivationPath = Brand<string, 'DerivationPath'>
 
-/** Момент времени, Unix-метка в миллисекундах. */
+/** Instant in time, Unix timestamp in milliseconds. */
 export type Timestamp = Brand<number, 'Timestamp'>
 
-/** Внутренний идентификатор аккаунта. Не адрес: аккаунт может быть переимпортирован. */
+/** Internal account id. Not an address: an account may be re-imported. */
 export type AccountId = Brand<string, 'AccountId'>
 
-/** Внутренний идентификатор набора ключей. */
+/** Internal keyring id. */
 export type KeyringId = Brand<string, 'KeyringId'>
 
 /**
- * Ссылка на блок в запросах к узлу.
+ * Block reference in node requests.
  *
- * Строковые теги — из спецификации JSON-RPC. `bigint` — конкретный номер блока.
+ * String tags come from the JSON-RPC spec. `bigint` is a concrete
+ * block number.
  */
 export type BlockTag = 'latest' | 'pending' | 'earliest' | 'safe' | 'finalized' | bigint
 
-/** Функция отписки от события. Возвращается методами подписки. */
+/** Unsubscribe function returned by subscription methods. */
 export type Unsubscribe = () => void

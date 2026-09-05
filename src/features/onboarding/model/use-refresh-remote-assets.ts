@@ -4,10 +4,10 @@ import { useDirectorySession } from './directory-session'
 import { readLoginCredentials } from './login-credentials'
 
 /**
- * При входе на экран запрашивает свежую витрину `GET /v1/users/:id`.
+ * On entering the screen, fetches a fresh showcase via `GET /v1/users/:id`.
  *
- * Баланс после списания перевода живёт в записи справочника.
- * Снимок сессии его не знает, пока этот запрос не вернётся.
+ * The balance after a transfer debit lives in the directory record.
+ * The session snapshot does not know it until this request returns.
  */
 export function useRefreshRemoteAssets(): void {
   const directory = useDirectorySession()

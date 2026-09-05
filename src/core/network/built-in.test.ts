@@ -4,37 +4,37 @@ import { BUILT_IN_CHAIN_ID, BUILT_IN_NETWORKS, DEFAULT_CHAIN_ID } from './built-
 import { assertValidExplorerUrl, assertValidRpcUrls } from './rpc-url'
 
 /**
- * Справочник сетей — это данные, а не логика. Тесты здесь защищают
- * от опечаток, которые компилятор не поймает: повторяющийся chainId,
- * незащищённый адрес узла, забытое число десятичных знаков.
+ * The network directory is data, not logic. Tests here guard against
+ * typos the compiler will not catch: a repeated chainId, an unsecured
+ * node address, a forgotten decimal count.
  */
 
 describe('BUILT_IN_NETWORKS', () => {
-  it('содержит семь сетей', () => {
+  it('contains seven networks', () => {
     expect(BUILT_IN_NETWORKS).toHaveLength(7)
   })
 
-  it('не содержит повторяющихся идентификаторов', () => {
+  it('contains no repeated identifiers', () => {
     const chainIds = BUILT_IN_NETWORKS.map((network) => network.chainId)
 
     expect(new Set(chainIds).size).toBe(chainIds.length)
   })
 
-  it('покрывает все объявленные идентификаторы', () => {
+  it('covers every declared identifier', () => {
     const declared = new Set(Object.values(BUILT_IN_CHAIN_ID))
     const present = new Set(BUILT_IN_NETWORKS.map((network) => network.chainId))
 
     expect(present).toEqual(declared)
   })
 
-  it('помечает все сети как встроенные и основные', () => {
+  it('marks every network as built-in and mainnet', () => {
     for (const network of BUILT_IN_NETWORKS) {
       expect(network.isBuiltIn).toBe(true)
       expect(network.isTestnet).toBe(false)
     }
   })
 
-  it('использует только защищённые RPC-адреса', () => {
+  it('uses only secured RPC addresses', () => {
     for (const network of BUILT_IN_NETWORKS) {
       expect(() => {
         assertValidRpcUrls(network.rpcUrls)
@@ -42,19 +42,19 @@ describe('BUILT_IN_NETWORKS', () => {
     }
   })
 
-  it('предоставляет несколько узлов на каждую сеть', () => {
+  it('provides several nodes for each network', () => {
     for (const network of BUILT_IN_NETWORKS) {
       expect(network.rpcUrls.length).toBeGreaterThanOrEqual(2)
     }
   })
 
-  it('не содержит повторяющихся RPC-адресов внутри сети', () => {
+  it('contains no repeated RPC addresses inside a network', () => {
     for (const network of BUILT_IN_NETWORKS) {
       expect(new Set(network.rpcUrls).size).toBe(network.rpcUrls.length)
     }
   })
 
-  it('указывает обозреватель блоков по https', () => {
+  it('points the block explorer at https', () => {
     for (const network of BUILT_IN_NETWORKS) {
       expect(network.blockExplorerUrls.length).toBeGreaterThanOrEqual(1)
 
@@ -66,7 +66,7 @@ describe('BUILT_IN_NETWORKS', () => {
     }
   })
 
-  it('описывает нативную валюту полностью', () => {
+  it('describes the native currency fully', () => {
     for (const network of BUILT_IN_NETWORKS) {
       expect(network.nativeCurrency.name.length).toBeGreaterThan(0)
       expect(network.nativeCurrency.symbol.length).toBeGreaterThan(0)
@@ -74,7 +74,7 @@ describe('BUILT_IN_NETWORKS', () => {
     }
   })
 
-  it('содержит ожидаемые идентификаторы сетей', () => {
+  it('contains the expected network identifiers', () => {
     expect(BUILT_IN_CHAIN_ID.Ethereum).toBe(1n)
     expect(BUILT_IN_CHAIN_ID.Optimism).toBe(10n)
     expect(BUILT_IN_CHAIN_ID.BnbChain).toBe(56n)
@@ -84,13 +84,13 @@ describe('BUILT_IN_NETWORKS', () => {
     expect(BUILT_IN_CHAIN_ID.Avalanche).toBe(43114n)
   })
 
-  it('помечает BNB Chain как сеть без действующего EIP-1559', () => {
+  it('marks BNB Chain as a network without live EIP-1559', () => {
     const bnb = BUILT_IN_NETWORKS.find((network) => network.chainId === BUILT_IN_CHAIN_ID.BnbChain)
 
     expect(bnb?.supportsEip1559).toBe(false)
   })
 
-  it('использует символ POL для Polygon', () => {
+  it('uses the POL symbol for Polygon', () => {
     const polygon = BUILT_IN_NETWORKS.find(
       (network) => network.chainId === BUILT_IN_CHAIN_ID.Polygon,
     )
@@ -98,7 +98,7 @@ describe('BUILT_IN_NETWORKS', () => {
     expect(polygon?.nativeCurrency.symbol).toBe('POL')
   })
 
-  it('назначает Ethereum сетью по умолчанию', () => {
+  it('assigns Ethereum as the default network', () => {
     expect(DEFAULT_CHAIN_ID).toBe(BUILT_IN_CHAIN_ID.Ethereum)
   })
 })

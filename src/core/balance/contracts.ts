@@ -5,52 +5,53 @@ import type { Address, ChainId, Unsubscribe } from '@/core/types'
 import type { BalanceEventMap, IAccountBalances, IBalance } from './types'
 
 /**
- * Получение и кэширование балансов.
+ * Obtaining and caching balances.
  *
- * Кэш обязателен: запрос балансов десяти токенов на каждый переход по
- * интерфейсу исчерпает лимиты публичного RPC-узла за минуты. Но кэш обязан
- * быть явным — см. флаг `isStale` в `IBalance`.
+ * A cache is required: asking for ten token balances on every UI
+ * navigation will exhaust a public RPC node's limits in minutes.
+ * But the cache must be explicit — see the `isStale` flag on
+ * `IBalance`.
  *
- * Сервис ничего не форматирует. Обоснование — в комментарии к `IBalance`.
+ * The service formats nothing. The rationale is in the comment on
+ * `IBalance`.
  */
 export interface IBalanceService extends IEventSource<BalanceEventMap> {
   /**
-   * Баланс нативной валюты.
+   * Native-currency balance.
    *
-   * Возвращает кэшированное значение немедленно, если оно есть, и
-   * инициирует фоновое обновление. Обновлённое значение приходит
-   * событием `balance:updated`.
+   * Returns the cached value immediately if there is one, and
+   * starts a background refresh. The updated value arrives as a
+   * `balance:updated` event.
    */
   getNative(owner: Address, chainId: ChainId): Promise<IBalance>
 
-  /** Баланс конкретного токена. */
   getToken(owner: Address, token: ITokenRef): Promise<IBalance>
 
   /**
-   * Все балансы адреса в сети.
+   * Every balance of an address on a network.
    *
-   * Реализация обязана объединять запросы в пакет (multicall либо batch
-   * JSON-RPC). Последовательные одиночные запросы на каждый токен — это
-   * десятки обращений к узлу на один экран.
+   * The implementation must batch requests (multicall or JSON-RPC
+   * batch). Sequential one-by-one requests per token are dozens of
+   * node calls for one screen.
    */
   getAll(owner: Address, chainId: ChainId): Promise<IAccountBalances>
 
   /**
-   * Принудительно перезапрашивает балансы, игнорируя кэш.
+   * Re-fetches balances, ignoring the cache.
    *
-   * Вызывается после подтверждения транзакции и по явному действию
-   * пользователя.
+   * Called after a transaction is confirmed and on an explicit
+   * user action.
    */
   refresh(owner: Address, chainId: ChainId): Promise<IAccountBalances>
 
   /**
-   * Подписывает на автоматическое обновление балансов адреса.
+   * Subscribes to automatic balance updates for an address.
    *
-   * @returns Функция отписки. Обязательна к вызову при размонтировании:
-   *          неотменённая подписка продолжает опрашивать узел.
+   * @returns Unsubscribe function. Must be called on unmount: a
+   *          leftover subscription keeps polling the node.
    */
   subscribe(owner: Address, chainId: ChainId): Unsubscribe
 
-  /** Сбрасывает кэш. Вызывается при смене сети и при блокировке. */
+  /** Clears the cache. Called on a network change and on lock. */
   invalidate(owner?: Address, chainId?: ChainId): void
 }

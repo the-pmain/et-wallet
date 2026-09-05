@@ -8,12 +8,12 @@ import { alertVariants } from './alert-variants'
 export type AlertProps = ComponentProps<'div'> & VariantProps<typeof alertVariants>
 
 /**
- * Блок предупреждения.
+ * Warning block.
  *
- * Роль `alert` назначается только вариантам `warning` и `danger`:
- * программы чтения с экрана прерывают чтение при появлении такого
- * элемента, и назначать эту роль нейтральному пояснению значит
- * приучать пользователя к прерываниям без причины.
+ * The `alert` role is assigned only to `warning` and `danger`:
+ * screen readers interrupt reading when such an element appears,
+ * and giving that role to a neutral note trains the user to ignore
+ * interruptions.
  */
 export function Alert({ className, variant, ...props }: AlertProps) {
   return (

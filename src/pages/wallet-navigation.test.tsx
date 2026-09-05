@@ -34,8 +34,8 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Навигация кошелька', () => {
-  it('показывает четыре раздела', async () => {
+describe('Wallet navigation', () => {
+  it('shows four sections', async () => {
     renderApp()
     await findDashboard()
 
@@ -48,7 +48,7 @@ describe('Навигация кошелька', () => {
     expect(within(navigation).queryByRole('link', { name: 'NFT' })).not.toBeInTheDocument()
   })
 
-  it('открывает раздел активов', async () => {
+  it('opens the assets section', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -59,7 +59,7 @@ describe('Навигация кошелька', () => {
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
   })
 
-  it('открывает раздел NFT', async () => {
+  it('opens the NFT section', async () => {
     renderApp()
     await findDashboard()
 
@@ -68,7 +68,7 @@ describe('Навигация кошелька', () => {
     expect(await screen.findByRole('heading', { name: 'NFT' })).toBeInTheDocument()
   })
 
-  it('открывает раздел истории', async () => {
+  it('opens the activity section', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -79,7 +79,7 @@ describe('Навигация кошелька', () => {
     expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
   })
 
-  it('открывает раздел настроек', async () => {
+  it('opens the settings section', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -90,7 +90,7 @@ describe('Навигация кошелька', () => {
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 
-  it('сохраняет шапку при переходе между разделами', async () => {
+  it('keeps the header when moving between sections', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -98,30 +98,29 @@ describe('Навигация кошелька', () => {
 
     await user.click(screen.getByRole('link', { name: 'Assets' }))
 
-    /* Шапка и навигация вынесены в общий маршрут-лейаут: их пересоздание
-       на каждом экране давало бы мерцание при переходе. */
+    /* Header and nav live in a shared route layout: recreating them
+       on every screen would flicker on navigation. */
     expect(screen.getByText('Account 1')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'ET WALLET' }).length).toBeGreaterThan(0)
   })
 })
 
-describe('Доступ к разделам кошелька', () => {
-  it('не пускает к настройкам при заблокированном кошельке', async () => {
+describe('Access to wallet sections', () => {
+  it('does not allow settings when the wallet is locked', async () => {
     services.onboarding.lock()
     openPath('/wallet/settings')
 
     renderApp()
 
-    /* Прямой переход по адресу обязан приводить к экрану пароля:
-       иначе пользователь увидит части интерфейса, доступ к которым
-       не подтверждал. */
+    /* A direct URL must land on the password screen: otherwise the
+       user would see UI they have not confirmed access to. */
     expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 })
 
-describe('Раздел активов', () => {
-  it('предлагает импорт токена', async () => {
+describe('Assets section', () => {
+  it('offers token import', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -129,13 +128,13 @@ describe('Раздел активов', () => {
 
     await user.click(screen.getByRole('link', { name: 'Assets' }))
 
-    /* Список известных токенов не подставляется: показанный в кошельке
-       токен выглядит одобренным, а прислать приманку с именем известного
-       проекта может кто угодно. Добавляет пользователь. */
+    /* A list of well-known tokens is not preloaded: a token shown in
+       the wallet looks endorsed, and anyone can send a lure named
+       after a known project. The user adds it. */
     expect(await screen.findByRole('button', { name: /Import a token/i })).toBeInTheDocument()
   })
 
-  it('показывает нативную валюту сети', async () => {
+  it('shows the network native currency', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -147,10 +146,10 @@ describe('Раздел активов', () => {
   })
 })
 
-describe('Раздел NFT', () => {
-  it('объясняет границы поиска вместо пустой галереи', async () => {
-    /* Пустой список без объяснения читается владельцем как пропажа
-       имущества: поиск охватывает окно блоков, а не всю цепь. */
+describe('NFT section', () => {
+  it('explains search bounds instead of an empty gallery', async () => {
+    /* An empty list with no explanation reads as missing property:
+       the search covers a window of blocks, not the whole chain. */
     renderApp()
     await findDashboard()
 
@@ -164,7 +163,7 @@ describe('Раздел NFT', () => {
     expect(screen.getByText(/scans the last/i)).toBeInTheDocument()
   })
 
-  it('предупреждает о раскрытии IP при загрузке изображений', async () => {
+  it('warns that loading images would reveal the IP address', async () => {
     renderApp()
     await findDashboard()
 
@@ -175,8 +174,8 @@ describe('Раздел NFT', () => {
   })
 })
 
-describe('Раздел настроек', () => {
-  it('переключает оформление', async () => {
+describe('Settings section', () => {
+  it('switches appearance', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -188,7 +187,7 @@ describe('Раздел настроек', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('содержит управление аккаунтами и сетями', async () => {
+  it('contains account and network management', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -201,11 +200,11 @@ describe('Раздел настроек', () => {
     expect(screen.queryByText('RPC nodes')).not.toBeInTheDocument()
   })
 
-  it('даёт выбрать срок автоблокировки', async () => {
-    /* Прежняя проверка утверждала, что автоблокировки нет. Она
-       появилась, и предупреждение о её отсутствии стало неверным:
-       предупреждение о несуществующем ограничении приучает не читать
-       остальные. */
+  it('lets the user choose an auto-lock interval', async () => {
+    /* The old check asserted that auto-lock did not exist. It does
+       now, and a warning about its absence became false: a warning
+       about a limit that does not exist trains people not to read
+       the others. */
     const user = userEvent.setup()
 
     renderApp()
@@ -217,7 +216,7 @@ describe('Раздел настроек', () => {
     expect(screen.getByRole('button', { name: '15 min' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('объясняет, чем опасен разблокированный кошелёк', async () => {
+  it('explains why an unlocked wallet is dangerous', async () => {
     const user = userEvent.setup()
 
     renderApp()

@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Тестовая мнемоническая фраза нулевой энтропии.
+ * Zero-entropy test mnemonic.
  *
- * Общеотраслевой вектор. Средства на её адресах не принадлежат никому,
- * поэтому она пригодна для проверок и непригодна ни для чего другого.
+ * Industry-standard vector. Funds on its addresses belong to nobody,
+ * so it is fit for checks and unfit for anything else.
  */
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
@@ -12,14 +12,14 @@ const TEST_MNEMONIC =
 const PASSWORD = 'Korova-7-Luna!'
 const LOGIN_EMAIL = 'james@example.com'
 
-/** Первый адрес тестовой фразы по пути `m/44'/60'/0'/0/0`. */
+/** First address of the test phrase at `m/44'/60'/0'/0/0`. */
 const FIRST_ADDRESS = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
 
 /**
- * Разворачивает кошелёк из тестовой фразы.
+ * Restores a wallet from the test phrase.
  *
- * Хранилище работает в памяти, поэтому каждая проверка начинается
- * с чистого состояния и разворачивает кошелёк заново.
+ * Storage is in memory, so each check starts clean and restores
+ * the wallet again.
  */
 async function importWallet(page: Page): Promise<void> {
   await page.goto('/import')
@@ -39,25 +39,25 @@ async function unlockWallet(page: Page, password = PASSWORD): Promise<void> {
   await page.getByRole('button', { name: 'Unlock' }).click()
 }
 
-test.describe('Сквозной путь: создание и работа кошелька', () => {
-  test('экран приветствия открывается собранным приложением', async ({ page }) => {
+test.describe('End-to-end: create and use a wallet', () => {
+  test('the welcome screen opens from the built app', async ({ page }) => {
     await page.goto('/')
 
     await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeVisible()
   })
 
-  test('кошелёк восстанавливается по seed-фразе', async ({ page }) => {
+  test('the wallet is restored from a seed phrase', async ({ page }) => {
     await importWallet(page)
 
-    /* Адрес выведен настоящим BIP-32 в собранном коде: совпадение
-       с известным значением подтверждает, что деривация пережила
-       сборку и отсечение неиспользуемого. */
+    /* The address is derived by real BIP-32 in the built code: a
+       match with the known value confirms derivation survived the
+       build and unused-code stripping. */
     await expect(page.getByText('0x9858…aEda94')).toBeVisible()
   })
 
-  test('разделы кошелька открываются: чанки загружаются', async ({ page }) => {
-    /* Экран, чанк которого не загрузился, в проверках на jsdom
-       выглядит исправным: там `import()` разрешается немедленно. */
+  test('wallet sections open: chunks load', async ({ page }) => {
+    /* A screen whose chunk failed to load looks fine in jsdom
+       checks: there `import()` resolves immediately. */
     await importWallet(page)
 
     for (const [path, heading] of [
@@ -71,16 +71,16 @@ test.describe('Сквозной путь: создание и работа ко�
     ] as const) {
       await page.goto(path)
 
-      /* Заголовок первого уровня, а не любой: на экране подключений
-         есть карточка «Active connections», и нестрогий поиск
-         нашёл бы оба. */
+      /* Level-1 heading, not any heading: the connections screen
+         has an "Active connections" card, and a loose search would
+         find both. */
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     }
   })
 
-  test('заблокированный кошелёк не показывает разделов', async ({ page }) => {
-    /* Прямой переход по адресу при заблокированном кошельке обязан
-       приводить к экрану пароля, а не к содержимому. */
+  test('a locked wallet does not show sections', async ({ page }) => {
+    /* A direct URL while the wallet is locked must land on the
+       password screen, not the content. */
     await importWallet(page)
 
     await page.goto('/wallet/settings')
@@ -91,15 +91,15 @@ test.describe('Сквозной путь: создание и работа ко�
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeHidden()
   })
 
-  test('кошелёк переживает перезагрузку страницы', async ({ page }) => {
+  test('the wallet survives a page reload', async ({ page }) => {
     /*
-      ГЛАВНАЯ ПРОВЕРКА ПОСТОЯННОГО ХРАНИЛИЩА. До его появления кошелёк
-      исчезал вместе со вкладкой, и пользоваться им с настоящими
-      средствами было нельзя.
+      MAIN DURABLE-STORAGE CHECK. Before it existed the wallet
+      vanished with the tab, so it could not be used with real
+      funds.
 
-      После перезагрузки кошелёк обязан оказаться ЗАБЛОКИРОВАННЫМ,
-      а не открытым: сессионный ключ шифрования живёт в памяти
-      и не сохраняется — иначе перезагрузка обходила бы пароль.
+      After reload the wallet must be LOCKED, not open: the session
+      encryption key lives in memory and is not saved — otherwise a
+      reload would skip the password.
     */
     await importWallet(page)
 
@@ -110,7 +110,7 @@ test.describe('Сквозной путь: создание и работа ко�
     await expect(page.getByRole('link', { name: /create a new wallet/i })).toBeHidden()
   })
 
-  test('неудачный вход не закрывает форму и не считает попытки', async ({ page }) => {
+  test('a failed login does not close the form or count attempts', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
@@ -124,7 +124,7 @@ test.describe('Сквозной путь: создание и работа ко�
     await expect(page.getByRole('button', { name: 'Unlock' })).toBeEnabled()
   })
 
-  test('после нескольких неудач верный пароль открывает кошелёк', async ({ page }) => {
+  test('after several failures the correct password opens the wallet', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
@@ -138,19 +138,19 @@ test.describe('Сквозной путь: создание и работа ко�
     await expect(page.getByText('0x9858…aEda94')).toBeVisible()
   })
 
-  test('после перезагрузки кошелёк открывается тем же паролем', async ({ page }) => {
+  test('after reload the wallet opens with the same password', async ({ page }) => {
     await importWallet(page)
     await page.reload()
 
     await unlockWallet(page)
 
-    /* Тот же адрес, что и до перезагрузки: расшифрована та же фраза. */
+    /* Same address as before reload: the same phrase was decrypted. */
     await expect(page.getByText('0x9858…aEda94')).toBeVisible()
   })
 })
 
-test.describe('Сквозной путь: отправка', () => {
-  test('форма не пускает дальше с непригодным получателем', async ({ page }) => {
+test.describe('End-to-end: send', () => {
+  test('the form does not continue with an unfit recipient', async ({ page }) => {
     await importWallet(page)
     await page.goto('/wallet/send')
 
@@ -160,7 +160,7 @@ test.describe('Сквозной путь: отправка', () => {
     await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  test('получатель с верным адресом принимается', async ({ page }) => {
+  test('a recipient with a valid address is accepted', async ({ page }) => {
     await importWallet(page)
     await page.goto('/wallet/send')
 
@@ -170,19 +170,19 @@ test.describe('Сквозной путь: отправка', () => {
     await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled()
   })
 
-  test('выбор актива предлагает нативную валюту', async ({ page }) => {
+  test('asset picker offers the native currency', async ({ page }) => {
     await importWallet(page)
     await page.goto('/wallet/send')
 
-    /* Список активов собирается из отслеживаемых токенов, и нативная
-       валюта в нём есть всегда: её нельзя убрать. Пустой список означал
-       бы, что отправить нечего вовсе. */
+    /* The asset list is built from tracked tokens, and native
+       currency is always in it: it cannot be removed. An empty list
+       would mean there is nothing to send at all. */
     await expect(page.getByLabel('What to send')).toHaveValue('native')
   })
 })
 
-test.describe('Сквозной путь: резервная копия', () => {
-  test('seed-фраза не выдаётся без пароля и отметки', async ({ page }) => {
+test.describe('End-to-end: backup', () => {
+  test('the seed phrase is not shown without a password and a check', async ({ page }) => {
     await importWallet(page)
     await page.goto('/wallet/backup')
 
@@ -192,10 +192,10 @@ test.describe('Сквозной путь: резервная копия', () => 
     await expect(page.getByText('about')).toBeHidden()
   })
 
-  /* Поле уточняется точным совпадением: на экране копии есть второе
-     поле пароля — у проверки записанного, — и подстрока совпадает
-     с обоими. */
-  test('фраза выдаётся после отметки и верного пароля', async ({ page }) => {
+  /* The field is pinned by exact match: the backup screen has a
+     second password field — for the written check — and a substring
+     matches both. */
+  test('the phrase is shown after a check and the correct password', async ({ page }) => {
     await importWallet(page)
     await page.goto('/wallet/backup')
 
@@ -209,7 +209,7 @@ test.describe('Сквозной путь: резервная копия', () => 
     await expect(page.getByText('about')).toBeVisible()
   })
 
-  test('неверный пароль фразу не выдаёт', async ({ page }) => {
+  test('a wrong password does not reveal the phrase', async ({ page }) => {
     await importWallet(page)
     await page.goto('/wallet/backup')
 

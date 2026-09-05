@@ -1,4 +1,4 @@
-/** Оттенок тоста. Совпадает с уровнями предупреждений остального интерфейса. */
+/** Toast tone. Matches the warning levels of the rest of the UI. */
 export const TOAST_TONE = {
   Neutral: 'neutral',
   Success: 'success',
@@ -8,7 +8,6 @@ export const TOAST_TONE = {
 
 export type ToastTone = (typeof TOAST_TONE)[keyof typeof TOAST_TONE]
 
-/** Показанное уведомление. */
 export interface IToast {
   readonly id: number
   readonly message: string
@@ -16,24 +15,24 @@ export interface IToast {
 }
 
 /**
- * Сколько тост держится на экране.
+ * How long a toast stays on screen.
  *
- * Достаточно, чтобы прочесть строку, и не настолько долго, чтобы копиться
- * на экране. Пользователь может закрыть раньше.
+ * Long enough to read a line, not so long that they pile up.
+ * The user can dismiss earlier.
  */
 export const TOAST_DURATION_MS = 4000
 
 /**
- * Хранилище тостов в модуле, а не в контексте.
+ * Toast store in a module, not in context.
  *
- * ПОЧЕМУ ТАК. Показать уведомление нужно из мест, у которых нет доступа
- * к дереву компонентов, — из обработчика, из сервиса. Модульная функция
- * `toast()` вызывается откуда угодно, а `<Toaster />` лишь отображает
- * то, что в хранилище.
+ * WHY. A toast must be shown from places with no access to the
+ * component tree — a handler, a service. The module function
+ * `toast()` is callable from anywhere; `<Toaster />` only renders
+ * what is in the store.
  *
- * ОТДЕЛЬНЫЙ ФАЙЛ ОТ КОМПОНЕНТА. Горячая перезагрузка React работает
- * верно только когда модуль экспортирует одни компоненты; хранилище
- * и функция живут здесь, а `Toaster` — рядом.
+ * SEPARATE FILE FROM THE COMPONENT. React Fast Refresh works
+ * correctly only when a module exports components alone; the store
+ * and function live here, `Toaster` next door.
  */
 let toasts: readonly IToast[] = []
 const listeners = new Set<() => void>()
@@ -45,17 +44,15 @@ function emit(): void {
   }
 }
 
-/** Убирает уведомление по идентификатору. */
 export function dismissToast(id: number): void {
   toasts = toasts.filter((entry) => entry.id !== id)
   emit()
 }
 
 /**
- * Показывает уведомление в правом верхнем углу.
+ * Shows a toast in the top-right corner.
  *
- * @returns Идентификатор — на случай, если уведомление нужно убрать
- *          раньше срока.
+ * @returns The id — in case the toast must be dismissed early.
  */
 export function toast(message: string, tone: ToastTone = TOAST_TONE.Neutral): number {
   const id = nextId

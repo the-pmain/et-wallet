@@ -3,43 +3,44 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 
 import type { Address, HexString } from '@/core/types'
 
-/** Длина узла ENS в байтах. Задана EIP-137 и настройке не подлежит. */
+/** ENS node length in bytes. Fixed by EIP-137 and not configurable. */
 const NODE_LENGTH = 32
 
 /**
- * Суффикс, под которым живут обратные записи.
+ * Suffix under which reverse records live.
  *
- * EIP-181: адрес `0xAbC…` имеет обратную запись в узле
- * `abc….addr.reverse`, где адрес записан в НИЖНЕМ регистре и без `0x`.
- * Запись в контрольной сумме EIP-55 дала бы другой узел и, как следствие,
- * «обратной записи нет» у адреса, у которого она есть.
+ * EIP-181: address `0xAbC…` has a reverse record at
+ * `abc….addr.reverse`, with the address in LOWERCASE and without `0x`.
+ * Writing it in EIP-55 checksum case would yield a different node
+ * and therefore "no reverse record" for an address that has one.
  */
 const REVERSE_SUFFIX = 'addr.reverse'
 
 /**
- * Вычисляет узел ENS по имени — алгоритм namehash из EIP-137.
+ * Computes the ENS node for a name — the namehash algorithm from EIP-137.
  *
  * ```
  * namehash('')          = 0x00…00
  * namehash('a.b')       = keccak256(namehash('b') ‖ keccak256('a'))
  * ```
  *
- * ПОЧЕМУ РЕАЛИЗОВАНО ЗДЕСЬ, А НЕ ВЗЯТО ИЗ БИБЛИОТЕКИ. Это не криптография,
- * а композиция готового keccak256, взятого из `@noble/hashes`: собственных
- * хэш-функций тут не появляется. Реализация умещается в десяток строк
- * и проверяется эталонными значениями из текста стандарта, поэтому
- * отдельная зависимость ради неё веса не окупает.
+ * WHY THIS IS IMPLEMENTED HERE, NOT TAKEN FROM A LIBRARY. This is not
+ * cryptography, it is composition of a ready keccak256 from
+ * `@noble/hashes`: no hash function of our own appears. The
+ * implementation fits in a dozen lines and is checked against
+ * reference values from the standard text, so a separate dependency
+ * for it does not earn its weight.
  *
- * ИМЯ ОБЯЗАНО БЫТЬ УЖЕ НОРМАЛИЗОВАНО. Функция хэширует то, что получила,
- * байт в байт: `Vitalik.eth` и `vitalik.eth` дадут разные узлы. Приводить
- * имя к каноническому виду — задача `normalizeEnsName`, и вызывать
- * namehash в обход неё нельзя.
+ * THE NAME MUST ALREADY BE NORMALIZED. The function hashes what it
+ * received, byte for byte: `Vitalik.eth` and `vitalik.eth` yield
+ * different nodes. Bringing the name to canonical form is
+ * `normalizeEnsName`'s job, and namehash must not be called around it.
  */
 export function namehash(name: string): HexString {
   let node = new Uint8Array(NODE_LENGTH)
 
   if (name !== '') {
-    /* Метки обходятся справа налево: узел строится от корня вниз. */
+    /* Labels are walked right to left: the node is built from the root down. */
     for (const label of name.split('.').reverse()) {
       const joined = new Uint8Array(NODE_LENGTH * 2)
 
@@ -54,9 +55,9 @@ export function namehash(name: string): HexString {
 }
 
 /**
- * Узел обратной записи для адреса.
+ * Reverse-record node for an address.
  *
- * @param address Адрес в любом регистре. Приводится к нижнему по EIP-181.
+ * @param address Address in any case. Lowercased per EIP-181.
  */
 export function reverseNode(address: Address): HexString {
   return namehash(`${address.slice(2).toLowerCase()}.${REVERSE_SUFFIX}`)

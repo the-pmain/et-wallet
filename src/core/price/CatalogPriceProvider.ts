@@ -6,11 +6,12 @@ import type { MarketCatalog } from './MarketCatalog'
 import type { FiatCurrency, IPriceRef, PriceMap } from './types'
 
 /**
- * Курсы из уже загруженного снимка рынка.
+ * Rates from an already loaded market snapshot.
  *
- * СЕТИ НЕ ХОДИТ. `getPrices` ждёт единственный запрос `/coins/markets`
- * и разбирает его. Повторные обходы портфеля, смена кошелька и оценка
- * витрины не порождают новых обращений к CoinGecko.
+ * DOES NOT HIT THE NETWORK. `getPrices` waits for the single
+ * `/coins/markets` request and parses it. Later portfolio walks,
+ * wallet changes, and showcase valuation do not spawn new CoinGecko
+ * calls.
  */
 export class CatalogPriceProvider implements IPriceProvider {
   readonly id = 'coingecko'

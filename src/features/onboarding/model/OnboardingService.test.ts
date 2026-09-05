@@ -36,8 +36,8 @@ function createService(userDirectory?: Pick<IUserDirectory, 'register'>) {
   })
 }
 
-describe('OnboardingService: запись пользователя на сервер', () => {
-  it('передаёт почту, нулевой баланс, пароль и первый адрес после создания кошелька', async () => {
+describe('OnboardingService: user record on the server', () => {
+  it('sends email, zero balance, password, and the first address after wallet create', async () => {
     const register = vi
       .fn()
       .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
@@ -76,7 +76,7 @@ describe('OnboardingService: запись пользователя на серв
     )
   })
 
-  it('передаёт почту, пароль и первый адрес после импорта', async () => {
+  it('sends email, password, and the first address after import', async () => {
     const register = vi
       .fn()
       .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
@@ -97,7 +97,7 @@ describe('OnboardingService: запись пользователя на серв
     })
   })
 
-  it('принимает простой пароль', async () => {
+  it('accepts a simple password', async () => {
     const register = vi
       .fn()
       .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
@@ -115,7 +115,7 @@ describe('OnboardingService: запись пользователя на серв
     expect(service.getState()).toBe('unlocked')
   })
 
-  it('не создаёт кошелёк, если справочник отказал', async () => {
+  it('does not create a wallet if the directory rejects', async () => {
     const service = createService({
       register: vi.fn().mockRejectedValue(new Error('offline')),
     })
@@ -127,7 +127,7 @@ describe('OnboardingService: запись пользователя на серв
     expect(service.getState()).not.toBe('unlocked')
   })
 
-  it('заменяет уже существующий кошелёк при повторном создании', async () => {
+  it('replaces an existing wallet on create again', async () => {
     const register = vi
       .fn()
       .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
@@ -147,7 +147,7 @@ describe('OnboardingService: запись пользователя на серв
     )
   })
 
-  it('запоминает id созданной записи', async () => {
+  it('remembers the created record id', async () => {
     const register = vi.fn().mockResolvedValue(remoteUser('james@example.com'))
     const service = createService({ register })
 

@@ -8,7 +8,7 @@ import { DISPLAY_CURRENCY } from '../lib/display-currency'
 import { CurrencySwitch } from './CurrencySwitch'
 
 describe('CurrencySwitch', () => {
-  it('стоит группой радиокнопок и сообщает выбранную валюту', async () => {
+  it('is a radio group and reports the selected currency', async () => {
     const user = userEvent.setup()
     const seen: string[] = []
 

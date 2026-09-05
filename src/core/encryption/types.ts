@@ -1,13 +1,13 @@
 /**
- * Алгоритмы вывода ключа из пароля.
+ * Password-based key-derivation algorithms.
  *
- * PBKDF2 доступен в WebCrypto нативно, но устойчив к перебору только за счёт
- * числа итераций — то есть плохо противостоит атаке на GPU и ASIC.
- * Argon2id устойчив дополнительно за счёт требований к памяти, но в WebCrypto
- * отсутствует и требует WASM-реализации.
+ * PBKDF2 is native in WebCrypto, but resists guessing only through
+ * iteration count — so it fares poorly against GPU and ASIC attacks.
+ * Argon2id also costs memory, but WebCrypto does not include it and a
+ * WASM implementation would be required.
  *
- * Выбор конкретного алгоритма — этап реализации шифрования. Формат хранения
- * поддерживает оба, чтобы смена алгоритма не потребовала ломки хранилища.
+ * Choosing the algorithm is an encryption-implementation step. The
+ * storage format supports both so a later switch does not break the vault.
  */
 export const KDF_ALGORITHM = {
   Pbkdf2: 'PBKDF2',
@@ -16,7 +16,7 @@ export const KDF_ALGORITHM = {
 
 export type KdfAlgorithm = (typeof KDF_ALGORITHM)[keyof typeof KDF_ALGORITHM]
 
-/** Алгоритм симметричного шифрования с аутентификацией (AEAD). */
+/** Authenticated symmetric cipher (AEAD). */
 export const CIPHER_ALGORITHM = {
   AesGcm: 'AES-GCM',
 } as const
@@ -24,50 +24,48 @@ export const CIPHER_ALGORITHM = {
 export type CipherAlgorithm = (typeof CIPHER_ALGORITHM)[keyof typeof CIPHER_ALGORITHM]
 
 /**
- * Параметры вывода ключа.
+ * Key-derivation parameters.
  *
- * Сохраняются рядом с шифротекстом. Без этого расшифровать данные после
- * изменения параметров в новой версии приложения невозможно: ключ выводится
- * иначе, а старые данные остаются зашифрованными по старым правилам.
+ * Stored next to the ciphertext. Without them, data cannot be decrypted
+ * after a later version changes the parameters: the key would be derived
+ * differently, while old records stay encrypted under the old rules.
  */
 export interface IKdfParams {
   readonly algorithm: KdfAlgorithm
 
-  /** Число итераций (PBKDF2) либо число проходов (Argon2id). */
+  /** Iteration count (PBKDF2) or pass count (Argon2id). */
   readonly iterations: number
 
   /**
-   * Соль. Генерируется заново для каждой операции шифрования.
-   * Повторное использование соли позволяет атаковать несколько хранилищ
-   * одной предвычисленной таблицей.
+   * Salt. Generated fresh for every encryption.
+   * Reusing a salt lets an attacker hit several vaults with one
+   * precomputed table.
    */
   readonly salt: Uint8Array
 
-  /** Длина выводимого ключа в байтах. */
   readonly keyLength: number
 
-  /** Требуемый объём памяти в килобайтах. Только для Argon2id. */
+  /** Memory cost in kibibytes. Argon2id only. */
   readonly memoryKib?: number
 
-  /** Степень параллелизма. Только для Argon2id. */
+  /** Parallelism. Argon2id only. */
   readonly parallelism?: number
 }
 
 /**
- * Зашифрованный контейнер.
+ * Encrypted container.
  *
- * Самодостаточен: содержит всё необходимое для расшифровки, кроме пароля.
- * Это обязательное свойство — иначе резервная копия хранилища окажется
- * бесполезной без знания настроек той версии приложения, которая её создала.
+ * Self-contained: holds everything needed to decrypt except the password.
+ * That is required — otherwise a vault backup is useless without knowing
+ * the settings of the app version that created it.
  */
 export interface IEncryptedPayload {
   /**
-   * Версия формата контейнера.
+   * Container format version.
    *
-   * Проверяется ДО попытки расшифровки. Контейнер с версией новее
-   * поддерживаемой обязан приводить к отказу в работе, а не к попытке
-   * прочитать его «как получится»: неверная интерпретация с последующей
-   * перезаписью означает безвозвратную потерю ключей.
+   * Checked BEFORE any decrypt attempt. A container newer than this build
+   * must fail closed, not be read "as best we can": a wrong interpretation
+   * followed by a rewrite means irreversible key loss.
    */
   readonly version: number
 
@@ -76,49 +74,47 @@ export interface IEncryptedPayload {
   readonly kdf: IKdfParams
 
   /**
-   * Вектор инициализации.
+   * Initialisation vector.
    *
-   * Для AES-GCM повторное использование пары «ключ + IV» полностью разрушает
-   * стойкость режима: раскрывается и содержимое, и ключ аутентификации.
-   * IV генерируется заново для каждой операции шифрования без исключений.
+   * For AES-GCM, reusing a key+IV pair destroys the mode: both the
+   * plaintext and the authentication key leak. A fresh IV is generated
+   * for every encryption, without exceptions.
    */
   readonly iv: Uint8Array
 
-  /** Шифротекст вместе с тегом аутентификации. */
+  /** Ciphertext including the authentication tag. */
   readonly ciphertext: Uint8Array
 }
 
 /**
- * Буфер с секретными данными.
+ * Buffer holding secret bytes.
  *
- * Существует потому, что тип `string` непригоден для хранения секретов:
- * строки в JavaScript иммутабельны и интернируются движком. Затереть
- * содержимое строки невозможно — оно остаётся в куче до сборки мусора,
- * а точный момент сборки не контролируется. Дамп памяти вкладки в этот
- * промежуток раскрывает секрет.
+ * Exists because `string` is unfit for secrets: JavaScript strings are
+ * immutable and interned. Their contents cannot be wiped — they stay on
+ * the heap until garbage collection, whose timing is uncontrolled. A tab
+ * memory dump in that window reveals the secret.
  *
- * `Uint8Array` затирается явно.
+ * `Uint8Array` can be wiped explicitly.
  *
- * Правила использования:
- * - буфер обязан быть затёрт сразу после использования, в блоке `finally`;
- * - буфер не сохраняется в состоянии UI и не передаётся между слоями
- *   дольше, чем требуется для одной операции;
- * - обращение к `bytes` после `wipe()` — ошибка, а не пустой результат.
+ * Rules:
+ * - wipe the buffer immediately after use, in a `finally` block;
+ * - do not keep it in UI state or pass it across layers longer than one
+ *   operation requires;
+ * - reading `bytes` after `wipe()` is an error, not an empty result.
  */
 export interface ISecretBuffer {
   /**
-   * Содержимое буфера.
+   * Buffer contents.
    *
-   * @throws SecretBufferWipedError если буфер уже затёрт.
+   * @throws SecretBufferWipedError if the buffer has already been wiped.
    */
   readonly bytes: Uint8Array
 
-  /** Затёрт ли буфер. */
   readonly isWiped: boolean
 
   /**
-   * Затирает содержимое нулями и помечает буфер недействительным.
-   * Повторный вызов безопасен.
+   * Zeroes the contents and marks the buffer invalid.
+   * A second call is safe.
    */
   wipe(): void
 }

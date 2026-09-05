@@ -12,14 +12,14 @@ interface PasswordFieldsProps {
 }
 
 /**
- * Пара полей «пароль» и «подтверждение».
+ * Password and confirmation fields.
  *
- * Требований к составу нет: проверяется только совпадение
- * и верхняя граница длины.
+ * No composition rules: only a match and an upper length bound
+ * are checked.
  *
- * `autoComplete="new-password"` подсказывает менеджеру паролей, что это
- * создание, а не вход. `autoCapitalize` и `autoCorrect` выключены: мобильная
- * клавиатура иначе изменит первый символ.
+ * `autoComplete="new-password"` tells the password manager this is
+ * create, not sign-in. `autoCapitalize` and `autoCorrect` are off:
+ * a mobile keyboard would otherwise change the first character.
  */
 export function PasswordFields({
   password,

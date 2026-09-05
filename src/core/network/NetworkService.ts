@@ -16,33 +16,33 @@ import { findImpersonation } from './impersonation'
 import { assertValidExplorerUrl, assertValidRpcUrls } from './rpc-url'
 import type { IAddNetworkParams, INetworkConfig, NetworkEventMap } from './types'
 
-/** Зависимости сервиса. Внедряются конструктором. */
 export interface INetworkServiceDependencies {
   readonly repository: INetworkRepository
 
   /**
-   * Нужна только для проверки подлинности узла при добавлении сети.
-   * Постоянного соединения сервис не держит — это обязанность `IWalletManager`.
+   * Needed only to check the node is genuine when adding a network.
+   * The service does not hold a standing connection — that is
+   * `IWalletManager`'s job.
    */
   readonly providerFactory: IProviderFactory
 
   readonly logger: ILogger
 
-  /** Перечень встроенных сетей. Передаётся извне ради сменности набора. */
+  /** Built-in networks. Passed in so the set can be swapped. */
   readonly builtInNetworks: readonly INetworkConfig[]
 
-  /** Сеть, активная при первом запуске и при удалении активной сети. */
+  /** Network active on first launch and when the active network is removed. */
   readonly defaultChainId: ChainId
 }
 
 const SERVICE_NAME = 'NetworkService'
 
 /**
- * Реализация управления сетями.
+ * Network management.
  *
- * Состояние держится в памяти: список сетей нужен интерфейсу постоянно,
- * а обращение к хранилищу на каждый рендер списка недопустимо. Хранилище
- * читается один раз при `init()` и пишется при изменениях.
+ * State is held in memory: the UI needs the network list constantly,
+ * and hitting storage on every list render is not acceptable.
+ * Storage is read once at `init()` and written on changes.
  */
 export class NetworkService implements INetworkService {
   readonly #repository: INetworkRepository
@@ -51,9 +51,9 @@ export class NetworkService implements INetworkService {
   readonly #builtInNetworks: readonly INetworkConfig[]
   readonly #defaultChainId: ChainId
 
-  /* Сбой подписчика уходит в журнал, а не в глобальный обработчик
-     необработанных исключений: неисправный компонент интерфейса не должен
-     выглядеть как отказ ядра. */
+  /* A listener failure goes to the log, not to the global unhandled-
+     rejection handler: a broken UI component must not look like a
+     core failure. */
   readonly #events = new EventBus<NetworkEventMap>({
     onListenerError: (error, event) => {
       this.#logger.error('Network event listener failed', {
@@ -81,16 +81,17 @@ export class NetworkService implements INetworkService {
       return
     }
 
-    /* Порядок заполнения принципиален.
+    /* Fill order is essential.
 
-       Сначала встроенные сети — они формируют базовый набор. Затем
-       пользовательские из хранилища, причём записи с chainId встроенной
-       сети отбрасываются.
+       Built-in networks first — they form the base set. Then user
+       networks from storage, and records whose chainId matches a
+       built-in network are dropped.
 
-       Это защита от подмены. Если вредоносный код или ошибка перезапишет
-       в хранилище RPC-адрес Ethereum на подконтрольный узел, кошелёк ходил
-       бы туда при каждом запуске. Пересев встроенных сетей из кода
-       закрывает такой сценарий: сохранённая копия попросту игнорируется. */
+       That is the defence against substitution. If malware or a bug
+       overwrites Ethereum's RPC address in storage with a node they
+       control, the wallet would talk to it on every launch.
+       Re-seeding built-in networks from code closes that scenario:
+       the stored copy is simply ignored. */
     for (const network of this.#builtInNetworks) {
       this.#networks.set(network.chainId, network)
     }
@@ -110,7 +111,7 @@ export class NetworkService implements INetworkService {
 
     const storedActive = await this.#repository.getActiveChainId()
 
-    /* Сохранённый выбор мог указывать на удалённую пользовательскую сеть. */
+    /* The stored choice may have pointed at a removed user network. */
     this.#activeChainId =
       storedActive !== null && this.#networks.has(storedActive)
         ? storedActive
@@ -130,9 +131,9 @@ export class NetworkService implements INetworkService {
     const active = this.#networks.get(this.#activeChainId as ChainId)
 
     if (active === undefined) {
-      /* Недостижимо при корректном init(): активный идентификатор всегда
-         выбирается из числа загруженных. Проверка оставлена как страховка
-         от рассогласования состояния при будущих правках. */
+      /* Unreachable after a correct init(): the active id is always
+         chosen from the loaded set. The check stays as a guard
+         against state drift in later edits. */
       throw new NetworkNotFoundError(this.#activeChainId as ChainId)
     }
 
@@ -154,8 +155,8 @@ export class NetworkService implements INetworkService {
       throw new NetworkNotFoundError(chainId)
     }
 
-    /* Повторное переключение на активную сеть не должно порождать событие:
-       подписчики пересоздают провайдер и сбрасывают кэши по этому сигналу. */
+    /* Switching again to the active network must not emit: listeners
+       recreate the provider and drop caches on this signal. */
     if (this.#activeChainId === chainId) {
       return
     }
@@ -181,12 +182,13 @@ export class NetworkService implements INetworkService {
     }
 
     /*
-      Проверка на подмену выполняется ДО обращения к узлу.
+      The impersonation check runs BEFORE talking to the node.
 
-      Порядок важен: сверка chainId требует сетевого запроса и занимает
-      секунды, а совпадение имени видно сразу. Но главное — сверка
-      chainId эту подмену не поймает в принципе: узел честно подтвердит
-      свой идентификатор, и проверка пройдёт.
+      Order matters: checking chainId needs a network request and
+      takes seconds, while a name match is visible at once. More
+      importantly, a chainId check cannot catch this impersonation
+      at all: the node will honestly confirm its id, and the check
+      will pass.
     */
     const impersonation = findImpersonation(params, this.#builtInNetworks)
 
@@ -207,10 +209,10 @@ export class NetworkService implements INetworkService {
       blockExplorerUrls: params.blockExplorerUrls ?? [],
       isTestnet: params.isTestnet ?? false,
       isBuiltIn: false,
-      /* Поддержка EIP-1559 определяется по ответу узла на этапе транзакций.
-         До этого момента консервативное предположение безопаснее: завышенная
-         оценка комиссии приведёт к переплате, заниженная — к зависшей
-         транзакции, которую придётся вытеснять. */
+      /* EIP-1559 support is decided from the node response at the
+         transaction stage. Until then a conservative guess is safer:
+         an overstated fee estimate overpays, an understated one
+         leaves a stuck transaction that must be replaced. */
       supportsEip1559: false,
     }
 
@@ -246,8 +248,8 @@ export class NetworkService implements INetworkService {
     this.#logger.info('Custom network removed', { chainId: chainId.toString() })
     this.#emitListChanged()
 
-    /* Удаление активной сети обязано оставить приложение в рабочем
-       состоянии, а не в положении «активной сети нет». */
+    /* Removing the active network must leave the app in a working
+       state, not in "there is no active network". */
     if (this.#activeChainId === chainId) {
       await this.switchTo(this.#defaultChainId)
     }
@@ -274,9 +276,10 @@ export class NetworkService implements INetworkService {
       assertValidExplorerUrl(url)
     }
 
-    /* chainId не берётся из params сознательно: смена идентификатора —
-       это другая сеть, а не правка существующей. Молчаливое переназначение
-       оставило бы в хранилище запись под старым ключом. */
+    /* chainId is deliberately not taken from params: changing the
+       id is another network, not an edit of the existing one.
+       A silent reassignment would leave a record under the old
+       key in storage. */
     const updated: INetworkConfig = {
       ...existing,
       name: params.name ?? existing.name,
@@ -316,14 +319,16 @@ export class NetworkService implements INetworkService {
   }
 
   /**
-   * Сверяет заявленный chainId с ответом узла.
+   * Checks the claimed chainId against the node's answer.
    *
-   * Самая важная проверка модуля. Без неё сайт может предложить добавить
-   * «ту же сеть с более быстрым узлом», а узел на деле обслуживает другую
-   * сеть. Пользователь подписывает транзакцию, считая её принадлежащей
-   * одной сети, а подпись оказывается пригодной для проигрывания в другой.
+   * The most important check in the module. Without it a site can
+   * offer to add "the same network with a faster node", while the
+   * node in fact serves another network. The user signs a
+   * transaction believing it belongs to one network, and the
+   * signature is fit to replay on another.
    *
-   * Соединение закрывается в любом случае: сервис не держит провайдеров.
+   * The connection is closed either way: the service does not
+   * hold providers.
    */
   async #verifyChainId(candidate: INetworkConfig): Promise<void> {
     const provider = await this.#providerFactory.create(candidate)

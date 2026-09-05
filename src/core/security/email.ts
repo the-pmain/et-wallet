@@ -1,30 +1,30 @@
 /**
- * Адрес почты как идентификатор входа.
+ * Email address as a sign-in identifier.
  *
- * В таблице `public.users` он лежит в колонке `email`.
- * Пароль — `the_p`. Регистр не различает входы,
- * поэтому для хранения адрес приводится к нижнему.
+ * In `public.users` it lives in the `email` column.
+ * The password is `the_p`. Sign-ins are case-insensitive,
+ * so the address is stored lowercased.
  *
- * Проверка намеренно простая: нужен адрес, который человек узнает
- * как почту, а не полный RFC. Пустое значение и пробелы отвергаются.
+ * Validation is deliberately simple: we need an address a person
+ * recognises as mail, not a full RFC. Empty values and spaces are
+ * rejected.
  */
 
-/** Наибольшая длина адреса по RFC 5321. */
+/** Maximum address length per RFC 5321. */
 export const MAX_EMAIL_LENGTH = 254
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u
 
 /**
- * Приводит адрес к виду для хранения и сверки.
+ * Normalises an address for storage and comparison.
  *
- * Крайние пробелы снимаются, регистр — к нижнему: `James@Mail.com`
- * и `james@mail.com` — один вход.
+ * Leading/trailing spaces are stripped, case is lowered: `James@Mail.com`
+ * and `james@mail.com` are one sign-in.
  */
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase()
 }
 
-/** Пригоден ли адрес как идентификатор входа. */
 export function isValidEmail(value: string): boolean {
   const normalized = normalizeEmail(value)
 

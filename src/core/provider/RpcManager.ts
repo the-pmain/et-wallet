@@ -11,33 +11,33 @@ import type { IRpcEndpoint, IRpcEndpointHealth, IRpcProvider } from './rpc-endpo
 const MANAGER_NAME = 'RpcManager'
 
 /**
- * Сколько адрес считается непригодным после отказа.
+ * How long an address stays unfit after a failure.
  *
- * Без выдержки отказавший адрес пробовался бы заново при каждом
- * подключении, добавляя к каждому запросу время ожидания таймаута.
- * Пять минут — достаточно, чтобы кратковременный сбой оператора успел
- * закончиться, и недостаточно, чтобы пользователь заметил задержку
- * возврата к предпочтительному узлу.
+ * Without a cooldown, a failed address would be retried on every
+ * connect, adding a timeout wait to every request. Five minutes is
+ * long enough for a brief operator outage to end, and short enough
+ * that the user does not notice the delay returning to the preferred
+ * node.
  */
 const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000
 
-/** Настройки менеджера. */
+/** Manager settings. */
 export interface IRpcManagerOptions {
   readonly cooldownMs?: number
 }
 
-/** Зависимости менеджера. */
+/** Manager dependencies. */
 export interface IRpcManagerDependencies {
   /**
-   * Источники адресов в порядке предпочтения.
+   * Address sources in preference order.
    *
-   * Порядок задаётся снаружи, а не зашит здесь: он выражает политику
-   * («сначала собственный узел, потом управляемый, потом публичный»),
-   * а политика — предмет настройки, а не свойство механизма.
+   * Order is supplied from outside, not hardcoded here: it expresses
+   * policy ("own node first, then managed, then public"), and policy
+   * is configuration, not a property of the mechanism.
    */
   readonly providers: readonly IRpcProvider[]
 
-  /** Транспорт. Подключается к одному конкретному адресу. */
+  /** Transport. Connects to one specific address. */
   readonly factory: IProviderFactory
 
   readonly clock: IClock
@@ -46,26 +46,25 @@ export interface IRpcManagerDependencies {
 }
 
 /**
- * Выбор RPC-узла, проверка доступности и кэш соединений.
+ * RPC-node selection, availability checks, and connection cache.
  *
- * ЧТО ЗДЕСЬ ПРОИСХОДИТ. Менеджер собирает адреса со всех источников
- * в один упорядоченный список, отбрасывает те, что недавно отказали,
- * и отдаёт `FailoverProvider`, умеющий пережить отказ узла посреди сессии.
+ * WHAT HAPPENS HERE. The manager gathers addresses from every source
+ * into one ordered list, drops those that failed recently, and hands
+ * out a `FailoverProvider` that can survive a node failing mid-session.
  *
- * ОДНО СОЕДИНЕНИЕ НА СЕТЬ. Пользователь переключает сети туда и обратно;
- * закрывать соединение при каждом переключении означало бы повторную
- * сверку chainId при возврате. В кэше лежит `Promise`, а не готовый
- * провайдер: параллельные запросы разделяют одно подключение.
+ * ONE CONNECTION PER NETWORK. The user switches networks back and
+ * forth; closing the connection on every switch would re-verify
+ * chainId on return. The cache stores a `Promise`, not a ready
+ * provider: concurrent requests share one connect.
  *
- * ПОРЯДОК ИСТОЧНИКОВ И «ПО УМОЛЧАНИЮ». Адрес, добавленный пользователем,
- * идёт впереди управляемого: пользователь выбрал его сознательно, и
- * игнорировать этот выбор ради значения по умолчанию значит отменять
- * решение владельца средств. Пока собственного адреса нет, первым
- * оказывается Alchemy — это и есть «по умолчанию».
+ * SOURCE ORDER AND "DEFAULT". An address the user added comes before
+ * the managed one: the user chose it on purpose, and ignoring that
+ * choice for a default would undo the owner's decision. While there
+ * is no own address, Alchemy is first — that is the "default".
  *
- * ПРОВЕРКА ПОДЛИННОСТИ УЗЛА НЕ ОТМЕНЕНА. Сверку `eth_chainId` выполняет
- * транспорт при подключении, и узел с чужим идентификатором исключается
- * так же, как недоступный.
+ * NODE AUTHENTICITY IS NOT SKIPPED. The transport verifies
+ * `eth_chainId` on connect, and a node with a foreign id is dropped
+ * the same way as an unreachable one.
  */
 export class RpcManager implements IProviderResolver {
   readonly #providers: readonly IRpcProvider[]
@@ -76,8 +75,8 @@ export class RpcManager implements IProviderResolver {
 
   readonly #connections = new Map<ChainId, Promise<FailoverProvider>>()
 
-  /* Адреса, отказавшие недавно. Ключ — адрес, значение — момент,
-     до которого он не пробуется. */
+  /* Addresses that failed recently. Key is the URL, value is the
+     moment until which it is not tried. */
   readonly #unavailableUntil = new Map<string, Timestamp>()
 
   #destroyed = false
@@ -91,10 +90,10 @@ export class RpcManager implements IProviderResolver {
   }
 
   /**
-   * Все адреса сети со всех источников, в порядке предпочтения.
+   * Every network address from every source, in preference order.
    *
-   * Повторы отбрасываются: один и тот же адрес мог быть добавлен
-   * пользователем вручную и одновременно присутствовать в конфигурации.
+   * Duplicates are dropped: the same address may have been added
+   * by the user and also appear in configuration.
    */
   listEndpoints(network: INetworkConfig): readonly IRpcEndpoint[] {
     const seen = new Set<string>()
@@ -119,10 +118,10 @@ export class RpcManager implements IProviderResolver {
   }
 
   /**
-   * Соединение с сетью, создаваемое при первом обращении.
+   * Connection to a network, created on first use.
    *
-   * @throws ProviderUnavailableError если пригодных адресов нет либо
-   *         ни один не отвечает.
+   * @throws ProviderUnavailableError if no usable addresses remain or
+   *         none of them answers.
    */
   async get(network: INetworkConfig): Promise<IProvider> {
     if (this.#destroyed) {
@@ -148,9 +147,9 @@ export class RpcManager implements IProviderResolver {
     try {
       return await created
     } catch (error) {
-      /* Неудачную попытку нельзя оставлять в кэше: следующий вызов получил
-         бы тот же отклонённый Promise и не попробовал бы соединиться заново
-         даже после восстановления узла. */
+      /* A failed attempt must not stay in cache: the next call would
+         get the same rejected Promise and would not try to connect
+         again even after the node recovered. */
       this.#connections.delete(network.chainId)
 
       throw error
@@ -158,17 +157,18 @@ export class RpcManager implements IProviderResolver {
   }
 
   /**
-   * Проверяет доступность всех адресов сети.
+   * Checks availability of every address on the network.
    *
-   * Проверка выполняет настоящее подключение и запрос номера блока:
-   * измерить то, что почувствует пользователь, иначе невозможно.
-   * Соединения закрываются сразу — это диагностика, а не рабочий канал.
+   * The check performs a real connect and a block-number request:
+   * there is no other way to measure what the user will feel.
+   * Connections are closed immediately — this is diagnostics, not a
+   * working channel.
    *
-   * Адреса проверяются параллельно: последовательный обход семи узлов
-   * с таймаутами занял бы десятки секунд.
+   * Addresses are checked in parallel: walking seven nodes with
+   * timeouts sequentially would take tens of seconds.
    *
-   * Отказ ОДНОГО адреса не прерывает проверку остальных: смысл операции
-   * в том, чтобы показать состояние всех.
+   * Failure of ONE address does not stop the rest: the point of the
+   * operation is to show the state of all of them.
    */
   async checkHealth(network: INetworkConfig): Promise<readonly IRpcEndpointHealth[]> {
     const endpoints = this.listEndpoints(network)
@@ -179,19 +179,19 @@ export class RpcManager implements IProviderResolver {
   }
 
   /**
-   * Добавляет пользовательский адрес после проверки подлинности узла.
+   * Adds a user address after verifying the node's authenticity.
    *
-   * ПОРЯДОК ДЕЙСТВИЙ ЗНАЧИМ. Сначала подключение и сверка chainId, только
-   * потом сохранение. Обратный порядок оставил бы в хранилище адрес узла,
-   * обслуживающего другую сеть, и кошелёк применял бы его при каждом
-   * запуске — готовый приём подмены: подписи, сделанные для чужой сети,
-   * пригодны для повторного проигрывания.
+   * ORDER MATTERS. Connect and verify chainId first, persist only
+   * after that. The reverse order would leave an address serving
+   * another network in storage, and the wallet would apply it on
+   * every launch — a ready replay attack: signatures made for a
+   * foreign network are valid for replay.
    *
-   * @throws InvalidRpcUrlError, InsecureRpcUrlError — формат адреса.
-   * @throws ChainIdMismatchError — узел обслуживает другую сеть.
-   * @throws ProviderUnavailableError — узел не отвечает.
-   * @throws InvalidArgumentError — источник пользовательских адресов
-   *         не подключён либо адрес уже добавлен.
+   * @throws InvalidRpcUrlError, InsecureRpcUrlError — address format.
+   * @throws ChainIdMismatchError — the node serves another network.
+   * @throws ProviderUnavailableError — the node does not answer.
+   * @throws InvalidArgumentError — the custom-address source is not
+   *         connected, or the address is already added.
    */
   async addCustomEndpoint(network: INetworkConfig, url: string): Promise<void> {
     assertValidRpcUrl(url)
@@ -201,9 +201,9 @@ export class RpcManager implements IProviderResolver {
     await this.#verifyEndpoint(url, network.chainId)
     await custom.add(network.chainId, url)
 
-    /* Соединение пересоздаётся: добавленный адрес имеет приоритет,
-       и продолжать работу через прежний узел значило бы не применить
-       выбор пользователя до перезапуска. */
+    /* The connection is rebuilt: the added address has priority, and
+       staying on the previous node would ignore the user's choice
+       until restart. */
     await this.release(network.chainId)
 
     this.#logger.info('Custom RPC endpoint added', {
@@ -211,13 +211,13 @@ export class RpcManager implements IProviderResolver {
     })
   }
 
-  /** Удаляет пользовательский адрес и пересоздаёт соединение. */
+  /** Removes a user address and rebuilds the connection. */
   async removeCustomEndpoint(network: INetworkConfig, url: string): Promise<void> {
     await this.#requireCustomProvider().remove(network.chainId, url)
     await this.release(network.chainId)
   }
 
-  /** Закрывает соединение с одной сетью. */
+  /** Closes the connection to one network. */
   async release(chainId: ChainId): Promise<void> {
     const pending = this.#connections.get(chainId)
 
@@ -230,7 +230,7 @@ export class RpcManager implements IProviderResolver {
     await this.#destroyQuietly(pending)
   }
 
-  /** Закрывает все соединения. Вызывается при блокировке кошелька. */
+  /** Closes every connection. Called when the wallet locks. */
   async destroy(): Promise<void> {
     this.#destroyed = true
 
@@ -259,20 +259,20 @@ export class RpcManager implements IProviderResolver {
       },
     })
 
-    /* Подключение выполняется здесь, а не при первом вызове: ошибка
-       «сеть недоступна» должна возникнуть при открытии экрана, а не
-       посреди подготовки транзакции. */
+    /* Connect happens here, not on the first call: "network
+       unavailable" must appear when the screen opens, not in the
+       middle of preparing a transaction. */
     await provider.getBlockNumber()
 
     return provider
   }
 
   /**
-   * Адреса, пригодные к попытке сейчас.
+   * Addresses that may be tried now.
    *
-   * Если выдержку не отбыл ни один адрес, возвращается полный список:
-   * отказать в подключении, имея непроверенные адреса, хуже, чем
-   * потратить время на попытку.
+   * If no address has finished its cooldown, the full list is
+   * returned: refusing to connect while unchecked addresses exist
+   * is worse than spending time on an attempt.
    */
   #availableEndpoints(network: INetworkConfig): readonly IRpcEndpoint[] {
     const all = this.listEndpoints(network)
@@ -287,9 +287,9 @@ export class RpcManager implements IProviderResolver {
   }
 
   async #connect(endpoint: IRpcEndpoint, chainId: ChainId): Promise<IProvider> {
-    /* Транспорту передаётся конфигурация с единственным адресом: перебор
-       выполняет `FailoverProvider`, и дублировать его внутри фабрики
-       значило бы иметь два несогласованных механизма перебора. */
+    /* The transport receives a config with a single address:
+       `FailoverProvider` owns rotation, and duplicating it inside
+       the factory would mean two disagreeing rotation mechanisms. */
     return await this.#factory.create(singleEndpointNetwork(chainId, endpoint.url))
   }
 
@@ -329,7 +329,7 @@ export class RpcManager implements IProviderResolver {
   }
 
   /**
-   * Убеждается, что узел отвечает и обслуживает ожидаемую сеть.
+   * Confirms the node answers and serves the expected network.
    *
    * @throws ChainIdMismatchError, ProviderUnavailableError
    */
@@ -340,12 +340,13 @@ export class RpcManager implements IProviderResolver {
       provider = await this.#factory.create(singleEndpointNetwork(chainId, url))
       await provider.getBlockNumber()
     } catch (error) {
-      /* Фабрика перебирает адреса и сообщает итог одной ошибкой
-         «нет доступных узлов», спрятав настоящую причину в `cause`.
-         Для перебора это верно, но здесь адрес один и указан вручную:
-         пользователю нужно знать, что его узел обслуживает другую сеть,
-         а не что «сеть недоступна». Иначе он будет искать несуществующую
-         проблему с соединением. */
+      /* The factory walks addresses and reports the outcome as a
+         single "no available nodes" error, hiding the real cause in
+         `cause`. That is correct for rotation, but here the address
+         is one and typed by the user: they need to know their node
+         serves another network, not that "the network is
+         unavailable". Otherwise they would hunt a connection problem
+         that does not exist. */
       throw findChainIdMismatch(error) ?? error
     } finally {
       provider?.destroy()
@@ -372,10 +373,10 @@ export class RpcManager implements IProviderResolver {
   }
 
   /**
-   * Закрывает соединение, не позволяя сбою прервать закрытие остальных.
+   * Closes a connection without letting a failure interrupt the rest.
    *
-   * Блокировка кошелька обязана завершиться при любом состоянии
-   * транспорта: исключение здесь оставило бы часть соединений открытыми.
+   * Wallet lock must finish regardless of transport state: an
+   * exception here would leave some connections open.
    */
   async #destroyQuietly(pending: Promise<IProvider>): Promise<void> {
     try {
@@ -389,15 +390,15 @@ export class RpcManager implements IProviderResolver {
 }
 
 /**
- * Ищет несовпадение chainId в цепочке причин.
+ * Finds a chainId mismatch in the cause chain.
  *
- * Транспорт сообщает о чужой сети отдельной ошибкой, но фабрика,
- * перебирающая адреса, заворачивает её в «нет доступных узлов»
- * и кладёт исходную в `cause`. Глубина вложенности не фиксирована,
- * поэтому цепочка обходится целиком.
+ * Transport reports a foreign network as a distinct error, but the
+ * factory that walks addresses wraps it in "no available nodes" and
+ * puts the original in `cause`. Nesting depth is not fixed, so the
+ * whole chain is walked.
  *
- * Ограничение глубины защищает от зацикливания на ошибке, чья `cause`
- * ссылается на неё саму: такие объекты приходят из внешних библиотек.
+ * A depth limit protects against a cycle on an error whose `cause`
+ * points at itself: such objects come from external libraries.
  */
 function findChainIdMismatch(error: unknown): ChainIdMismatchError | null {
   const MAX_DEPTH = 8
@@ -419,11 +420,11 @@ function findChainIdMismatch(error: unknown): ChainIdMismatchError | null {
 }
 
 /**
- * Конфигурация сети с единственным адресом.
+ * Network config with a single address.
  *
- * Нужна потому, что транспорт принимает `INetworkConfig`, а перебором
- * занимается вызывающий код. Поля, не влияющие на подключение, заполнены
- * значениями-заглушками и наружу не выходят.
+ * Needed because transport accepts `INetworkConfig` while the caller
+ * owns rotation. Fields that do not affect connect are filled with
+ * stubs and never leave this function.
  */
 function singleEndpointNetwork(chainId: ChainId, url: string): INetworkConfig {
   return {

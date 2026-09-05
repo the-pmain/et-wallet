@@ -12,7 +12,7 @@ afterEach(() => {
 })
 
 describe('login-credentials', () => {
-  it('записывает id, email и the_p', () => {
+  it('writes id, email, and the_p', () => {
     writeLoginCredentials({ id: '7', email: 'james@example.com', theP: '123456' })
 
     expect(JSON.parse(localStorage.getItem(LOGIN_CREDENTIALS_STORAGE_KEY) ?? '{}')).toEqual({
@@ -27,7 +27,7 @@ describe('login-credentials', () => {
     })
   })
 
-  it('читает id числом — так его кладёт JSON из таблицы users', () => {
+  it('reads a numeric id — as JSON from the users table stores it', () => {
     localStorage.setItem(
       LOGIN_CREDENTIALS_STORAGE_KEY,
       JSON.stringify({ id: 70, email: 'theguy@email.com', the_p: '123456' }),
@@ -40,7 +40,7 @@ describe('login-credentials', () => {
     })
   })
 
-  it('читает прежнюю запись с ключом username, если есть id', () => {
+  it('reads a legacy record with username when id is present', () => {
     localStorage.setItem(
       LOGIN_CREDENTIALS_STORAGE_KEY,
       JSON.stringify({ id: '7', username: 'james@example.com', the_p: '123456' }),
@@ -53,7 +53,7 @@ describe('login-credentials', () => {
     })
   })
 
-  it('отвергает запись без id', () => {
+  it('rejects a record without id', () => {
     localStorage.setItem(
       LOGIN_CREDENTIALS_STORAGE_KEY,
       JSON.stringify({ email: 'james@example.com', the_p: '123456' }),
@@ -62,7 +62,7 @@ describe('login-credentials', () => {
     expect(readLoginCredentials()).toBeNull()
   })
 
-  it('отвергает повреждённую запись', () => {
+  it('rejects a corrupted record', () => {
     localStorage.setItem(LOGIN_CREDENTIALS_STORAGE_KEY, '{')
     expect(readLoginCredentials()).toBeNull()
 
@@ -73,7 +73,7 @@ describe('login-credentials', () => {
     expect(readLoginCredentials()).toBeNull()
   })
 
-  it('стирает запись', () => {
+  it('clears the record', () => {
     writeLoginCredentials({ id: '7', email: 'james@example.com', theP: '123456' })
     clearLoginCredentials()
     expect(readLoginCredentials()).toBeNull()

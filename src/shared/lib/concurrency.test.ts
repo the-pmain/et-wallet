@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { mapWithLimit } from './concurrency'
 
-/** Задача, завершающаяся после явного разрешения. */
+/** Task that finishes after an explicit resolve. */
 function deferred<TValue>() {
   let resolve!: (value: TValue) => void
   let reject!: (reason: unknown) => void
@@ -16,26 +16,26 @@ function deferred<TValue>() {
 }
 
 describe('mapWithLimit', () => {
-  it('сохраняет порядок результатов', async () => {
-    /* Список токенов показывается в заданном порядке; перестановка
-       строк при каждом обновлении читалась бы как изменение состава. */
+  it('preserves result order', async () => {
+    /* The token list is shown in a given order; reshuffling rows on
+       every refresh would read as a change in composition. */
     const results = await mapWithLimit(
       [
-        async () => await Promise.resolve('первый'),
-        async () => await Promise.resolve('второй'),
-        async () => await Promise.resolve('третий'),
+        async () => await Promise.resolve('first'),
+        async () => await Promise.resolve('second'),
+        async () => await Promise.resolve('third'),
       ],
       2,
     )
 
     expect(results.map((entry) => (entry.status === 'fulfilled' ? entry.value : null))).toEqual([
-      'первый',
-      'второй',
-      'третий',
+      'first',
+      'second',
+      'third',
     ])
   })
 
-  it('не запускает больше задач, чем разрешено', async () => {
+  it('does not start more tasks than allowed', async () => {
     const gates = [deferred<number>(), deferred<number>(), deferred<number>()]
 
     let started = 0
@@ -62,35 +62,35 @@ describe('mapWithLimit', () => {
     expect(started).toBe(3)
   })
 
-  it('отказ одной задачи не отменяет остальные', async () => {
-    /* Недоступный контракт не имеет права стереть с экрана балансы
-       прочих токенов. */
+  it('one task failing does not cancel the rest', async () => {
+    /* An unreachable contract must not wipe other token balances
+       off the screen. */
     const results = await mapWithLimit(
       [
-        async () => await Promise.resolve('есть'),
-        () => Promise.reject(new Error('узел не ответил')),
-        async () => await Promise.resolve('тоже есть'),
+        async () => await Promise.resolve('present'),
+        () => Promise.reject(new Error('The node did not respond')),
+        async () => await Promise.resolve('also present'),
       ],
       2,
     )
 
-    expect(results[0]).toEqual({ status: 'fulfilled', value: 'есть' })
+    expect(results[0]).toEqual({ status: 'fulfilled', value: 'present' })
     expect(results[1]?.status).toBe('rejected')
-    expect(results[2]).toEqual({ status: 'fulfilled', value: 'тоже есть' })
+    expect(results[2]).toEqual({ status: 'fulfilled', value: 'also present' })
   })
 
-  it('сообщает причину отказа, а не проглатывает её', async () => {
-    const results = await mapWithLimit([() => Promise.reject(new Error('лимит частоты'))], 4)
+  it('reports the failure reason instead of swallowing it', async () => {
+    const results = await mapWithLimit([() => Promise.reject(new Error('rate limit'))], 4)
     const first = results[0]
 
     expect(first?.status === 'rejected' && first.reason).toBeInstanceOf(Error)
   })
 
-  it('пустой список задач допустим', async () => {
+  it('accepts an empty task list', async () => {
     await expect(mapWithLimit([], 4)).resolves.toEqual([])
   })
 
-  it('предел меньше единицы приводится к последовательному обходу', async () => {
+  it('a limit below one becomes sequential', async () => {
     const order: number[] = []
 
     await mapWithLimit(

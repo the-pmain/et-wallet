@@ -3,18 +3,18 @@ import { createContext, use, useSyncExternalStore } from 'react'
 import type { IWalletSession, IWalletSnapshot } from './contracts'
 
 /**
- * Контекст сессии кошелька.
+ * Wallet session context.
  *
- * Значения по умолчанию нет намеренно: обращение к сессии вне провайдера —
- * ошибка композиции, и проявиться она должна сразу, а не превратиться
- * в вечно пустой экран.
+ * No default on purpose: using the session outside the provider is a
+ * composition error and must fail immediately, not become a forever-
+ * empty screen.
  */
 export const WalletContext = createContext<IWalletSession | null>(null)
 
 /**
- * Доступ к операциям кошелька.
+ * Access to wallet operations.
  *
- * @throws Если вызван вне провайдера.
+ * @throws If called outside the provider.
  */
 export function useWallet(): IWalletSession {
   const session = use(WalletContext)
@@ -27,11 +27,11 @@ export function useWallet(): IWalletSession {
 }
 
 /**
- * Снимок состояния кошелька с подпиской на изменения.
+ * Wallet state snapshot with a change subscription.
  *
- * `useSyncExternalStore` требует, чтобы `getSnapshot` возвращал стабильную
- * ссылку между изменениями. Сессия соблюдает это условие: снимок заменяется
- * целиком и только при настоящем изменении данных.
+ * `useSyncExternalStore` requires `getSnapshot` to return a stable
+ * reference between changes. The session honours that: the snapshot
+ * is replaced as a whole and only when data actually changes.
  */
 export function useWalletSnapshot(): IWalletSnapshot {
   const session = useWallet()

@@ -2,52 +2,47 @@ import { AutoLockService, type IClock } from '@/core'
 import { useEffect, useMemo, useState } from 'react'
 
 /**
- * События браузера, считающиеся признаком присутствия пользователя.
+ * Browser events treated as a sign the user is present.
  *
- * Движение указателя в список НЕ входит намеренно: курсор двигается
- * от случайного касания стола, и автоблокировка, продлеваемая этим,
- * не наступит никогда на брошенном ноутбуке.
+ * Pointer move is left out on purpose: the cursor moves from an
+ * accidental bump of the desk, and auto-lock extended by that
+ * would never fire on a laptop left open.
  */
 const ACTIVITY_EVENTS: readonly string[] = ['pointerdown', 'keydown', 'wheel', 'touchstart']
 
-/** Состояние автоблокировки для интерфейса. */
 export interface IAutoLockState {
-  /** Показывать предупреждение о скорой блокировке. */
   readonly isWarning: boolean
 
-  /** Сколько осталось до блокировки. `null`, пока отсчёт не идёт. */
+  /** Time left until lock. `null` while the countdown is not running. */
   readonly remainingMs: number | null
 
-  /** Продлевает сессию: вызывается кнопкой «остаться». */
   readonly extend: () => void
 }
 
-/** Параметры подключения автоблокировки. */
 export interface IUseAutoLockParams {
-  /** Отсчёт идёт только у разблокированного кошелька. */
+  /** The countdown runs only on an unlocked wallet. */
   readonly isUnlocked: boolean
 
   readonly timeoutMs: number
   readonly clock: IClock
 
-  /** Блокировка кошелька. Вызывается по истечении срока. */
   readonly onExpire: () => void
 }
 
 /**
- * Подключает автоблокировку к браузеру.
+ * Wire auto-lock to the browser.
  *
- * ЯДРО СЧИТАЕТ ВРЕМЯ, ЭТОТ ХУК СЛУШАЕТ БРАУЗЕР. Разделение нужно, чтобы
- * `AutoLockService` оставался работоспособным в service worker, где нет
- * ни DOM, ни событий ввода.
+ * THE CORE COUNTS TIME; THIS HOOK LISTENS TO THE BROWSER. The split
+ * keeps `AutoLockService` usable in a service worker, where there is
+ * no DOM and no input events.
  *
- * ПЕРЕХОД ВКЛАДКИ В ФОН СЧИТАЕТСЯ БЕЗДЕЙСТВИЕМ, А НЕ АКТИВНОСТЬЮ.
- * Обратное трактование продлевало бы сессию каждым переключением
- * окна — то есть ровно тогда, когда пользователь от кошелька отошёл.
+ * MOVING THE TAB TO THE BACKGROUND COUNTS AS IDLE, NOT ACTIVITY.
+ * The opposite reading would extend the session on every window
+ * switch — exactly when the user walked away from the wallet.
  *
- * СОБЫТИЯ СЛУШАЮТСЯ В ФАЗЕ ПЕРЕХВАТА. Обработчик, остановивший
- * всплытие, иначе отменил бы продление сессии, и кошелёк блокировался
- * бы посреди работы.
+ * EVENTS ARE LISTENED IN THE CAPTURE PHASE. A handler that stopped
+ * bubbling would otherwise cancel the session extension, and the
+ * wallet would lock mid-work.
  */
 export function useAutoLock({
   isUnlocked,
@@ -62,9 +57,9 @@ export function useAutoLock({
 
   useEffect(() => {
     if (!isUnlocked) {
-      /* Состояние здесь не сбрасывается: синхронный `setState` в теле
-         эффекта вызывает каскадный рендер. Сброс выполняет очистка
-         предыдущего запуска — она отрабатывает раньше этой ветки. */
+      /* State is not reset here: a synchronous `setState` in the
+         effect body causes a cascading render. Reset is done by the
+         previous run's cleanup — it runs before this branch. */
       service.stop()
 
       return
@@ -106,9 +101,9 @@ export function useAutoLock({
       unsubscribeExpired()
       service.stop()
 
-      /* Предупреждение снимается вместе с отсчётом: иначе оно всплыло бы
-         сразу после следующей разблокировки, когда до блокировки ещё
-         целый срок. */
+      /* The warning is cleared with the countdown: otherwise it would
+         pop up right after the next unlock, while a full timeout
+         remains. */
       setWarning(false)
       setRemainingMs(null)
     }

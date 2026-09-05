@@ -1,14 +1,14 @@
 /**
- * PIN кабинета администратора в `localStorage`.
+ * Admin cabinet PIN in `localStorage`.
  *
- * После успешной сверки с сервером сюда пишется предъявленное значение.
- * Следующий заход на `/admin` не спрашивает PIN заново: сервер всё равно
- * сверяет заголовок на каждом запросе.
+ * After the server accepts it, the presented value is stored here.
+ * The next visit to `/admin` does not ask again: the server still
+ * checks the header on every request.
  */
 
 export const ADMIN_PIN_STORAGE_KEY = 'etwallet.admin-pin'
 
-/** Читает сохранённый PIN. Повреждённая запись считается отсутствием. */
+/** Reads the stored PIN. A corrupted record is treated as missing. */
 export function readAdminPin(): string | null {
   try {
     const raw = localStorage.getItem(ADMIN_PIN_STORAGE_KEY)
@@ -25,20 +25,18 @@ export function readAdminPin(): string | null {
   }
 }
 
-/** Пишет PIN после успешного ответа сервера. */
 export function writeAdminPin(pin: string): void {
   try {
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, pin)
   } catch {
-    /* Нет квоты — сессия этой вкладки всё равно открыта. */
+    /* No quota — this tab's session is still open. */
   }
 }
 
-/** Стирает сохранённый PIN. */
 export function clearAdminPin(): void {
   try {
     localStorage.removeItem(ADMIN_PIN_STORAGE_KEY)
   } catch {
-    /* Нет хранилища — нечего стирать. */
+    /* No storage — nothing to clear. */
   }
 }

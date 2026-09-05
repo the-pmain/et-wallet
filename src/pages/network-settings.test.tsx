@@ -11,7 +11,7 @@ import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-/** Идентификатор, не занятый ни одной встроенной сетью. */
+/** An id not taken by any built-in network. */
 const CUSTOM_CHAIN = 31_337
 
 let services: ITestAppServices
@@ -24,7 +24,6 @@ function renderApp() {
   )
 }
 
-/** Открывает экран настроек, где живёт управление сетями. */
 async function openSettings(): Promise<void> {
   const user = userEvent.setup()
 
@@ -33,7 +32,6 @@ async function openSettings(): Promise<void> {
   await screen.findByRole('heading', { name: 'Settings' })
 }
 
-/** Раскрывает форму добавления сети. */
 async function openAddForm(): Promise<void> {
   const user = userEvent.setup()
 
@@ -41,7 +39,6 @@ async function openAddForm(): Promise<void> {
   await screen.findByLabelText('Network name')
 }
 
-/** Заполняет обязательные поля формы. */
 async function fillNetwork(name: string, chainId: number): Promise<void> {
   const user = userEvent.setup()
 
@@ -59,32 +56,32 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Сети: список', () => {
-  it('перечисляет встроенные сети', async () => {
+describe('Networks: list', () => {
+  it('lists the built-in networks', async () => {
     renderApp()
     await openSettings()
 
-    /* Запрос ограничен карточкой сетей: имя активной сети встречается
-       ещё и в шапке оболочки. */
+    /* The query is scoped to the networks card: the active network
+       name also appears in the shell header. */
     const card = screen.getByText('Networks').closest('[data-slot=card]') as HTMLElement
 
     expect(within(card).getByText('Ethereum')).toBeInTheDocument()
     expect(within(card).getByText('Polygon')).toBeInTheDocument()
   })
 
-  it('не предлагает удалить встроенную сеть', async () => {
+  it('does not offer to delete a built-in network', async () => {
     renderApp()
     await openSettings()
 
-    /* Конфигурация встроенной сети — часть защиты от подмены: удалив
-       основную сеть, пользователь мог бы добавить вместо неё
-       одноимённую с чужим идентификатором. */
+    /* Built-in network config is part of impersonation protection:
+       after deleting the main network the user could add a namesake
+       with a foreign id. */
     expect(
       screen.queryByRole('button', { name: /remove network Ethereum/i }),
     ).not.toBeInTheDocument()
   })
 
-  it('переключает активную сеть', async () => {
+  it('switches the active network', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -100,8 +97,8 @@ describe('Сети: список', () => {
   })
 })
 
-describe('Сети: добавление', () => {
-  it('добавляет пользовательскую сеть после проверки узла', async () => {
+describe('Networks: add', () => {
+  it('adds a custom network after the node is checked', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -116,7 +113,7 @@ describe('Сети: добавление', () => {
     })
   })
 
-  it('помечает добавленную сеть как пользовательскую', async () => {
+  it('marks an added network as custom', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -126,15 +123,15 @@ describe('Сети: добавление', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add network' }))
 
-    /* Различие между проверенной встроенной конфигурацией и добавленной
-       вручную важно: у второй и узел, и обозреватель заданы тем,
-       кто её добавил. */
+    /* The difference between a checked built-in config and one added
+       by hand matters: for the latter both the node and the explorer
+       are set by whoever added it. */
     await waitFor(() => {
       expect(screen.getByText('custom')).toBeInTheDocument()
     })
   })
 
-  it('предупреждает о подмене при совпадении имени со встроенной сетью', async () => {
+  it('warns about impersonation when the name matches a built-in network', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -144,13 +141,13 @@ describe('Сети: добавление', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add network' }))
 
-    /* Сверка chainId с узлом этого не поймает: узел честно подтвердит
-       свой идентификатор. */
+    /* Checking chainId with the node will not catch this: the node
+       will honestly confirm its own id. */
     expect(await screen.findByText('The network impersonates an existing one')).toBeInTheDocument()
     expect(screen.getByText(/a common network spoofing trick/i)).toBeInTheDocument()
   })
 
-  it('не добавляет одноимённую сеть без согласия', async () => {
+  it('does not add a namesake network without consent', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -164,7 +161,7 @@ describe('Сети: добавление', () => {
     expect(screen.queryByText('custom')).not.toBeInTheDocument()
   })
 
-  it('добавляет одноимённую сеть по явному согласию', async () => {
+  it('adds a namesake network after explicit consent', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -180,7 +177,7 @@ describe('Сети: добавление', () => {
     })
   })
 
-  it('показывает причину отказа узла дословно', async () => {
+  it('shows the node refusal reason verbatim', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -195,12 +192,12 @@ describe('Сети: добавление', () => {
     await fillNetwork('My Private Chain', CUSTOM_CHAIN)
     await user.click(screen.getByRole('button', { name: 'Add network' }))
 
-    /* «The node serves a different network» и «адрес недоступен» требуют
-       разных действий: обобщение лишило бы пользователя возможности
-       понять, что исправлять. */
-    /* На экране несколько предупреждений: постоянное о доверии к узлу
-       и появившееся сообщение об отказе. Проверяется наличие второго
-       среди них, а не единственность роли. */
+    /* "The node serves a different network" and "the address is
+       unreachable" need different actions: a generic message would
+       leave the user unable to see what to fix. */
+    /* The screen has several warnings: a standing one about trusting
+       the node, and the new refusal message. The check is that the
+       second is among them, not that it is the only alert. */
     await waitFor(() => {
       const alerts = screen.getAllByRole('alert').map((node) => node.textContent ?? '')
 
@@ -210,7 +207,7 @@ describe('Сети: добавление', () => {
     })
   })
 
-  it('предупреждает, что узел и обозреватель задаёт добавляющий', async () => {
+  it('warns that the adder sets the node and the explorer', async () => {
     renderApp()
     await openSettings()
     await openAddForm()
@@ -219,8 +216,8 @@ describe('Сети: добавление', () => {
   })
 })
 
-describe('Сети: удаление', () => {
-  it('удаляет пользовательскую сеть', async () => {
+describe('Networks: delete', () => {
+  it('deletes a custom network', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -240,7 +237,7 @@ describe('Сети: удаление', () => {
     })
   })
 
-  it('возвращает кошелёк на сеть по умолчанию, удалив активную', async () => {
+  it('returns the wallet to the default network after deleting the active one', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -256,8 +253,8 @@ describe('Сети: удаление', () => {
     await user.click(screen.getByText('My Private Chain'))
     await user.click(screen.getByRole('button', { name: 'Remove network My Private Chain' }))
 
-    /* Удаление активной сети обязано оставить кошелёк в рабочем
-       состоянии, а не в положении «активной сети нет». */
+    /* Deleting the active network must leave the wallet usable, not
+       in a "there is no active network" state. */
     await waitFor(() => {
       const list = screen.getByText('Networks').closest('[data-slot=card]') as HTMLElement
 

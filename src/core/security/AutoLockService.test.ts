@@ -15,28 +15,28 @@ beforeEach(() => {
   service = new AutoLockService({ clock }, { timeoutMs: TIMEOUT_MS, warningMs: WARNING_MS })
 })
 
-describe('AutoLockService: отсчёт', () => {
-  it('до запуска остаток неизвестен', () => {
-    /* «Не запущено» и «осталось ноль» — разные состояния, и второе
-       означает немедленную блокировку. */
+describe('AutoLockService: countdown', () => {
+  it('remaining time is unknown before start', () => {
+    /* "Not started" and "zero left" are different states, and the
+       latter means lock now. */
     expect(service.remainingMs).toBeNull()
     expect(service.isRunning).toBe(false)
   })
 
-  it('после запуска остаток равен полному сроку', () => {
+  it('after start remaining time equals the full timeout', () => {
     service.start()
 
     expect(service.remainingMs).toBe(TIMEOUT_MS)
   })
 
-  it('остаток уменьшается со временем', () => {
+  it('remaining time decreases with time', () => {
     service.start()
     clock.advance(20_000)
 
     expect(service.remainingMs).toBe(TIMEOUT_MS - 20_000)
   })
 
-  it('остановка снимает отсчёт', () => {
+  it('stop clears the countdown', () => {
     service.start()
     service.stop()
 
@@ -44,7 +44,7 @@ describe('AutoLockService: отсчёт', () => {
     expect(service.isRunning).toBe(false)
   })
 
-  it('повторный запуск не создаёт второй таймер', () => {
+  it('a second start does not create a second timer', () => {
     const expired = vi.fn()
 
     service.on('autolock:expired', expired)
@@ -57,8 +57,8 @@ describe('AutoLockService: отсчёт', () => {
   })
 })
 
-describe('AutoLockService: истечение срока', () => {
-  it('сообщает об истечении по достижении срока', () => {
+describe('AutoLockService: timeout expiry', () => {
+  it('reports expiry when the timeout is reached', () => {
     const expired = vi.fn()
 
     service.on('autolock:expired', expired)
@@ -69,7 +69,7 @@ describe('AutoLockService: истечение срока', () => {
     expect(expired).toHaveBeenCalledTimes(1)
   })
 
-  it('не сообщает раньше срока', () => {
+  it('does not report before the timeout', () => {
     const expired = vi.fn()
 
     service.on('autolock:expired', expired)
@@ -80,9 +80,9 @@ describe('AutoLockService: истечение срока', () => {
     expect(expired).not.toHaveBeenCalled()
   })
 
-  it('останавливает отсчёт до вызова обработчика', () => {
-    /* Обработчик блокирует кошелёк; таймер, переживший блокировку,
-       обращался бы к уничтоженным сервисам. */
+  it('stops the countdown before calling the handler', () => {
+    /* The handler locks the wallet; a timer that outlived the lock
+       would call destroyed services. */
     let runningInsideHandler: boolean | null = null
 
     service.on('autolock:expired', () => {
@@ -95,7 +95,7 @@ describe('AutoLockService: истечение срока', () => {
     expect(runningInsideHandler).toBe(false)
   })
 
-  it('активность откладывает блокировку', () => {
+  it('activity postpones the lock', () => {
     const expired = vi.fn()
 
     service.on('autolock:expired', expired)
@@ -108,7 +108,7 @@ describe('AutoLockService: истечение срока', () => {
     expect(expired).not.toHaveBeenCalled()
   })
 
-  it('активность после остановки ничего не запускает', () => {
+  it('activity after stop starts nothing', () => {
     const expired = vi.fn()
 
     service.on('autolock:expired', expired)
@@ -122,10 +122,10 @@ describe('AutoLockService: истечение срока', () => {
   })
 })
 
-describe('AutoLockService: предупреждение', () => {
-  it('предупреждает до блокировки', () => {
-    /* Блокировка посреди заполнения формы теряет введённое.
-       Предупреждение даёт продлить сессию одним движением. */
+describe('AutoLockService: warning', () => {
+  it('warns before lock', () => {
+    /* Locking mid-form loses what was typed. A warning lets the
+       session be extended in one motion. */
     const warned = vi.fn()
 
     service.on('autolock:warning', warned)
@@ -136,7 +136,7 @@ describe('AutoLockService: предупреждение', () => {
     expect(warned).toHaveBeenCalledTimes(1)
   })
 
-  it('предупреждает один раз, а не на каждом такте', () => {
+  it('warns once, not on every tick', () => {
     const warned = vi.fn()
 
     service.on('autolock:warning', warned)
@@ -147,7 +147,7 @@ describe('AutoLockService: предупреждение', () => {
     expect(warned).toHaveBeenCalledTimes(1)
   })
 
-  it('сообщает оставшееся время', () => {
+  it('reports the remaining time', () => {
     const warned = vi.fn()
 
     service.on('autolock:warning', warned)
@@ -158,8 +158,8 @@ describe('AutoLockService: предупреждение', () => {
     expect(warned.mock.calls[0]?.[0]).toMatchObject({ remainingMs: expect.any(Number) })
   })
 
-  it('активность снимает предупреждение', () => {
-    /* Иначе оно висело бы до самой блокировки, которой уже не будет. */
+  it('activity clears the warning', () => {
+    /* Otherwise it would hang until a lock that will no longer happen. */
     const resumed = vi.fn()
 
     service.on('autolock:resumed', resumed)
@@ -171,7 +171,7 @@ describe('AutoLockService: предупреждение', () => {
     expect(resumed).toHaveBeenCalledTimes(1)
   })
 
-  it('без предупреждения активность не сообщает о возобновлении', () => {
+  it('without a warning, activity does not report a resume', () => {
     const resumed = vi.fn()
 
     service.on('autolock:resumed', resumed)
@@ -182,10 +182,10 @@ describe('AutoLockService: предупреждение', () => {
   })
 })
 
-describe('AutoLockService: смена срока', () => {
-  it('новый срок применяется с начала отсчёта', () => {
-    /* Применить новый срок к уже прошедшему времени значило бы
-       заблокировать кошелёк немедленно при выборе более короткого. */
+describe('AutoLockService: changing the timeout', () => {
+  it('a new timeout is applied from the start of the countdown', () => {
+    /* Applying a new timeout to time already elapsed would lock the
+       wallet immediately when a shorter value is chosen. */
     service.start()
     clock.advance(50_000)
 
@@ -194,15 +194,15 @@ describe('AutoLockService: смена срока', () => {
     expect(service.remainingMs).toBe(30_000)
   })
 
-  it('смена срока у остановленного сервиса не запускает отсчёт', () => {
+  it('changing the timeout on a stopped service does not start the countdown', () => {
     service.setTimeout(30_000)
 
     expect(service.isRunning).toBe(false)
   })
 
-  it('предупреждение не длиннее половины короткого срока', () => {
-    /* Иначе оно показывалось бы с первой секунды и перестало бы
-       означать «скоро заблокируется». */
+  it('the warning is not longer than half of a short timeout', () => {
+    /* Otherwise it would show from the first second and stop meaning
+       "about to lock". */
     const warned = vi.fn()
 
     service.on('autolock:warning', warned)

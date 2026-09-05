@@ -31,48 +31,48 @@ import type {
 } from './types'
 
 /**
- * Предельное время ожидания ответа узла.
+ * Maximum time to wait for a node response.
  *
- * Без ограничения зависший узел подвесил бы кошелёк: пользователь увидел
- * бы бесконечную загрузку вместо предложения сменить сеть. Тридцать секунд
- * с запасом покрывают медленную мобильную сеть и при этом не выглядят
- * как зависание.
+ * Without a limit a hung node would hang the wallet: the user would
+ * see an endless load instead of a prompt to change network. Thirty
+ * seconds covers a slow mobile network with margin and still does not
+ * look like a hang.
  */
 const DEFAULT_TIMEOUT_MS = 30_000
 
 /**
- * Периодичность опроса новых блоков.
+ * How often new blocks are polled.
  *
- * Применяется только при наличии подписчиков: ethers не опрашивает узел,
- * пока никто не слушает события. Четыре секунды примерно соответствуют
- * времени блока Ethereum и не расходуют лимиты публичных узлов зря.
+ * Applied only when there are subscribers: ethers does not poll the
+ * node while nobody is listening. Four seconds roughly matches the
+ * Ethereum block time and does not waste public-node quotas.
  */
 const DEFAULT_POLLING_INTERVAL_MS = 4_000
 
-/** Настройки соединения. */
+/** Connection settings. */
 export interface IRpcClientOptions {
   readonly timeoutMs?: number
   readonly pollingIntervalMs?: number
 }
 
 /**
- * Транспорт к узлу поверх ethers v6.
+ * Transport to a node on top of ethers v6.
  *
- * ЕДИНСТВЕННОЕ место в приложении, знающее о существовании ethers.
- * Домен зависит от `IProvider`, поэтому замена библиотеки затрагивает
- * только этот файл и отображение ошибок.
+ * The ONLY place in the app that knows ethers exists. The domain
+ * depends on `IProvider`, so replacing the library touches only this
+ * file and the error mapping.
  *
- * ЧТО ДЕЛАЕТСЯ ПРИ ПОДКЛЮЧЕНИИ:
+ * WHAT HAPPENS ON CONNECT:
  *
- * 1. Запрашивается `eth_chainId` и сверяется с ожидаемым значением.
- *    Несовпадение — отказ и разрыв соединения. Узел, обслуживающий другую
- *    сеть, заставил бы кошелёк подписать транзакцию, пригодную для
- *    повторного проигрывания в целевой сети.
+ * 1. `eth_chainId` is requested and compared with the expected value.
+ *    A mismatch is a refusal and a disconnect. A node serving another
+ *    network would make the wallet sign a transaction valid for replay
+ *    on the target network.
  *
- * 2. Сеть фиксируется параметром `staticNetwork`. Без него ethers
- *    периодически перезапрашивает chainId и МОЛЧА следует за узлом,
- *    если тот сменил сеть. Для кошелька такое поведение недопустимо:
- *    смена сети обязана быть решением пользователя.
+ * 2. The network is pinned with `staticNetwork`. Without it ethers
+ *    periodically re-requests chainId and SILENTLY follows the node
+ *    if it switches networks. For a wallet that is unacceptable:
+ *    changing network must be the user's decision.
  */
 export class RpcClient implements IProvider {
   readonly chainId: ChainId
@@ -91,10 +91,10 @@ export class RpcClient implements IProvider {
   }
 
   /**
-   * Устанавливает соединение с узлом по HTTP.
+   * Establishes an HTTP connection to a node.
    *
-   * @throws ProviderUnavailableError если узел не отвечает.
-   * @throws ChainIdMismatchError если узел обслуживает другую сеть.
+   * @throws ProviderUnavailableError if the node does not answer.
+   * @throws ChainIdMismatchError if the node serves another network.
    */
   static async connect(
     rpcUrl: string,
@@ -105,8 +105,8 @@ export class RpcClient implements IProvider {
     request.timeout = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
     const provider = new JsonRpcProvider(request, Network.from(Number(expectedChainId)), {
-      /* Сеть зафиксирована: ethers не станет перезапрашивать chainId
-         и не последует за узлом, сменившим сеть. */
+      /* Network is pinned: ethers will not re-request chainId and
+         will not follow a node that switched networks. */
       staticNetwork: Network.from(Number(expectedChainId)),
       pollingInterval: options.pollingIntervalMs ?? DEFAULT_POLLING_INTERVAL_MS,
     })
@@ -115,11 +115,11 @@ export class RpcClient implements IProvider {
   }
 
   /**
-   * Оборачивает готовый провайдер ethers.
+   * Wraps a ready ethers provider.
    *
-   * Точка расширения для нестандартных транспортов — WebSocket, IPC,
-   * внутренний провайдер расширения. Сверка chainId выполняется так же,
-   * как при обычном подключении.
+   * Extension point for non-standard transports — WebSocket, IPC, an
+   * internal extension provider. chainId is verified the same way as
+   * on a normal connect.
    */
   static async attach(
     provider: JsonRpcApiProvider,
@@ -151,8 +151,8 @@ export class RpcClient implements IProvider {
   }
 
   async getChainId(): Promise<ChainId> {
-    /* Ответ узла недоверенный: разбор выполняется валидирующим
-       конструктором, а не приведением типа. */
+    /* The node response is untrusted: parsing goes through a
+       validating constructor, not a type cast. */
     return parseChainIdFromHex(await this.request<unknown>({ method: 'eth_chainId' }))
   }
 
@@ -179,10 +179,10 @@ export class RpcClient implements IProvider {
   }
 
   async getNonce(address: Address): Promise<number> {
-    /* Тег `pending` зашит намеренно и не выносится в параметр: значение
-       по умолчанию (`latest`) не учитывает транзакции в мемпуле, и новая
-       транзакция заменила бы собой ожидающую. Ошибка молчаливая —
-       пользователь обнаружит её по пропавшему переводу. */
+    /* The `pending` tag is hardcoded on purpose and is not a
+       parameter: the default (`latest`) ignores mempool transactions,
+       and a new transaction would replace the pending one. The bug is
+       silent — the user notices it when a transfer disappears. */
     return await this.getTransactionCount(address, 'pending')
   }
 
@@ -227,15 +227,16 @@ export class RpcClient implements IProvider {
   }
 
   async sendRawTransaction(signedTransaction: HexString): Promise<TxHash> {
-    /* Прямой вызов JSON-RPC вместо `broadcastTransaction` из ethers.
-       Тот дополнительно запрашивает номер блока и собирает объект ответа
-       с методами ожидания подтверждения — лишний обход к узлу на каждую
-       отправку. Кошельку нужен только хэш: отслеживанием статуса
-       занимается транзакционный слой по собственному расписанию.
+    /* Direct JSON-RPC instead of ethers' `broadcastTransaction`.
+       That extra call also requests the block number and builds a
+       response object with wait-for-confirm helpers — an extra hop
+       to the node on every send. The wallet only needs the hash:
+       status tracking belongs to the transaction layer on its own
+       schedule.
 
-       Хэш проходит валидирующий конструктор: ответ узла недоверенный,
-       а некорректное значение попало бы в историю операций и в ссылку
-       на обозреватель блоков. */
+       The hash goes through a validating constructor: the node
+       response is untrusted, and a bad value would land in operation
+       history and in a block-explorer link. */
     return await this.#call(async () =>
       toTxHash(await this.#provider.send('eth_sendRawTransaction', [signedTransaction])),
     )
@@ -255,8 +256,8 @@ export class RpcClient implements IProvider {
         blockHash: toBlockHash(receipt.blockHash),
         from: toAddress(receipt.from),
         to: receipt.to === null ? null : toAddress(receipt.to),
-        /* Транзакция, включённая в блок, могла завершиться откатом.
-           Газ при этом списан, и показывать её успешной нельзя. */
+        /* A transaction included in a block may still have reverted.
+           Gas was spent, and showing it as successful is not allowed. */
         status: receipt.status === 1 ? 'success' : 'reverted',
         gasUsed: receipt.gasUsed,
         effectiveGasPrice: receipt.gasPrice,
@@ -336,11 +337,12 @@ export class RpcClient implements IProvider {
   }
 
   /**
-   * Сверяет chainId узла с ожидаемым.
+   * Compares the node's chainId with the expected value.
    *
-   * Самая важная проверка транспорта. Узел, обслуживающий другую сеть,
-   * вернёт чужие балансы и чужой nonce, а подпись, созданная по его
-   * данным, окажется пригодной для проигрывания в целевой сети.
+   * The most important transport check. A node serving another
+   * network would return foreign balances and a foreign nonce, and a
+   * signature built from its data would be valid for replay on the
+   * target network.
    */
   async #verifyChainId(): Promise<void> {
     const actual = await this.getChainId()
@@ -351,10 +353,11 @@ export class RpcClient implements IProvider {
   }
 
   /**
-   * Оборачивает вызов к узлу: проверяет состояние и отображает ошибки.
+   * Wraps a node call: checks state and maps errors.
    *
-   * Проверка активности обязательна: обращение к уничтоженному провайдеру
-   * ethers даёт невнятную внутреннюю ошибку вместо понятного отказа.
+   * The activity check is required: talking to a destroyed ethers
+   * provider yields an opaque internal error instead of a clear
+   * refusal.
    */
   async #call<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
     if (!this.#active) {
@@ -380,7 +383,7 @@ export class RpcClient implements IProvider {
     void this.#provider.on('block', this.#blockListener)
   }
 
-  /** Прекращает опрос, когда подписчиков на новые блоки не осталось. */
+  /** Stops polling when no new-block subscribers remain. */
   #stopBlockPollingIfIdle(): void {
     if (this.#events.listenerCount('provider:block') === 0) {
       this.#stopBlockPolling()
@@ -397,16 +400,15 @@ export class RpcClient implements IProvider {
   }
 
   /**
-   * Восстанавливает базовую комиссию блока.
+   * Recovers the block base fee.
    *
-   * ethers не возвращает `baseFeePerGas` в составе данных о комиссии,
-   * но вычисляет `maxFeePerGas` как `baseFee * 2 + priorityFee`.
-   * Обратное преобразование даёт оценку базовой комиссии без
-   * дополнительного запроса к узлу.
+   * ethers does not return `baseFeePerGas` in fee data, but computes
+   * `maxFeePerGas` as `baseFee * 2 + priorityFee`. The inverse gives
+   * a base-fee estimate without an extra node request.
    *
-   * Это ОЦЕНКА, а не точное значение из заголовка блока. Для показа
-   * пользователю пригодна, для расчёта комиссии — используйте
-   * `maxFeePerGas` напрямую.
+   * This is an ESTIMATE, not the exact value from the block header.
+   * Fit to show the user; for fee calculation use `maxFeePerGas`
+   * directly.
    */
   static #deriveBaseFee(maxFeePerGas: bigint | null, priorityFee: bigint | null): bigint | null {
     if (maxFeePerGas === null || priorityFee === null) {
@@ -427,13 +429,13 @@ export class RpcClient implements IProvider {
   }
 
   /**
-   * Готовит запрос оценки газа.
+   * Prepares a gas-estimate request.
    *
-   * ПОЛЕ `to` ОПУСКАЕТСЯ ЦЕЛИКОМ, а не заполняется чем-нибудь. Именно
-   * его отсутствие означает для узла развёртывание контракта; подстановка
-   * адреса отправителя дала бы оценку простого перевода самому себе —
-   * величину, которой не хватит на развёртывание, и транзакция
-   * завершилась бы откатом со списанием газа.
+   * The `to` FIELD IS OMITTED ENTIRELY, not filled with something.
+   * Its absence is how the node understands contract deployment;
+   * substituting the sender address would estimate a simple transfer
+   * to self — an amount too small for deployment, and the transaction
+   * would revert with gas spent.
    */
   static #toEstimateRequest(request: IGasEstimateRequest): {
     to?: string
@@ -484,7 +486,7 @@ export class RpcClient implements IProvider {
   }
 }
 
-/** Приводит числовой идентификатор сети ethers к доменному типу. */
+/** Maps an ethers numeric network id to the domain type. */
 export function chainIdFromEthers(value: bigint): ChainId {
   return toChainId(value)
 }

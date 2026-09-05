@@ -2,32 +2,28 @@ import type { ITypedData } from '@/core/transaction'
 import type { Address, ChainId, HexString } from '@/core/types'
 
 /**
- * Что именно просит удалённая сторона.
+ * What exactly the remote side is asking for.
  *
- * ПЕРЕЧИСЛЕНИЕ ЗАКРЫТОЕ. Метод, не попавший сюда, обрабатываться
- * не будет: неизвестный запрос обязан быть отклонён, а не пропущен
- * «на всякий случай». Подписать то, чего мы не разбираем, — значит
- * подписать вслепую.
+ * THE ENUMERATION IS CLOSED. A method that is not here will not be
+ * handled: an unknown request must be rejected, not passed through
+ * "just in case". Signing what we do not parse means signing blind.
  */
 export const DAPP_REQUEST_KIND = {
-  /** Подпись произвольного сообщения, EIP-191. */
   SignMessage: 'sign-message',
-  /** Подпись структурированных данных, EIP-712. */
   SignTypedData: 'sign-typed-data',
-  /** Подпись и отправка транзакции. */
   SendTransaction: 'send-transaction',
-  /** Подпись транзакции без отправки. */
   SignTransaction: 'sign-transaction',
 } as const
 
 export type DappRequestKind = (typeof DAPP_REQUEST_KIND)[keyof typeof DAPP_REQUEST_KIND]
 
 /**
- * Сведения о приложении, приславшем запрос.
+ * Details of the application that sent the request.
  *
- * ВСЕ ПОЛЯ НЕДОВЕРЕННЫЕ. Имя, описание и адрес сайта задаёт само
- * приложение: назваться «Uniswap» может кто угодно. Интерфейс обязан
- * показывать их как заявление стороны, а не как установленный факт.
+ * EVERY FIELD IS UNTRUSTED. Name, description, and site address are
+ * set by the application itself: anyone can call themselves
+ * "Uniswap". The UI must show them as a party's claim, not as an
+ * established fact.
  */
 export interface IDappMetadata {
   readonly name: string
@@ -36,78 +32,69 @@ export interface IDappMetadata {
   readonly iconUrl: string | null
 }
 
-/** Транзакция, как её прислало приложение. */
 export interface IDappTransaction {
   readonly from: Address
   readonly to: Address | null
   readonly value: bigint
   readonly data: HexString | null
 
-  /** Лимит газа, если приложение его назначило. */
+  /** Gas limit, if the application set one. */
   readonly gasLimit: bigint | null
 }
 
-/** Запрос на подпись сообщения. */
 export interface ISignMessageRequest {
   readonly kind: typeof DAPP_REQUEST_KIND.SignMessage
   readonly address: Address
 
-  /** Сообщение в том виде, в каком его прислали. */
+  /** Message in the form it was sent. */
   readonly message: string
 }
 
-/** Запрос на подпись структурированных данных. */
 export interface ISignTypedDataRequest {
   readonly kind: typeof DAPP_REQUEST_KIND.SignTypedData
   readonly address: Address
   readonly typedData: ITypedData
 }
 
-/** Запрос на отправку либо подпись транзакции. */
 export interface ITransactionRequestFromDapp {
   readonly kind: typeof DAPP_REQUEST_KIND.SendTransaction | typeof DAPP_REQUEST_KIND.SignTransaction
   readonly transaction: IDappTransaction
 }
 
-/** Содержимое запроса. */
 export type DappRequestPayload =
   ISignMessageRequest | ISignTypedDataRequest | ITransactionRequestFromDapp
 
-/** Запрос, ожидающий решения пользователя. */
 export interface IDappRequest {
-  /** Устойчивый идентификатор: по нему отправляется ответ. */
+  /** Stable identifier: the reply is sent against it. */
   readonly id: string
 
-  /** Сессия, в рамках которой пришёл запрос. */
   readonly sessionId: string
 
   readonly dapp: IDappMetadata
 
   /**
-   * Сеть, в которой приложение просит выполнить действие.
+   * Network in which the application asks the action to be done.
    *
-   * Может отличаться от активной сети кошелька — и это отдельный повод
-   * для предупреждения, а не для молчаливого переключения.
+   * May differ from the wallet's active network — and that is a
+   * separate reason for a warning, not for a silent switch.
    */
   readonly chainId: ChainId
 
   readonly payload: DappRequestPayload
 }
 
-/** Действующее подключение. */
 export interface IDappSession {
   readonly id: string
   readonly dapp: IDappMetadata
 
-  /** Сети, к которым приложение получило доступ. */
+  /** Networks the application was given access to. */
   readonly chainIds: readonly ChainId[]
 
-  /** Адреса, выданные приложению. */
+  /** Addresses given to the application. */
   readonly addresses: readonly Address[]
 
-  /** Момент установления подключения. */
   readonly connectedAt: number
 
-  /** Момент истечения, если транспорт его сообщил. */
+  /** Expiry, if the transport reported one. */
   readonly expiresAt: number | null
 }

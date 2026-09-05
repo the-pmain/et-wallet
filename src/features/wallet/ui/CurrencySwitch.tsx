@@ -9,11 +9,11 @@ interface CurrencySwitchProps {
 }
 
 /**
- * Выбор валюты показа.
+ * Display-currency picker.
  *
- * Стоит слева в шапке карточки баланса: это первое, чем задают,
- * в каких единицах читать сумму. Переключение не меняет сами деньги,
- * только подпись.
+ * Sits left in the balance-card header: it is the first thing that
+ * sets the units the amount is read in. Switching does not change
+ * the money, only the label.
  */
 export function CurrencySwitch({ value, onChange }: CurrencySwitchProps) {
   const { t } = useTranslation()

@@ -16,18 +16,19 @@ const NATIVE: IPriceRef = { chainId: ETHEREUM, address: null }
 const USDC_REF: IPriceRef = { chainId: ETHEREUM, address: USDC }
 const WBTC_REF: IPriceRef = { chainId: ETHEREUM, address: WBTC }
 
-/** Запрошенные адреса: позволяют проверить, что именно ушло наружу. */
+/** Requested URLs: used to check exactly what went out. */
 let requested: string[]
 
-/** Ответы по частям пути the time of every request. */
+/** Replies by path fragment for every request. */
 let responder: (url: string) => { status: number; body: unknown }
 
 function createProvider(contractBatchSize = 10) {
   return new CoinGeckoPriceProvider({
     baseUrl: 'https://prices.test/api/v3',
     contractBatchSize,
-    /* Провайдер всегда передаёт адрес строкой: подпись `fetch` шире,
-       но сужать её здесь безопасно — это единственное место вызова. */
+    /* The provider always passes the address as a string: the
+       `fetch` signature is wider, but narrowing it here is safe —
+       this is the only call site. */
     fetchImpl: ((input: string) => {
       const url = input
 
@@ -50,21 +51,21 @@ beforeEach(() => {
   responder = () => ({ status: 200, body: {} })
 })
 
-describe('CoinGecko: поддержка сетей', () => {
-  it('поддерживает встроенные сети', () => {
+describe('CoinGecko: network support', () => {
+  it('supports built-in networks', () => {
     const provider = createProvider()
 
     expect(provider.supports(ETHEREUM)).toBe(true)
     expect(provider.supports(toChainId(8453n))).toBe(true)
   })
 
-  it('не поддерживает сеть вне перечня', () => {
-    /* Подставить похожую платформу значило бы показать курс чужого
-       актива. */
+  it('does not support a network outside the list', () => {
+    /* Substituting a similar platform would show the rate of a
+       foreign asset. */
     expect(createProvider().supports(UNKNOWN_CHAIN)).toBe(false)
   })
 
-  it('не обращается к сервису за неподдерживаемой сетью', () => {
+  it('does not call the service for an unsupported network', () => {
     const provider = createProvider()
 
     return provider
@@ -76,8 +77,8 @@ describe('CoinGecko: поддержка сетей', () => {
   })
 })
 
-describe('CoinGecko: нативная валюта', () => {
-  it('запрашивает курс по идентификатору монеты', async () => {
+describe('CoinGecko: native currency', () => {
+  it('requests the rate by coin id', async () => {
     responder = () => ({
       status: 200,
       body: { ethereum: { usd: 1864, usd_24h_change: -2.95, last_updated_at: 1_785_507_970 } },
@@ -91,7 +92,7 @@ describe('CoinGecko: нативная валюта', () => {
     expect(requested[0]).toContain('ids=ethereum')
   })
 
-  it('переводит момент котировки из секунд в миллисекунды', async () => {
+  it('converts the quote instant from seconds to milliseconds', async () => {
     responder = () => ({
       status: 200,
       body: { ethereum: { usd: 1864, last_updated_at: 1_785_507_970 } },
@@ -103,8 +104,8 @@ describe('CoinGecko: нативная валюта', () => {
   })
 })
 
-describe('CoinGecko: токены', () => {
-  it('запрашивает курсы по адресам контрактов', async () => {
+describe('CoinGecko: tokens', () => {
+  it('requests rates by contract addresses', async () => {
     responder = () => ({
       status: 200,
       body: { [USDC.toLowerCase()]: { usd: 1.0001, usd_24h_change: 0.01 } },
@@ -116,9 +117,10 @@ describe('CoinGecko: токены', () => {
     expect(requested[0]).toContain('token_price/ethereum')
   })
 
-  it('в запрос попадает только адрес контракта и ничей больше', async () => {
-    /* Адрес кошелька метод не принимает и передать его не может.
-       Сервис узнаёт состав портфеля, но не то, чей он. */
+  it('only the contract address enters the request, and no one else\'s', async () => {
+    /* The method does not accept a wallet address and cannot pass
+       it. The service learns the portfolio composition, but not
+       whose it is. */
     responder = () => ({ status: 200, body: {} })
 
     await createProvider().getPrices([USDC_REF], FIAT_CURRENCY.Usd)
@@ -128,9 +130,9 @@ describe('CoinGecko: токены', () => {
     expect(addresses.map((item) => item.toLowerCase())).toEqual([USDC.toLowerCase()])
   })
 
-  it('разбивает запрос на части заданного размера', async () => {
-    /* Бесплатный доступ принимает один адрес за запрос: пакет больше
-       единицы отвергается с кодом 10012. */
+  it('splits the request into chunks of the given size', async () => {
+    /* Free access accepts one address per request: a batch larger
+       than one is refused with code 10012. */
     responder = () => ({ status: 200, body: {} })
 
     await createProvider(1).getPrices([USDC_REF, WBTC_REF], FIAT_CURRENCY.Usd)
@@ -138,7 +140,7 @@ describe('CoinGecko: токены', () => {
     expect(requested).toHaveLength(2)
   })
 
-  it('отправляет несколько адресов одним запросом при большем пакете', async () => {
+  it('sends several addresses in one request when the batch is larger', async () => {
     responder = () => ({ status: 200, body: {} })
 
     await createProvider(10).getPrices([USDC_REF, WBTC_REF], FIAT_CURRENCY.Usd)
@@ -147,10 +149,11 @@ describe('CoinGecko: токены', () => {
   })
 })
 
-describe('CoinGecko: неизвестное не подменяется нулём', () => {
-  it('отсутствие записи означает неизвестный курс', async () => {
-    /* Сервис отвечает пустым объектом на неизвестный контракт —
-       без ошибки. Ноль здесь объявил бы актив ничего не стоящим. */
+describe('CoinGecko: unknown is not replaced with zero', () => {
+  it('a missing record means an unknown rate', async () => {
+    /* The service replies with an empty object for an unknown
+       contract — without an error. Zero here would declare the
+       asset worth nothing. */
     responder = () => ({ status: 200, body: {} })
 
     const result = await createProvider().getPrices([USDC_REF], FIAT_CURRENCY.Usd)
@@ -158,7 +161,7 @@ describe('CoinGecko: неизвестное не подменяется нулё
     expect(result.has(priceRefKey(USDC_REF))).toBe(false)
   })
 
-  it('нулевая и отрицательная цена отвергаются', () => {
+  it('zero and negative prices are rejected', () => {
     responder = () => ({ status: 200, body: { [USDC.toLowerCase()]: { usd: 0 } } })
 
     return createProvider()
@@ -168,7 +171,7 @@ describe('CoinGecko: неизвестное не подменяется нулё
       })
   })
 
-  it('отсутствие суточного изменения не подменяется нулём', async () => {
+  it('a missing daily change is not replaced with zero', async () => {
     responder = () => ({ status: 200, body: { [USDC.toLowerCase()]: { usd: 1 } } })
 
     const result = await createProvider().getPrices([USDC_REF], FIAT_CURRENCY.Usd)
@@ -177,10 +180,11 @@ describe('CoinGecko: неизвестное не подменяется нулё
   })
 })
 
-describe('CoinGecko: отказы', () => {
-  it('распознаёт ошибку в теле ответа при коде 200', async () => {
-    /* Превышение предела адресов приходит именно так. Без проверки
-       поля `error_code` такой ответ был бы разобран как «курсов нет». */
+describe('CoinGecko: refusals', () => {
+  it('recognises an error in the reply body with status 200', async () => {
+    /* Exceeding the address limit arrives that way. Without
+       checking the `error_code` field such a reply would be parsed
+       as "there are no rates". */
     responder = () => ({
       status: 200,
       body: {
@@ -194,18 +198,18 @@ describe('CoinGecko: отказы', () => {
     )
   })
 
-  it('сохраняет код ответа в сообщении об отказе', async () => {
-    /* Ограничение частоты лечится ожиданием, а превышение предела
-       адресов — настройкой: общее «источник недоступен» вместо кода
-       не говорит, что делать. */
+  it('keeps the status code in the refusal message', async () => {
+    /* A rate limit is fixed by waiting, exceeding the address
+       limit by a setting: a generic "source unavailable" instead
+       of the code does not say what to do. */
     responder = () => ({ status: 429, body: {} })
 
     await expect(createProvider().getPrices([NATIVE], FIAT_CURRENCY.Usd)).rejects.toThrow(/429/u)
   })
 
-  it('частичный отказ не отменяет полученного', async () => {
-    /* Курс эфира полезен и тогда, когда цену токена получить
-       не удалось. */
+  it('a partial refusal does not cancel what was obtained', async () => {
+    /* The ether rate is useful even when a token price could not
+       be obtained. */
     responder = (url) =>
       url.includes('token_price')
         ? { status: 500, body: {} }

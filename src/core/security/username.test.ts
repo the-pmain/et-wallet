@@ -7,95 +7,106 @@ import {
   normalizeUsername,
 } from './username'
 
-/** Символы, которых в имени быть не должно, — заданы кодами. */
+/** Characters that must not appear in a name — given as code points. */
 const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b)
 const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x202e)
 const NEWLINE = String.fromCodePoint(0x000a)
 
-describe('Приведение имени', () => {
-  it('убирает пробелы по краям', () => {
-    expect(normalizeUsername('  Дмитрий  ')).toBe('Дмитрий')
+/* Cyrillic fixtures as escapes: the source must hold no raw letters. */
+const DMITRY = '\u0414\u043C\u0438\u0442\u0440\u0438\u0439'
+const DMITRY_INNER_CAP = '\u0414\u041C\u0438\u0442\u0440\u0438\u0439'
+const DMITRY_LOWER = '\u0434\u043C\u0438\u0442\u0440\u0438\u0439'
+const IVANOV = '\u0418\u0432\u0430\u043D\u043E\u0432'
+const MARIA = '\u041C\u0430\u0440\u0438\u044F'
+const MARIA_PETROVA = '\u041C\u0430\u0440\u0438\u044F \u041F\u0435\u0442\u0440\u043E\u0432\u0430'
+const LI = '\u041B\u0438'
+const CYRILLIC_DE = '\u0414'
+const CYRILLIC_A = '\u0430'
+
+describe('Name normalisation', () => {
+  it('strips edge spaces', () => {
+    expect(normalizeUsername(`  ${DMITRY}  `)).toBe(DMITRY)
   })
 
-  it('схлопывает повторяющиеся пробелы', () => {
-    /* «Дмитрий  Иванов» и «Дмитрий Иванов» — одно и то же имя,
-       а разница в интерфейсе выглядела бы опечаткой. */
-    expect(normalizeUsername('Дмитрий   Иванов')).toBe('Дмитрий Иванов')
+  it('collapses repeated spaces', () => {
+    /* "Dmitry  Ivanov" and "Dmitry Ivanov" are the same name,
+       and the difference in the UI would look like a typo. */
+    expect(normalizeUsername(`${DMITRY}   ${IVANOV}`)).toBe(`${DMITRY} ${IVANOV}`)
   })
 
-  it('сохраняет регистр', () => {
-    /* Это отображаемое имя: приводить «Дмитрий» к «дмитрий» значит
-       показывать владельцу не то, что он ввёл. */
-    expect(normalizeUsername('ДМитрий')).toBe('ДМитрий')
+  it('preserves case', () => {
+    /* This is a display name: lowercasing "Dmitry" would show the
+       owner something other than what they typed. */
+    expect(normalizeUsername(DMITRY_INNER_CAP)).toBe(DMITRY_INNER_CAP)
   })
 })
 
-describe('Пригодность имени', () => {
-  it.each(['Дмитрий', 'Alex', 'Мария Петрова', 'user_42', 'Ли', '大明'])(
-    'принимает «%s»',
+describe('Name acceptability', () => {
+  it.each([DMITRY, 'Alex', MARIA_PETROVA, 'user_42', LI, '大明'])(
+    'accepts "%s"',
     (name) => {
-      /* Набор символов не ограничивается: запрещать людям называться так,
-       как они называются, кошелёк не вправе. */
+      /* The character set is not restricted: a wallet has no right
+         to forbid people from being called what they are called. */
       expect(isValidUsername(name)).toBe(true)
     },
   )
 
-  it('отвергает пустое значение', () => {
+  it('rejects an empty value', () => {
     expect(isValidUsername('')).toBe(false)
     expect(isValidUsername('   ')).toBe(false)
   })
 
-  it('отвергает имя из одного символа', () => {
-    /* Подпись кошелька из единственной буквы не отличает его ни от чего. */
-    expect(isValidUsername('Д')).toBe(false)
+  it('rejects a one-character name', () => {
+    /* A one-letter wallet label distinguishes it from nothing. */
+    expect(isValidUsername(CYRILLIC_DE)).toBe(false)
   })
 
-  it('отвергает слишком длинное имя', () => {
-    /* Длинное имя вытеснило бы адрес из строки подтверждения
-       транзакции — то есть скрыло бы то, куда уходят средства. */
-    expect(isValidUsername('а'.repeat(MAX_USERNAME_LENGTH + 1))).toBe(false)
+  it('rejects an overly long name', () => {
+    /* A long name would push the address off the transaction
+       confirmation row — hiding where the funds go. */
+    expect(isValidUsername(CYRILLIC_A.repeat(MAX_USERNAME_LENGTH + 1))).toBe(false)
   })
 
-  it('принимает имя ровно предельной длины', () => {
-    expect(isValidUsername('а'.repeat(MAX_USERNAME_LENGTH))).toBe(true)
+  it('accepts a name of exactly the limit length', () => {
+    expect(isValidUsername(CYRILLIC_A.repeat(MAX_USERNAME_LENGTH))).toBe(true)
   })
 
-  it('перевод строки становится пробелом, а не отказом', () => {
-    /* Он ломает вёрстку списка аккаунтов, но отвергать из-за него имя
-       незачем: вставка из буфера с переносом — обычная случайность,
-       и разумнее её исправить, чем требовать переписать имя. */
-    expect(isValidUsername(`Дмитрий${NEWLINE}Иванов`)).toBe(true)
-    expect(normalizeUsername(`Дмитрий${NEWLINE}Иванов`)).toBe('Дмитрий Иванов')
+  it('a newline becomes a space, not a rejection', () => {
+    /* It breaks the account-list layout, but rejecting the name for
+       it is unnecessary: a paste with a newline is an ordinary
+       accident, and fixing it is better than forcing a rewrite. */
+    expect(isValidUsername(`${DMITRY}${NEWLINE}${IVANOV}`)).toBe(true)
+    expect(normalizeUsername(`${DMITRY}${NEWLINE}${IVANOV}`)).toBe(`${DMITRY} ${IVANOV}`)
   })
 
-  it('отвергает непечатаемый управляющий символ', () => {
-    /* В отличие от переноса, он не пробельный: превратить его
-       во что-то осмысленное нельзя, а в имени он не нужен. */
-    expect(isValidUsername(`Дмитрий${String.fromCodePoint(0x0007)}`)).toBe(false)
+  it('rejects a non-printable control character', () => {
+    /* Unlike a newline, it is not whitespace: it cannot be turned
+       into anything meaningful, and it does not belong in a name. */
+    expect(isValidUsername(`${DMITRY}${String.fromCodePoint(0x0007)}`)).toBe(false)
   })
 
-  it('отвергает символ нулевой ширины', () => {
-    /* Двумя внешне одинаковыми именами подделывают подписи так же,
-       как адреса и имена ENS. */
-    expect(isValidUsername(`Дмитрий${ZERO_WIDTH_SPACE}`)).toBe(false)
+  it('rejects a zero-width character', () => {
+    /* Two visually identical names fake labels the same way
+       addresses and ENS names are faked. */
+    expect(isValidUsername(`${DMITRY}${ZERO_WIDTH_SPACE}`)).toBe(false)
   })
 
-  it('отвергает переключение направления письма', () => {
-    /* Им переставляют видимый порядок символов, не меняя строку. */
-    expect(isValidUsername(`Дмитрий${RIGHT_TO_LEFT_OVERRIDE}`)).toBe(false)
+  it('rejects a writing-direction override', () => {
+    /* They reorder visible characters without changing the string. */
+    expect(isValidUsername(`${DMITRY}${RIGHT_TO_LEFT_OVERRIDE}`)).toBe(false)
   })
 })
 
-describe('Сравнение имён', () => {
-  it('не различает регистр', () => {
-    expect(areUsernamesEqual('Дмитрий', 'дмитрий')).toBe(true)
+describe('Name comparison', () => {
+  it('does not distinguish case', () => {
+    expect(areUsernamesEqual(DMITRY, DMITRY_LOWER)).toBe(true)
   })
 
-  it('не различает лишние пробелы', () => {
-    expect(areUsernamesEqual(' Дмитрий  Иванов ', 'Дмитрий Иванов')).toBe(true)
+  it('does not distinguish extra spaces', () => {
+    expect(areUsernamesEqual(` ${DMITRY}  ${IVANOV} `, `${DMITRY} ${IVANOV}`)).toBe(true)
   })
 
-  it('различает разные имена', () => {
-    expect(areUsernamesEqual('Дмитрий', 'Мария')).toBe(false)
+  it('distinguishes different names', () => {
+    expect(areUsernamesEqual(DMITRY, MARIA)).toBe(false)
   })
 })

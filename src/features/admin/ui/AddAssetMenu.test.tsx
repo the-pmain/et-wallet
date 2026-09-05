@@ -16,7 +16,7 @@ const ETH = {
 }
 
 describe('AddAssetMenu', () => {
-  it('открывает список по нажатию и держит знак в каждой строке', async () => {
+  it('opens the list on click and keeps a mark in every row', async () => {
     const user = userEvent.setup()
     render(<AddAssetMenu existing={[]} disabled={false} onAdd={() => undefined} />)
 
@@ -35,7 +35,7 @@ describe('AddAssetMenu', () => {
     expect(menu.querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(8)
   })
 
-  it('передаёт выбранную монету и закрывает список', async () => {
+  it('passes the chosen coin and closes the list', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     render(<AddAssetMenu existing={[]} disabled={false} onAdd={onAdd} />)
@@ -53,7 +53,7 @@ describe('AddAssetMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('не даёт добавить уже лежащую в витрине монету', async () => {
+  it('does not allow adding a coin already in the showcase', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     render(<AddAssetMenu existing={[ETH]} disabled={false} onAdd={onAdd} />)
@@ -67,7 +67,7 @@ describe('AddAssetMenu', () => {
     expect(onAdd).not.toHaveBeenCalled()
   })
 
-  it('закрывает список по второму нажатию на кнопку', async () => {
+  it('closes the list on a second click of the button', async () => {
     const user = userEvent.setup()
     render(<AddAssetMenu existing={[]} disabled={false} onAdd={() => undefined} />)
 

@@ -14,18 +14,19 @@ import type {
 } from './types'
 
 /**
- * Кошелёк как целое: зашифрованное хранилище и управление доступом к нему.
+ * The wallet as a whole: the encrypted vault and access control to it.
  *
- * Отношение к соседним абстракциям:
- * - `IWallet` владеет хранилищем и состоянием блокировки;
- * - `IKeyring` владеет секретами конкретного источника ключей;
- * - `IAccountService` работает с публичной проекцией — адресами и именами.
+ * Relation to neighbouring abstractions:
+ * - `IWallet` owns the vault and the lock state;
+ * - `IKeyring` owns the secrets of one key source;
+ * - `IAccountService` works with the public projection — addresses
+ *   and names.
  *
- * Разделение позволяет UI постоянно держать список аккаунтов, тогда как
- * доступ к ключам существует лишь на время снятой блокировки.
+ * The split lets the UI keep the account list at all times, while
+ * access to keys exists only while the lock is lifted.
  */
 export interface IWallet extends IEventSource<WalletEventMap> {
-  /** Читает хранилище и определяет исходное состояние. */
+  /** Reads the vault and determines the starting state. */
   init(): Promise<void>
 
   getStatus(): WalletStatus
@@ -33,120 +34,122 @@ export interface IWallet extends IEventSource<WalletEventMap> {
   isUnlocked(): boolean
 
   /**
-   * Создаёт новый кошелёк.
+   * Creates a new wallet.
    *
-   * Возвращает мнемонику ровно один раз. Повторно получить её можно только
-   * через `exportMnemonic` с вводом пароля. Вызывающий обязан затереть буфер
-   * после подтверждения пользователем.
+   * Returns the mnemonic exactly once. Getting it again is only
+   * possible through `exportMnemonic` with a password. The caller
+   * must wipe the buffer after the user confirms.
    *
    * @throws WalletAlreadyInitializedError, WeakPasswordError
    */
   create(params: ICreateWalletParams): Promise<IWalletCreationResult>
 
   /**
-   * Импортирует кошелёк по мнемонической фразе.
+   * Imports a wallet from a mnemonic phrase.
    *
    * @throws WalletAlreadyInitializedError, InvalidMnemonicError, WeakPasswordError
    */
   importFromMnemonic(params: IImportWalletParams): Promise<void>
 
   /**
-   * Снимает блокировку.
+   * Unlocks.
    *
-   * Реализация обязана иметь защиту от подбора: задержку между попытками
-   * либо ограничение их числа. Стойкость KDF замедляет перебор, но не
-   * отменяет необходимость ограничения на уровне приложения.
+   * The implementation must have brute-force protection: a delay
+   * between attempts or a cap on their number. KDF hardness slows
+   * guessing, but does not remove the need for an application-level
+   * limit.
    *
    * @throws InvalidPasswordError, WalletNotInitializedError
    */
   unlock(password: string): Promise<void>
 
   /**
-   * Ставит блокировку и обнуляет все буферы секретов.
+   * Locks and zeroes every secret buffer.
    *
-   * Синхронный метод намеренно: блокировка обязана выполниться до того,
-   * как управление вернётся в цикл событий. Асинхронная блокировка
-   * оставляет промежуток, в течение которого ключи ещё в памяти,
-   * а приложение считает себя заблокированным.
+   * Synchronous on purpose: the lock must finish before control
+   * returns to the event loop. An async lock leaves a window in
+   * which the keys are still in memory while the app considers
+   * itself locked.
    */
   lock(reason: LockReason): void
 
   /**
-   * Меняет пароль.
+   * Changes the password.
    *
-   * Перешифровывает хранилище новым ключом. Операция обязана быть
-   * атомарной: сбой посреди перезаписи не должен оставить хранилище
-   * ни в старом, ни в новом состоянии частично.
+   * Re-encrypts the vault with the new key. The operation must be
+   * atomic: a failure mid-rewrite must not leave the vault partly
+   * in the old state and partly in the new.
    *
    * @throws InvalidPasswordError, WeakPasswordError
    */
   changePassword(currentPassword: string, newPassword: string): Promise<void>
 
   /**
-   * Выгружает мнемоническую фразу.
+   * Exports the mnemonic phrase.
    *
-   * Пароль запрашивается заново, даже если кошелёк уже разблокирован:
-   * показ seed-фразы — необратимое по последствиям действие, и оно обязано
-   * требовать явного подтверждения владения паролем.
+   * The password is asked again even if the wallet is already
+   * unlocked: showing a seed phrase is irreversible in its
+   * consequences, and it must require an explicit proof of
+   * password ownership.
    *
    * @throws InvalidPasswordError
    */
   exportMnemonic(password: string): Promise<ISecretBuffer>
 
-  /** Наборы ключей. Пустой список при заблокированном кошельке. */
+  /** Keyrings. Empty list while the wallet is locked. */
   getKeyrings(): readonly IKeyring[]
 
-  /** Поиск набора по идентификатору. */
   getKeyringById(id: KeyringId): IKeyring | null
 
   /**
-   * Находит набор, обслуживающий адрес.
+   * Finds the keyring that serves an address.
    *
-   * Используется перед подписью: выбор набора по адресу, а не наоборот.
+   * Used before signing: pick the keyring by address, not the
+   * other way around.
    *
    * @throws AccountNotFoundError
    */
   getKeyringForAddress(address: Address): IKeyring
 
   /**
-   * Добавляет набор ключей: импорт приватного ключа, подключение
-   * аппаратного кошелька, добавление наблюдаемого адреса.
+   * Adds a keyring: import a private key, connect a hardware
+   * wallet, or add a watch-only address.
    *
    * @throws WalletLockedError, AccountAlreadyExistsError
    */
   addKeyring(options: KeyringCreationOptions): Promise<IKeyring>
 
   /**
-   * Удаляет набор ключей.
+   * Removes a keyring.
    *
-   * Основной HD-набор удалить нельзя: его удаление означало бы потерю
-   * доступа ко всем выведенным из него аккаунтам при сохранении их
-   * в списке.
+   * The primary HD keyring cannot be removed: removing it would
+   * mean losing access to every account derived from it while
+   * they remain on the list.
    */
   removeKeyring(id: KeyringId): Promise<void>
 
   /**
-   * Полностью удаляет кошелёк.
+   * Deletes the wallet entirely.
    *
-   * НЕОБРАТИМАЯ ОПЕРАЦИЯ. Без сохранённой seed-фразы средства теряются
-   * безвозвратно. Реализация обязана требовать пароль, а вызывающий код —
-   * явное подтверждение пользователя.
+   * IRREVERSIBLE. Without a saved seed phrase the funds are lost
+   * for good. The implementation must require the password, and
+   * the caller — an explicit user confirmation.
    */
   reset(password: string): Promise<void>
 }
 
-/** Долговременное хранение зашифрованного хранилища ключей. */
+/** Long-term storage of the encrypted key vault. */
 export interface IVaultRepository {
-  /** Существует ли хранилище. Проверяется до попытки чтения. */
+  /** Whether the vault exists. Checked before a read is attempted. */
   exists(): Promise<boolean>
 
   load(): Promise<IVault | null>
 
   /**
-   * Сохраняет хранилище.
+   * Saves the vault.
    *
-   * Реализация обязана писать атомарно. Прерывание записи, оставляющее
-   * повреждённое хранилище, означает безвозвратную потерю ключей.
+   * The implementation must write atomically. An interrupted write
+   * that leaves a damaged vault means irreversible loss of the keys.
    */
   save(vault: IVault): Promise<void>
 

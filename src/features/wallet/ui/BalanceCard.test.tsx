@@ -47,7 +47,7 @@ const ETH: IToken = {
   addedAt: NOW,
 }
 
-/** Целые эфиры: `balanceOf(2n)` — два эфира, а не два вея. */
+/** Whole ether: `balanceOf(2n)` is two ether, not two wei. */
 const ETHER = 10n ** 18n
 
 function balanceOf(raw: bigint): IBalance {
@@ -59,7 +59,7 @@ function balanceOf(raw: bigint): IBalance {
   } as unknown as IBalance
 }
 
-/** Сводка с известным курсом эфира. */
+/** Summary with a known ether rate. */
 function portfolioAt(price: number, balance = 1n): IPortfolioSummary {
   return buildPortfolio(
     [{ token: ETH, balance: toWei(balance * ETHER) }],
@@ -104,29 +104,29 @@ function renderCard(balance: IBalance | null, options: Options = {}) {
   return render(card(balance, options))
 }
 
-/** Узел с самой суммой: он идёт первым и несёт крупный кегль. */
+/** Node that holds the amount: it comes first and carries the large type size. */
 function amountNode(): HTMLElement {
   return document.querySelector('[data-slot=card-content] p.text-4xl') as HTMLElement
 }
 
 /**
- * Движение суммы означает ПРИХОД ДРУГОГО ЗНАЧЕНИЯ.
+ * Amount motion means A DIFFERENT VALUE ARRIVED.
  *
- * Проверяется тестом, а не глазами: браузерная панель предпросмотра
- * в этой среде не рисует кадров, и анимация в ней всегда стоит на нуле.
- * Наличие или отсутствие классов появления — то, что можно утверждать
- * достоверно.
+ * Checked by a test, not by eye: the browser preview in this
+ * environment does not paint frames, so the animation always sits at
+ * zero. Presence or absence of enter classes is what can be asserted
+ * reliably.
  */
-describe('BalanceCard: появление суммы', () => {
-  it('при первом показе не анимируется', () => {
+describe('BalanceCard: amount appear', () => {
+  it('does not animate on first paint', () => {
     renderCard(balanceOf(5n))
 
-    /* Экран в этот момент уже появляется целиком. Второй вход на самом
-       крупном объекте поверх первого читается как рябь. */
+    /* The screen is already entering as a whole. A second enter on
+       the largest object on top of the first reads as flicker. */
     expect(amountNode().className).not.toContain('animate-in')
   })
 
-  it('анимируется, когда пришло другое значение', () => {
+  it('animates when a different value arrived', () => {
     const view = renderCard(balanceOf(5n))
 
     view.rerender(card(balanceOf(7n)))
@@ -134,22 +134,22 @@ describe('BalanceCard: появление суммы', () => {
     expect(amountNode().className).toContain('animate-in')
   })
 
-  it('не анимируется, когда сумма прежняя', () => {
+  it('does not animate when the amount is unchanged', () => {
     const view = renderCard(balanceOf(5n))
 
-    /* Сессия пересоздаёт объект баланса при каждом обновлении.
-       Сравнивается значение, а не ссылка, иначе рябь шла бы на каждый
-       опрос узла. */
+    /* The session recreates the balance object on every refresh.
+       Compare the value, not the reference, or every node poll would
+       flicker. */
     view.rerender(card(balanceOf(5n)))
 
     expect(amountNode().className).not.toContain('animate-in')
   })
 
-  it('помечает область занятой, пока сумма обновляется', () => {
+  it('marks the region busy while the amount refreshes', () => {
     renderCard(balanceOf(5n), { isLoading: true })
 
-    /* Вращение значка — единственный признак работы для зрячего;
-       для слушающего страницу им служит эта пометка. */
+    /* The spinning icon is the only work cue for a sighted user;
+       for a listener this mark is that cue. */
     const content = document.querySelector('[data-slot=card-content]')
 
     expect(content?.getAttribute('aria-busy')).toBe('true')
@@ -157,17 +157,17 @@ describe('BalanceCard: появление суммы', () => {
   })
 })
 
-describe('BalanceCard: оценка в долларах', () => {
-  it('показывает оценку показанной суммы', () => {
+describe('BalanceCard: dollar estimate', () => {
+  it('shows an estimate of the displayed amount', () => {
     renderCard(balanceOf(2n), { arePricesEnabled: true, portfolio: portfolioAt(3000) })
 
     expect(screen.getByText('approximately $6,000.00')).toBeInTheDocument()
   })
 
-  it('оценивает свежую сумму, а не ту, по которой считалась сводка', () => {
-    /* Кнопка обновления баланса портфель не пересчитывает. Готовое
-       значение из сводки описывало бы прежнюю сумму — и стояло бы
-       вплотную под новой. */
+  it('values the fresh amount, not the one the summary was computed from', () => {
+    /* Refreshing the balance does not recompute the portfolio. A
+       ready summary value would describe the previous amount sitting
+       right under the new one. */
     renderCard(balanceOf(5n), {
       arePricesEnabled: true,
       portfolio: portfolioAt(3000, 2n),
@@ -176,10 +176,10 @@ describe('BalanceCard: оценка в долларах', () => {
     expect(screen.getByText('approximately $15,000.00')).toBeInTheDocument()
   })
 
-  it('без согласия предлагает переход, а не запрашивает курсы', () => {
-    /* Обращение к источнику курсов выдаёт ему состав портфеля.
-       Согласие берётся на экране портфеля, где перечислено, что именно
-       уйдёт наружу; здесь — только переход туда. */
+  it('without consent offers a link instead of fetching rates', () => {
+    /* A price-source request reveals the portfolio. Consent is taken
+       on the portfolio screen, where what leaves is listed; here it
+       is only a link there. */
     renderCard(balanceOf(2n), { arePricesEnabled: false, portfolio: portfolioAt(3000) })
 
     expect(screen.getByRole('link', { name: /show the value in dollars/iu })).toHaveAttribute(
@@ -189,16 +189,16 @@ describe('BalanceCard: оценка в долларах', () => {
     expect(screen.queryByText(/approximately/iu)).not.toBeInTheDocument()
   })
 
-  it('не подставляет ноль, когда курс неизвестен', () => {
-    /* Самая опасная подмена в этом месте: «0,00 $» под непустым
-       балансом читается как «средства ничего не стоят». */
+  it('does not substitute zero when the rate is unknown', () => {
+    /* The most dangerous swap here: "$0.00" under a non-empty
+       balance reads as "the funds are worthless". */
     renderCard(balanceOf(2n), { arePricesEnabled: true, portfolio: null })
 
     expect(screen.getByText('The value could not be estimated')).toBeInTheDocument()
     expect(screen.queryByText(/\$0\.00/u)).not.toBeInTheDocument()
   })
 
-  it('пока курсы идут, не объявляет оценку недоступной', () => {
+  it('does not declare the estimate unavailable while rates are loading', () => {
     renderCard(balanceOf(2n), {
       arePricesEnabled: true,
       portfolio: null,
@@ -209,24 +209,23 @@ describe('BalanceCard: оценка в долларах', () => {
     expect(screen.queryByText('The value could not be estimated')).not.toBeInTheDocument()
   })
 
-  it('показывает время котировки рядом с оценкой', () => {
-    /* Курс опрашивается раз в минуту, но при отказе источника на экране
-       остаётся прежний. Живое число от замершего отличает только
-       время. */
+  it('shows the quote time next to the estimate', () => {
+    /* The rate polls once a minute, but a source failure leaves the
+       previous figure. Only the time tells live from frozen. */
     renderCard(balanceOf(2n), { arePricesEnabled: true, portfolio: portfolioAt(3000) })
 
     expect(screen.getByText(/^Rate as of \d{1,2}:\d{2}/u)).toBeInTheDocument()
   })
 
-  it('не выдумывает время, когда момент котировки неизвестен', () => {
-    /* Подставить текущее время значило бы объявить свежим то,
-       о чём ничего не известно. */
+  it('does not invent a time when the quote instant is unknown', () => {
+    /* Substituting the current time would label unknown data as
+       fresh. */
     renderCard(balanceOf(2n), { arePricesEnabled: true, portfolio: null })
 
     expect(screen.queryByText(/Rate as of/u)).not.toBeInTheDocument()
   })
 
-  it('без баланса не занимает места', () => {
+  it('takes no space without a balance', () => {
     renderCard(null, { arePricesEnabled: true, portfolio: portfolioAt(3000) })
 
     expect(screen.queryByText(/approximately/iu)).not.toBeInTheDocument()

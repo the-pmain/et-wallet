@@ -5,75 +5,76 @@ import { toAddress } from '@/core/address'
 import type { Address, HexString } from '@/core/types'
 
 /**
- * Кодировка ABI: то общее, что не относится ни к одному стандарту.
+ * ABI encoding: the parts that belong to no single standard.
  *
- * ЗАЧЕМ ОТДЕЛЬНЫЙ МОДУЛЬ. Длина слова, выравнивание адреса и разбор
- * ответа контракта одинаковы для ERC-20, ERC-721, ERC-1155 и любого
- * другого контракта: это правила кодирования, а не свойства стандарта.
- * Разложенные по модулям токенов, предметов и разрешений, они
- * существовали в трёх копиях — и копии уже начали расходиться.
+ * WHY A SEPARATE MODULE. Word length, address padding, and reading a
+ * contract response are the same for ERC-20, ERC-721, ERC-1155, and
+ * any other contract: they are encoding rules, not properties of a
+ * standard. Spread across the token, item, and approval modules they
+ * existed in three copies — and the copies had already started to
+ * diverge.
  *
- * ЧЕМ ЭТО ОПАСНО ИМЕННО ЗДЕСЬ. Проверка «старшие двенадцать байт слова
- * нулевые» стояла в двух местах и определяла, какой адрес показать
- * на экране подтверждения. Расхождение копий означало бы, что в одном
- * месте кошелёк отвергает подделанное слово, а в другом принимает
- * и показывает владельцу чужой адрес как получателя.
+ * WHY THAT IS DANGEROUS HERE. The check "the high twelve bytes of the
+ * word are zero" lived in two places and decided which address to
+ * show on the confirmation screen. Divergent copies would mean the
+ * wallet rejects a forged word in one place and accepts it in another,
+ * showing the owner a recipient who is not in the call.
  *
- * ЧТО СЮДА НЕ ВХОДИТ. Селекторы конкретных функций и разбор конкретных
- * вызовов: они принадлежат стандартам и живут в своих модулях.
+ * WHAT DOES NOT BELONG HERE. Selectors of concrete functions and
+ * parsing of concrete calls: those belong to the standards and live
+ * in their own modules.
  */
 
-/** Длина слова ABI в шестнадцатеричных символах: тридцать два байта. */
+/** ABI word length in hex characters: thirty-two bytes. */
 export const WORD_LENGTH = 64
 
-/** Длина селектора функции в шестнадцатеричных символах: четыре байта. */
+/** Function-selector length in hex characters: four bytes. */
 export const SELECTOR_LENGTH = 8
 
-/** Длина адреса в шестнадцатеричных символах: двадцать байт. */
+/** Address length in hex characters: twenty bytes. */
 export const ADDRESS_LENGTH = 40
 
-/** Наибольшее значение `uint256`. */
+/** Largest `uint256` value. */
 export const MAX_UINT256 = (1n << 256n) - 1n
 
-/** Отступ адреса внутри слова: старшие байты, которые обязаны быть нулевыми. */
+/** Address padding inside a word: the high bytes that must be zero. */
 const ADDRESS_PADDING = WORD_LENGTH - ADDRESS_LENGTH
 
 /**
- * Селектор функции — первые четыре байта keccak256 от её подписи.
+ * Function selector — the first four bytes of keccak256 of its signature.
  *
- * ЗНАЧЕНИЯ ВЫЧИСЛЯЮТСЯ, А НЕ ВПИСЫВАЮТСЯ КОНСТАНТАМИ. Восемь
- * шестнадцатеричных символов, скопированных из памяти, непроверяемы
- * при чтении кода: ошибка в одном из них даёт вызов несуществующей
- * функции и отказ контракта без внятной причины. Подпись читается
- * и сверяется со стандартом глазами.
+ * VALUES ARE COMPUTED, NOT PASTED AS CONSTANTS. Eight hex characters
+ * copied from memory are unverifiable on a code read: a one-character
+ * error calls a function that does not exist and the contract refuses
+ * with no useful reason. The signature is readable and can be checked
+ * against the standard by eye.
  */
 export function functionSelector(signature: string): string {
   return bytesToHex(keccak_256(utf8ToBytes(signature))).slice(0, SELECTOR_LENGTH)
 }
 
 /**
- * Идентификатор события в журнале — keccak256 от подписи целиком.
+ * Event id in a log — keccak256 of the whole signature.
  *
- * От селектора функции отличается длиной: событие занимает все
- * тридцать два байта, функция — первые четыре. Перепутать их значит
- * искать в журналах то, чего там нет, и получать пустой список без
- * единого сообщения об ошибке.
+ * It differs from a function selector in length: an event occupies
+ * all thirty-two bytes, a function the first four. Mixing them up
+ * means searching the logs for something that is not there and
+ * getting an empty list with no error at all.
  */
 export function eventTopic(signature: string): HexString {
   return `0x${bytesToHex(keccak_256(utf8ToBytes(signature)))}` as HexString
 }
 
-/** Убирает префикс `0x`, если он есть. */
 export function strip(data: HexString | string): string {
   return data.startsWith('0x') ? data.slice(2) : data
 }
 
 /**
- * Кодирует беззнаковое число как слово.
+ * Encodes an unsigned integer as a word.
  *
- * @throws RangeError если значение отрицательно либо не помещается
- *         в `uint256`. Обрезать величину молча нельзя: получился бы
- *         вызов с другой суммой или про другой предмет.
+ * @throws RangeError if the value is negative or does not fit in
+ *         `uint256`. Silently truncating would produce a call with a
+ *         different amount or about a different item.
  */
 export function encodeUintWord(value: bigint): string {
   if (value < 0n) {
@@ -88,31 +89,27 @@ export function encodeUintWord(value: bigint): string {
 }
 
 /**
- * Кодирует адрес как слово.
+ * Encodes an address as a word.
  *
- * Регистр приводится к нижнему: контракт сравнивает байты, и запись
- * с контрольной суммой EIP-55 читалась бы как другое значение.
+ * Case is forced to lower: the contract compares bytes, and an
+ * EIP-55 checksum spelling would be read as a different value.
  */
 export function encodeAddressWord(address: Address): string {
   return address.slice(2).toLowerCase().padStart(WORD_LENGTH, '0')
 }
 
-/** Вызов без аргументов. */
 export function encodeCall(selector: string): HexString {
   return `0x${selector}` as HexString
 }
 
-/** Вызов с одним адресом. */
 export function encodeCallWithAddress(selector: string, address: Address): HexString {
   return `0x${selector}${encodeAddressWord(address)}` as HexString
 }
 
-/** Вызов с одним числом. */
 export function encodeCallWithUint(selector: string, value: bigint): HexString {
   return `0x${selector}${encodeUintWord(value)}` as HexString
 }
 
-/** Вызов с адресом и числом. */
 export function encodeCallWithAddressAndUint(
   selector: string,
   address: Address,
@@ -121,7 +118,6 @@ export function encodeCallWithAddressAndUint(
   return `0x${selector}${encodeAddressWord(address)}${encodeUintWord(value)}` as HexString
 }
 
-/** Вызов с двумя адресами. */
 export function encodeCallWithTwoAddresses(
   selector: string,
   first: Address,
@@ -131,14 +127,14 @@ export function encodeCallWithTwoAddresses(
 }
 
 /**
- * Читает адрес из слова, проверяя выравнивание.
+ * Reads an address from a word, checking alignment.
  *
- * ЭТО ПРОВЕРКА БЕЗОПАСНОСТИ, А НЕ ФОРМАЛЬНОСТЬ. Адрес занимает младшие
- * двадцать байт; слово с ненулевыми старшими байтами адресом
- * не является. Прочитав его как адрес, кошелёк показал бы на экране
- * подтверждения получателя, которого в вызове нет.
+ * THIS IS A SAFETY CHECK, NOT A FORMALITY. The address occupies the
+ * low twenty bytes; a word with non-zero high bytes is not an
+ * address. Reading it as one would show, on the confirmation screen,
+ * a recipient who is not in the call.
  *
- * @returns `null`, если слово адресом не является.
+ * @returns `null` if the word is not an address.
  */
 export function readAddressWord(word: string): Address | null {
   if (word.length !== WORD_LENGTH) {
@@ -153,9 +149,10 @@ export function readAddressWord(word: string): Address | null {
 }
 
 /**
- * Читает беззнаковое целое из ответа контракта.
+ * Reads an unsigned integer from a contract response.
  *
- * @throws Error если ответ пуст: это означает, что функции нет.
+ * @throws Error if the response is empty: that means the function is
+ *         missing.
  */
 export function decodeUint(data: HexString): bigint {
   const body = strip(data)
@@ -168,11 +165,11 @@ export function decodeUint(data: HexString): bigint {
 }
 
 /**
- * Читает логическое значение из ответа контракта.
+ * Reads a boolean from a contract response.
  *
- * Ненулевое слово означает `true`. Пустой ответ означает, что функции
- * нет: у ERC-165 это законный случай — старые контракты интерфейс
- * не объявляют.
+ * A non-zero word means `true`. An empty response means the function
+ * is missing: for ERC-165 that is a legal case — old contracts do
+ * not declare the interface at all.
  */
 export function decodeBool(data: HexString): boolean {
   const body = strip(data)
@@ -181,9 +178,10 @@ export function decodeBool(data: HexString): boolean {
 }
 
 /**
- * Читает адрес из ответа контракта.
+ * Reads an address from a contract response.
  *
- * @throws Error если ответ короче слова либо слово адресом не является.
+ * @throws Error if the response is shorter than a word or the word
+ *         is not an address.
  */
 export function decodeAddress(data: HexString): Address {
   const body = strip(data)

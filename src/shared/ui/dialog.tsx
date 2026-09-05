@@ -9,39 +9,39 @@ interface DialogProps {
   readonly isOpen: boolean
   readonly onClose: () => void
 
-  /** Заголовок. Он же связывается с окном для программ чтения экрана. */
+  /** Title. Also linked to the dialog for screen readers. */
   readonly title: string
 
-  /** Подзаголовок под названием. */
   readonly description?: string
 
   readonly children?: ReactNode
 
-  /** Нижний ряд действий. Без него окно закрывается только крестиком и Escape. */
+  /** Action row. Without it the dialog closes only via the X and Escape. */
   readonly footer?: ReactNode
 
   readonly className?: string
 }
 
 /**
- * Модальное окно.
+ * Modal dialog.
  *
- * НА НАТИВНОМ `<dialog>`, А НЕ НА СВОЁМ СЛОЕ. Элемент даёт бесплатно
- * то, что вручную пишется десятками строк и постоянно пишется неверно:
- * удержание фокуса внутри окна, закрытие по Escape, отключение
- * остального документа для программ чтения экрана и верхний слой
- * браузера, которому не нужен `z-index` и который не обрезается
- * ни одним `overflow: hidden` у предков.
+ * BUILT ON NATIVE `<dialog>`, NOT A CUSTOM LAYER. The element gives
+ * for free what is written by hand in dozens of lines and constantly
+ * written wrong: focus trapped inside the dialog, Escape to close,
+ * the rest of the document inert for screen readers, and the browser
+ * top layer that needs no `z-index` and is not clipped by any
+ * ancestor `overflow: hidden`.
  *
- * Собственная ловушка фокуса — классический источник дыр
- * в доступности: она ловит Tab, но не ловит переход по заголовкам,
- * виртуальный курсор и жесты чтения с экрана. `showModal` закрывает
- * все эти пути разом, потому что делает это на уровне браузера.
+ * A homemade focus trap is a classic accessibility hole: it catches
+ * Tab but not heading navigation, the virtual cursor, or screen-reader
+ * gestures. `showModal` closes all those paths at once because it
+ * does so at the browser level.
  *
- * ЗАКРЫТИЕ ПО ФОНУ — ПО ПОЛОЖЕНИЮ УКАЗАТЕЛЯ, А НЕ ПО ЦЕЛИ СОБЫТИЯ.
- * Проверка `event.target === dialog` кажется рабочей, но ломается
- * на нажатии, начатом внутри окна и отпущенном на фоне: выделяя текст
- * мышью, пользователь случайно закрывал бы окно.
+ * BACKDROP CLOSE USES POINTER POSITION, NOT THE EVENT TARGET.
+ * Checking `event.target === dialog` looks like it works, but breaks
+ * on a press that starts inside the dialog and is released on the
+ * backdrop: selecting text with the mouse would accidentally close
+ * the dialog.
  */
 export function Dialog({
   isOpen,
@@ -64,9 +64,10 @@ export function Dialog({
     }
 
     if (isOpen && !dialog.open) {
-      /* `showModal` в jsdom отсутствует и подставляется в подготовке
-         тестовой среды. Проверка здесь на случай другой среды без него:
-         окно должно открыться хотя бы немодально, а не уронить экран. */
+      /* `showModal` is missing in jsdom and is stubbed in test setup.
+         The check here covers another environment without it: the
+         dialog must still open non-modally rather than crash the
+         screen. */
       if (typeof dialog.showModal === 'function') {
         dialog.showModal()
       } else {
@@ -84,10 +85,10 @@ export function Dialog({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={description === undefined ? undefined : descriptionId}
-      /* Событие `close` приходит и от Escape, и от `dialog.close()`.
-         Состояние снаружи обязано узнать об этом: иначе окно, закрытое
-         клавишей, осталось бы «открытым» в состоянии, и повторное
-         нажатие кнопки не открыло бы ничего. */
+      /* `close` fires from Escape and from `dialog.close()`.
+         Outer state must hear it: otherwise a dialog closed by
+         the key would stay “open” in state, and pressing the
+         button again would open nothing. */
       onClose={onClose}
       onClick={(event) => {
         const dialog = dialogRef.current
@@ -103,8 +104,8 @@ export function Dialog({
           event.clientY >= box.top &&
           event.clientY <= box.bottom
 
-        /* Нажатие клавиатурой (Enter на кнопке) приходит с нулевыми
-           координатами и попало бы в «снаружи». */
+        /* A keyboard activation (Enter on a button) arrives with
+           zero coordinates and would count as “outside”. */
         const isPointer = event.clientX !== 0 || event.clientY !== 0
 
         if (isPointer && !isInside) {
@@ -112,17 +113,18 @@ export function Dialog({
         }
       }}
       className={cn(
-        /* `m-auto` ОБЯЗАТЕЛЕН, И ЭТО НЕ УКРАШЕНИЕ. Браузер центрирует
-           модальное окно сам, но делает это через `margin: auto` при
-           `inset: 0`. Сброс Tailwind обнуляет отступы у всех элементов,
-           и вместе с ними — это правило: окно прижималось в левый
-           верхний угол экрана. Измерено, глазами в этой среде
-           не проверяется. */
+        /* `m-auto` IS REQUIRED, NOT DECORATION. The browser centers
+           a modal itself, but it does so via `margin: auto` with
+           `inset: 0`. Tailwind's reset zeros margins on every
+           element, including that rule: the dialog stuck to the
+           top-left corner. Measured; not checked by eye in this
+           environment. */
         'm-auto w-[calc(100vw-2rem)] max-w-md',
 
-        /* Высокое содержимое прокручивается внутри окна, а не выходит
-           за экран: у элемента в верхнем слое обрезки предком нет,
-           и без ограничения нижняя часть окна оказалась бы недоступна. */
+        /* Tall content scrolls inside the dialog instead of leaving
+           the screen: a top-layer element is not clipped by an
+           ancestor, and without a limit the bottom of the dialog
+           would be unreachable. */
         'max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain',
 
         'rounded-2xl border border-border bg-card p-0 text-card-foreground shadow-raised',
@@ -131,9 +133,9 @@ export function Dialog({
         className,
       )}
     >
-      {/* Внутренняя обёртка обязательна: отступы на самом `<dialog>`
-          вошли бы в его прямоугольник, и нажатие по отступу считалось
-          бы нажатием по фону. */}
+      {/* Inner wrapper is required: padding on `<dialog>` itself
+          would join its rectangle, and a click on the padding
+          would count as a click on the backdrop. */}
       <div className="flex flex-col gap-4 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">

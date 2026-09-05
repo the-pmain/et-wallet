@@ -26,7 +26,7 @@ function ethereumCoin(price = ETH_USD) {
 }
 
 describe('MarketCatalog', () => {
-  it('ходит к источнику один раз и отдаёт курс всем кошелькам', async () => {
+  it('hits the source once and gives the rate to every wallet', async () => {
     let calls = 0
     const catalog = new MarketCatalog({
       loadMarkets: async () => {
@@ -47,7 +47,7 @@ describe('MarketCatalog', () => {
     expect(optimism?.price).toBe(ETH_USD)
   })
 
-  it('оценивает известный ERC-20 по снимку рынка, без второго запроса', async () => {
+  it('values a known ERC-20 from the market snapshot, without a second request', async () => {
     const catalog = new MarketCatalog({
       loadMarkets: async () => [
         ethereumCoin(),
@@ -74,7 +74,7 @@ describe('MarketCatalog', () => {
     expect(catalog.coinForAsset({ chainId: CHAIN, address: null })?.id).toBe('ethereum')
   })
 
-  it('при отказе CoinGecko подставляет курс эфира с запасного источника', async () => {
+  it('on CoinGecko failure substitutes the ether rate from a fallback source', async () => {
     const catalog = new MarketCatalog({
       loadMarkets: async () => {
         throw new Error('429')

@@ -21,8 +21,8 @@ import {
 import { decodePayload, encodePayload } from './payload-codec'
 import { CIPHER_ALGORITHM, KDF_ALGORITHM, type IEncryptedPayload } from './types'
 
-const PASSWORD = 'правильный-пароль-1234'
-const SECRET = utf8ToBytes('приватный ключ пользователя')
+const PASSWORD = 'correct-password-1234'
+const SECRET = utf8ToBytes('user private key')
 
 let service: FastEncryptionService
 
@@ -30,8 +30,8 @@ beforeAll(() => {
   service = new FastEncryptionService()
 })
 
-describe('параметры шифрования', () => {
-  it('соответствуют действующим рекомендациям', () => {
+describe('encryption parameters', () => {
+  it('match current recommendations', () => {
     expect(PBKDF2_ITERATIONS).toBe(600_000)
     expect(PBKDF2_HASH).toBe('SHA-256')
     expect(SALT_LENGTH).toBe(32)
@@ -39,11 +39,11 @@ describe('параметры шифрования', () => {
     expect(AUTH_TAG_BITS).toBe(128)
   })
 
-  it('использует 96-битный вектор инициализации — размер, для которого определён GCM', () => {
+  it('uses a 96-bit IV — the size GCM is defined for', () => {
     expect(IV_LENGTH).toBe(12)
   })
 
-  it('боевой сервис создаёт параметры с полным числом итераций', () => {
+  it('the production service creates parameters with the full iteration count', () => {
     const params = new EncryptionService().createKdfParams()
 
     expect(params.iterations).toBe(PBKDF2_ITERATIONS)
@@ -53,8 +53,8 @@ describe('параметры шифрования', () => {
   })
 })
 
-describe('EncryptionService: цикл шифрования', () => {
-  it('расшифровывает то, что зашифровал', async () => {
+describe('EncryptionService: encrypt/decrypt cycle', () => {
+  it('decrypts what it encrypted', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
     const decrypted = await service.decrypt(payload, PASSWORD)
 
@@ -65,7 +65,7 @@ describe('EncryptionService: цикл шифрования', () => {
     }
   })
 
-  it('формирует контейнер с ожидаемой структурой', async () => {
+  it('builds a container with the expected structure', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
     expect(payload.version).toBe(PAYLOAD_VERSION)
@@ -74,19 +74,19 @@ describe('EncryptionService: цикл шифрования', () => {
     expect(payload.kdf.salt).toHaveLength(SALT_LENGTH)
   })
 
-  it('не оставляет открытый текст в шифротексте', async () => {
+  it('does not leave plaintext in the ciphertext', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
     expect(bytesToHex(payload.ciphertext)).not.toContain(bytesToHex(SECRET))
   })
 
-  it('шифротекст длиннее открытого текста на размер тега аутентификации', async () => {
+  it('ciphertext is longer than plaintext by the authentication-tag size', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
     expect(payload.ciphertext.length).toBe(SECRET.length + AUTH_TAG_BITS / 8)
   })
 
-  it('шифрует пустые данные', async () => {
+  it('encrypts empty data', async () => {
     const payload = await service.encrypt(new Uint8Array(0), PASSWORD)
     const decrypted = await service.decrypt(payload, PASSWORD)
 
@@ -98,31 +98,31 @@ describe('EncryptionService: цикл шифрования', () => {
   })
 })
 
-describe('EncryptionService: свежесть соли и вектора инициализации', () => {
-  it('генерирует новую соль на каждое шифрование', async () => {
+describe('EncryptionService: fresh salt and IV', () => {
+  it('generates a new salt on every encryption', async () => {
     const first = await service.encrypt(SECRET, PASSWORD)
     const second = await service.encrypt(SECRET, PASSWORD)
 
     expect(bytesToHex(first.kdf.salt)).not.toBe(bytesToHex(second.kdf.salt))
   })
 
-  it('генерирует новый вектор инициализации на каждое шифрование', async () => {
+  it('generates a new IV on every encryption', async () => {
     const first = await service.encrypt(SECRET, PASSWORD)
     const second = await service.encrypt(SECRET, PASSWORD)
 
     expect(bytesToHex(first.iv)).not.toBe(bytesToHex(second.iv))
   })
 
-  it('даёт разный шифротекст для одних и тех же данных и пароля', async () => {
-    /* Совпадение шифротекстов означало бы детерминированное шифрование:
-       наблюдатель видел бы, что содержимое хранилища не изменилось. */
+  it('produces different ciphertext for the same data and password', async () => {
+    /* Matching ciphertext would mean deterministic encryption: an
+       observer would see that vault contents did not change. */
     const first = await service.encrypt(SECRET, PASSWORD)
     const second = await service.encrypt(SECRET, PASSWORD)
 
     expect(bytesToHex(first.ciphertext)).not.toBe(bytesToHex(second.ciphertext))
   })
 
-  it('меняет вектор инициализации и при работе сессионным ключом', async () => {
+  it('changes the IV when using a session key too', async () => {
     const params = service.createKdfParams()
     const key = await service.deriveKey(PASSWORD, params)
 
@@ -137,35 +137,34 @@ describe('EncryptionService: свежесть соли и вектора ини�
   })
 })
 
-describe('EncryptionService: обнаружение подмены', () => {
+describe('EncryptionService: tamper detection', () => {
   let payload: IEncryptedPayload
 
   beforeAll(async () => {
     payload = await service.encrypt(SECRET, PASSWORD)
   })
 
-  it('отвергает неверный пароль', async () => {
-    await expect(service.decrypt(payload, 'неверный-пароль')).rejects.toThrow(DecryptionFailedError)
+  it('rejects a wrong password', async () => {
+    await expect(service.decrypt(payload, 'wrong-password')).rejects.toThrow(DecryptionFailedError)
   })
 
-  it('отвергает изменённый шифротекст', async () => {
+  it('rejects a modified ciphertext', async () => {
     const tampered = { ...payload, ciphertext: Uint8Array.from(payload.ciphertext) }
     tampered.ciphertext.set([(tampered.ciphertext[0] as number) ^ 0xff], 0)
 
     await expect(service.decrypt(tampered, PASSWORD)).rejects.toThrow(DecryptionFailedError)
   })
 
-  it('отвергает изменённый вектор инициализации', async () => {
+  it('rejects a modified IV', async () => {
     const tampered = { ...payload, iv: Uint8Array.from(payload.iv) }
     tampered.iv.set([(tampered.iv[0] as number) ^ 0xff], 0)
 
     await expect(service.decrypt(tampered, PASSWORD)).rejects.toThrow(DecryptionFailedError)
   })
 
-  it('отвергает подмену числа итераций в заголовке', async () => {
-    /* Заголовок входит в аутентифицируемые данные AES-GCM, поэтому
-       его изменение обнаруживается тегом, а не только несовпадением
-       выведенного ключа. */
+  it('rejects a swapped iteration count in the header', async () => {
+    /* The header is AES-GCM additional data, so a change is caught by
+       the tag, not only by a mismatched derived key. */
     const tampered: IEncryptedPayload = {
       ...payload,
       kdf: { ...payload.kdf, iterations: 1 },
@@ -174,7 +173,7 @@ describe('EncryptionService: обнаружение подмены', () => {
     await expect(service.decrypt(tampered, PASSWORD)).rejects.toThrow(DecryptionFailedError)
   })
 
-  it('отвергает подмену соли в заголовке', async () => {
+  it('rejects a swapped salt in the header', async () => {
     const tampered: IEncryptedPayload = {
       ...payload,
       kdf: { ...payload.kdf, salt: new Uint8Array(SALT_LENGTH).fill(7) },
@@ -183,7 +182,7 @@ describe('EncryptionService: обнаружение подмены', () => {
     await expect(service.decrypt(tampered, PASSWORD)).rejects.toThrow(DecryptionFailedError)
   })
 
-  it('отвергает подмену версии формата на равную поддерживаемой', async () => {
+  it('rejects a format-version swap even when it still matches the supported version', async () => {
     const params = service.createKdfParams()
     const key = await service.deriveKey(PASSWORD, params)
 
@@ -191,8 +190,8 @@ describe('EncryptionService: обнаружение подмены', () => {
       const original = await service.encryptWithKey(SECRET, key, params)
       const tampered: IEncryptedPayload = { ...original, version: PAYLOAD_VERSION }
 
-      /* Версия совпадает, но проверяется весь заголовок целиком:
-         подмена любого поля ломает тег аутентификации. */
+      /* The version matches, but the whole header is checked:
+         swapping any field breaks the authentication tag. */
       const decrypted = await service.decryptWithKey(tampered, key)
       decrypted.wipe()
 
@@ -207,41 +206,41 @@ describe('EncryptionService: обнаружение подмены', () => {
     }
   })
 
-  it('отказывается читать контейнер новее поддерживаемого формата', async () => {
+  it('refuses to read a container newer than the supported format', async () => {
     const future: IEncryptedPayload = { ...payload, version: PAYLOAD_VERSION + 1 }
 
     await expect(service.decrypt(future, PASSWORD)).rejects.toThrow(UnsupportedVaultVersionError)
   })
 })
 
-describe('EncryptionService: проверка пароля', () => {
-  it('подтверждает верный пароль', async () => {
+describe('EncryptionService: password check', () => {
+  it('accepts the correct password', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
     await expect(service.verifyPassword(payload, PASSWORD)).resolves.toBe(true)
   })
 
-  it('отклоняет неверный пароль', async () => {
+  it('rejects a wrong password', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
-    await expect(service.verifyPassword(payload, 'другой')).resolves.toBe(false)
+    await expect(service.verifyPassword(payload, 'other')).resolves.toBe(false)
   })
 
-  it('различает пароли, отличающиеся одним символом', async () => {
+  it('distinguishes passwords that differ by one character', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
     await expect(service.verifyPassword(payload, `${PASSWORD}5`)).resolves.toBe(false)
   })
 })
 
-describe('EncryptionService: устаревание параметров', () => {
-  it('признаёт устаревшим контейнер с меньшим числом итераций', async () => {
+describe('EncryptionService: stale parameters', () => {
+  it('treats a container with a lower iteration count as stale', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
 
     expect(service.needsUpgrade(payload)).toBe(true)
   })
 
-  it('не признаёт устаревшим контейнер с актуальными параметрами', () => {
+  it('does not treat a container with current parameters as stale', () => {
     const production = new EncryptionService()
     const payload: IEncryptedPayload = {
       version: PAYLOAD_VERSION,
@@ -255,8 +254,8 @@ describe('EncryptionService: устаревание параметров', () =>
   })
 })
 
-describe('сериализация контейнера', () => {
-  it('обратима', async () => {
+describe('container serialisation', () => {
+  it('is reversible', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
     const restored = decodePayload(encodePayload(payload))
 
@@ -266,7 +265,7 @@ describe('сериализация контейнера', () => {
     expect(restored.kdf.iterations).toBe(payload.kdf.iterations)
   })
 
-  it('переживает передачу через JSON', async () => {
+  it('survives a JSON round-trip', async () => {
     const payload = await service.encrypt(SECRET, PASSWORD)
     const restored = decodePayload(JSON.parse(JSON.stringify(encodePayload(payload))))
     const decrypted = await service.decrypt(restored, PASSWORD)
@@ -278,15 +277,15 @@ describe('сериализация контейнера', () => {
     }
   })
 
-  it('отвергает контейнер без версии', () => {
+  it('rejects a container without a version', () => {
     expect(() => decodePayload({ cipher: 'AES-GCM' })).toThrow(VaultCorruptedError)
   })
 
-  it('отвергает неизвестный алгоритм шифрования', () => {
+  it('rejects an unknown cipher', () => {
     expect(() => decodePayload({ version: 1, cipher: 'DES' })).toThrow(VaultCorruptedError)
   })
 
-  it('отвергает неизвестный алгоритм вывода ключа', async () => {
+  it('rejects an unknown key-derivation algorithm', async () => {
     const record = encodePayload(await service.encrypt(SECRET, PASSWORD))
 
     expect(() => decodePayload({ ...record, kdf: { ...record.kdf, algorithm: 'MD5' } })).toThrow(
@@ -294,7 +293,7 @@ describe('сериализация контейнера', () => {
     )
   })
 
-  it('отвергает нулевое число итераций', async () => {
+  it('rejects a zero iteration count', async () => {
     const record = encodePayload(await service.encrypt(SECRET, PASSWORD))
 
     expect(() => decodePayload({ ...record, kdf: { ...record.kdf, iterations: 0 } })).toThrow(
@@ -302,20 +301,20 @@ describe('сериализация контейнера', () => {
     )
   })
 
-  it('отвергает недопустимые символы в шестнадцатеричном поле', async () => {
+  it('rejects illegal characters in a hex field', async () => {
     const record = encodePayload(await service.encrypt(SECRET, PASSWORD))
 
     expect(() => decodePayload({ ...record, iv: 'zzzz' })).toThrow(VaultCorruptedError)
   })
 
-  it('отвергает не-объект', () => {
+  it('rejects a non-object', () => {
     expect(() => decodePayload(null)).toThrow(VaultCorruptedError)
-    expect(() => decodePayload('строка')).toThrow(VaultCorruptedError)
+    expect(() => decodePayload('string')).toThrow(VaultCorruptedError)
   })
 })
 
-describe('EncryptionService: сессионный ключ', () => {
-  it('не позволяет выгрузить материал ключа', async () => {
+describe('EncryptionService: session key', () => {
+  it('does not allow exporting key material', async () => {
     const key = await service.deriveKey(PASSWORD, service.createKdfParams())
 
     try {
@@ -325,7 +324,7 @@ describe('EncryptionService: сессионный ключ', () => {
     }
   })
 
-  it('не раскрывает ключ при сериализации состояния', async () => {
+  it('does not reveal the key when state is serialised', async () => {
     const key = await service.deriveKey(PASSWORD, service.createKdfParams())
 
     try {
@@ -336,7 +335,7 @@ describe('EncryptionService: сессионный ключ', () => {
     }
   })
 
-  it('отвергает использование после уничтожения', async () => {
+  it('rejects use after destroy', async () => {
     const params = service.createKdfParams()
     const key = await service.deriveKey(PASSWORD, params)
     key.destroy()
@@ -345,7 +344,7 @@ describe('EncryptionService: сессионный ключ', () => {
     await expect(service.encryptWithKey(SECRET, key, params)).rejects.toThrow()
   })
 
-  it('допускает повторное уничтожение', async () => {
+  it('allows destroying again', async () => {
     const key = await service.deriveKey(PASSWORD, service.createKdfParams())
     key.destroy()
 
@@ -354,10 +353,10 @@ describe('EncryptionService: сессионный ключ', () => {
     }).not.toThrow()
   })
 
-  it('ключи от разных паролей несовместимы', async () => {
+  it('keys from different passwords are incompatible', async () => {
     const params = service.createKdfParams()
     const first = await service.deriveKey(PASSWORD, params)
-    const second = await service.deriveKey('другой пароль', params)
+    const second = await service.deriveKey('other password', params)
 
     try {
       const payload = await service.encryptWithKey(SECRET, first, params)
@@ -369,7 +368,7 @@ describe('EncryptionService: сессионный ключ', () => {
     }
   })
 
-  it('ключи от одной соли и пароля совпадают', async () => {
+  it('keys from the same salt and password match', async () => {
     const params = service.createKdfParams()
     const first = await service.deriveKey(PASSWORD, params)
     const second = await service.deriveKey(PASSWORD, params)

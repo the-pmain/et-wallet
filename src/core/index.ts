@@ -1,17 +1,18 @@
 /**
- * Публичный API доменного ядра.
+ * Public API of the domain core.
  *
- * Слои `features`, `pages` и `app` обращаются к ядру только через этот файл.
- * Импорт напрямую во внутренние модули (`@/core/keyring/Keyring`) технически
- * возможен, но нежелателен: он привязывает потребителя к текущей структуре
- * каталогов и мешает рефакторингу ядра.
+ * The `features`, `pages`, and `app` layers talk to the core only
+ * through this file. Importing an internal module directly
+ * (`@/core/keyring/Keyring`) is technically possible but undesirable:
+ * it binds the consumer to the current directory layout and hinders
+ * core refactoring.
  *
- * Ядро не зависит от React и от DOM. Это условие переноса его в service
- * worker manifest v3 без переписывания и проверяется правилом ESLint
- * `no-restricted-imports`.
+ * The core does not depend on React or the DOM. That is the condition
+ * for moving it into a service-worker manifest v3 without a rewrite,
+ * and it is checked by the ESLint `no-restricted-imports` rule.
  */
 
-/* --- Примитивы предметной области --- */
+/* --- Domain primitives --- */
 export {
   MAX_CHAIN_ID,
   chainIdToHex,
@@ -36,10 +37,10 @@ export type {
   Wei,
 } from './types'
 
-/* --- События --- */
+/* --- Events --- */
 export { EventBus, type EventListener, type IEventBus, type IEventSource } from './events'
 
-/* --- Платформенные зависимости --- */
+/* --- Platform dependencies --- */
 export {
   ConsoleLogger,
   LOG_LEVEL,
@@ -51,7 +52,7 @@ export {
   type LogLevel,
 } from './platform'
 
-/* --- Ошибки --- */
+/* --- Errors --- */
 export {
   AccountAlreadyExistsError,
   AccountNotFoundError,
@@ -113,7 +114,7 @@ export {
   type MnemonicInvalidReason,
 } from './errors'
 
-/* --- Шифрование, секреты в памяти и защищённое хранилище --- */
+/* --- Encryption, in-memory secrets, and protected storage --- */
 export {
   AUTH_TAG_BITS,
   CIPHER_ALGORITHM,
@@ -144,7 +145,7 @@ export {
   type KdfAlgorithm,
 } from './encryption'
 
-/* --- Адреса EVM --- */
+/* --- EVM addresses --- */
 export {
   ADDRESS_BYTE_LENGTH,
   AddressService,
@@ -172,7 +173,7 @@ export {
   type PublicKeyFormat,
 } from './address'
 
-/* --- HD-кошелёк BIP-32 / BIP-44 --- */
+/* --- BIP-32 / BIP-44 HD wallet --- */
 export {
   BIP44_PURPOSE,
   CHANGE_EXTERNAL,
@@ -194,7 +195,7 @@ export {
   type IParsedBip44Path,
 } from './hdwallet'
 
-/* --- Политика экспорта секретов и паролей --- */
+/* --- Secret-export and password policy --- */
 export {
   CHARACTER_CLASS,
   EXPORT_KIND,
@@ -256,7 +257,7 @@ export {
   type IExportRiskAssessment,
 } from './security'
 
-/* --- Имена ENS --- */
+/* --- ENS names --- */
 export {
   ENS_ADDR_SELECTOR,
   ENS_CHAIN_ID,
@@ -278,7 +279,7 @@ export {
   type IEnsServiceDependencies,
 } from './ens'
 
-/* --- Резервное копирование секретов --- */
+/* --- Secret backup --- */
 export {
   BackupManager,
   checkMnemonic,
@@ -287,7 +288,7 @@ export {
   type IMnemonicCheck,
 } from './backup'
 
-/* --- Подпись --- */
+/* --- Signing --- */
 export {
   SigningService,
   assertTypedDataMatchesChain,
@@ -297,7 +298,7 @@ export {
   type SignableMessage,
 } from './signing'
 
-/* --- Мнемонические фразы BIP-39 --- */
+/* --- BIP-39 mnemonic phrases --- */
 export {
   BIP39_SEED_LENGTH,
   MNEMONIC_STRENGTH,
@@ -310,7 +311,7 @@ export {
   type MnemonicStrength,
 } from './mnemonic'
 
-/* --- Хранилище --- */
+/* --- Storage --- */
 export {
   IndexedDbStorageService,
   MemoryStorageService,
@@ -329,7 +330,7 @@ export {
   type StorageNamespace,
 } from './storage'
 
-/* --- Сети --- */
+/* --- Networks --- */
 export {
   BUILT_IN_CHAIN_ID,
   BUILT_IN_NETWORKS,
@@ -351,7 +352,7 @@ export {
   type NetworkEventMap,
 } from './network'
 
-/* --- Провайдер и транспорт к узлам --- */
+/* --- Provider and node transport --- */
 export {
   AlchemyProvider,
   CustomRpcProvider,
@@ -391,7 +392,7 @@ export {
   type RpcProviderId,
 } from './provider'
 
-/* --- Наборы ключей --- */
+/* --- Keyrings --- */
 export {
   KEYRING_TYPE,
   type IHardwareKeyringOptions,
@@ -406,7 +407,7 @@ export {
   type KeyringType,
 } from './keyring'
 
-/* --- Кошелёк --- */
+/* --- Wallet --- */
 export {
   LOCK_REASON,
   WALLET_STATUS,
@@ -422,7 +423,7 @@ export {
   type WalletStatus,
 } from './wallet'
 
-/* --- Аккаунты --- */
+/* --- Accounts --- */
 export {
   AccountManager,
   DEFAULT_GAP_LIMIT,
@@ -448,7 +449,7 @@ export {
   type IImportPrivateKeyParams,
 } from './account'
 
-/* --- Подключения к приложениям --- */
+/* --- App connections --- */
 export {
   DAPP_REQUEST_KIND,
   DAPP_RISK,
@@ -470,7 +471,7 @@ export {
   type SessionTransportEventMap,
 } from './dapp'
 
-/* --- Курсы --- */
+/* --- Prices --- */
 export {
   CatalogPriceProvider,
   CoinGeckoMarketClient,
@@ -514,7 +515,7 @@ export {
   type PriceMap,
 } from './price'
 
-/* --- Портфель --- */
+/* --- Portfolio --- */
 export {
   EMPTY_PORTFOLIO,
   buildPortfolio,
@@ -524,7 +525,7 @@ export {
   type ITokenAmount,
 } from './portfolio'
 
-/* --- Разрешения --- */
+/* --- Approvals --- */
 export {
   ALLOWANCE_SELECTOR,
   APPROVAL_FOR_ALL_TOPIC,
@@ -542,7 +543,7 @@ export {
   type IApprovalServiceDependencies,
 } from './approval'
 
-/* --- Коллекционные токены --- */
+/* --- Collectible tokens --- */
 export {
   ERC1155_BALANCE_OF_SELECTOR,
   NftService,
@@ -561,7 +562,7 @@ export {
   type INftServiceDependencies,
 } from './nft'
 
-/* --- Кодировка ABI --- */
+/* --- ABI encoding --- */
 export {
   ADDRESS_LENGTH,
   MAX_UINT256,
@@ -583,7 +584,7 @@ export {
   strip,
 } from './abi'
 
-/* --- Токены --- */
+/* --- Tokens --- */
 export {
   BALANCE_OF_SELECTOR,
   DECIMALS_SELECTOR,
@@ -611,7 +612,7 @@ export {
   type TokenStandard,
 } from './token'
 
-/* --- Балансы --- */
+/* --- Balances --- */
 export {
   BalanceService,
   type BalanceEventMap,
@@ -622,7 +623,7 @@ export {
   type IBalanceServiceOptions,
 } from './balance'
 
-/* --- История переводов --- */
+/* --- Transfer history --- */
 export {
   AlchemyHistoryProvider,
   HistoryService,
@@ -650,7 +651,7 @@ export {
   type TransferSource,
 } from './history'
 
-/* --- Симуляция --- */
+/* --- Simulation --- */
 export {
   SimulationService,
   TenderlySimulationProvider,
@@ -661,7 +662,7 @@ export {
   type ITenderlyOptions,
 } from './simulation'
 
-/* --- Транзакции --- */
+/* --- Transactions --- */
 export {
   FEE_PRIORITY,
   RECIPIENT_RISK,
@@ -707,7 +708,7 @@ export {
   type TransactionType,
 } from './transaction'
 
-/* --- Аппаратные кошельки --- */
+/* --- Hardware wallets --- */
 export {
   HardwareDeviceError,
   LedgerDevice,
@@ -720,6 +721,6 @@ export {
   type IHardwareDevice,
 } from './hardware'
 
-/* --- Фасад и внедрение зависимостей --- */
+/* --- Facade and dependency injection --- */
 export type { IWalletCoreConfig, IWalletManager, WalletCoreEventMap } from './manager'
 export type { IWalletCoreDependencies, WalletCoreFactory } from './di'

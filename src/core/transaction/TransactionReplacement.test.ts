@@ -33,11 +33,10 @@ const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
 const HASH = '0x1111111111111111111111111111111111111111111111111111111111111111' as TxHash
 
-/** Комиссия исходной транзакции. */
 const ORIGINAL_MAX_FEE = 30_000_000_000n
 const ORIGINAL_PRIORITY_FEE = 2_000_000_000n
 
-/** Данные вызова исходной операции. Ускорение обязано их сохранить. */
+/** Call data of the original operation. A speed-up must keep it. */
 const ORIGINAL_DATA =
   '0xa9059cbb0000000000000000000000000000000000000000000000000000000000000001' as HexString
 
@@ -48,7 +47,7 @@ class ReplacementNode implements IProvider {
 
   balance = 10n ** 20n
 
-  /** Предложение узла. Может быть ниже прежней комиссии транзакции. */
+  /** The node's quote. It may be lower than the original fee. */
   feeData: IFeeData = {
     baseFeePerGas: 1_000_000_000n,
     maxFeePerGas: 2_000_000_000n,
@@ -99,7 +98,7 @@ class ReplacementNode implements IProvider {
   }
 
   request<TResult>(): Promise<TResult> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   call(): Promise<HexString> {
@@ -111,7 +110,7 @@ class ReplacementNode implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -123,7 +122,7 @@ let node: ReplacementNode
 let repository: TransactionRepository
 let service: TransactionService
 
-/** Кладёт в хранилище зависшую транзакцию со всеми параметрами. */
+/** Puts a stuck transaction with all parameters into storage. */
 async function saveStuck(overrides: Partial<ITransactionRecord> = {}): Promise<void> {
   await repository.save({
     hash: HASH,
@@ -179,18 +178,19 @@ beforeEach(async () => {
   })
 })
 
-describe('Ускорение', () => {
-  it('сохраняет номер исходной транзакции', async () => {
-    /* В нём весь смысл замены. Взяв следующий свободный номер, кошелёк
-       отправил бы вторую транзакцию вдобавок к зависшей. */
+describe('Speed-up', () => {
+  it('keeps the original transaction nonce', async () => {
+    /* The replacement's whole point is this nonce. Taking the next
+       free number would send a second transaction on top of the stuck
+       one. */
     await saveStuck()
 
     expect((await service.prepareSpeedUp(HASH)).nonce).toBe(7)
   })
 
-  it('повторяет ту же операцию, а не собирает новую', async () => {
-    /* Иначе пользователь ждал бы ускорения своего перевода, а получил
-       бы под тем же номером неизвестно что. */
+  it('repeats the same operation, rather than building a new one', async () => {
+    /* Otherwise the user would wait for their transfer to speed up
+       and receive something unknown under the same nonce. */
     await saveStuck()
 
     const replacement = await service.prepareSpeedUp(HASH)
@@ -201,8 +201,8 @@ describe('Ускорение', () => {
     expect(replacement.gasLimit).toBe(60_000n)
   })
 
-  it('поднимает комиссию выше прежней', async () => {
-    /* Узел принимает замену только при заметно большей комиссии. */
+  it('raises the fee above the original', async () => {
+    /* The node accepts a replacement only at a noticeably higher fee. */
     await saveStuck()
 
     const replacement = await service.prepareSpeedUp(HASH)
@@ -210,9 +210,9 @@ describe('Ускорение', () => {
     expect(replacement.maxFeePerGas ?? 0n).toBeGreaterThan(ORIGINAL_MAX_FEE)
   })
 
-  it('поднимает обе части комиссии, а не только предельную', async () => {
-    /* Узел сравнивает и предельную, и приоритетную: подняв одну,
-       замену получить не удастся. */
+  it('raises both fee parts, not only the cap', async () => {
+    /* The node compares both the cap and the tip: raising only one
+       will not get the replacement accepted. */
     await saveStuck()
 
     const replacement = await service.prepareSpeedUp(HASH)
@@ -220,9 +220,9 @@ describe('Ускорение', () => {
     expect(replacement.maxPriorityFeePerGas ?? 0n).toBeGreaterThan(ORIGINAL_PRIORITY_FEE)
   })
 
-  it('надбавка превышает десять процентов', async () => {
-    /* Ровно десять даёт при целочисленном округлении значение
-       на единицу ниже порога узла, и замена отвергается. */
+  it('the bump exceeds ten percent', async () => {
+    /* Exactly ten, after integer rounding, yields a value one below
+       the node's threshold, and the replacement is rejected. */
     await saveStuck()
 
     const replacement = await service.prepareSpeedUp(HASH)
@@ -230,17 +230,19 @@ describe('Ускорение', () => {
     expect(replacement.maxFeePerGas ?? 0n).toBeGreaterThan((ORIGINAL_MAX_FEE * 110n) / 100n)
   })
 
-  it('берёт предложение узла, если сеть подорожала сильнее надбавки', async () => {
-    /* Иначе ускоренная транзакция зависла бы так же, как исходная. */
+  it('takes the node quote when the network rose more than the bump', async () => {
+    /* Otherwise the sped-up transaction would stall the same way as
+       the original. */
     await saveStuck()
     node.feeData = { ...node.feeData, maxFeePerGas: 500_000_000_000n }
 
     expect((await service.prepareSpeedUp(HASH)).maxFeePerGas).toBe(500_000_000_000n)
   })
 
-  it('отказывает, если параметры исходной транзакции не сохранены', async () => {
-    /* Запись сделана версией без их хранения. Догадка означала бы
-       отправку другой операции под тем же номером. */
+  it('refuses when the original transaction parameters were not saved', async () => {
+    /* The record was written by a version that did not store them.
+       Guessing would mean sending a different operation under the
+       same nonce. */
     await saveStuck({ data: null, gasLimit: null })
 
     await expect(service.prepareSpeedUp(HASH)).rejects.toThrow(TransactionNotReplaceableError)
@@ -248,7 +250,7 @@ describe('Ускорение', () => {
 })
 
 describe('Cancel', () => {
-  it('занимает номер переводом самому себе', async () => {
+  it('occupies the nonce with a transfer to oneself', async () => {
     await saveStuck()
 
     const cancel = await service.prepareCancel(HASH)
@@ -259,48 +261,49 @@ describe('Cancel', () => {
     expect(cancel.data).toBe('0x')
   })
 
-  it('стоит как простой перевод', async () => {
+  it('costs as a simple transfer', async () => {
     await saveStuck()
 
     expect((await service.prepareCancel(HASH)).gasLimit).toBe(21_000n)
   })
 
-  it('поднимает комиссию выше прежней', async () => {
+  it('raises the fee above the original', async () => {
     await saveStuck()
 
     expect((await service.prepareCancel(HASH)).maxFeePerGas ?? 0n).toBeGreaterThan(ORIGINAL_MAX_FEE)
   })
 
-  it('доступна и без сохранённых параметров исходной транзакции', async () => {
-    /* Отмене они не нужны: она не повторяет операцию, а занимает номер. */
+  it('is available even without saved original parameters', async () => {
+    /* Cancel does not need them: it does not repeat the operation,
+       it occupies the nonce. */
     await saveStuck({ data: null, gasLimit: null })
 
     await expect(service.prepareCancel(HASH)).resolves.toMatchObject({ nonce: 7 })
   })
 })
 
-describe('Замена невозможна', () => {
-  it('неизвестная транзакция', async () => {
+describe('Replacement is impossible', () => {
+  it('an unknown transaction', async () => {
     await expect(service.prepareSpeedUp(HASH)).rejects.toThrow(TransactionNotFoundError)
   })
 
   it.each([
-    ['уже в блоке', TRANSACTION_STATUS.Confirmed],
-    ['откачена, но в блоке', TRANSACTION_STATUS.Reverted],
-    ['уже замещена', TRANSACTION_STATUS.Replaced],
+    ['already in a block', TRANSACTION_STATUS.Confirmed],
+    ['reverted, but in a block', TRANSACTION_STATUS.Reverted],
+    ['already replaced', TRANSACTION_STATUS.Replaced],
   ])('%s', async (_name, status: TransactionStatus) => {
-    /* Заменить включённую в блок транзакцию нельзя: её номер
-       израсходован. Молчаливая отправка «замены» списала бы комиссию
-       ни за что. */
+    /* A transaction already in a block cannot be replaced: its nonce
+       is spent. Silently sending a "replacement" would charge a fee
+       for nothing. */
     await saveStuck({ status })
 
     await expect(service.prepareSpeedUp(HASH)).rejects.toThrow(TransactionNotReplaceableError)
     await expect(service.prepareCancel(HASH)).rejects.toThrow(TransactionNotReplaceableError)
   })
 
-  it('причина отказа называется дословно', async () => {
-    /* «Ускорить не удалось» без объяснения оставляет владельца наедине
-       с зависшим переводом. */
+  it('the refusal reason is named verbatim', async () => {
+    /* "Speed-up failed" with no explanation leaves the owner alone
+       with a stuck transfer. */
     await saveStuck({ status: TRANSACTION_STATUS.Confirmed })
 
     await expect(service.prepareSpeedUp(HASH)).rejects.toThrow(/included in a block/i)

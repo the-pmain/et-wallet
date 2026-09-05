@@ -17,6 +17,7 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  CABINET_SHEET,
   Card,
   CardContent,
   CardHeader,
@@ -36,17 +37,17 @@ import {
 } from '@/features/wallet'
 
 /**
- * Главный экран разблокированного кошелька.
+ * Home screen of an unlocked wallet.
  *
- * КАБИНЕТ СПРАВОЧНИКА И ЛОКАЛЬНЫЙ КОШЕЛЁК ДЕЛЯТ ОДИН ЭКРАН. После
- * создания запись на сервере появляется вместе с открытой сессией
- * на устройстве. Если смотреть на сессию раньше записи, владелец
- * видит старую карточку с эфиром — а после входа, когда сессии ещё
- * нет, ту же сумму в долларах. Порядок обратный: есть запись —
- * кабинет, и создание с входом совпадают.
+ * THE DIRECTORY CABINET AND THE LOCAL WALLET SHARE THIS SCREEN. After
+ * creation the server record appears together with an open device
+ * session. Checking the session before the record shows the old ether
+ * card — and after sign-in, while the session is still missing, the
+ * same amount in dollars. Reverse the order: a record means cabinet,
+ * so creation and sign-in look the same.
  *
- * ОШИБКА ОТКРЫТИЯ СЕССИИ ПОКАЗЫВАЕТСЯ, А НЕ ГЛОТАЕТСЯ. Пустой экран после
- * успешного ввода пароля выглядит как потеря кошелька.
+ * A SESSION-OPEN FAILURE IS SHOWN, NOT SWALLOWED. A blank screen after
+ * a successful password looks like the wallet is gone.
  */
 export function DashboardPage() {
   useRefreshRemoteAssets()
@@ -91,25 +92,25 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4 max-lg:gap-6">
       <BalanceCard
         balance={snapshot.balance}
         network={snapshot.activeNetwork}
         isLoading={snapshot.isBalanceLoading}
         error={snapshot.balanceError}
         onRefresh={() => void session.refreshBalance()}
-        /* Оценка в долларах собирается из уже имеющегося снимка: курсы
-           портфеля запрашиваются тем же обходом, что балансы и токены,
-           и только при данном согласии. Таблица рынка ниже — отдельный
-           публичный каталог: адресов владельца в нём нет. */
+        /* Dollar estimate comes from the existing snapshot: portfolio
+           rates are fetched in the same pass as balances and tokens,
+           and only after consent. The market table below is a separate
+           public catalog and contains no owner addresses. */
         portfolio={snapshot.portfolio}
         arePricesEnabled={snapshot.arePricesEnabled}
         isPortfolioLoading={snapshot.isPortfolioLoading}
-        /* Действия встроены в карточку баланса, а не стоят отдельной
-           плитой под ней: сумма и обращение с ней — один объект.
-           Портфель входит в тот же ряд — он такое же обращение к
-           деньгам, а в нижнюю панель не попал сознательно: пять
-           пунктов предел для окна шириной 360 пикселей. */
+        /* Actions sit inside the balance card, not as a slab under it:
+           the amount and what you do with it are one object. Portfolio
+           is in the same row — it is the same kind of money action —
+           and was left out of the bottom bar on purpose: five items
+           is the limit for a 360-pixel window. */
         action={<QuickActions account={snapshot.activeAccount} wallets={{}} />}
       />
 
@@ -123,14 +124,14 @@ export function DashboardPage() {
 }
 
 /**
- * Сколько операций показывается на главном экране.
+ * How many operations the home screen shows.
  *
- * Главный экран даёт срез, а не архив: длинный список вытесняет баланс
- * за пределы видимой области, ради которого экран и открывают.
+ * Home is a slice, not an archive: a long list pushes the balance —
+ * the reason the screen is opened — out of view.
  */
 const RECENT_LIMIT = 5
 
-/** Оценка остатков по живым курсам, иначе колонка `balance`. */
+/** Live-rate valuation of holdings; falls back to the `balance` column. */
 function remotePortfolioUsd(
   user: IRemoteUser,
   totalValue: number | null,
@@ -165,7 +166,7 @@ function RemoteAccountHome({
       : remotePortfolioUsd(user, displayed.portfolio?.totalValue ?? 0, quotesReady)
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4 max-lg:gap-6">
       <FiatBalanceCard
         amountUsd={amountUsd}
         isRefreshing={isRefreshing || displayed.isLoading}
@@ -200,9 +201,9 @@ function RecentActivity() {
   const { t } = useTranslation()
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">
+    <Card className={CABINET_SHEET}>
+      <CardHeader className="max-lg:border-b max-lg:border-border max-lg:px-1 max-lg:pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground max-lg:text-sm max-lg:font-semibold max-lg:text-foreground">
           {t('dashboard.recent')}
         </CardTitle>
       </CardHeader>

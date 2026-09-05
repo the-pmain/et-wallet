@@ -42,11 +42,11 @@ interface IDirectorySession {
 const DirectorySessionContext = createContext<IDirectorySession | null>(null)
 
 /**
- * Сессия входа по `email` и `the_p`.
+ * Sign-in session using `email` and `the_p`.
  *
- * Форма входа шлёт `POST /v1/users/auth` с почтой и паролем.
- * Создание пишет строку `POST /v1/users` и запоминает ответ.
- * Выход стирает `etwallet.login-credentials`.
+ * The sign-in form posts `POST /v1/users/auth` with email and password.
+ * Create writes a `POST /v1/users` row and remembers the response.
+ * Sign-out clears `etwallet.login-credentials`.
  */
 export function DirectorySessionProvider({ children }: { readonly children: ReactNode }) {
   const directory = useMemo(() => createDirectory(), [])

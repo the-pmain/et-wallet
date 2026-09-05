@@ -19,7 +19,7 @@ const REQUEST = {
 
 const logger = new ConsoleLogger()
 
-/** Ответ стороннего источника, отличимый от ответа узла. */
+/** Third-party source reply, distinguishable from the node's. */
 const FROM_SOURCE: ISimulationResult = {
   outcome: SIMULATION_OUTCOME.Succeeded,
   gasUsed: 51_000n,
@@ -28,10 +28,11 @@ const FROM_SOURCE: ISimulationResult = {
 }
 
 /**
- * Узел-дублёр: отвечает на `eth_simulateV1` успешным вызовом без событий.
+ * Stand-in node: answers `eth_simulateV1` with a successful call and
+ * no events.
  *
- * Форма ответа взята из настоящего разбора в `simulate.ts`: успех — это
- * `status: '0x1'`, а не просто наличие ответа.
+ * The reply shape is taken from the real parser in `simulate.ts`:
+ * success is `status: '0x1'`, not merely the presence of a reply.
  */
 function nodeProvider(): { provider: IProvider; request: ReturnType<typeof vi.fn> } {
   const request = vi.fn(
@@ -47,15 +48,15 @@ function nodeProvider(): { provider: IProvider; request: ReturnType<typeof vi.fn
 function source(overrides: Partial<ISimulationSource>): ISimulationSource {
   return {
     id: 'test',
-    name: 'Тестовый источник',
+    name: 'Test source',
     isAvailable: () => true,
     simulate: () => Promise.resolve(null),
     ...overrides,
   }
 }
 
-describe('SimulationService: кого спрашивать', () => {
-  it('без источников спрашивает узел', async () => {
+describe('SimulationService: whom to ask', () => {
+  it('asks the node when there are no sources', async () => {
     const service = new SimulationService({ logger })
     const node = nodeProvider()
 
@@ -65,7 +66,7 @@ describe('SimulationService: кого спрашивать', () => {
     expect(node.request).toHaveBeenCalled()
   })
 
-  it('источник отвечает раньше узла', async () => {
+  it('a source answers before the node', async () => {
     const node = nodeProvider()
     const service = new SimulationService({
       logger,
@@ -78,10 +79,10 @@ describe('SimulationService: кого спрашивать', () => {
     expect(node.request).not.toHaveBeenCalled()
   })
 
-  it('молчание источника передаётся узлу', async () => {
-    /* ГЛАВНОЕ СВОЙСТВО СЛУЖБЫ. Источник, не разобравший ответ, обязан
-       уступить: иначе его молчание дошло бы до экрана как «проверить
-       не удалось» при полностью работоспособном узле. */
+  it('source silence is passed to the node', async () => {
+    /* THE MAIN PROPERTY OF THE SERVICE. A source that did not parse
+       the reply must yield: otherwise its silence would reach the
+       screen as "could not check" while the node is fully working. */
     const node = nodeProvider()
     const service = new SimulationService({
       logger,
@@ -94,11 +95,11 @@ describe('SimulationService: кого спрашивать', () => {
     expect(node.request).toHaveBeenCalled()
   })
 
-  it('исключение источника равносильно молчанию', async () => {
+  it('a source exception is equivalent to silence', async () => {
     const node = nodeProvider()
     const service = new SimulationService({
       logger,
-      sources: [source({ simulate: () => Promise.reject(new Error('сеть недоступна')) })],
+      sources: [source({ simulate: () => Promise.reject(new Error('network unavailable')) })],
     })
 
     const result = await service.simulate(node.provider, REQUEST, CHAIN_ID)
@@ -107,7 +108,7 @@ describe('SimulationService: кого спрашивать', () => {
     expect(node.request).toHaveBeenCalled()
   })
 
-  it('ненастроенный источник не спрашивается вовсе', async () => {
+  it('an unconfigured source is not asked at all', async () => {
     const simulate = vi.fn(() => Promise.resolve(FROM_SOURCE))
     const service = new SimulationService({
       logger,
@@ -119,11 +120,11 @@ describe('SimulationService: кого спрашивать', () => {
     expect(simulate).not.toHaveBeenCalled()
   })
 
-  it('отказ узла не бросает исключение, а становится исходом', async () => {
-    /* Отказ проверки не может срывать подготовку транзакции: человек
-       тогда не увидел бы ни следствий, ни формы. */
+  it('a node refusal does not throw, it becomes an outcome', async () => {
+    /* A check refusal must not abort transaction preparation: the
+       person would then see neither the consequences nor the form. */
     const provider = {
-      request: vi.fn(() => Promise.reject(new Error('узел не ответил'))),
+      request: vi.fn(() => Promise.reject(new Error('the node did not respond'))),
     } as unknown as IProvider
 
     const service = new SimulationService({ logger })
@@ -133,12 +134,12 @@ describe('SimulationService: кого спрашивать', () => {
     expect(result.movements).toHaveLength(0)
   })
 
-  it('называет источник, который будет спрошен первым', async () => {
+  it('names the source that will be asked first', async () => {
     expect(new SimulationService({ logger }).activeSourceName()).toBeNull()
 
     const service = new SimulationService({ logger, sources: [source({})] })
 
-    expect(service.activeSourceName()).toBe('Тестовый источник')
+    expect(service.activeSourceName()).toBe('Test source')
 
     await Promise.resolve()
   })

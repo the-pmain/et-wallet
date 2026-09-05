@@ -42,7 +42,6 @@ import {
 
 import type { AccountId, ChainId } from '@/core'
 
-/** Доступные режимы оформления. */
 const THEME_OPTIONS: readonly { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
@@ -50,12 +49,12 @@ const THEME_OPTIONS: readonly { value: Theme; label: string; icon: typeof Sun }[
 ]
 
 /**
- * Настройки кошелька.
+ * Wallet settings.
  *
- * СОБРАНЫ ВМЕСТЕ УПРАВЛЕНИЕ АККАУНТАМИ, СЕТЯМИ И УЗЛАМИ. На главном
- * экране им не место: он отвечает на вопрос «сколько у меня и что
- * происходит», а перечисленное меняет устройство кошелька и требует
- * осознанного захода в настройки.
+ * ACCOUNT, NETWORK, AND NODE CONTROLS LIVE HERE TOGETHER. They do not
+ * belong on the home screen: home answers "how much do I have and
+ * what is happening", and these change how the wallet is built and
+ * need a deliberate trip into settings.
  */
 export function SettingsPage() {
   const session = useWallet()
@@ -64,13 +63,13 @@ export function SettingsPage() {
   const directory = useDirectorySession()
   const { theme, setTheme } = useTheme()
 
-  /* Имя читается из зашифрованного хранилища, то есть асинхронно.
-     Отдельного поля в снимке кошелька ему не заведено: оно относится
-     к онбордингу, а не к состоянию сессии, и меняться во время работы
-     не может. */
+  /* The name is read from encrypted storage, so asynchronously.
+     There is no dedicated field on the wallet snapshot: it belongs
+     to onboarding, not session state, and cannot change while the
+     wallet is in use. */
   const [username, setUsername] = useState<string | null>(null)
 
-  /* Итог поиска аккаунтов. `null` — поиск не запускали в этот заход. */
+  /* Account-discovery result. `null` means search was not run this visit. */
   const [discovery, setDiscovery] = useState<IAccountDiscoverySummary | null>(null)
   const [isDiscovering, setDiscovering] = useState(false)
 
@@ -91,7 +90,7 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <header>
-        <h1 className="text-lg font-semibold">Settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       </header>
 
       <Card>
@@ -99,10 +98,10 @@ export function SettingsPage() {
           <CardTitle className="text-base font-medium text-muted-foreground">Your name</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          {/* Имя показывается ровно там, где владелец его ищет, — рядом
-              с остальными сведениями о кошельке. Оно же подписывает
-              первый аккаунт, поэтому строка отвечает на вопрос «почему
-              мой аккаунт называется так». */}
+          {/* The name is shown exactly where the owner looks for it —
+              next to the other wallet facts. It also labels the first
+              account, so the row answers "why is my account called
+              that". */}
           <p className="text-sm">
             {username === null ? (
               <span className="text-muted-foreground">
@@ -121,13 +120,13 @@ export function SettingsPage() {
       </Card>
 
       <Card>
-        {/* Заголовка карточки нет намеренно: подпись переключателя уже
-            называет раздел, а два заголовка подряд — «Appearance» над
-            «Appearance» — читаются как сбой вёрстки. */}
+        {/* No card title on purpose: the switcher label already names
+            the section, and two titles in a row — "Appearance" over
+            "Appearance" — read as a layout bug. */}
         <CardContent>
-          {/* Тот же переключатель, что у отбора истории и скорости
-              отправки. Свой набор кнопок здесь отличался высотой и
-              видом выбранного — три места, расходившиеся в мелочах. */}
+          {/* The same switcher as history filters and send speed. A
+              custom button set here differed in height and selected
+              look — three places that drifted in small ways. */}
           <SegmentedControl
             legend="Appearance"
             options={THEME_OPTIONS}
@@ -138,28 +137,28 @@ export function SettingsPage() {
       </Card>
 
       {/*
-        ЧЕТЫРЕ ПЕРЕХОДА ОДНИМ СПИСКОМ, А НЕ ЧЕТЫРЬМЯ КАРТОЧКАМИ.
+        FOUR LINKS AS ONE LIST, NOT FOUR CARDS.
 
-        Прежде каждый занимал отдельную карточку из заголовка, кнопки
-        во всю ширину и абзаца — четыре одинаковых блока подряд, ради
-        четырёх ссылок. Экран настроек из-за этого прокручивался вчетверо
-        дольше нужного, а одинаковость блоков мешала различать разделы:
-        глаз читал ритм, а не содержание.
+        Each used to be its own card of a title, a full-width button,
+        and a paragraph — four identical blocks in a row, for four
+        links. Settings then scrolled four times longer than needed,
+        and the sameness made sections hard to tell apart: the eye
+        read the rhythm, not the content.
 
-        Строка вместо кнопки — потому что это переход, а не действие.
-        Шеврон справа обещает именно переход, и вся строка целиком
-        служит целью нажатия: попасть в неё проще, чем в кнопку.
+        A row instead of a button because this is navigation, not an
+        action. The chevron on the right promises a transition, and
+        the whole row is the tap target: easier to hit than a button.
 
-        Пояснения сохранены дословно. Они не украшение: одобрение,
-        не имеющее срока, и фраза на бумаге как единственный способ
-        восстановления — то, чего пользователь может не знать, а узнать
-        обязан до, а не после.
+        The explanations are kept verbatim. They are not decoration:
+        an approval with no expiry, and a paper phrase as the only
+        recovery path, are things the user may not know and must
+        learn before, not after.
       */}
       <Card className="py-2">
         <CardContent className="flex flex-col divide-y divide-border/70 px-0 sm:px-0">
-          {/* Раздел не попал в нижнюю панель: пять пунктов — предел
-              для окна шириной 360 пикселей, и шестой сделал бы подписи
-              нечитаемыми. */}
+          {/* The section is not in the bottom bar: five items is the
+              limit for a 360-pixel window, and a sixth would make
+              the labels unreadable. */}
           <SettingsNavRow
             to="/wallet/connections"
             icon={Plug}
@@ -244,10 +243,10 @@ export function SettingsPage() {
             {discovery.added > 0
               ? `Found and added ${String(discovery.added)} account${discovery.added === 1 ? '' : 's'} that had been used before.`
               : 'No previously used addresses were found beyond the accounts you already have.'}{' '}
-            {/* ГЛУБИНА НАЗЫВАЕТСЯ ВСЕГДА. «Ничего не найдено» без неё
-                читается как «у вас больше ничего нет» — утверждение,
-                которого поиск не делает: он смотрит ограниченное число
-                адресов и не видит те, где лежат только токены. */}
+            {/* DEPTH IS ALWAYS NAMED. "Nothing found" without it
+                reads as "you have nothing else" — a claim the search
+                does not make: it looks at a limited number of
+                addresses and cannot see those that hold only tokens. */}
             {String(discovery.scanned)} addresses were checked
             {discovery.stoppedByLimit
               ? ', and the search stopped at the limit — there may be more'
@@ -257,8 +256,8 @@ export function SettingsPage() {
         </Alert>
       )}
 
-      {/* Аппаратный кошелёк идёт после списка аккаунтов: это способ
-          добавить ещё один, а не отдельный раздел настроек. */}
+      {/* Hardware wallet sits after the account list: it is a way to
+          add another account, not a separate settings section. */}
       <HardwareAccountForm />
 
       <NetworkList
@@ -271,9 +270,9 @@ export function SettingsPage() {
         onRemove={(chainId: ChainId) => {
           void session.removeNetwork(chainId)
         }}
-        /* Форма получает обработчик, возвращающий обещание: ей нужно
-           дождаться проверки узла и показать причину отказа, а не
-           отправить запрос и забыть о нём. */
+        /* The form gets a handler that returns a promise: it must
+           wait for the node check and show the refusal reason, not
+           fire the request and forget it. */
         addForm={<AddNetworkForm onAdd={(params) => session.addNetwork(params)} />}
       />
 
@@ -304,7 +303,7 @@ export function SettingsPage() {
   )
 }
 
-/** Подписи сроков автоблокировки. Ключ — значение в миллисекундах. */
+/** Auto-lock interval labels. The key is the value in milliseconds. */
 const AUTO_LOCK_LABEL: Readonly<Record<number, string>> = {
   60_000: '1 min',
   300_000: '5 min',
@@ -314,13 +313,13 @@ const AUTO_LOCK_LABEL: Readonly<Record<number, string>> = {
 }
 
 /**
- * Настройки модуля безопасности.
+ * Security-module settings.
  *
- * СРОК ВЫБИРАЕТСЯ ИЗ СПИСКА, А НЕ ВВОДИТСЯ. Поле ввода позволило бы
- * назначить сутки и превратить защиту в её видимость.
+ * THE INTERVAL IS PICKED FROM A LIST, NOT TYPED. A free field would
+ * let someone set a day and turn the protection into its appearance.
  *
- * ПОДТВЕРЖДЕНИЕ ПОДПИСИ ВЫКЛЮЧАЕТСЯ, НО ПОСЛЕДСТВИЕ НАЗВАНО. Это выбор
- * владельца средств, и он вправе его сделать — но не вслепую.
+ * SIGN CONFIRMATION CAN BE TURNED OFF, BUT THE COST IS NAMED. That
+ * is the owner's choice, and they may make it — but not blindly.
  */
 function SecuritySection() {
   const { settings, setAutoLockTimeout, setConfirmBeforeSigning } = useSecurity()
@@ -334,9 +333,9 @@ function SecuritySection() {
 
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          {/* Четвёртое место, где стоял свой набор кнопок. Здесь он был
-              ещё и ниже прочих — 34 пикселя при пределе прицеливания
-              пальцем в 44. */}
+          {/* A fourth place that had its own button set. Here it was
+              also shorter than the others — 34 pixels against a
+              44-pixel finger target. */}
           <SegmentedControl
             legend="Lock after inactivity"
             options={AUTO_LOCK_OPTIONS.map((value) => ({
@@ -385,31 +384,31 @@ interface SettingsNavRowProps {
   readonly title: string
 
   /**
-   * Зачем этот раздел нужен.
+   * Why this section exists.
    *
-   * Обязательное поле. Название раздела отвечает на вопрос «куда я
-   * попаду», но не на вопрос «зачем мне туда». В настройках кошелька
-   * второй вопрос важнее: разделы вроде одобрений открывают редко
-   * и ровно потому, что не знают, чем они грозят.
+   * Required. The section name answers "where will I land", not
+   * "why would I go there". In wallet settings the second question
+   * matters more: sections like approvals are opened rarely, and
+   * exactly because people do not know what they can cost.
    */
   readonly description: string
   readonly linkState?: { readonly from: 'wallet' }
 }
 
 /**
- * Строка-переход в списке настроек.
+ * A navigation row in the settings list.
  *
- * ССЫЛКА, А НЕ КНОПКА. Переход, оформленный кнопкой, теряет средний
- * щелчок, «открыть в новой вкладке» и объявление «ссылка» в программе
- * чтения с экрана.
+ * A LINK, NOT A BUTTON. Navigation styled as a button loses
+ * middle-click, "open in a new tab", and the "link" announcement in
+ * a screen reader.
  *
- * ЦЕЛЬ НАЖАТИЯ — ВСЯ СТРОКА. Попасть в неё проще, чем в кнопку внутри
- * блока, и это единственная цель: вложенных органов управления здесь
- * нет, поэтому неоднозначности «куда я нажал» не возникает.
+ * THE TAP TARGET IS THE WHOLE ROW. Easier to hit than a button
+ * inside a block, and it is the only target: there are no nested
+ * controls, so "where did I press" cannot be ambiguous.
  *
- * ОПИСАНИЕ ВХОДИТ В ДОСТУПНОЕ ИМЯ ССЫЛКИ. Это намеренно: тот, кто
- * слушает страницу, получает ровно то же, что видит зрячий, — название
- * и причину, по которой сюда стоит зайти.
+ * THE DESCRIPTION IS PART OF THE ACCESSIBLE LINK NAME. On purpose:
+ * someone who listens to the page gets exactly what a sighted
+ * reader sees — the title and the reason to go there.
  */
 function SettingsNavRow({ to, icon: Icon, title, description, linkState }: SettingsNavRowProps) {
   return (

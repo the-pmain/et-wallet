@@ -1,27 +1,27 @@
 import { SecretBufferWipedError } from '@/core/errors'
 
 /**
- * Сессионный ключ шифрования.
+ * Session encryption key.
  *
- * Непрозрачная обёртка над `CryptoKey` Web Crypto API. Существует
- * по трём причинам:
+ * Opaque wrapper around a Web Crypto `CryptoKey`. It exists for three
+ * reasons:
  *
- * 1. **Ключ не покидает Web Crypto.** Он создаётся с `extractable: false`,
- *    поэтому выгрузить байты ключа из JavaScript невозможно в принципе —
- *    ни отладчиком, ни через `JSON.stringify`, ни при дампе состояния.
- *    Это сильнее любого затирания буфера.
+ * 1. **The key never leaves Web Crypto.** It is created with
+ *    `extractable: false`, so the key bytes cannot be exported from
+ *    JavaScript at all — not by a debugger, not via `JSON.stringify`,
+ *    not from a state dump. That is stronger than any buffer wipe.
  *
- * 2. **Тип `CryptoKey` не протекает в доменные контракты.** Домен не должен
- *    знать, что под ним Web Crypto: замена реализации не должна затрагивать
- *    интерфейсы.
+ * 2. **`CryptoKey` does not leak into domain contracts.** The domain
+ *    must not know Web Crypto sits underneath: swapping the
+ *    implementation must not touch the interfaces.
  *
- * 3. **Явная точка уничтожения.** `destroy()` отмечает ключ недействительным,
- *    и дальнейшие операции с ним отвергаются.
+ * 3. **An explicit destroy point.** `destroy()` marks the key invalid,
+ *    and further operations with it are rejected.
  *
- * ГРАНИЦА ГАРАНТИИ. `destroy()` отпускает ссылку, но не затирает материал
- * ключа: JavaScript такой возможности не даёт, а хранит ключ реализация
- * браузера вне кучи JS. Ключ исчезает при сборке мусора, момент которой
- * не контролируется. Обещать большее было бы обманом.
+ * LIMIT OF THE GUARANTEE. `destroy()` drops the reference but does not
+ * wipe key material: JavaScript cannot do that, and the browser keeps
+ * the key outside the JS heap. The key disappears at GC, whose timing
+ * is uncontrolled. Promising more would be a lie.
  */
 export class EncryptionKey {
   #key: CryptoKey | null
@@ -31,24 +31,23 @@ export class EncryptionKey {
   }
 
   /**
-   * Оборачивает выведенный ключ.
+   * Wraps a derived key.
    *
-   * @internal Вызывается только из `EncryptionService`.
+   * @internal Called only from `EncryptionService`.
    */
   static wrap(key: CryptoKey): EncryptionKey {
     return new EncryptionKey(key)
   }
 
-  /** Уничтожен ли ключ. */
   get isDestroyed(): boolean {
     return this.#key === null
   }
 
   /**
-   * Материал ключа для операций Web Crypto.
+   * Key material for Web Crypto operations.
    *
-   * @internal Используется только реализацией шифрования.
-   * @throws SecretBufferWipedError если ключ уже уничтожен.
+   * @internal Used only by the encryption implementation.
+   * @throws SecretBufferWipedError if the key has already been destroyed.
    */
   unwrap(): CryptoKey {
     if (this.#key === null) {
@@ -58,17 +57,17 @@ export class EncryptionKey {
     return this.#key
   }
 
-  /** Отмечает ключ недействительным. Повторный вызов безопасен. */
+  /** Marks the key invalid. A second call is safe. */
   destroy(): void {
     this.#key = null
   }
 
-  /** Не раскрывает состояние при подстановке в строку. */
+  /** Does not reveal state when coerced to a string. */
   toString(): string {
     return '[EncryptionKey]'
   }
 
-  /** Не раскрывает состояние при сериализации состояния приложения. */
+  /** Does not reveal state when app state is serialised. */
   toJSON(): string {
     return '[EncryptionKey]'
   }

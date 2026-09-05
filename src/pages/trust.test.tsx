@@ -26,11 +26,10 @@ beforeEach(() => {
   services = createTestAppServices()
 })
 
-describe('Чему приходится доверять', () => {
-  it('доступно с первого экрана, до создания кошелька', async () => {
-    /* Сведения нужны раньше решения: человек, уже создавший кошелёк
-       и переведший туда средства, распорядиться ими иначе уже
-       не сможет. */
+describe('What you have to trust', () => {
+  it('is available from the first screen, before wallet creation', async () => {
+    /* The facts are needed before the decision: someone who already
+       created a wallet and sent funds there cannot undo that. */
     const user = userEvent.setup()
 
     renderApp()
@@ -42,10 +41,10 @@ describe('Чему приходится доверять', () => {
     ).toBeInTheDocument()
   })
 
-  it('называет главное: код приходит с сервера при каждом открытии', async () => {
-    /* Это отличает веб-кошелёк от расширения и от настольного
-       приложения, и умолчать об этом значит обещать безопасность,
-       которой нет. */
+  it('names the core fact: the code is downloaded from the server on every open', async () => {
+    /* This is what sets a web wallet apart from an extension or a
+       desktop app, and staying silent would promise safety it does
+       not have. */
     openPath('/trust')
 
     renderApp()
@@ -53,10 +52,10 @@ describe('Чему приходится доверять', () => {
     expect(await screen.findByText(/downloaded from a server every time/i)).toBeInTheDocument()
   })
 
-  it('прямо говорит, что шифрование здесь не помогает', async () => {
-    /* Соблазн успокоить упоминанием шифрования велик, но подменённый
-       код и есть кошелёк: шифровать он будет ровно так, как ему
-       велели. */
+  it('says plainly that encryption does not help here', async () => {
+    /* The temptation to soothe with a mention of encryption is strong,
+       but the replaced code is the wallet: it will encrypt exactly as
+       it is told. */
     openPath('/trust')
 
     renderApp()
@@ -66,7 +65,7 @@ describe('Чему приходится доверять', () => {
     ).toBeInTheDocument()
   })
 
-  it('разделяет то, что кошелёк защищает, и то, чего не может', async () => {
+  it('separates what the wallet protects from what it cannot', async () => {
     openPath('/trust')
 
     renderApp()
@@ -75,9 +74,9 @@ describe('Чему приходится доверять', () => {
     expect(screen.getByText('What it cannot protect')).toBeInTheDocument()
   })
 
-  it('даёт выполнимые советы, а не призыв не пользоваться', async () => {
-    /* Решение принимает владелец средств: кошелёк обязан дать
-       сведения, а не выбирать за него. */
+  it('gives actionable advice, not a call not to use the wallet', async () => {
+    /* The owner of the funds decides: the wallet must inform, not
+       choose for them. */
     openPath('/trust')
 
     renderApp()
@@ -86,9 +85,9 @@ describe('Чему приходится доверять', () => {
     expect(screen.getByText(/hardware wallet/i)).toBeInTheDocument()
   })
 
-  it('оговаривает, что это свойство всех веб-кошельков', async () => {
-    /* Иначе прочитанное выглядит как признание в собственной
-       ненадёжности, а не как объяснение устройства. */
+  it('notes that this is a property of every web wallet', async () => {
+    /* Otherwise the page reads as a confession of its own unreliability,
+       not as an explanation of how the form works. */
     openPath('/trust')
 
     renderApp()
@@ -96,7 +95,7 @@ describe('Чему приходится доверять', () => {
     expect(await screen.findByText(/every wallet that runs as a web page/i)).toBeInTheDocument()
   })
 
-  it('доступно из настроек открытого кошелька', async () => {
+  it('is available from settings of an unlocked wallet', async () => {
     const user = userEvent.setup()
 
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)

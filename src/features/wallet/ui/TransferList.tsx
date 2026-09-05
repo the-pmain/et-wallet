@@ -8,12 +8,12 @@ import type { ReplacementKind } from '../lib/replacement'
 import { TransferRow } from './TransferRow'
 
 /**
- * Высота строки в пикселях. Обязана совпадать с `h-16` в `TransferRow`.
+ * Row height in pixels. Must match `h-16` in `TransferRow`.
  *
- * Дублирование значения между разметкой и кодом неизбежно: виртуализация
- * вычисляет положение окна арифметически и измерять каждую строку
- * не может — именно ради этого она и существует. Расхождение данных
- * не теряет, но сдвигает список при прокрутке.
+ * Duplicating the value between markup and code is unavoidable:
+ * virtualization places the window by arithmetic and cannot measure
+ * each row — that is why it exists. A mismatch does not lose data
+ * but shifts the list while scrolling.
  */
 const ROW_HEIGHT = 64
 
@@ -23,51 +23,49 @@ interface TransferListProps {
   readonly isLoading: boolean
 
   /**
-   * Заголовок пустого состояния.
+   * Empty-state title.
    *
-   * Задаётся вызывающим, потому что причин пустого списка две и они
-   * означают разное: операций не было либо под условия отбора ничего
-   * не подошло. Первое, показанное вместо второго, читается владельцем
-   * средств как пропажа.
+   * Passed in because there are two reasons for an empty list and
+   * they mean different things: no operations, or nothing matched
+   * the filter. The first in place of the second reads as funds gone.
    */
   readonly emptyTitle?: string
 
   readonly emptyDescription: ReactNode
 
   /**
-   * Оформление пустого состояния.
+   * Empty-state styling.
    *
-   * Нужно потому, что один и тот же список стоит на двух экранах с
-   * разной ценой пустоты. На экране истории пустота — весь смысл
-   * экрана, и ей отведено место. На главном экране тот же блок
-   * вытеснял бы за нижний край баланс, ради которого экран и открыт.
+   * Needed because the same list sits on two screens with different
+   * costs of emptiness. On history, empty is the point of the screen
+   * and gets space. On home, the same block would push the balance —
+   * the reason the screen is open — off the bottom.
    */
   readonly emptyClassName?: string | undefined
 
   /**
-   * Начинает замену зависшей отправки.
+   * Starts replacing a stuck send.
    *
-   * Ссылка обязана быть устойчивой: её смена перерисовывает всё окно
-   * виртуального списка и обесценивает мемоизацию строк.
+   * The reference must be stable: changing it re-renders the whole
+   * virtual-list window and voids row memoization.
    */
   readonly onReplace?: ((hash: TxHash, kind: ReplacementKind) => void) | undefined
 }
 
 /**
- * Список переводов.
+ * Transfer list.
  *
- * НАПРАВЛЕНИЕ РАЗЛИЧАЕТСЯ ЗНАКОМ И ЗНАЧКОМ, А НЕ ТОЛЬКО ЦВЕТОМ.
- * Цвет как единственный признак недоступен людям с нарушением
- * цветовосприятия, а спутать приход с расходом в кошельке — дорогая
- * ошибка.
+ * Direction is told by a sign and an icon, not color alone. Color as
+ * the only cue is invisible to people with color-vision deficiency,
+ * and mixing income with expense in a wallet is an expensive mistake.
  *
- * ИСТОЧНИК ЗАПИСИ ПОКАЗЫВАЕТСЯ. Отправка, ещё не подтверждённая сетью,
- * и подтверждённый перевод из индексатора — разные по надёжности
- * сведения, и пользователь вправе их различать.
+ * The record source is shown. An unconfirmed send and a confirmed
+ * indexer transfer have different reliability, and the user may tell
+ * them apart.
  *
- * ДЛИННЫЙ СПИСОК ВИРТУАЛИЗИРУЕТСЯ. Порог задан в `VirtualList`: короткий
- * список остаётся обычным, и у него работают поиск браузера и печать.
- * Для длинного эту потерю возмещает собственный отбор на экране истории.
+ * A long list is virtualized. The threshold is in `VirtualList`: a
+ * short list stays ordinary so browser find and print still work.
+ * For a long list the history-screen filter makes up for that loss.
  */
 export function TransferList({
   transfers,
@@ -78,9 +76,9 @@ export function TransferList({
   emptyClassName,
   onReplace,
 }: TransferListProps) {
-  /* Обработчики создаются заново при смене сети, а не на каждый рендер:
-     новая ссылка на `renderItem` заставила бы `VirtualList` перерисовать
-     всё окно, обесценив мемоизацию строк. */
+  /* Handlers are remade when the network changes, not on every
+     render: a new `renderItem` reference would make `VirtualList`
+     redraw the whole window and void row memoization. */
   const renderItem = useCallback(
     (record: ITransferRecord) => (
       <TransferRow record={record} network={network} onReplace={onReplace} />

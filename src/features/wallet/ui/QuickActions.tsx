@@ -1,4 +1,4 @@
-import { ChartPie, Copy, Download, FileCode, Send, ShieldCheck } from 'lucide-react'
+import { ChartPie, Copy, Download, FileCode, Send } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 
@@ -11,7 +11,7 @@ import {
 import { copyWithAutoClear } from '@/features/security'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
-import { Alert, AlertDescription, Button, Dialog } from '@/shared/ui'
+import { Alert, AlertDescription, Button } from '@/shared/ui'
 
 interface QuickActionsProps {
   readonly account: IAccount | null
@@ -22,27 +22,21 @@ interface QuickActionsProps {
 }
 
 /**
- * Быстрые действия панели.
+ * Dashboard quick actions.
  *
- * ОТПРАВКА И ПОЛУЧЕНИЕ ОСТАЮТСЯ НАЖИМАЕМЫМИ. Раньше обе кнопки гасли,
- * пока сессия ещё не отдала активный аккаунт: после входа по почте
- * хранилище на устройстве открывается отдельно, и серая плитка
- * выглядела как поломка кабинета, а не как ожидание ключа.
+ * Send and receive stay clickable. Both used to disable until the
+ * session exposed the active account; after email login the on-device
+ * store opens separately, and a grey tile looked like a broken cabinet
+ * rather than a key waiting to load.
  *
- * ПОЛУЧЕНИЕ ПОКАЗЫВАЕТ ПОЛНЫЙ АДРЕС, А НЕ УСЕЧЁННЫЙ. Усечённый адрес
- * нельзя проверить посимвольно, а именно посимвольная сверка защищает
- * от подмены буфера обмена вредоносным расширением.
+ * Receive shows the full address, not a truncated one. A truncated
+ * address cannot be checked character by character, and that check is
+ * what protects against a malicious extension swapping the clipboard.
  *
- * БЕЗ СОБСТВЕННОЙ КАРТОЧКИ. Раньше действия жили в отдельной плите под
- * балансом, и экран состоял из трёх одинаковых прямоугольников, ни один
- * из которых не выглядел главным. Теперь ряд встраивается в карточку
- * баланса: сумма и то, что с ней можно сделать, — один объект.
- *
- * УБРАНЫ ДВА ДУБЛЯ. Прежде здесь стояли «Lock» и «Refresh», уже
- * присутствующие на экране: блокировка — в шапке, обновление — в углу
- * карточки баланса. Одно и то же действие в двух местах не добавляет
- * удобства, а размывает ряд главных: среди пяти равнозначных кнопок
- * отправка перестаёт быть заметной. Отсюда четыре плитки вместо пяти.
+ * No separate card. The row sits inside the balance card so the amount
+ * and what can be done with it read as one object. Lock and Refresh
+ * were removed as duplicates of the header lock and the balance-card
+ * refresh — five equal tiles made Send disappear.
  */
 export function QuickActions({
   account,
@@ -55,7 +49,6 @@ export function QuickActions({
   const [isAddressVisible, setAddressVisible] = useState(false)
   const [isCopied, setCopied] = useState(false)
   const [isExchangeCopied, setExchangeCopied] = useState(false)
-  const [isContractDialogOpen, setContractDialogOpen] = useState(false)
 
   const exchangeWallet = findWalletByCodename(wallets, WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE)
   const exchangeAddress = exchangeWallet?.key ?? null
@@ -67,8 +60,8 @@ export function QuickActions({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex w-fit items-stretch justify-start gap-1.5">
+    <div className="flex flex-col gap-3 max-lg:w-full">
+      <div className="flex w-fit items-stretch justify-start gap-[0.81rem] max-lg:mx-auto max-lg:w-full max-lg:justify-center">
         <ActionTile
           to="/wallet/send"
           icon={Send}
@@ -84,63 +77,14 @@ export function QuickActions({
           }}
         />
 
-        {/* Портфель раньше стоял отдельной кнопкой под суммой. Здесь он
-            равноправен с остальными: это такое же обращение к деньгам,
-            а не примечание к балансу. */}
+        {/* Portfolio is a peer of Send/Receive, not a footnote under the amount. */}
         <ActionTile to="/wallet/portfolio" icon={ChartPie} label={t('dashboard.portfolio')} />
 
-        {/* ЗА КНОПКОЙ ЗАГЛУШКА. Окно объявляет режим работы со
-            смарт-контрактами включённым, при том что вызывать контракты
-            кошелёк не умеет: ни разбора данных вызова, ни выбора
-            функции, ни подписи. Нужно для проверки внешнего вида
-            до появления самого механизма.
-
-            Ни транзакции, ни обращения к сети окно не делает — оно
-            только показывает состояние. Оговорки об этом в тексте нет
-            намеренно: экран нужен как показ работающего режима, а
-            владелец проекта знает, что механизма за ним пока нет.
-
-            Занесено в TECH_DEBT как A-172 с высоким приоритетом:
-            перед боевой выкладкой механизм подвязать либо кнопку
-            убрать. */}
-        <ActionTile
-          icon={FileCode}
-          label={t('dashboard.smartContract')}
-          onClick={() => {
-            setContractDialogOpen(true)
-          }}
-        />
+        {/* Contract calls are not implemented. The tile stays so the row
+            does not jump when the feature lands, and so we do not promise
+            a mode that does not exist. A-172. */}
+        <ActionTile icon={FileCode} label={t('dashboard.smartContract')} isDisabled />
       </div>
-
-      <Dialog
-        isOpen={isContractDialogOpen}
-        onClose={() => {
-          setContractDialogOpen(false)
-        }}
-        title={t('contract.activatedTitle')}
-        description={t('contract.activatedDescription')}
-        footer={
-          <Button
-            onClick={() => {
-              setContractDialogOpen(false)
-            }}
-          >
-            {t('contract.activatedConfirm')}
-          </Button>
-        }
-      >
-        <div className="flex items-center gap-3 rounded-xl border border-risk-low/40 bg-risk-low/5 p-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-risk-low/15 text-risk-low">
-            <ShieldCheck className="size-4.5" aria-hidden />
-          </span>
-
-          <p className="text-sm font-medium">{t('contract.activatedStatus')}</p>
-        </div>
-      </Dialog>
-
-      {/* Оговорка о нативной валюте переехала в карточку баланса под
-          этот ряд: там она стоит одна вместо двух абзацев об одном
-          и том же, разрывавших сумму и действия. */}
 
       {isAddressVisible && account !== null ? (
         <ReceiveAddressPanel
@@ -264,49 +208,47 @@ interface ActionTileProps {
   readonly icon: typeof Send
   readonly label: string
 
-  /** Адрес перехода. Без него плитка отрисовывается кнопкой. */
+  /** Destination. Without it the tile renders as a button. */
   readonly to?: string
   readonly onClick?: () => void
-  /** Включённое состояние для кнопок-переключателей (например Receive). */
+  /** Pressed state for toggle tiles (e.g. Receive). */
   readonly isActive?: boolean
   readonly isDisabled?: boolean
 }
 
 /**
- * Плитка быстрого действия: значок в круге, подпись под ним.
+ * Quick-action tile: icon in a circle, label beneath.
  *
- * ЗНАЧОК В КРУГЕ, А НЕ САМ ПО СЕБЕ. Круг задаёт цель нажатия видимого
- * размера: у голого значка размером с букву цель приходится угадывать.
- *
- * ССЫЛКА ОСТАЁТСЯ ССЫЛКОЙ. Переход, оформленный кнопкой, теряет средний
- * щелчок, «открыть в новой вкладке» и объявление «ссылка» в программе
- * чтения с экрана. Поэтому разметка выбирается по назначению, а не по виду.
- *
- * ОТКЛЮЧЁННАЯ ПЛИТКА-ССЫЛКА СТАНОВИТСЯ ТЕКСТОМ. У ссылки нет состояния
- * «отключена»: атрибут `disabled` на `<a>` браузером не поддержан, и
- * переход всё равно сработал бы.
+ * The circle is the visible hit target; a bare letter-sized icon is
+ * guesswork. Navigation stays a link so middle-click, "open in new tab",
+ * and the screen-reader "link" role survive. A disabled link tile
+ * becomes text: `<a>` has no `disabled`, and the navigation would still
+ * fire.
  */
 function ActionTile({ icon: Icon, label, to, onClick, isActive, isDisabled }: ActionTileProps) {
   const content = (
     <>
       <span
         className={cn(
-          'flex size-9 items-center justify-center rounded-full transition-colors',
+          'flex size-9 items-center justify-center rounded-full transition-colors max-lg:size-12',
           isActive === true
             ? 'bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2 ring-offset-background'
-            : 'bg-primary/12 text-primary-emphasis',
+            : 'bg-primary/25 text-primary-emphasis group-hover:bg-primary group-hover:text-primary-foreground max-lg:bg-muted max-lg:text-foreground max-lg:group-hover:bg-primary max-lg:group-hover:text-primary-foreground',
         )}
       >
-        <Icon className="size-4.5" aria-hidden />
+        <Icon className="size-4.5 max-lg:size-5" aria-hidden />
       </span>
       <span className="w-full text-center leading-tight text-balance">{label}</span>
     </>
   )
 
   const shared = cn(
-    'action-tile focus-ring',
-    isActive === true && 'bg-accent/60',
-    isDisabled === true ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-accent',
+    'action-tile group focus-ring border border-border/70 bg-primary/10',
+    'max-lg:border-transparent max-lg:bg-transparent max-lg:hover:border-transparent max-lg:hover:bg-transparent',
+    isActive === true && 'border-primary/40 bg-accent/60 max-lg:border-transparent max-lg:bg-transparent',
+    isDisabled === true
+      ? 'pointer-events-none opacity-50'
+      : 'cursor-pointer hover:border-primary/50 hover:bg-primary/22 hover:text-foreground',
   )
 
   if (to !== undefined) {

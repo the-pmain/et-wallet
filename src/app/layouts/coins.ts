@@ -1,41 +1,40 @@
-/** Параметры одной падающей монеты. */
 export interface ICoin {
-  /** Отступ слева в процентах ширины экрана. */
+  /** Left offset as a percent of screen width. */
   readonly left: number
 
-  /** Диаметр в пикселях. */
+  /** Diameter in pixels. */
   readonly size: number
 
-  /** Длительность падения в секундах. */
+  /** Fall duration in seconds. */
   readonly duration: number
 
-  /** Задержка начала в секундах. Отрицательная сдвигает фазу назад. */
+  /** Start delay in seconds. A negative value shifts the phase backward. */
   readonly delay: number
 
-  /** Горизонтальное смещение за всё падение, в пикселях. */
+  /** Horizontal drift over the whole fall, in pixels. */
   readonly drift: number
 
-  /** Непрозрачность. Мелкие монеты бледнее — это создаёт глубину. */
+  /** Opacity. Smaller coins are paler — that creates depth. */
   readonly opacity: number
 
-  /** Полный угол поворота за падение. */
+  /** Full rotation angle over the fall. */
   readonly spin: number
 }
 
 /**
- * Раскладка монет.
+ * Coin layout.
  *
- * ЗНАЧЕНИЯ ЗАДАНЫ ЯВНО, А НЕ СЛУЧАЙНЫ. Случайная раскладка менялась бы
- * при каждом рендере и иногда сбивалась в кучу у одного края. Здесь
- * положения распределены по ширине, а длительности взяты взаимно
- * непохожими: совпадающие периоды дали бы заметное падение «строем».
+ * VALUES ARE EXPLICIT, NOT RANDOM. A random layout would change on
+ * every render and sometimes pile up at one edge. Positions here are
+ * spread across the width, and durations are deliberately dissimilar:
+ * matching periods would produce a noticeable fall "in formation".
  *
- * ОТРИЦАТЕЛЬНЫЕ ЗАДЕРЖКИ СДВИГАЮТ ФАЗУ НАЗАД: монеты уже находятся
- * в пути в момент открытия экрана. Без этого первые секунды после
- * запуска фон был бы пустым, и эффект замечали бы только терпеливые.
+ * NEGATIVE DELAYS SHIFT THE PHASE BACKWARD: coins are already in
+ * flight when the screen opens. Without that the first seconds after
+ * launch would be empty, and only the patient would notice the effect.
  *
- * Тринадцать монет — компромисс: меньше выглядит случайной россыпью,
- * заметно больше даёт ощущение снегопада и начинает отвлекать от текста.
+ * Thirteen coins is the compromise: fewer looks like a random scatter,
+ * noticeably more feels like snowfall and starts to distract from text.
  */
 export const COINS: readonly ICoin[] = [
   { left: 4, size: 14, duration: 26, delay: -3, drift: 18, opacity: 0.22, spin: 260 },

@@ -3,21 +3,21 @@ import { describe, expect, it } from 'vitest'
 import { normalizeEnsName, toSafeText, safeText } from '@/core'
 
 /**
- * Опасные символы собираются из кодов, а не пишутся литералами.
+ * Dangerous characters are built from code points, not written as
+ * literals.
  *
- * Невидимый символ внутри строки исходного кода невозможно увидеть при
- * чтении — ровно по той причине, по которой он опасен в показываемом
- * тексте.
+ * An invisible character inside a source-code string cannot be seen
+ * when reading — exactly why it is dangerous in displayed text.
  */
 const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x202e)
 const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b)
 const SOFT_HYPHEN = String.fromCodePoint(0x00ad)
 const CYRILLIC_A = String.fromCodePoint(0x0430)
 
-describe('Обезвреживание текста из контрактов и от сторонних сервисов', () => {
-  it('переопределение направления письма не проходит на экран', () => {
-    /* U+202E показывает текст задом наперёд: так подделывают символы
-       токенов и имена сетей. */
+describe('Sanitizing text from contracts and third-party services', () => {
+  it('does not let a direction override reach the screen', () => {
+    /* U+202E shows text backwards: that is how token symbols and
+       network names are spoofed. */
     const result = toSafeText(`USD${RIGHT_TO_LEFT_OVERRIDE}C`)
 
     expect(result.text).not.toContain(RIGHT_TO_LEFT_OVERRIDE)
@@ -25,34 +25,34 @@ describe('Обезвреживание текста из контрактов и
   })
 
   it.each([
-    ['нулевой ширины пробел', ZERO_WIDTH_SPACE],
-    ['мягкий перенос', SOFT_HYPHEN],
-  ])('невидимый символ (%s) помечается, а не удаляется молча', (_name, character) => {
-    /* Удалив невидимку, мы сделали бы подделку неотличимой
-       от оригинала — ровно то, чего добивался автор контракта. */
+    ['zero-width space', ZERO_WIDTH_SPACE],
+    ['soft hyphen', SOFT_HYPHEN],
+  ])('marks an invisible character (%s) instead of deleting it silently', (_name, character) => {
+    /* Deleting the invisible would make a spoof indistinguishable
+       from the original — exactly what the contract author wanted. */
     const result = toSafeText(`USD${character}C`)
 
     expect(result.hasHiddenCharacters).toBe(true)
     expect(result.text).not.toBe('USDC')
   })
 
-  it('перевод строки не ломает соседнюю строку списка', () => {
-    const result = toSafeText('USDC\nПодтверждено')
+  it('does not let a newline break the next list row', () => {
+    const result = toSafeText('USDC\nConfirmed')
 
     expect(result.text).not.toContain('\n')
   })
 
-  it('длинное имя не вытесняет с экрана сумму', () => {
-    /* Автор контракта вправе назвать токен как угодно; занимать этим
-       весь экран он права не имеет. */
+  it('does not let a long name push the amount off the screen', () => {
+    /* A contract author may name a token anything; they have no
+       right to occupy the whole screen with it. */
     const result = toSafeText('A'.repeat(500))
 
     expect(result.isTruncated).toBe(true)
     expect(result.text.length).toBeLessThan(100)
   })
 
-  it('обычный текст проходит без изменений', () => {
-    /* Ложные срабатывания приучают не читать предупреждения. */
+  it('leaves ordinary text unchanged', () => {
+    /* False positives train people not to read warnings. */
     const result = toSafeText('Tether USD')
 
     expect(result.text).toBe('Tether USD')
@@ -60,40 +60,40 @@ describe('Обезвреживание текста из контрактов и
     expect(result.isTruncated).toBe(false)
   })
 
-  it('краткая форма даёт тот же текст', () => {
+  it('the short form yields the same text', () => {
     expect(safeText(`USD${ZERO_WIDTH_SPACE}C`)).toBe(toSafeText(`USD${ZERO_WIDTH_SPACE}C`).text)
   })
 
-  it('разметка остаётся текстом и не становится разметкой', () => {
-    /* React экранирует сам; проверка закрепляет, что обезвреживание
-       не превращает строку во что-то исполняемое. */
+  it('markup stays text and does not become markup', () => {
+    /* React escapes on its own; the check locks that sanitizing
+       does not turn the string into something executable. */
     const payload = '<img src=x onerror=alert(1)>'
 
     expect(toSafeText(payload).text).toBe(payload)
   })
 })
 
-describe('Имена ENS: подмена не доходит до пользователя', () => {
-  it('смешение письменностей внутри метки отвергается', () => {
+describe('ENS names: a spoof does not reach the user', () => {
+  it('rejects mixed scripts inside a label', () => {
     const spoofed = `vit${CYRILLIC_A}lik.eth`
 
     expect(spoofed).not.toBe('vitalik.eth')
     expect(normalizeEnsName(spoofed)).toBeNull()
   })
 
-  it('невидимый символ не создаёт второго имени', () => {
-    /* Обе записи обязаны давать один узел: иначе они указывали бы
-       на разных получателей при одинаковом виде. */
+  it('does not let an invisible character create a second name', () => {
+    /* Both records must hash to one node: otherwise they would
+       point at different recipients while looking the same. */
     expect(normalizeEnsName(`vitalik${ZERO_WIDTH_SPACE}.eth`)).toBe(normalizeEnsName('vitalik.eth'))
   })
 
-  it('punycode отвергается', () => {
-    /* Метка `xn--` хэшируется как есть, а разворачивается в юникод
-       где-то ещё. */
+  it('rejects punycode', () => {
+    /* An `xn--` label is hashed as-is and is expanded to Unicode
+       somewhere else. */
     expect(normalizeEnsName('xn--80ak6aa92e.eth')).toBeNull()
   })
 
-  it('домен верхнего уровня получателем не считается', () => {
+  it('does not treat a TLD as a recipient', () => {
     expect(normalizeEnsName('eth')).toBeNull()
   })
 })

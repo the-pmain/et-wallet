@@ -7,81 +7,80 @@ import type { IClock, ILogger } from '@/core/platform'
 import type { IStorageService } from '@/core/storage'
 
 /**
- * Внешние зависимости ядра.
+ * External dependencies of the core.
  *
- * ВЫБОР СПОСОБА ВНЕДРЕНИЯ И ЕГО ОБОСНОВАНИЕ
+ * WHY CONSTRUCTOR DI AND A MANUAL COMPOSITION ROOT.
  *
- * Применяется конструкторный DI с ручным composition root. Контейнер
- * (InversifyJS, tsyringe и аналоги) отвергнут по трём причинам:
+ * Constructor injection with a hand-written composition root is used.
+ * A container (InversifyJS, tsyringe, and the like) was rejected for
+ * three reasons:
  *
- * 1. Технический конфликт. Контейнеры на декораторах требуют
- *    `emitDecoratorMetadata` — неустранимую кодогенерацию. В tsconfig
- *    включён `erasableSyntaxOnly: true`, запрещающий такие конструкции.
+ * 1. A technical conflict. Decorator containers need
+ *    `emitDecoratorMetadata` — unavoidable codegen. The tsconfig has
+ *    `erasableSyntaxOnly: true`, which forbids those constructs.
  *
- * 2. Безопасность. Контейнер тянет `reflect-metadata` в бандл, который
- *    исполняется рядом с ключами. Каждая библиотека в этом периметре
- *    требует отдельного обоснования.
+ * 2. Security. A container pulls `reflect-metadata` into the bundle
+ *    that runs next to the keys. Every library in that perimeter
+ *    needs its own justification.
  *
- * 3. Потеря проверок. Контейнер разрешает зависимости в рантайме:
- *    незарегистрированная зависимость падает при запуске. Ручной
- *    composition root проверяется компилятором — пропущенная зависимость
- *    становится ошибкой сборки.
+ * 3. Lost checks. A container resolves dependencies at runtime: a
+ *    missing registration fails at launch. A manual composition root
+ *    is checked by the compiler — a missed dependency becomes a
+ *    build error.
  *
- * ЧЕГО ЗДЕСЬ СОЗНАТЕЛЬНО НЕТ: источника случайности.
+ * WHAT IS DELIBERATELY ABSENT: a randomness source.
  *
- * `crypto.getRandomValues` зашит в реализацию жёстко. Возможность подменить
- * генератор случайных чисел в кошельке — это возможность сделать все ключи
- * предсказуемыми. Удобство тестирования такой цены не стоит.
+ * `crypto.getRandomValues` is hard-wired into the implementation.
+ * The ability to swap the RNG in a wallet is the ability to make
+ * every key predictable. Test convenience is not worth that price.
  */
 export interface IWalletCoreDependencies {
-  /** Постоянное хранилище. Подменяется: IndexedDB, chrome.storage, память. */
+  /** Persistent storage. Swappable: IndexedDB, chrome.storage, memory. */
   readonly storage: IStorageService
 
-  /** Шифрование хранилища ключей. */
   readonly encryption: IEncryptionService
 
-  /** Создание транспорта к RPC-узлам. */
   readonly providerFactory: IProviderFactory
 
   /**
-   * Создание наборов ключей.
+   * Keyring factory.
    *
-   * Точка расширения для аппаратных кошельков: поддержка Ledger и Trezor
-   * добавляется реализацией фабрики, без изменения `IWallet`.
+   * Extension point for hardware wallets: Ledger and Trezor support
+   * is added by a factory implementation, without changing `IWallet`.
    */
   readonly keyringFactory: IKeyringFactory
 
   /**
-   * Источник времени и таймеров.
+   * Time and timers.
    *
-   * Внедряется ради тестируемости автоблокировки: тест, который реально
-   * ждёт пятнадцать минут, бесполезен.
+   * Injected so auto-lock is testable: a test that really waits
+   * fifteen minutes is useless.
    */
   readonly clock: IClock
 
-  /** Журналирование с обязательной редакцией секретов. */
+  /** Logging with mandatory redaction of secrets. */
   readonly logger: ILogger
 
-  /** Настройки поведения ядра. */
   readonly config: IWalletCoreConfig
 
   /**
-   * Встроенные сети.
+   * Built-in networks.
    *
-   * Передаются извне, а не жёстко зашиты в ядро: набор поддерживаемых
-   * сетей — продуктовое решение, которое может отличаться у веб-версии
-   * и расширения.
+   * Passed in, not hard-wired into the core: the supported set is a
+   * product decision and may differ between the web app and the
+   * extension.
    */
   readonly builtInNetworks: readonly INetworkConfig[]
 }
 
 /**
- * Composition root ядра.
+ * Composition root of the core.
  *
- * Единственная функция, знающая, как связать реализации между собой.
- * Всё остальное приложение получает готовый `IWalletManager` и не знает
- * ни об одной конкретной реализации.
+ * The only function that knows how to wire implementations together.
+ * The rest of the app receives a ready `IWalletManager` and knows
+ * none of the concrete implementations.
  *
- * Реализация — следующий этап. Здесь зафиксирован только контракт.
+ * The implementation is a later step. Only the contract is fixed
+ * here.
  */
 export type WalletCoreFactory = (dependencies: IWalletCoreDependencies) => IWalletManager

@@ -2,70 +2,68 @@ import type { TransactionStatus } from '@/core/transaction'
 
 import type { Address, ChainId, Timestamp, TxHash } from '@/core/types'
 
-/** Что именно переведено. */
+/** What was transferred. */
 export const TRANSFER_KIND = {
-  /** Нативная валюта сети. */
   Native: 'native',
-  /** Взаимозаменяемый токен ERC-20. */
   Erc20: 'erc20',
-  /** Невзаимозаменяемый токен ERC-721. */
   Erc721: 'erc721',
-  /** Токен ERC-1155: и взаимозаменяемый, и уникальный в одном контракте. */
+  /** ERC-1155 token: fungible and unique in one contract. */
   Erc1155: 'erc1155',
 } as const
 
 export type TransferKind = (typeof TRANSFER_KIND)[keyof typeof TRANSFER_KIND]
 
-/** Направление относительно аккаунта, чья история запрошена. */
+/** Direction relative to the account whose history was requested. */
 export const TRANSFER_DIRECTION = {
   Incoming: 'incoming',
   Outgoing: 'outgoing',
-  /** Отправитель и получатель — один и тот же аккаунт. */
+  /** Sender and recipient are the same account. */
   Self: 'self',
 } as const
 
 export type TransferDirection = (typeof TRANSFER_DIRECTION)[keyof typeof TRANSFER_DIRECTION]
 
 /**
- * Сведения о токене, сопровождающие перевод.
+ * Token details that accompany a transfer.
  *
- * ВСЕ ПОЛЯ МОГУТ ОТСУТСТВОВАТЬ, И ЭТО НЕ ИСКЛЮЧИТЕЛЬНАЯ СИТУАЦИЯ.
- * Контракт не обязан реализовывать `symbol()` и `decimals()`: они входят
- * в необязательную часть ERC-20. Источник истории также может их не
- * сообщить.
+ * EVERY FIELD MAY BE ABSENT, AND THAT IS NOT EXCEPTIONAL.
+ * A contract need not implement `symbol()` and `decimals()`: they
+ * are the optional part of ERC-20. The history source may also
+ * omit them.
  *
- * `decimals: null` ОБЯЗАН ОБРАБАТЫВАТЬСЯ ОТДЕЛЬНО. Подстановка привычных
- * восемнадцати знаков вместо неизвестного значения искажает сумму
- * на порядки: перевод 1000 USDC (шесть знаков) превратился бы
- * в 0.000000000001. Интерфейсу следует показывать необработанные единицы
- * с явной пометкой.
+ * `decimals: null` MUST BE HANDLED SEPARATELY. Substituting the
+ * familiar eighteen places for an unknown value distorts the
+ * amount by orders of magnitude: a transfer of 1000 USDC (six
+ * decimals) would become 0.000000000001. The UI should show the
+ * raw units with an explicit mark.
  */
 export interface ITransferAsset {
-  /** Адрес контракта. `null` для нативной валюты. */
+  /** Contract address. `null` for the native currency. */
   readonly contract: Address | null
 
   /**
-   * Символ.
+   * Symbol.
    *
-   * НЕДОВЕРЕННОЕ ЗНАЧЕНИЕ: его задаёт автор контракта, и ничто не мешает
-   * выпустить токен с символом существующего. Интерфейс обязан отличать
-   * проверенные токены от произвольных.
+   * UNTRUSTED VALUE: the contract author sets it, and nothing
+   * stops anyone from shipping a token with an existing symbol.
+   * The UI must distinguish verified tokens from arbitrary ones.
    */
   readonly symbol: string | null
 
-  /** Число десятичных знаков. `null`, если контракт его не сообщил. */
+  /** Decimal places. `null` if the contract did not report them. */
   readonly decimals: number | null
 }
 
 /**
- * Одна запись истории.
+ * One history record.
  *
- * ЭТО НЕ ТРАНЗАКЦИЯ, А ПЕРЕВОД. Одна транзакция порождает несколько
- * переводов: обмен токенов — минимум два, раздача — сотни. Ключом служит
- * пара «хэш транзакции + порядковый номер внутри неё», а не один хэш.
+ * THIS IS NOT A TRANSACTION, IT IS A TRANSFER. One transaction
+ * yields several transfers: a token swap is at least two, a
+ * drop is hundreds. The key is the pair "transaction hash +
+ * ordinal inside it", not the hash alone.
  */
 export interface ITransferRecord {
-  /** Устойчивый идентификатор записи: хэш плюс номер внутри транзакции. */
+  /** Stable record id: hash plus the number inside the transaction. */
   readonly id: string
 
   readonly hash: TxHash
@@ -74,129 +72,131 @@ export interface ITransferRecord {
   readonly direction: TransferDirection
 
   readonly from: Address
-  /** `null` при выпуске токена либо развёртывании контракта. */
+  /** `null` on a token mint or a contract deploy. */
   readonly to: Address | null
 
   /**
-   * Сумма в минимальных единицах.
+   * Amount in the smallest units.
    *
-   * Для ERC-721 всегда единица: уникальный предмет не делится.
+   * Always one for ERC-721: a unique item does not divide.
    */
   readonly value: bigint
 
-  /** Идентификатор предмета. Заполняется для ERC-721 и ERC-1155. */
+  /** Item id. Filled for ERC-721 and ERC-1155. */
   readonly tokenId: bigint | null
 
   readonly asset: ITransferAsset
 
   /**
-   * Состояние перевода.
+   * Transfer state.
    *
-   * Для записей от индексатора и из журналов узла всегда
-   * «подтверждён»: они существуют только потому, что уже попали
-   * в блок. Смысл поле обретает у собственных отправок кошелька —
-   * оно отличает «ждёт включения», «выполнено», «откачено» и
-   * «замещено другой транзакцией».
+   * For records from an indexer and from node logs this is always
+   * "confirmed": they exist only because they already landed in a
+   * block. The field gains meaning for the wallet's own sends —
+   * it distinguishes "waiting to be included", "done", "reverted",
+   * and "replaced by another transaction".
    *
-   * ОТКАЧЕННАЯ ОПЕРАЦИЯ — НЕ УСПЕХ. Газ списан, перевода не было,
-   * и показывать её наравне с состоявшейся нельзя.
+   * A REVERTED OPERATION IS NOT A SUCCESS. Gas was spent, there
+   * was no transfer, and it must not be shown on a par with one
+   * that completed.
    */
   readonly status: TransactionStatus
 
   readonly blockNumber: bigint
 
   /**
-   * Время включения в блок.
+   * Time of inclusion in a block.
    *
-   * `null`, если источник его не сообщил: узел не отдаёт время вместе
-   * с логом, а запрашивать заголовок блока на каждую запись — десятки
-   * лишних обращений на один экран.
+   * `null` if the source did not report it: the node does not
+   * return time with the log, and fetching the block header for
+   * every record is dozens of extra calls for one screen.
    */
   readonly timestamp: Timestamp | null
 
-  /** Происхождение записи. Показывается пользователю. */
+  /** Where the record came from. Shown to the user. */
   readonly source: TransferSource
 }
 
-/** Откуда получена запись. */
+/** Where the record was obtained. */
 export const TRANSFER_SOURCE = {
-  /** Собственная отправка, сохранённая кошельком локально. */
+  /** The wallet's own send, stored locally. */
   Local: 'local',
-  /** Индексатор: полная история, включая нативные переводы. */
+  /** Indexer: full history, including native transfers. */
   Indexer: 'indexer',
-  /** Разбор журналов узла: только токены, ограниченное окно. */
+  /** Node-log scan: tokens only, a bounded window. */
   Logs: 'logs',
 } as const
 
 export type TransferSource = (typeof TRANSFER_SOURCE)[keyof typeof TRANSFER_SOURCE]
 
-/** Что именно ограничивает полученную историю. */
+/** What bounds the history that was received. */
 export interface IHistoryLimits {
   /**
-   * Нативные переводы недоступны источнику.
+   * Native transfers are unavailable to the source.
    *
-   * Верно для разбора журналов: перевод нативной валюты не порождает
-   * события и в журналах отсутствует физически.
+   * True for a log scan: a native-currency transfer emits no
+   * event and is physically absent from the logs.
    */
   readonly nativeTransfersUnavailable: boolean
 
   /**
-   * История ограничена окном в блоках.
+   * History is bounded by a window in blocks.
    *
-   * `null` означает полную историю. Число блоков сообщается, чтобы
-   * интерфейс мог честно сказать, за какой период показаны данные.
+   * `null` means the full history. The block count is reported
+   * so the UI can honestly say which period the data covers.
    */
   readonly scannedBlocks: number | null
 
   /**
-   * Ни один источник не ответил.
+   * No source answered.
    *
-   * ОТЛИЧАТЬ ЭТО ОТ ПУСТОЙ ИСТОРИИ ОБЯЗАТЕЛЬНО. «Операций не было»
-   * и «узнать не удалось» — разные утверждения, и второе, выданное
-   * за первое, читается владельцем как пропажа средств.
+   * DISTINGUISHING THIS FROM AN EMPTY HISTORY IS REQUIRED.
+   * "There were no operations" and "could not find out" are
+   * different claims, and the second, presented as the first,
+   * reads to the owner as missing funds.
    *
-   * Случай не гипотетический: публичные узлы отказывают в выборке
-   * журналов без указания контракта, а именно такая выборка нужна,
-   * чтобы найти переводы всех токенов сразу.
+   * Not a hypothetical case: public nodes refuse a log query
+   * without a contract, and that is exactly the query needed
+   * to find transfers of every token at once.
    */
   readonly sourceUnavailable: boolean
 
-  /** Причина отказа источника. Показывается пользователю дословно. */
+  /** Source rejection reason. Shown to the user verbatim. */
   readonly reason: string | null
 }
 
 /**
- * Метка продолжения выдачи.
+ * Continuation token for the next page.
  *
- * НЕПРОЗРАЧНА ДЛЯ ВЫЗЫВАЮЩЕГО. Источники продолжают выдачу по-разному:
- * разбор журналов сдвигает окно блоков, индексатор возвращает
- * собственный ключ страницы. Общего представления у этих величин нет,
- * и попытка его выдумать связала бы вызывающий код с устройством
- * обоих источников.
+ * OPAQUE TO THE CALLER. Sources continue differently: a log scan
+ * shifts the block window, an indexer returns its own page key.
+ * Those values have no common representation, and inventing one
+ * would couple the caller to the internals of both sources.
  *
- * ИМЯ ИСТОЧНИКА ХРАНИТСЯ РЯДОМ СО ЗНАЧЕНИЕМ, потому что метку обязан
- * разбирать тот же источник, который её выдал. Ключ страницы
- * индексатора, поданный разбору журналов, был бы истолкован как номер
- * блока — и следующая страница пришла бы из другого места истории,
- * без единого признака подмены.
+ * THE SOURCE NAME IS STORED BESIDE THE VALUE, because the token
+ * must be parsed by the same source that issued it. An indexer
+ * page key fed to a log scan would be read as a block number —
+ * and the next page would come from another place in history,
+ * with no sign of the substitution.
  */
 export interface IHistoryCursor {
   readonly providerId: string
   readonly value: string
 }
 
-/** Результат запроса истории. */
+/** History query result. */
 export interface IHistoryPage {
   readonly transfers: readonly ITransferRecord[]
   readonly limits: IHistoryLimits
 
   /**
-   * Чем продолжить выдачу. `null` — продолжать нечем.
+   * How to continue the page. `null` — nothing to continue with.
    *
-   * РАЗЛИЧАТЬ «ДАЛЬШЕ НИЧЕГО НЕТ» И «ДАЛЬШЕ НЕ СПРАШИВАЛИ» ОБЯЗАТЕЛЬНО.
-   * Пустая страница с меткой продолжения означает, что просмотренный
-   * участок пуст, а не что операций не было: у разбора журналов первое
-   * окно легко оказывается пустым при полной истории за ним.
+   * DISTINGUISHING "NOTHING FURTHER" FROM "WE DID NOT ASK FURTHER"
+   * IS REQUIRED. An empty page with a continuation token means
+   * the scanned stretch is empty, not that there were no
+   * operations: a log scan's first window is easily empty with
+   * a full history behind it.
    */
   readonly cursor: IHistoryCursor | null
 }

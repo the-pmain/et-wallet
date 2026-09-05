@@ -9,44 +9,39 @@ import {
   type SessionTransportEventMap,
 } from '@/core'
 
-/** Ответ, отправленный приложению. */
 export interface ISentResponse {
   readonly requestId: string
   readonly response: DappResponse
 }
 
 /**
- * Транспорт-дублёр.
+ * Transport double.
  *
- * Позволяет проверить весь путь подключения — предложение, запрос,
- * подтверждение, отказ, отключение — без relay-сервера, без ключа
- * стороннего сервиса и без сети. Именно здесь проверяются решения,
- * от которых зависит сохранность средств.
+ * Lets a test cover the whole connection path — proposal, request,
+ * approve, reject, disconnect — without a relay server, a third-party
+ * key, or a network. This is where decisions that affect the safety
+ * of funds are checked.
  */
 export class FakeSessionTransport implements ISessionTransport {
   readonly id = 'fake'
-  readonly name = 'Дублёр подключений'
+  readonly name = 'Connection double'
 
   readonly #events = new EventBus<SessionTransportEventMap>()
 
-  /** Ответы, отправленные приложению. */
   readonly responses: ISentResponse[] = []
 
-  /** Разорванные подключения. */
   readonly disconnected: string[] = []
 
-  /** Ответы на предложения: `null` означает отказ. */
+  /** Answers to proposals: `null` means reject. */
   readonly proposalAnswers: (readonly [string, unknown])[] = []
 
-  /** Строки приглашений, по которым выполнялось подключение. */
   readonly pairings: string[] = []
 
-  /** Уведомления о смене состояния: сеть и выданные адреса. */
   readonly stateChanges: { chainId: ChainId; addresses: readonly Address[] }[] = []
 
   #sessions: IDappSession[] = []
 
-  /** Причина отказа при инициализации. Без неё транспорт поднимается. */
+  /** Init failure reason. Without it the transport starts. */
   initError: string | null = null
 
   init(): Promise<void> {
@@ -95,15 +90,11 @@ export class FakeSessionTransport implements ISessionTransport {
     return Promise.resolve()
   }
 
-  /* --- Управление из теста --- */
-
-  /** Задаёт действующие подключения. */
   setSessions(sessions: readonly IDappSession[]): void {
     this.#sessions = [...sessions]
   }
 
-  /** Присылает предложение подключения. */
-  emitProposal(id: string, chainIds: readonly ChainId[], name = 'Пример'): void {
+  emitProposal(id: string, chainIds: readonly ChainId[], name = 'Example'): void {
     this.#events.emit('session:proposal', {
       id,
       dapp: { name, url: 'https://example.com', description: null, iconUrl: null },
@@ -111,18 +102,15 @@ export class FakeSessionTransport implements ISessionTransport {
     })
   }
 
-  /** Присылает запрос на подпись. */
   emitRequest(request: IDappRequest): void {
     this.#events.emit('session:request', { request })
   }
 
-  /** Сообщает об установленном подключении. */
   emitConnected(session: IDappSession): void {
     this.#sessions = [...this.#sessions, session]
     this.#events.emit('session:connected', { session })
   }
 
-  /** Адреса последнего одобренного предложения. */
   lastApprovedAddresses(): readonly Address[] {
     const last = this.proposalAnswers.at(-1)?.[1]
 

@@ -3,37 +3,37 @@ import type { ILogger } from '@/core/platform'
 
 import type { IProvider, IProviderFactory } from './contracts'
 
-/** Зависимости фабрики. Совпадают с зависимостями настоящей. */
+/** Factory dependencies. Same as the real factory. */
 export interface ILazyRpcClientFactoryDependencies {
   readonly logger: ILogger
 }
 
 /**
- * Фабрика соединений, подгружающая транспорт при первом обращении.
+ * Connection factory that loads transport on first use.
  *
- * ЗАЧЕМ. `RpcClient` построен поверх ethers, а ethers — самая тяжёлая
- * зависимость приложения: около 250 КБ до сжатия. Настоящая фабрика
- * создаётся в конструкторе сессии кошелька, то есть при запуске, — и
- * тянула ethers в начальный чанк на экраны, где сети нет вовсе:
- * приветствие, создание кошелька, разблокировка.
+ * WHY. `RpcClient` sits on ethers, and ethers is the heaviest app
+ * dependency: about 250 KB before compression. The real factory is
+ * created in the wallet-session constructor, i.e. at startup — and
+ * pulled ethers into the initial chunk on screens that have no
+ * network at all: welcome, wallet creation, unlock.
  *
- * Здесь транспорт подгружается только тогда, когда действительно
- * понадобилось соединение с узлом, — то есть после разблокировки.
+ * Here transport is loaded only when a node connection is actually
+ * needed — i.e. after unlock.
  *
- * ПОЧЕМУ ЭТО НЕ ЗАМЕДЛЯЕТ РАБОТУ. `create` и без того асинхронна: она
- * подключается к узлу и сверяет chainId. Загрузка чанка добавляется
- * к этому ожиданию один раз за сессию, а модуль после первого вызова
- * остаётся в памяти — обещание импорта запоминается.
+ * WHY THIS DOES NOT SLOW THINGS DOWN. `create` is already async: it
+ * connects to a node and verifies chainId. Chunk load is added to
+ * that wait once per session, and after the first call the module
+ * stays in memory — the import promise is remembered.
  *
- * ЧЕГО ЭТО НЕ МЕНЯЕТ. Ни поведения, ни проверок: возвращается ровно
- * тот же `RpcClient`, включая сверку chainId и перебор резервных
- * адресов. Отличие только в моменте загрузки кода.
+ * WHAT THIS DOES NOT CHANGE. Neither behaviour nor checks: the same
+ * `RpcClient` is returned, including chainId verification and backup
+ * rotation. The only difference is when the code is loaded.
  */
 export class LazyRpcClientFactory implements IProviderFactory {
   readonly #logger: ILogger
 
-  /* Запоминается обещание, а не результат: два одновременных вызова
-     иначе запустили бы две загрузки одного модуля. */
+  /* The promise is remembered, not the result: two concurrent calls
+     would otherwise start two loads of the same module. */
   #loading: Promise<IProviderFactory> | null = null
 
   constructor(dependencies: ILazyRpcClientFactoryDependencies) {

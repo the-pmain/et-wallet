@@ -1,76 +1,76 @@
 /// <reference types="vite/client" />
 
 /**
- * Версия приложения, подставляемая на этапе сборки через `define` в vite.config.ts.
- * Читается только через `APP_CONFIG.version` — прямое использование не предполагается.
+ * App version inlined at build time via `define` in vite.config.ts.
+ * Read only through `APP_CONFIG.version` — direct use is not intended.
  */
 declare const __APP_VERSION__: string
 
 /**
- * Переменные окружения сборки.
+ * Build-time environment variables.
  *
- * ВСЁ, ЧТО ЗДЕСЬ ОБЪЯВЛЕНО, ПОПАДАЕТ В БАНДЛ ОТКРЫТЫМ ТЕКСТОМ.
- * Vite подставляет значения `VITE_*` прямо в код; они видны каждому,
- * кто откроет исходники страницы. Секреты — приватные ключи, мнемоники,
- * ключи с правом подписи — здесь недопустимы ни при каких условиях.
+ * EVERYTHING DECLARED HERE LANDS IN THE BUNDLE IN PLAIN TEXT.
+ * Vite substitutes `VITE_*` values into the code; anyone who opens
+ * the page source can see them. Secrets — private keys, mnemonics,
+ * keys with signing rights — must never go here.
  */
 interface ImportMetaEnv {
   /**
-   * Ключ API Alchemy.
+   * Alchemy API key.
    *
-   * Публичен по природе клиентского приложения. Обязан быть ограничен
-   * доменом приложения в панели Alchemy: без ограничения его используют
-   * посторонние и квота исчерпается.
+   * Public by nature of a client app. Must be restricted to the app
+   * domain in the Alchemy dashboard: without that restriction strangers
+   * use it and the quota runs out.
    *
-   * Отсутствие ключа — рабочее состояние: кошелёк использует публичные
-   * узлы из конфигурации сети.
+   * A missing key is a working state: the wallet uses public nodes
+   * from the network config.
    */
   readonly VITE_ALCHEMY_API_KEY?: string
 
   /**
-   * Учётные данные Tenderly для симуляции транзакций.
+   * Tenderly credentials for transaction simulation.
    *
-   * ГОДЯТСЯ ТОЛЬКО ДЛЯ ПРОВЕРКИ НА СВОЕЙ МАШИНЕ. Ключ доступа даёт право
-   * тратить квоту проекта и читать историю его симуляций; попав
-   * в выложенную сборку, он достаётся каждому, кто открыл страницу.
-   * Кошелёк принимает те же данные через настройки, где они лежат
-   * в зашифрованном хранилище и принадлежат одному владельцу, —
-   * это и есть путь для выкладываемых сборок.
+   * FIT ONLY FOR CHECKS ON YOUR OWN MACHINE. The access key can spend
+   * the project quota and read its simulation history; once it is in
+   * a shipped build, anyone who opened the page has it. The wallet
+   * accepts the same data through settings, where they live in
+   * encrypted storage and belong to one owner — that is the path for
+   * shipped builds.
    *
-   * Отсутствие данных — рабочее состояние: следствия транзакции
-   * считает узел методом `eth_simulateV1`.
+   * Missing data is a working state: the node computes transaction
+   * effects with `eth_simulateV1`.
    */
   readonly VITE_TENDERLY_ACCOUNT?: string
   readonly VITE_TENDERLY_PROJECT?: string
   readonly VITE_TENDERLY_ACCESS_KEY?: string
 
   /**
-   * Ключ демонстрационного доступа к CoinGecko.
+   * CoinGecko demo-access key.
    *
-   * Публичен так же, как и предыдущий, и обязан быть ограничен доменом.
-   * Права подписи не даёт: сервис отдаёт курсы и ничего не подписывает.
+   * Public like the previous one, and must be restricted to the domain.
+   * Grants no signing rights: the service returns rates and signs nothing.
    *
-   * Отсутствие ключа — рабочее состояние: адреса контрактов уходят
-   * по одному за запрос, как того требует бесплатный доступ.
+   * A missing key is a working state: contract addresses go out one
+   * per request, as free access requires.
    */
   readonly VITE_COINGECKO_API_KEY?: string
 
   /**
-   * Идентификатор проекта WalletConnect (Reown).
+   * WalletConnect (Reown) project id.
    *
-   * Публичен по природе клиентского приложения и права подписи не даёт:
-   * им пользуется relay для учёта трафика.
+   * Public by nature of a client app and grants no signing rights:
+   * the relay uses it to account for traffic.
    *
-   * Отсутствие — рабочее состояние: раздел подключений откроется
-   * и объяснит, что не настроен. Остальной кошелёк работает.
+   * Missing is a working state: the connections section opens and
+   * explains it is not configured. The rest of the wallet works.
    */
   readonly VITE_WALLETCONNECT_PROJECT_ID?: string
 
   /**
-   * Адрес Fastify (`server/`).
+   * Fastify address (`server/`).
    *
-   * Публичен: это URL, а не секрет. Кошелёк вызывает `POST /v1/users`.
-   * Пустое значение — тот же origin, Vite проксирует на порт 8080.
+   * Public: a URL, not a secret. The wallet calls `POST /v1/users`.
+   * An empty value is the same origin; Vite proxies to port 8080.
    */
   readonly VITE_SERVER_URL?: string
 }

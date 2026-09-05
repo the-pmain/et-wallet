@@ -20,14 +20,14 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 describe('CloudflareEmailService', () => {
-  it('отказывается без ключей', async () => {
+  it('refuses without keys', async () => {
     const service = new CloudflareEmailService({ accountId: null, apiToken: null })
 
     expect(service.isConfigured).toBe(false)
     await expect(service.send(MESSAGE)).rejects.toBeInstanceOf(EmailUnavailableError)
   })
 
-  it('отправляет письмо на Cloudflare Email Sending', async () => {
+  it('sends mail through Cloudflare Email Sending', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         success: true,
@@ -71,7 +71,7 @@ describe('CloudflareEmailService', () => {
     expect(result.messageId).toBe('msg-1')
   })
 
-  it('отправляет глобальный ключ как X-Auth-Email и X-Auth-Key', async () => {
+  it('sends a global key as X-Auth-Email and X-Auth-Key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         success: true,
@@ -99,7 +99,7 @@ describe('CloudflareEmailService', () => {
     expect(init.headers).not.toHaveProperty('Authorization')
   })
 
-  it('отказывается от глобального ключа без почты входа', async () => {
+  it('refuses a global key without a login email', async () => {
     const fetchMock = vi.fn()
     const service = new CloudflareEmailService({
       accountId: 'account-id',
@@ -115,7 +115,7 @@ describe('CloudflareEmailService', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('отказывается, если CLOUDFLARE_EMAIL — не почта, а ключ', async () => {
+  it('refuses when CLOUDFLARE_EMAIL is a key, not an email', async () => {
     const fetchMock = vi.fn()
     const service = new CloudflareEmailService({
       accountId: 'account-id',
@@ -132,7 +132,7 @@ describe('CloudflareEmailService', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('пробрасывает отказ схемы Cloudflare', async () => {
+  it('forwards a Cloudflare schema refusal', async () => {
     const service = new CloudflareEmailService({
       accountId: 'account-id',
       apiToken: 'token',
@@ -151,7 +151,7 @@ describe('CloudflareEmailService', () => {
     })
   })
 
-  it('объясняет, если Email Sending выключен на зоне', async () => {
+  it('explains when Email Sending is off on the zone', async () => {
     const service = new CloudflareEmailService({
       accountId: 'account-id',
       apiToken: 'token',
@@ -169,7 +169,7 @@ describe('CloudflareEmailService', () => {
     })
   })
 
-  it('прячет отказ токена за недоступностью отправки', async () => {
+  it('hides a token refusal behind send unavailability', async () => {
     const service = new CloudflareEmailService({
       accountId: 'account-id',
       apiToken: 'bad',

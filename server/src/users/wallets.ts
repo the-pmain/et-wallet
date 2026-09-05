@@ -1,46 +1,45 @@
 import { hasAddressShape, toChecksumAddress } from '../lib/address.ts'
 
-/** Назначение основного адреса для входящих переводов. */
+/** Role of the primary address for incoming transfers. */
 export const WALLET_CODENAME_RECEIVING_FUNDS = 'address-receiving-funds'
 
-/** Адрес для входящих переводов с биржи или учреждения. */
+/** Address for incoming transfers from an exchange or institution. */
 export const WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE = 'address-receiving-funds-exchange'
 
-/** Одна запись кошелька: адрес и строковое значение. */
+/** One wallet record: address and string value. */
 export interface IWalletSlot {
   readonly key: string
   readonly value: string
 }
 
-/** Карта кошельков по `codename`. */
+/** Wallets map keyed by `codename`. */
 export type IUserWallets = Readonly<Record<string, IWalletSlot>>
 
-/** Запись из HTTP-тела, где `codename` может идти отдельным полем. */
+/** HTTP-body entry where `codename` may be a separate field. */
 export interface IWalletEntryInput {
   readonly key: string
   readonly value: string
   readonly codename?: string
 }
 
-/** Начальное `value` созданного адреса. Не секрет. */
+/** Initial `value` of a created address. Not a secret. */
 export const INITIAL_WALLET_VALUE = '0'
 
-/** Длина `value`. Имя аккаунта в клиенте не длиннее 64. */
+/** `value` length. Client account name is at most 64. */
 export const WALLET_VALUE_MAX_LENGTH = 64
 
-/** Длина `codename`. Короткий идентификатор назначения кошелька. */
+/** `codename` length. Short id for the wallet's role. */
 export const WALLET_CODENAME_MAX_LENGTH = 64
 
 const WALLET_ENTRY_KEY = 'key'
 const WALLET_ENTRY_VALUE = 'value'
 const WALLET_ENTRY_CODENAME = 'codename'
 
-/** Пустая карта. */
 export function emptyWallets(): IUserWallets {
   return {}
 }
 
-/** Все адреса с нулевым значением: так создаётся кошелёк. */
+/** Every address with a zero value: how a wallet is created. */
 export function withZeroBalances(wallets: IUserWallets): IUserWallets {
   const next: Record<string, IWalletSlot> = {}
 
@@ -52,10 +51,10 @@ export function withZeroBalances(wallets: IUserWallets): IUserWallets {
 }
 
 /**
- * Разбирает колонку `wallets`.
+ * Parses the `wallets` column.
  *
- * Принимает карту `{ codename: { key, value } }`, список `{ key, value, codename? }`,
- * одиночный объект той же формы и прежнюю карту `{ "0x…": "…" }`.
+ * Accepts a `{ codename: { key, value } }` map, a `{ key, value, codename? }`
+ * list, a single object of that shape, and the legacy `{ "0x…": "…" }` map.
  */
 export function parseWallets(value: unknown): IUserWallets {
   if (value === null || value === undefined) {
@@ -84,7 +83,7 @@ export function parseWallets(value: unknown): IUserWallets {
   return readLegacyMap(value)
 }
 
-/** Добавляет или заменяет слот по `codename`. */
+/** Adds or replaces the slot for `codename`. */
 export function mergeWallet(
   wallets: IUserWallets,
   codename: string,
@@ -94,7 +93,7 @@ export function mergeWallet(
   const parsedCodename = readWalletCodename(codename)
 
   if (parsedCodename === null) {
-    throw new Error(`Codename кошелька непригоден: ${codename}`)
+    throw new Error(`Wallet codename is invalid: ${codename}`)
   }
 
   return {
@@ -106,17 +105,16 @@ export function mergeWallet(
   }
 }
 
-/** Возвращает слот по `codename`. */
 export function findWalletSlot(wallets: IUserWallets, codename: string): IWalletSlot | null {
   return wallets[codename] ?? null
 }
 
-/** Принимает ли строка вид ключа карты. */
+/** Whether the string looks like a map key. */
 export function isWalletKey(value: string): boolean {
   return hasAddressShape(value)
 }
 
-/** `value` после обрезки, либо `null` если пустая или слишком длинная. */
+/** Trimmed `value`, or `null` if empty or too long. */
 export function readWalletValue(value: string): string | null {
   const trimmed = value.trim()
 
@@ -127,7 +125,7 @@ export function readWalletValue(value: string): string | null {
   return trimmed
 }
 
-/** `codename` после обрезки, либо `null` если пустой или слишком длинный. */
+/** Trimmed `codename`, or `null` if empty or too long. */
 export function readWalletCodename(value: string): string | null {
   const trimmed = value.trim()
 
@@ -143,10 +141,10 @@ export function readWalletCodename(value: string): string | null {
 }
 
 /**
- * Разбирает `wallets` из тела запроса.
+ * Parses `wallets` from the request body.
  *
- * Отсутствующее поле — пустая карта. Карта, список или одиночный объект.
- * Битая запись — отказ целиком.
+ * A missing field is an empty map. Map, list, or single object.
+ * A broken record is a full rejection.
  */
 export function readWalletsPayload(value: unknown): IUserWallets | null {
   if (value === undefined) {
@@ -330,7 +328,7 @@ function readCodenameMapStrict(value: Record<string, unknown>): IUserWallets | n
   return wallets
 }
 
-/** Прежняя карта `{ "0x…": "подпись" }` — читаем, больше не пишем. */
+/** Legacy `{ "0x…": "label" }` map — read, never write again. */
 function readLegacyMap(value: object): IUserWallets {
   let wallets = emptyWallets()
   let index = 0

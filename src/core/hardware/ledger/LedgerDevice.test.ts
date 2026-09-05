@@ -20,7 +20,7 @@ import { CLA, INS, MAX_DATA_LENGTH, P1_FIRST, P1_MORE, buildApdu, readResponse }
 import { LedgerDevice } from './LedgerDevice'
 import { encodeDerivationPath } from './path'
 
-/** Ключ, которым «подписывает» подставное устройство. */
+/** Key the stand-in device “signs” with. */
 const SIGNING_KEY = new SigningKey(`0x${'07'.repeat(32)}`)
 const DEVICE_ADDRESS = toAddress(computeAddress(SIGNING_KEY.publicKey))
 
@@ -29,7 +29,7 @@ const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
 const OK = new Uint8Array([0x90, 0x00])
 
-/** Успешный ответ: данные плюс слово состояния. */
+/** Successful reply: data plus the status word. */
 function ok(body: Uint8Array): Uint8Array {
   const response = new Uint8Array(body.length + 2)
 
@@ -39,30 +39,30 @@ function ok(body: Uint8Array): Uint8Array {
   return response
 }
 
-/** Ответ с заданным словом состояния и без данных. */
+/** Reply with a given status word and no data. */
 function status(word: number): Uint8Array {
   return new Uint8Array([(word >> 8) & 0xff, word & 0xff])
 }
 
 /**
- * Подставное устройство.
+ * Stand-in device.
  *
- * ПОДПИСЫВАЕТ ПО-НАСТОЯЩЕМУ, настоящим ключом и настоящей кривой:
- * иначе проверка сборки подписи ничего не проверяла бы. Разница
- * с живым устройством только в том, что здесь нет ни экрана,
- * ни человека, который нажимает кнопку.
+ * SIGNS FOR REAL, with a real key and a real curve: otherwise the
+ * signature-assembly check would check nothing. The only difference
+ * from a live device is that there is no screen here, and no person
+ * pressing a button.
  */
 class FakeLedger implements IApduTransport {
-  /** Все полученные команды: проверяется их состав. */
+  /** Every command received: their composition is checked. */
   readonly commands: Uint8Array[] = []
 
-  /** Слово состояния, которым отвечать вместо успеха. */
+  /** Status word to reply with instead of success. */
   failWith: number | null = null
 
-  /** Подписывать другим ключом: так выглядит чужой путь деривации. */
+  /** Sign with another key: that is what a foreign derivation path looks like. */
   signWithForeignKey = false
 
-  /** Накопленные данные подписи из всех частей. */
+  /** Accumulated signing data from every chunk. */
   #payload: Uint8Array<ArrayBufferLike> = new Uint8Array()
 
   exchange(command: Uint8Array): Promise<Uint8Array> {
@@ -80,12 +80,12 @@ class FakeLedger implements IApduTransport {
       return Promise.resolve(ok(this.#addressResponse()))
     }
 
-    /* Части складываются так же, как это делает устройство. */
+    /* Chunks are concatenated the same way the device does. */
     this.#payload = p1 === P1_FIRST ? Uint8Array.from(data) : concat(this.#payload, data)
 
-    /* Ответ приходит только на последнюю часть. Здесь последней
-       считается любая неполная — ровно так ведёт себя устройство,
-       получающее данные фиксированными кусками. */
+    /* The reply arrives only on the last chunk. Here any incomplete
+       one is treated as last — exactly how the device behaves when
+       it receives data in fixed-size pieces. */
     if (data.length === MAX_DATA_LENGTH) {
       return Promise.resolve(ok(new Uint8Array()))
     }
@@ -93,7 +93,7 @@ class FakeLedger implements IApduTransport {
     return Promise.resolve(ok(this.#signature(instruction ?? 0)))
   }
 
-  /** Что именно устройство «увидело» на подпись, без пути. */
+  /** What the device “saw” for signing, without the path. */
   get signedPayload(): Uint8Array {
     const pathLength = encodeDerivationPath(PATH).length
 
@@ -113,19 +113,20 @@ class FakeLedger implements IApduTransport {
   }
 
   /**
-   * Подпись того, что накопилось.
+   * Signature of what has accumulated.
    *
-   * Хэш считается по правилам соответствующей команды: транзакция
-   * хэшируется целиком, сообщение — с префиксом EIP-191, структура
-   * приходит уже готовыми хэшами.
+   * The hash is computed by the rules of the matching command: a
+   * transaction is hashed whole, a message with the EIP-191 prefix,
+   * a structure arrives as ready hashes.
    */
   #signature(instruction: number): Uint8Array {
     const key = this.signWithForeignKey ? new SigningKey(`0x${'09'.repeat(32)}`) : SIGNING_KEY
     const digest = this.#digest(instruction)
     const signature = key.sign(digest)
 
-    /* Первый байт — то самое поле `v`, которому кошелёк не доверяет:
-       здесь оно намеренно заполнено бессмысленным значением. */
+    /* The first byte is the same `v` field the wallet does not
+       trust: here it is deliberately filled with a meaningless
+       value. */
     return concat(new Uint8Array([0xff]), getBytes(signature.r), getBytes(signature.s))
   }
 
@@ -133,7 +134,7 @@ class FakeLedger implements IApduTransport {
     const payload = this.signedPayload
 
     if (instruction === INS.SignPersonalMessage) {
-      /* Первые четыре байта — длина сообщения. */
+      /* The first four bytes are the message length. */
       return hashMessage(Uint8Array.from(payload.subarray(4)))
     }
 
@@ -200,16 +201,17 @@ const TYPED_DATA: ITypedData = {
   message: { to: RECIPIENT, amount: 1n },
 }
 
-describe('Чтение адреса с устройства', () => {
-  it('адрес приходит с контрольной суммой EIP-55', async () => {
-    /* Регистр в ответе устройства зависит от версии прошивки,
-       а сверять адрес глазами человек будет именно по нему. */
+describe('Reading an address from the device', () => {
+  it('the address arrives with an EIP-55 checksum', async () => {
+    /* Casing in the device reply depends on firmware version,
+       and that is what a person will use to check the address by
+       eye. */
     const device = new LedgerDevice(new FakeLedger())
 
     expect((await device.getAddress(PATH)).address).toBe(DEVICE_ADDRESS)
   })
 
-  it('путь деривации уходит устройству в его формате', async () => {
+  it('the derivation path goes to the device in its format', async () => {
     const transport = new FakeLedger()
 
     await new LedgerDevice(transport).getAddress(PATH)
@@ -218,13 +220,13 @@ describe('Чтение адреса с устройства', () => {
 
     expect(command?.[0]).toBe(CLA)
     expect(command?.[1]).toBe(INS.GetAddress)
-    /* Пять уровней пути: m/44'/60'/0'/0/0. */
+    /* Five path levels: m/44'/60'/0'/0/0. */
     expect(command?.[5]).toBe(5)
   })
 
-  it('подтверждение на экране запрашивается отдельным параметром', async () => {
-    /* Подменённый на экране компьютера адрес иначе не отличить
-       от настоящего. */
+  it('on-screen confirmation is requested by a separate parameter', async () => {
+    /* An address swapped on the computer screen is otherwise
+       indistinguishable from the real one. */
     const transport = new FakeLedger()
 
     await new LedgerDevice(transport).getAddress(PATH, true)
@@ -233,16 +235,17 @@ describe('Чтение адреса с устройства', () => {
   })
 })
 
-describe('Подпись транзакции устройством', () => {
-  it('подписанная транзакция принадлежит адресу устройства', async () => {
+describe('Signing a transaction on the device', () => {
+  it('the signed transaction belongs to the device address', async () => {
     const raw = await new LedgerDevice(new FakeLedger()).signTransaction(PATH, TRANSACTION)
 
     expect(Transaction.from(raw).from).toBe(DEVICE_ADDRESS)
   })
 
-  it('в подпись уходят ровно те байты, что описывают показанную транзакцию', async () => {
-    /* Расхождение здесь означало бы подпись под другой транзакцией,
-       чем показана человеку, — и обнаружилось бы уже в цепи. */
+  it('exactly the bytes that describe the shown transaction go into the signature', async () => {
+    /* A mismatch here would mean a signature over a different
+       transaction than the one shown to the person — and would
+       only be noticed on chain. */
     const transport = new FakeLedger()
 
     await new LedgerDevice(transport).signTransaction(PATH, TRANSACTION)
@@ -262,10 +265,11 @@ describe('Подпись транзакции устройством', () => {
     )
   })
 
-  it('подпись чужим ключом отвергается, а не публикуется', async () => {
-    /* Так выглядит неверный путь деривации: устройство отвечает
-       исправной подписью, но не того аккаунта. Отправив её, человек
-       перевёл бы средства с другого своего адреса. */
+  it('a signature with a foreign key is rejected, not published', async () => {
+    /* That is what a wrong derivation path looks like: the
+       device replies with a valid signature, but not of that
+       account. Sending it, the person would move funds from
+       another of their addresses. */
     const transport = new FakeLedger()
 
     transport.signWithForeignKey = true
@@ -275,8 +279,8 @@ describe('Подпись транзакции устройством', () => {
     )
   })
 
-  it('длинные данные уходят частями, и ни один байт не теряется', async () => {
-    /* Вызов контракта легко превышает предел одной команды. */
+  it('long data goes in chunks, and no byte is lost', async () => {
+    /* A contract call easily exceeds the limit of one command. */
     const transport = new FakeLedger()
     const longCall = `0x${'ab'.repeat(600)}` as HexString
 
@@ -295,17 +299,17 @@ describe('Подпись транзакции устройством', () => {
   })
 })
 
-describe('Подпись сообщения и структуры', () => {
-  it('подпись сообщения восстанавливается в адрес устройства', async () => {
+describe('Signing a message and a structure', () => {
+  it('a message signature recovers to the device address', async () => {
     const message = Uint8Array.from(new TextEncoder().encode('Sign in to Example'))
     const signature = await new LedgerDevice(new FakeLedger()).signMessage(PATH, message)
 
     expect(toAddress(recoverAddress(hashMessage(message), signature))).toBe(DEVICE_ADDRESS)
   })
 
-  it('длина сообщения передаётся отдельным полем', async () => {
-    /* Устройство получает данные частями и обязано знать длину
-       заранее. */
+  it('message length is sent as a separate field', async () => {
+    /* The device receives data in chunks and must know the
+       length in advance. */
     const transport = new FakeLedger()
     const message = Uint8Array.from(new TextEncoder().encode('abc'))
 
@@ -314,13 +318,13 @@ describe('Подпись сообщения и структуры', () => {
     expect([...transport.signedPayload.subarray(0, 4)]).toEqual([0, 0, 0, 3])
   })
 
-  it('структура EIP-712 подписывается двумя хэшами и восстанавливается', async () => {
+  it('an EIP-712 structure is signed with two hashes and recovers', async () => {
     const signature = await new LedgerDevice(new FakeLedger()).signTypedData(PATH, TYPED_DATA)
 
     expect(toAddress(recoverAddress(hashTypedData(TYPED_DATA), signature))).toBe(DEVICE_ADDRESS)
   })
 
-  it('устройству уходят ровно два хэша по тридцать два байта', async () => {
+  it('exactly two hashes of thirty-two bytes go to the device', async () => {
     const transport = new FakeLedger()
 
     await new LedgerDevice(transport).signTypedData(PATH, TYPED_DATA)
@@ -329,8 +333,8 @@ describe('Подпись сообщения и структуры', () => {
   })
 })
 
-describe('Отказы устройства', () => {
-  it('отказ человека назван отказом, а не поломкой', async () => {
+describe('Device refusals', () => {
+  it("a person's refusal is named a refusal, not a breakage", async () => {
     const transport = new FakeLedger()
 
     transport.failWith = 0x6985
@@ -338,7 +342,7 @@ describe('Отказы устройства', () => {
     await expect(new LedgerDevice(transport).getAddress(PATH)).rejects.toThrow(/rejected/i)
   })
 
-  it('заблокированное устройство объясняет, что делать', async () => {
+  it('a locked device explains what to do', async () => {
     const transport = new FakeLedger()
 
     transport.failWith = 0x5515
@@ -346,7 +350,7 @@ describe('Отказы устройства', () => {
     await expect(new LedgerDevice(transport).getAddress(PATH)).rejects.toThrow(/PIN/i)
   })
 
-  it('закрытое приложение отличается от прочих отказов', async () => {
+  it('a closed application is distinguished from other refusals', async () => {
     const transport = new FakeLedger()
 
     transport.failWith = 0x6511
@@ -356,7 +360,7 @@ describe('Отказы устройства', () => {
     )
   })
 
-  it('неизвестный код показывается числом, а не выдумкой', async () => {
+  it('an unknown code is shown as a number, not an invention', async () => {
     const transport = new FakeLedger()
 
     transport.failWith = 0x1234
@@ -365,26 +369,26 @@ describe('Отказы устройства', () => {
   })
 })
 
-describe('Составление и разбор команд', () => {
-  it('данные длиннее предела команду не составляют', () => {
-    /* Обрезав их молча, мы отправили бы на подпись не то, что
-       показано. */
+describe('Building and parsing commands', () => {
+  it('data longer than the limit does not form a command', () => {
+    /* Silently truncating them, we would send something other
+       than what was shown to be signed. */
     expect(() => buildApdu(INS.SignTransaction, P1_FIRST, 0, new Uint8Array(256))).toThrow(
       /longer than the protocol allows/i,
     )
   })
 
-  it('успешный ответ отдаётся без слова состояния', () => {
+  it('a successful reply is returned without the status word', () => {
     expect([...readResponse(new Uint8Array([1, 2, 0x90, 0x00]))]).toEqual([1, 2])
   })
 
-  it('слишком короткий ответ отвергается', () => {
+  it('a too-short reply is rejected', () => {
     expect(() => readResponse(new Uint8Array([0x90]))).toThrow(/too short/i)
   })
 })
 
-describe('Разбор пути деривации', () => {
-  it('закалённые уровни отличаются старшим битом', () => {
+describe('Parsing a derivation path', () => {
+  it('hardened levels are marked by the high bit', () => {
     const encoded = encodeDerivationPath("m/44'/60'" as DerivationPath)
 
     expect(encoded[0]).toBe(2)
@@ -392,16 +396,16 @@ describe('Разбор пути деривации', () => {
     expect([...encoded.subarray(5, 9)]).toEqual([0x80, 0x00, 0x00, 0x3c])
   })
 
-  it('шестнадцатеричная запись уровня отвергается', () => {
-    /* `Number('0x10')` дал бы шестнадцатый аккаунт вместо отказа. */
+  it('a hexadecimal level is rejected', () => {
+    /* `Number('0x10')` would give the sixteenth account instead of a refusal. */
     expect(() => encodeDerivationPath('m/0x10' as DerivationPath)).toThrow(/malformed level/i)
   })
 
-  it('путь без начального «m» отвергается', () => {
+  it('a path without a leading "m" is rejected', () => {
     expect(() => encodeDerivationPath("44'/60'/0'/0/0" as DerivationPath)).toThrow(/start with/i)
   })
 
-  it('слишком глубокий путь отвергается', () => {
+  it('a too-deep path is rejected', () => {
     expect(() => encodeDerivationPath('m/0/0/0/0/0/0/0/0/0/0/0' as DerivationPath)).toThrow(
       /unsupported depth/i,
     )

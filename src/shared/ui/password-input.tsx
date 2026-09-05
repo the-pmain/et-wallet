@@ -10,9 +10,6 @@ export interface PasswordInputProps extends Omit<ComponentProps<'input'>, 'type'
   readonly id: string
 }
 
-/**
- * Password field with show/hide toggle.
- */
 export function PasswordInput({ id, className, disabled, ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false)
 

@@ -10,111 +10,112 @@ import type {
 } from './types'
 
 /**
- * Набор ключей: единственный владелец секретов в приложении.
+ * Keyring: the only owner of secrets in the application.
  *
- * Это центральная абстракция безопасности. Границы, обязательные для любой
- * реализации:
+ * This is the central security abstraction. Bounds that every
+ * implementation must keep:
  *
- * 1. **Секрет наружу не выходит.** Публичные методы отдают адреса и готовые
- *    подписи. Единственное исключение — `exportPrivateKey`, который требует
- *    отдельного подтверждения паролем на уровне выше и возвращает буфер,
- *    подлежащий немедленному затиранию.
+ * 1. **A secret does not leave.** Public methods return addresses
+ *    and finished signatures. The only exception is
+ *    `exportPrivateKey`, which requires a separate password
+ *    confirmation one level up and returns a buffer that must be
+ *    wiped immediately.
  *
- * 2. **Секрет не попадает в состояние UI.** Стор Zustand — обычный объект
- *    в куче вкладки: он виден в React DevTools, доступен любому скрипту
- *    на странице и сериализуется при отладочном дампе состояния.
+ * 2. **A secret does not enter UI state.** A Zustand store is an
+ *    ordinary object on the tab heap: it is visible in React
+ *    DevTools, reachable by any script on the page, and serialised
+ *    in a debug state dump.
  *
- * 3. **Секрет хранится в `Uint8Array`, а не в `string`.** Строки в JavaScript
- *    иммутабельны и интернируются — затереть их невозможно.
+ * 3. **A secret lives in `Uint8Array`, not `string`.** Strings in
+ *    JavaScript are immutable and interned — they cannot be wiped.
  *
- * 4. **`wipe()` обязан обнулять буферы**, а не просто терять ссылки на них.
- *    Потеря ссылки оставляет данные в куче до сборки мусора, момент которой
- *    не контролируется.
+ * 4. **`wipe()` must zero the buffers**, not merely drop references
+ *    to them. Dropping a reference leaves the data on the heap
+ *    until garbage collection, whose timing is not controlled.
  *
- * Абстракция единообразно покрывает и программные ключи, и аппаратные
- * устройства. Именно поэтому все методы подписи асинхронны: подпись
- * на Ledger требует физического подтверждения и занимает секунды.
+ * The abstraction covers software keys and hardware devices
+ * uniformly. That is why every signing method is async: a Ledger
+ * signature needs a physical confirmation and takes seconds.
  */
 export interface IKeyring {
   readonly id: KeyringId
   readonly type: KeyringType
 
-  /** Что этот набор умеет. Проверяется до показа формы подписи. */
+  /** What this keyring can do. Checked before the sign form is shown. */
   readonly capabilities: IKeyringCapabilities
 
-  /** Адреса, обслуживаемые набором. */
   getAddresses(): Promise<readonly Address[]>
 
   /**
-   * Выводит очередной аккаунт из того же корня.
+   * Derives the next account from the same root.
    *
-   * @throws KeyringCannotSignError если тип набора не поддерживает деривацию.
+   * @throws KeyringCannotSignError if the keyring type does not
+   *         support derivation.
    */
   deriveAccount(): Promise<Address>
 
-  /** Путь деривации адреса. `null` для наборов без HD-структуры. */
+  /** Derivation path of an address. `null` for keyrings with no HD structure. */
   getDerivationPath(address: Address): DerivationPath | null
 
   /**
-   * Подписывает транзакцию.
+   * Signs a transaction.
    *
-   * На подпись уходит уже подготовленная и проверенная структура. Набор
-   * ключей не изменяет её и не досчитывает поля: любая правка здесь означала
-   * бы расхождение между показанным пользователю и подписанным.
+   * What goes to signing is an already-prepared and checked
+   * structure. The keyring does not change it and does not fill in
+   * fields: any edit here would mean a mismatch between what the
+   * user was shown and what was signed.
    *
    * @throws KeyringCannotSignError, UserRejectedError
    */
   signTransaction(address: Address, transaction: ISignableTransaction): Promise<HexString>
 
   /**
-   * Подписывает произвольное сообщение (`personal_sign`).
+   * Signs an arbitrary message (`personal_sign`).
    *
-   * Реализация обязана применять префикс EIP-191. Без него подписанные
-   * байты могут оказаться корректной транзакцией, и подпись «безобидного»
-   * сообщения превратится в подпись перевода средств.
+   * The implementation must apply the EIP-191 prefix. Without it
+   * the signed bytes may be a valid transaction, and the signature
+   * of a "harmless" message becomes a signature of a funds transfer.
    */
   signMessage(address: Address, message: Uint8Array): Promise<HexString>
 
   /**
-   * Подписывает структурированные данные (EIP-712).
+   * Signs structured data (EIP-712).
    *
-   * Опаснее подписи транзакции: подписанное сообщение может быть предъявлено
-   * контракту позже. Вызывающий код обязан показать разобранную структуру
-   * и сверить `domain.chainId` с активной сетью.
+   * More dangerous than signing a transaction: the signed message
+   * can be presented to a contract later. The caller must show the
+   * parsed structure and check `domain.chainId` against the active
+   * network.
    */
   signTypedData(address: Address, typedData: ITypedData): Promise<HexString>
 
   /**
-   * Выгружает приватный ключ.
+   * Exports a private key.
    *
-   * Требует подтверждения паролем на уровне выше. Возвращённый буфер
-   * вызывающий обязан затереть в блоке `finally`.
+   * Requires a password confirmation one level up. The caller must
+   * wipe the returned buffer in a `finally` block.
    *
-   * @throws ExportNotPermittedError для аппаратных и наблюдаемых наборов.
+   * @throws ExportNotPermittedError for hardware and watch-only
+   *         keyrings.
    */
   exportPrivateKey(address: Address): Promise<ISecretBuffer>
 
-  /** Готовит состояние набора к шифрованию и сохранению. */
   serialize(): Promise<ISerializedKeyring>
 
-  /** Обнуляет все буферы секретов. Вызывается при блокировке кошелька. */
+  /** Zeroes every secret buffer. Called when the wallet is locked. */
   wipe(): void
 }
 
 /**
- * Создание наборов ключей.
+ * Keyring factory.
  *
- * Внедряется как зависимость. Это точка расширения: поддержка Ledger
- * и Trezor добавляется реализацией фабрики, без изменения `IWallet`
- * и всего, что от него зависит.
+ * Injected as a dependency. This is the extension point: Ledger and
+ * Trezor support is added by a factory implementation, without
+ * changing `IWallet` or anything that depends on it.
  */
 export interface IKeyringFactory {
-  /** Создаёт новый набор из параметров. */
   create(options: KeyringCreationOptions): Promise<IKeyring>
 
-  /** Восстанавливает набор из расшифрованного состояния. */
   deserialize(serialized: ISerializedKeyring): Promise<IKeyring>
 
-  /** Поддерживается ли тип в текущей сборке. */
   supports(type: KeyringType): boolean
 }

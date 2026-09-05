@@ -5,16 +5,15 @@ import { InvalidArgumentError, VaultCorruptedError } from '@/core/errors'
 import { CIPHER_ALGORITHM, KDF_ALGORITHM, type IEncryptedPayload, type IKdfParams } from './types'
 
 /**
- * Портируемое представление зашифрованного контейнера.
+ * Portable representation of an encrypted container.
  *
- * Двоичные поля записаны шестнадцатеричными строками. Причина — та же,
- * что у представления сетей в этапе 3: требовать поддержки `Uint8Array`
- * от каждого бэкенда хранилища значит ограничить выбор. `chrome.storage`
- * сериализует через JSON, где типизированные массивы превращаются
- * в объекты с числовыми ключами и молча портятся.
+ * Binary fields are hex strings. Same reason as the network records:
+ * requiring `Uint8Array` from every storage backend would narrow the
+ * choice. `chrome.storage` serialises through JSON, where typed arrays
+ * become objects with numeric keys and silently corrupt.
  *
- * Шестнадцатеричная запись удваивает объём. Для хранилища ключей размером
- * в единицы килобайт это несущественно, а корректность важнее.
+ * Hex doubles the size. For a key vault measured in kilobytes that
+ * does not matter; correctness does.
  */
 export interface IEncryptedPayloadRecord {
   readonly version: number
@@ -31,7 +30,6 @@ export interface IEncryptedPayloadRecord {
   readonly ciphertext: string
 }
 
-/** Переводит контейнер в портируемый вид. */
 export function encodePayload(payload: IEncryptedPayload): IEncryptedPayloadRecord {
   return {
     version: payload.version,
@@ -50,16 +48,16 @@ export function encodePayload(payload: IEncryptedPayload): IEncryptedPayloadReco
 }
 
 /**
- * Восстанавливает контейнер из портируемого вида.
+ * Restores a container from the portable form.
  *
- * Данные из хранилища НЕДОВЕРЕННЫЕ: они могли быть записаны другой версией
- * приложения, повреждены сбоем записи либо изменены посторонним кодом.
- * Поэтому проверяется структура целиком, а не только наличие полей.
+ * Data from storage is UNTRUSTED: it may have been written by another
+ * app version, corrupted by a failed write, or altered by other code.
+ * The whole structure is checked, not just field presence.
  *
- * Подмена самих параметров при этом обнаруживается не здесь, а при
- * расшифровке: заголовок входит в аутентифицируемые данные AES-GCM.
+ * Tampering with the parameters themselves is detected later, at
+ * decrypt: the header is part of AES-GCM additional authenticated data.
  *
- * @throws VaultCorruptedError при нарушении структуры.
+ * @throws VaultCorruptedError if the structure is invalid.
  */
 export function decodePayload(record: unknown): IEncryptedPayload {
   if (typeof record !== 'object' || record === null) {
@@ -131,22 +129,22 @@ function safeHexToBytes(value: unknown, field: string): Uint8Array {
 }
 
 /**
- * Формирует дополнительные аутентифицируемые данные (AAD) для AES-GCM.
+ * Builds additional authenticated data (AAD) for AES-GCM.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Заголовок контейнера — версия формата, алгоритм шифра
- * и параметры KDF — хранится рядом с шифротекстом в открытом виде.
- * Включение его в AAD означает, что тег аутентификации покрывает и заголовок:
- * любое изменение параметров делает расшифровку невозможной.
+ * WHY. The container header — format version, cipher, KDF parameters —
+ * sits next to the ciphertext in the clear. Putting it in AAD means the
+ * authentication tag covers the header too: any parameter change makes
+ * decrypt fail.
  *
- * Без этого заголовок остаётся неподписанным. Прямой выгоды атакующему
- * это сейчас не даёт (изменённые параметры дадут другой ключ, и расшифровка
- * провалится), но с появлением второго алгоритма KDF открывается атака
- * понижения: подмена `algorithm` на более слабый вариант. AAD закрывает
- * весь этот класс заранее и стоит нескольких строк.
+ * Without this the header is unsigned. That gives an attacker no direct
+ * win today (changed parameters yield a different key, so decrypt fails),
+ * but a second KDF algorithm would open a downgrade: swap `algorithm`
+ * for a weaker one. AAD closes that class in advance and costs a few
+ * lines.
  *
- * Строка собирается вручную, а не через `JSON.stringify`: порядок ключей
- * при сериализации объекта не гарантирован спецификацией, а AAD обязан
- * побайтово совпадать при шифровании и расшифровке.
+ * The string is built by hand, not via `JSON.stringify`: object key
+ * order is not guaranteed, and AAD must match byte-for-byte on encrypt
+ * and decrypt.
  */
 export function buildAdditionalData(
   payload: Omit<IEncryptedPayload, 'ciphertext' | 'iv'>,
@@ -163,7 +161,7 @@ export function buildAdditionalData(
   return utf8ToBytes(parts.join('|'))
 }
 
-/** Проверяет, что число байт положительно. Защита от вырожденных вызовов. */
+/** Rejects a non-positive byte count. Guards degenerate calls. */
 export function assertPositiveLength(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new InvalidArgumentError(name, 'a positive integer is expected')

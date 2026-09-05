@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Toaster as ToasterComponent } from './toast'
 import type { toast as toastFn } from './toast-store'
 
-/* Модуль хранит уведомления на своём уровне. Чтобы состояние одного
-   теста не протекало в следующий, модули переимпортируются заново
-   в каждом. */
+/* The module holds toasts at module scope. To keep one test from
+   leaking into the next, modules are re-imported each time. */
 let Toaster: typeof ToasterComponent
 let toast: typeof toastFn
 
@@ -21,24 +20,23 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('Уведомления', () => {
-  it('показанное уведомление появляется в области', () => {
+describe('Toasts', () => {
+  it('shows a toast in the region', () => {
     render(<Toaster />)
 
     act(() => {
-      toast('Готово')
+      toast('Done')
     })
 
-    expect(screen.getByRole('status')).toHaveTextContent('Готово')
+    expect(screen.getByRole('status')).toHaveTextContent('Done')
   })
 
-  it('уведомление само исчезает по времени', () => {
-    /* Иначе они копятся на экране и перекрывают то, ради чего человек
-       смотрит на страницу. */
+  it('dismisses a toast after its duration', () => {
+    /* Otherwise they pile up and cover what the person came to see. */
     render(<Toaster />)
 
     act(() => {
-      toast('Исчезнет')
+      toast('Will vanish')
     })
 
     expect(screen.queryByRole('status')).not.toBeNull()
@@ -50,11 +48,11 @@ describe('Уведомления', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('уведомление можно закрыть раньше срока', () => {
+  it('can be dismissed before the duration ends', () => {
     render(<Toaster />)
 
     act(() => {
-      toast('Закрой меня')
+      toast('Dismiss me')
     })
 
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
@@ -62,9 +60,9 @@ describe('Уведомления', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('область объявляется программам чтения с экрана', () => {
-    /* Уведомление сообщает об уже случившемся; незрячий пользователь
-       узнаёт о нём только через живую область. */
+  it('announces the region to screen readers', () => {
+    /* A toast reports something that already happened; a blind user
+       learns of it only through a live region. */
     render(<Toaster />)
 
     expect(document.querySelector('[aria-live="polite"]')).not.toBeNull()

@@ -1,10 +1,11 @@
 import type { IRemoteAssetToken, IRemoteAssets } from '../model/RemoteUserDirectory'
 
 /**
- * Витрина, которую клиент кладёт в `POST /v1/users`.
+ * Showcase the client puts in `POST /v1/users`.
  *
- * Одна позиция: нативный ETH в Ethereum, остаток `"0"`.
- * Курса и оценки в объекте нет: их считает экран по снимку рынка.
+ * One position: native ETH on Ethereum, balance `"0"`.
+ * The object has no quote or valuation: the screen computes those
+ * from the market snapshot.
  */
 export const STARTING_REMOTE_TOKENS: readonly IRemoteAssetToken[] = [
   holding('1', 'native', null, 'ETH', 'Ether', 18),

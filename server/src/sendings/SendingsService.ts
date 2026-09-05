@@ -82,9 +82,10 @@ export class SendingsService {
       return owned
     }
 
-    /* Если фильтр `user_id` на таблице пуст, а запись всё же есть
-       (другой тип колонки, старый ряд), не показываем владельцу пустой
-       список при живых переводах в общей выдаче. */
+    /* If the table `user_id` filter is empty but a record still
+       exists (another column type, an old row), do not show the
+       owner an empty list while live transfers appear in the
+       unfiltered listing. */
     const listed = await this.#sendings.list({ limit: 200 })
 
     return listed.filter((record) => record.userId !== null && record.userId === user.id)

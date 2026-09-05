@@ -19,16 +19,16 @@ import {
 
 import { AccountManager } from './AccountManager'
 
-const PASSWORD = 'правильный-пароль-1234'
+const PASSWORD = 'correct-password-1234'
 
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
-/** Ключ, который «лежит в устройстве». */
+/** Key that “sits in the device”. */
 const DEVICE_KEY = new SigningKey(`0x${'07'.repeat(32)}`)
 const DEVICE_ADDRESS = toAddress(computeAddress(DEVICE_KEY.publicKey))
 
-/** Ключ другого устройства: та же позиция, другая seed-фраза. */
+/** Key of another device: same position, different seed phrase. */
 const OTHER_KEY = new SigningKey(`0x${'09'.repeat(32)}`)
 const OTHER_ADDRESS = toAddress(computeAddress(OTHER_KEY.publicKey))
 
@@ -36,16 +36,17 @@ const PATH = "m/44'/60'/0'/0/0" as DerivationPath
 const RECIPIENT = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 
 /**
- * Устройство-дублёр.
+ * Stand-in device.
  *
- * Подписывает настоящим ключом: проверяется путь от менеджера аккаунтов
- * до готовой подписи целиком, а не то, что вызов дошёл.
+ * Signs with a real key: the path from the account manager to the
+ * finished signature is checked whole, not merely that the call
+ * arrived.
  */
 class FakeDevice implements IHardwareDevice {
-  /** Ключ, которым отвечает устройство. Подменяется в проверках. */
+  /** Key the device replies with. Substituted in checks. */
   key = DEVICE_KEY
 
-  /** Сколько раз запрашивался адрес: сверка перед подписью обязана быть. */
+  /** How many times the address was asked: the pre-sign check must happen. */
   addressReads = 0
 
   getAddress(path: DerivationPath): Promise<IHardwareAddress> {
@@ -115,7 +116,7 @@ const TYPED_DATA: ITypedData = {
 let manager: AccountManager
 let device: FakeDevice
 
-/** HD-дерево из тестовой фразы. Требуется менеджеру при сборке. */
+/** HD tree from the test phrase. Required by the manager at assembly. */
 async function createHdWallet(): Promise<HDWalletService> {
   const mnemonicService = new MnemonicService()
   const mnemonic = mnemonicService.fromPhrase(TEST_MNEMONIC)
@@ -135,8 +136,8 @@ beforeEach(async () => {
 
   await secure.initialize(PASSWORD)
 
-  /* Дерево нужно только для того, чтобы менеджер завёлся: аппаратные
-     аккаунты к нему не относятся. */
+  /* The tree is needed only so the manager starts: hardware
+     accounts do not belong to it. */
   const hdWallet = await createHdWallet()
 
   device = new FakeDevice()
@@ -152,7 +153,7 @@ beforeEach(async () => {
   await manager.init()
 })
 
-/** Добавляет аккаунт устройства и возвращает его. */
+/** Adds a device account and returns it. */
 async function addDeviceAccount(address: Address = DEVICE_ADDRESS) {
   return await manager.addHardwareAccount({
     type: KEYRING_TYPE.Ledger,
@@ -161,10 +162,10 @@ async function addDeviceAccount(address: Address = DEVICE_ADDRESS) {
   })
 }
 
-describe('Аккаунт аппаратного кошелька', () => {
-  it('хранит адрес и путь, но не индекс в нашем дереве', async () => {
-    /* Дерево живёт в устройстве: индекс у нас означал бы, что мы
-       умеем выводить его ключи, а мы не умеем. */
+describe('Hardware-wallet account', () => {
+  it('stores the address and path, but not an index in our tree', async () => {
+    /* The tree lives in the device: an index on our side would
+       mean we can derive its keys, and we cannot. */
     const account = await addDeviceAccount()
 
     expect(account.source).toBe(KEYRING_TYPE.Ledger)
@@ -173,8 +174,8 @@ describe('Аккаунт аппаратного кошелька', () => {
     expect(account.addressIndex).toBeNull()
   })
 
-  it('приватный ключ выдать невозможно', async () => {
-    /* Не потому, что мы запретили, а потому, что его у нас нет. */
+  it('the private key cannot be revealed', async () => {
+    /* Not because we forbade it, but because we do not have it. */
     const account = await addDeviceAccount()
 
     await expect(
@@ -185,31 +186,31 @@ describe('Аккаунт аппаратного кошелька', () => {
     ).rejects.toThrow()
   })
 
-  it('повторное добавление того же адреса отвергается', async () => {
+  it('adding the same address again is rejected', async () => {
     await addDeviceAccount()
 
     await expect(addDeviceAccount()).rejects.toThrow(/already/i)
   })
 })
 
-describe('Подпись аппаратным аккаунтом', () => {
-  it('транзакция подписывается ключом устройства', async () => {
+describe('Signing with a hardware account', () => {
+  it('the transaction is signed with the device key', async () => {
     const account = await addDeviceAccount()
     const signed = await manager.signTransaction(account.id, TRANSACTION)
 
     expect(Transaction.from(signed.raw).from).toBe(DEVICE_ADDRESS)
   })
 
-  it('хэш подписанной транзакции совпадает с тем, что даст сеть', async () => {
-    /* По этому хэшу кошелёк следит за судьбой отправки. Разойдись он
-       с настоящим — операция навсегда осталась бы «ожидающей». */
+  it('the signed-transaction hash matches what the network will give', async () => {
+    /* The wallet tracks the send by this hash. If it diverged from
+       the real one, the operation would stay “pending” forever. */
     const account = await addDeviceAccount()
     const signed = await manager.signTransaction(account.id, TRANSACTION)
 
     expect(signed.hash).toBe(Transaction.from(signed.raw).hash)
   })
 
-  it('сообщение подписывается и восстанавливается в адрес устройства', async () => {
+  it('a message is signed and recovers to the device address', async () => {
     const account = await addDeviceAccount()
     const message = 'Sign in to Example'
     const signature = await manager.signMessage(account.id, message)
@@ -219,17 +220,17 @@ describe('Подпись аппаратным аккаунтом', () => {
     expect(toAddress(recoverAddress(hashMessage(message), signature))).toBe(DEVICE_ADDRESS)
   })
 
-  it('структура для чужой сети до устройства не доходит', async () => {
-    /* Устройство получает два готовых хэша и домен проверить уже
-       не может: сверка обязана произойти здесь. */
+  it('a structure for a foreign network does not reach the device', async () => {
+    /* The device gets two ready hashes and can no longer check
+       the domain: the match must happen here. */
     const account = await addDeviceAccount()
 
     await expect(manager.signTypedData(account.id, TYPED_DATA, toChainId(137n))).rejects.toThrow()
   })
 })
 
-describe('Защита от чужого устройства', () => {
-  it('адрес сверяется перед каждой подписью', async () => {
+describe('Protection against a foreign device', () => {
+  it('the address is checked before every signature', async () => {
     const account = await addDeviceAccount()
 
     await manager.signTransaction(account.id, TRANSACTION)
@@ -237,10 +238,10 @@ describe('Защита от чужого устройства', () => {
     expect(device.addressReads).toBeGreaterThan(0)
   })
 
-  it('подключённое чужое устройство подписать не даёт', async () => {
-    /* У другой seed-фразы по тому же пути лежит другой ключ. Подпиши
-       мы вслепую — средства ушли бы с адреса, которого человек
-       на экране не видел, а показанный остался бы нетронутым. */
+  it('a connected foreign device is not allowed to sign', async () => {
+    /* Another seed phrase has another key at the same path. If we
+       signed blind, funds would leave an address the person did
+       not see on screen, and the shown one would stay untouched. */
     const account = await addDeviceAccount()
 
     device.key = OTHER_KEY
@@ -250,18 +251,18 @@ describe('Защита от чужого устройства', () => {
     )
   })
 
-  it('подпись отвергается до обращения к устройству за ней', async () => {
-    /* Отказ обязан наступить раньше, чем человек начнёт нажимать
-       кнопки: иначе он подтвердит операцию, которая всё равно
-       не состоится. */
+  it('the signature is rejected before the device is asked for it', async () => {
+    /* The refusal must come before the person starts pressing
+       buttons: otherwise they will confirm an operation that will
+       not happen anyway. */
     const account = await addDeviceAccount(OTHER_ADDRESS)
 
     await expect(manager.signMessage(account.id, 'anything')).rejects.toThrow(/different address/i)
   })
 })
 
-describe('Сборка без поддержки устройств', () => {
-  it('подпись отвергается внятно, а не падением', async () => {
+describe('Build without device support', () => {
+  it('signing is refused clearly, not by a crash', async () => {
     const secure = new SecureStorage(new InMemoryStorageService(), new FastEncryptionService())
 
     await secure.initialize(PASSWORD)
@@ -287,10 +288,10 @@ describe('Сборка без поддержки устройств', () => {
   })
 })
 
-describe('Байты, уходящие на устройство', () => {
-  it('на подпись уходит та же транзакция, что показана', async () => {
-    /* Менеджер не пересчитывает поля: показанное и подписанное
-       обязаны совпадать. */
+describe('Bytes that go to the device', () => {
+  it('the same transaction that was shown goes to be signed', async () => {
+    /* The manager does not recompute fields: what was shown and
+       what was signed must match. */
     const account = await addDeviceAccount()
     const signed = await manager.signTransaction(account.id, TRANSACTION)
     const parsed = Transaction.from(signed.raw)

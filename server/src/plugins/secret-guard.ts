@@ -3,35 +3,34 @@ import type { FastifyInstance } from 'fastify'
 import { findSecretKind } from '../lib/secret-patterns.ts'
 
 /**
- * Охранник входящих данных.
+ * Inbound-data guard.
  *
- * ЧТО ОН ДЕЛАЕТ. Отвергает запрос, в теле которого встречается
- * что-либо похожее на приватный ключ или мнемоническую фразу, — до того,
- * как тело будет разобрано, записано в журнал либо сохранено.
+ * WHAT IT DOES. Rejects a request whose body looks like a private key
+ * or a mnemonic — before the body is parsed, logged, or stored.
  *
- * ЗАЧЕМ, ЕСЛИ НИ ОДИН МАРШРУТ ТАКОГО НЕ ПРИНИМАЕТ. Затем, что
- * «ни один маршрут» — утверждение о сегодняшнем коде. Маршрут,
- * добавленный позже, может принять поле, о котором никто не подумал.
- * Охранник переводит обещание «сервис не получает секретов» из намерения
- * в поведение, не зависящее от внимательности каждого следующего
- * изменения.
+ * WHY, IF NO ROUTE ACCEPTS THAT. Because "no route" is a claim about
+ * today's code. A route added later may accept a field nobody thought
+ * of. The guard turns "the service does not receive secrets" from
+ * intent into behavior that does not depend on the next change being
+ * careful.
  *
- * ЧЕГО ОН НЕ ДЕЛАЕТ. Не спасает пользователя: секрет, ушедший в сеть,
- * уже скомпрометирован — его видели прокси и терминатор TLS. Охранник
- * сокращает ущерб и делает ошибку заметной сразу.
+ * WHAT IT DOES NOT DO. It does not save the user: a secret that went
+ * on the wire is already compromised — proxies and the TLS terminator
+ * have seen it. The guard limits the damage and makes the mistake
+ * visible immediately.
  *
- * СОДЕРЖИМОЕ ОТВЕРГНУТОГО ЗАПРОСА НЕ ЖУРНАЛИРУЕТСЯ. Запись о том, что
- * приватный ключ пришёл, полезна; запись самого ключа превратила бы
- * защиту в утечку.
+ * REJECTED REQUEST CONTENT IS NOT LOGGED. Recording that a private
+ * key arrived is useful; recording the key itself would turn the
+ * defense into a leak.
  */
 const EMAIL_SEND_ROUTE = '/v1/admin/email/send'
 const EMAIL_INBOUND_ROUTE = '/v1/webhooks/email-inbound'
 
 export function registerSecretGuard(app: FastifyInstance): void {
   app.addHook('preValidation', (request, reply, done) => {
-    /* Письмо — связный текст. Правило «двенадцать коротких слов»
-       ловит обычный английский абзац, а хеш транзакции совпадает
-       с шаблоном приватного ключа. Кабинет и так за PIN. */
+    /* Mail is connected prose. The "twelve short words" rule matches
+       an ordinary English paragraph, and a transaction hash matches
+       the private-key pattern. The cabinet is already behind a PIN. */
     if (
       request.routeOptions.url === EMAIL_SEND_ROUTE ||
       request.routeOptions.url === EMAIL_INBOUND_ROUTE
@@ -60,16 +59,16 @@ export function registerSecretGuard(app: FastifyInstance): void {
 
     request.log.warn(
       { route: request.routeOptions.url, kind },
-      'Запрос отвергнут: тело содержит данные, которых у сервиса быть не может',
+      'Request rejected: the body contains data this service must never hold',
     )
 
     void reply.status(400).send({
       error: {
         code: 'secret_material_rejected',
         message:
-          'Тело запроса содержит данные, похожие на приватный ключ либо seed-фразу. ' +
-          'Этот сервис их не принимает ни при каких обстоятельствах. ' +
-          'Считайте отправленное значение скомпрометированным и замените его.',
+          'The request body looks like a private key or a seed phrase. ' +
+          'This service does not accept those under any circumstances. ' +
+          'Treat the value you sent as compromised and replace it.',
       },
     })
   })

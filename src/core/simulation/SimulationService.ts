@@ -14,29 +14,31 @@ export interface ISimulationServiceDependencies {
   readonly logger: ILogger
 
   /**
-   * Сторонние источники в порядке предпочтения.
+   * Third-party sources in preference order.
    *
-   * Пусто — обычное положение дел: кошелёк работает на одном узле,
-   * и это путь по умолчанию.
+   * Empty is the ordinary state: the wallet runs on one node, and
+   * that is the default path.
    */
   readonly sources?: readonly ISimulationSource[]
 }
 
 /**
- * Выбирает, у кого спросить о следствиях транзакции.
+ * Chooses whom to ask about transaction consequences.
  *
- * УЗЕЛ — НЕ ОДИН ИЗ ИСТОЧНИКОВ, А ОСНОВАНИЕ. Он опрашивается последним
- * и всегда: сторонний сервис может быть не настроен, не работать,
- * не знать сети или отвечать отказом по частоте — и ни один из этих
- * случаев не должен означать «проверить нельзя». Отсюда порядок:
- * сначала тот, кто знает больше, затем тот, кто есть всегда.
+ * THE NODE IS NOT ONE OF THE SOURCES, IT IS THE BASE. It is asked
+ * last and always: a third-party service may be unconfigured, down,
+ * unaware of the network, or refusing on rate — and none of those
+ * cases must mean "cannot check". Hence the order: first whoever
+ * knows more, then whoever is always there.
  *
- * МОЛЧАНИЕ ИСТОЧНИКА ПЕРЕДАЁТСЯ ДАЛЬШЕ, А НЕ ВЫДАЁТСЯ ЗА ОТВЕТ.
- * Источник, вернувший `null`, пропускается; исход `Unavailable`
- * доходит до экрана, только если промолчали все, включая узел.
+ * SOURCE SILENCE IS PASSED ON, NOT ISSUED AS AN ANSWER. A source
+ * that returned `null` is skipped; the `Unavailable` outcome
+ * reaches the screen only if everyone stayed silent, including the
+ * node.
  *
- * ИСКЛЮЧЕНИЙ НЕ БРОСАЕТ. Отказ проверки не может срывать подготовку
- * транзакции: пользователь тогда не увидел бы ни следствий, ни формы.
+ * DOES NOT THROW. A check refusal must not abort transaction
+ * preparation: the user would then see neither the consequences nor
+ * the form.
  */
 export class SimulationService {
   readonly #logger: ILogger
@@ -47,7 +49,7 @@ export class SimulationService {
     this.#sources = dependencies.sources ?? []
   }
 
-  /** Имя источника, который будет спрошен первым. `null` — только узел. */
+  /** Name of the source that will be asked first. `null` — node only. */
   activeSourceName(): string | null {
     return this.#sources.find((source) => source.isAvailable())?.name ?? null
   }
@@ -69,8 +71,8 @@ export class SimulationService {
           return result
         }
       } catch (error) {
-        /* Источник, бросивший исключение, равносилен промолчавшему:
-           дальше спрашивается следующий, и в конце — узел. */
+        /* A source that threw is equivalent to one that stayed
+           silent: the next is asked, and at the end — the node. */
         this.#logger.warn('A simulation source failed', {
           source: source.id,
           reason: error instanceof Error ? error.message : String(error),

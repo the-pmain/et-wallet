@@ -4,89 +4,88 @@ import type { Address } from '@/core/types'
 import type { PublicKeyFormat } from './types'
 
 /**
- * Работа с адресами EVM.
+ * Work with EVM addresses.
  *
- * Единственная точка вычисления и проверки адресов в приложении.
- * Вторая независимая реализация недопустима: две функции вычисления
- * адреса неизбежно разойдутся, и кошелёк начнёт показывать разные
- * адреса в разных местах интерфейса.
+ * The only place that computes and checks addresses in the app. A
+ * second independent implementation is forbidden: two address
+ * functions will inevitably diverge, and the wallet will start
+ * showing different addresses in different parts of the UI.
  *
- * Сервис не хранит состояния и не имеет внедряемых зависимостей.
- * Он существует как контракт, чтобы потребители зависели от абстракции
- * и могли подменить реализацию в тестах, а не как носитель состояния.
+ * The service holds no state and has no injected dependencies. It
+ * exists as a contract so consumers depend on an abstraction and
+ * can swap the implementation in tests, not as a state holder.
  *
- * Задействованные примитивы:
- * - secp256k1 — вывод публичного ключа и разворачивание сжатой формы;
- * - Keccak-256 — вычисление адреса и контрольной суммы;
- * - EIP-55 — кодирование контрольной суммы в регистре букв.
+ * Primitives used:
+ * - secp256k1 — public-key derivation and expanding the compressed form;
+ * - Keccak-256 — address and checksum computation;
+ * - EIP-55 — encoding the checksum in letter case.
  */
 export interface IAddressService {
   /**
-   * Разбирает строку как адрес, проверяя формат и контрольную сумму.
+   * Parses a string as an address, checking format and checksum.
    *
    * @throws InvalidAddressError, AddressChecksumMismatchError
    */
   parse(value: string): Address
 
-  /** Приводит адрес к контрольной сумме EIP-55 без её проверки. */
+  /** Brings an address to EIP-55 checksum form without checking it. */
   checksum(value: string): Address
 
-  /** Проверка без исключения. Для валидации по мере ввода. */
+  /** Check without throwing. For validation as the user types. */
   isValid(value: string): boolean
 
-  /** Сравнение без учёта регистра. */
+  /** Comparison that ignores case. */
   equals(left: string, right: string): boolean
 
-  /** Двоичное представление адреса, 20 байт. */
+  /** Binary form of the address, 20 bytes. */
   toBytes(address: Address): Uint8Array
 
   /**
-   * Адрес из 20 байт.
+   * Address from 20 bytes.
    *
-   * @throws InvalidAddressError при неверной длине.
+   * @throws InvalidAddressError on a wrong length.
    */
   fromBytes(bytes: Uint8Array): Address
 
   /**
-   * Адрес из публичного ключа.
+   * Address from a public key.
    *
-   * Принимается сжатая (33 байта), несжатая (65 байт) либо сырая
-   * (64 байта) форма SEC1.
+   * Accepts compressed (33 bytes), uncompressed (65 bytes), or raw
+   * (64 bytes) SEC1 form.
    *
    * @throws InvalidPublicKeyError
    */
   fromPublicKey(publicKey: Uint8Array): Address
 
   /**
-   * Адрес из приватного ключа.
+   * Address from a private key.
    *
    * @throws InvalidPrivateKeyError, SecretBufferWipedError
    */
   fromPrivateKey(privateKey: ISecretBuffer): Address
 
   /**
-   * Публичный ключ из приватного.
+   * Public key from a private key.
    *
    * @throws InvalidPrivateKeyError, SecretBufferWipedError
    */
   getPublicKey(privateKey: ISecretBuffer, format?: PublicKeyFormat): Uint8Array
 
   /**
-   * Пригоден ли приватный ключ.
+   * Whether a private key is usable.
    *
-   * Проверяется не только длина, но и диапазон 1..n-1: значение вне его
-   * не задаёт точку на кривой.
+   * Not only length is checked, but also the range 1..n-1: a value
+   * outside it does not define a point on the curve.
    */
   isValidPrivateKey(privateKey: Uint8Array): boolean
 
-  /** Нулевой ли адрес. */
   isZero(address: string): boolean
 
   /**
-   * Заведомо ли невосстановимы средства, отправленные по адресу.
+   * Whether funds sent to the address are known to be unrecoverable.
    *
-   * Отправку не запрещает: сжигание бывает намеренным. Задача метода —
-   * дать интерфейсу основание предупредить.
+   * Does not forbid the send: burning can be intentional. The
+   * method's job is to give the UI a reason to warn.
    */
   isBurn(address: string): boolean
 }

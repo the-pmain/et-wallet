@@ -1,84 +1,79 @@
 /**
- * Имя пользователя — подпись кошелька в интерфейсе.
+ * Username — the wallet's label in the UI.
  *
- * ЭТО МЕТКА, А НЕ УЧЁТНАЯ ЗАПИСЬ. Кошелёк некастодиальный: сервера,
- * который сверял бы пару «имя — пароль», не существует и существовать
- * не должно. Имя хранится на устройстве в зашифрованном виде и служит
- * подписью кошелька вместо безликого «Аккаунт 1».
+ * THIS IS A LABEL, NOT AN ACCOUNT. The wallet is non-custodial: there
+ * is no server that would check a name/password pair, and there must
+ * not be one. The name is stored encrypted on the device and labels
+ * the wallet instead of a faceless "Account 1".
  *
- * ЧЕГО ОНО НЕ ДАЁТ. Ни восстановления доступа, ни второго фактора,
- * ни возможности обратиться в поддержку: писать некому. Интерфейс
- * обязан говорить это прямо, иначе владелец решит, что забытый пароль
- * восстановят по имени, и потеряет средства.
+ * WHAT IT DOES NOT GIVE. No access recovery, no second factor, no
+ * support to write to: there is nobody to write to. The UI must say
+ * this plainly, or the owner will assume a forgotten password can be
+ * recovered by name and lose funds.
  *
- * ПОЧЕМУ НЕ ПОЧТА. Адрес электронной почты выглядит учётной записью:
- * человек, вводящий его при создании кошелька, обоснованно ждёт письма
- * для восстановления — а письма не будет. Кроме того, почта раскрывает
- * личность владельца тому, кто получил доступ к устройству, ничего
- * не давая взамен: сверка выполняется уже после расшифровки хранилища
- * и защиты от подбора не добавляет.
+ * WHY NOT EMAIL. An email address looks like an account: someone
+ * entering it at wallet creation reasonably expects a recovery mail —
+ * and none will come. Email also reveals the owner's identity to
+ * whoever has the device, giving nothing back: the check runs after
+ * the vault is decrypted and adds no guessing resistance.
  */
 
-/** Наименьшая длина имени после обрезки пробелов. */
 export const MIN_USERNAME_LENGTH = 2
 
 /**
- * Наибольшая длина имени.
+ * Maximum name length.
  *
- * Совпадает с ограничением на имя аккаунта: имя становится подписью
- * первого аккаунта, и более длинное значение пришлось бы обрезать
- * при сохранении.
+ * Matches the account-name limit: the name becomes the first account's
+ * label, and a longer value would have to be truncated on save.
  */
 export const MAX_USERNAME_LENGTH = 32
 
 /**
- * Управляющие символы и невидимые разделители.
+ * Control characters and invisible separators.
  *
- * ЗАЧЕМ ОНИ ЗАПРЕЩЕНЫ. Перевод строки ломает вёрстку списка аккаунтов,
- * а невидимые символы позволяют собрать два внешне одинаковых имени —
- * приём, которым подделывают адреса и имена ENS. Здесь имя задаёт сам
- * владелец, но оно попадает в резервную копию, а копия может прийти
- * извне.
+ * WHY THEY ARE FORBIDDEN. A newline breaks the account-list layout,
+ * and invisible characters let two names look the same — the trick
+ * used to fake addresses and ENS names. The owner sets the name here,
+ * but it goes into a backup, and a backup may come from outside.
  */
 const FORBIDDEN_PATTERN = new RegExp(
   [
-    /* Управляющие символы: перевод строки, возврат каретки, табуляция. */
+    /* Control characters: newline, carriage return, tab. */
     '[\u0000-\u001f\u007f-\u009f]',
-    /* Нулевой ширины: соединители и разделители слов. */
+    /* Zero-width: word joiners and separators. */
     '[\u200b-\u200f\u2060\ufeff]',
-    /* Управление направлением письма: ими переставляют видимый порядок. */
+    /* Bidi controls: they reorder what is visible. */
     '[\u202a-\u202e\u2066-\u2069]',
   ].join('|'),
   'u',
 )
 
 /**
- * Приводит имя к виду для хранения.
+ * Normalises a name for storage.
  *
- * Пробелы по краям убираются, повторяющиеся внутри схлопываются:
- * «Дмитрий  Иванов» и «Дмитрий Иванов» — одно и то же имя, а разница
- * в интерфейсе выглядела бы опечаткой.
+ * Edge spaces are stripped, repeats inside collapse: "James  Smith"
+ * and "James Smith" are the same name, and the difference in the UI
+ * would look like a typo.
  *
- * СЮДА ЖЕ ПОПАДАЮТ ПЕРЕНОС СТРОКИ И ТАБУЛЯЦИЯ: они пробельные
- * и становятся обычным пробелом. Отвергать имя из-за переноса,
- * пришедшего вместе со вставкой из буфера, значит требовать переписать
- * его вручную там, где достаточно исправить.
+ * NEWLINES AND TABS LAND HERE TOO: they are whitespace and become a
+ * regular space. Rejecting a name because a paste brought a newline
+ * would force a rewrite where a fix is enough.
  *
- * РЕГИСТР СОХРАНЯЕТСЯ. Это отображаемое имя: приводить «Дмитрий»
- * к «дмитрий» значит показывать владельцу не то, что он ввёл.
+ * CASE IS PRESERVED. This is a display name: lowercasing "James" would
+ * show the owner something other than what they typed.
  */
 export function normalizeUsername(value: string): string {
   return value.trim().replace(/\s+/gu, ' ')
 }
 
 /**
- * Пригодно ли имя.
+ * Whether the name is acceptable.
  *
- * ПРОВЕРКА НАМЕРЕННО МЯГКАЯ. Имя никуда не отправляется и ни с чем
- * не сверяется; ограничивать его набор символов значило бы запрещать
- * людям называться так, как они называются. Отвергается только то,
- * что ломает интерфейс либо позволяет подделку: управляющие символы,
- * невидимые разделители, пустое и слишком длинное значение.
+ * THE CHECK IS DELIBERATELY SOFT. The name is not sent anywhere and
+ * is not matched against anything; restricting its character set would
+ * forbid people from being called what they are called. Only what
+ * breaks the UI or enables a fake is rejected: control characters,
+ * invisible separators, empty and overly long values.
  */
 export function isValidUsername(value: string): boolean {
   const normalized = normalizeUsername(value)
@@ -91,10 +86,10 @@ export function isValidUsername(value: string): boolean {
 }
 
 /**
- * Совпадают ли имена.
+ * Whether two names match.
  *
- * Сравнение по нормализованному виду и без учёта регистра: разница
- * между «Дмитрий» и «дмитрий» для человека отсутствует.
+ * Compared in normalised form, case-insensitive: the difference
+ * between "James" and "james" does not exist for a person.
  */
 export function areUsernamesEqual(left: string, right: string): boolean {
   return normalizeUsername(left).toLowerCase() === normalizeUsername(right).toLowerCase()

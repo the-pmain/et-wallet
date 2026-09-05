@@ -1,75 +1,74 @@
 import type { ChainId } from '@/core/types'
 
-/** Нативная валюта сети. */
+/** Native currency of a network. */
 export interface INativeCurrency {
   readonly name: string
   readonly symbol: string
 
   /**
-   * Число десятичных знаков. Для Ethereum — 18.
+   * Number of decimal places. For Ethereum — 18.
    *
-   * Хранится в конфигурации, а не берётся константой: сети с иным числом
-   * знаков существуют, и жёсткая цифра 18 в коде приведёт к отображению
-   * суммы, отличающейся от реальной на порядки.
+   * Stored in configuration, not taken as a constant: networks
+   * with a different count exist, and a hard-coded 18 would show
+   * an amount off from the real one by orders of magnitude.
    */
   readonly decimals: number
 }
 
 /**
- * Конфигурация блокчейн-сети.
+ * Blockchain network configuration.
  *
- * Это ДАННЫЕ: сериализуемые, хранимые, редактируемые пользователем.
- * Живое соединение с узлом описывает `IProvider` — см. пояснение
- * о разделении понятий в его файле.
+ * This is DATA: serializable, stored, editable by the user.
+ * A live connection to a node is `IProvider` — see the note on
+ * the split of concepts in its file.
  */
 export interface INetworkConfig {
   readonly chainId: ChainId
 
-  /** Отображаемое имя сети. */
   readonly name: string
 
   readonly nativeCurrency: INativeCurrency
 
   /**
-   * Адреса RPC-узлов в порядке приоритета.
+   * RPC node addresses in priority order.
    *
-   * Список, а не одно значение: узел может быть недоступен, и переключение
-   * на резервный не должно требовать вмешательства пользователя.
+   * A list, not a single value: a node can be down, and switching
+   * to a fallback must not require the user to intervene.
    *
-   * ТРЕБОВАНИЕ БЕЗОПАСНОСТИ: допустимы только схемы `https:` и `wss:`.
-   * Открытый HTTP позволяет посреднику подменить баланс, nonce, цену газа
-   * и результат вызова контракта — пользователь подпишет транзакцию,
-   * отличную от показанной. Проверка выполняется при добавлении сети
-   * и приводит к `InsecureRpcUrlError`.
+   * SECURITY REQUIREMENT: only `https:` and `wss:` schemes are
+   * allowed. Plain HTTP lets a middleman substitute the balance,
+   * nonce, gas price, and contract call result — the user will
+   * sign a transaction different from the one shown. The check
+   * runs when a network is added and yields `InsecureRpcUrlError`.
    */
   readonly rpcUrls: readonly string[]
 
-  /** Адреса обозревателей блоков для построения ссылок на транзакции. */
+  /** Block-explorer addresses for building transaction links. */
   readonly blockExplorerUrls: readonly string[]
 
   /**
-   * Тестовая сеть.
+   * Test network.
    *
-   * Влияет не только на оформление: операции в тестовой сети не должны
-   * учитываться в сводной стоимости портфеля, иначе пользователь увидит
-   * несуществующие средства.
+   * Affects more than styling: operations on a test network must
+   * not count toward the portfolio total, or the user will see
+   * funds that do not exist.
    */
   readonly isTestnet: boolean
 
   /**
-   * Встроенная сеть.
+   * Built-in network.
    *
-   * Встроенные сети нельзя удалить, а их chainId и RPC не редактируются
-   * пользователем. Это защита от подмены параметров основной сети
-   * через интерфейс добавления сети — приём, применяемый в фишинге.
+   * Built-in networks cannot be removed, and their chainId and
+   * RPC are not user-editable. That is the defence against
+   * substituting main-network parameters through the add-network
+   * UI — a phishing technique.
    */
   readonly isBuiltIn: boolean
 
-  /** Поддерживает ли сеть транзакции EIP-1559. */
   readonly supportsEip1559: boolean
 }
 
-/** Параметры добавления пользовательской сети. */
+/** Parameters for adding a user network. */
 export interface IAddNetworkParams {
   readonly chainId: ChainId
   readonly name: string
@@ -79,21 +78,19 @@ export interface IAddNetworkParams {
   readonly isTestnet?: boolean
 
   /**
-   * Согласие добавить сеть, чьё имя совпадает с именем встроенной.
+   * Consent to add a network whose name matches a built-in one.
    *
-   * Отдельный флаг, а не молчаливое разрешение: совпадение имени —
-   * основной приём подмены сети, и добавление должно требовать
-   * осознанного подтверждения. Значение по умолчанию `false` означает
-   * отказ с ошибкой `NetworkImpersonationError`, которую интерфейс
-   * обязан показать пользователю до повторной попытки.
+   * A separate flag, not a silent allow: a name match is the main
+   * network-impersonation trick, and adding must require a
+   * deliberate confirmation. The default `false` means a reject
+   * with `NetworkImpersonationError`, which the UI must show
+   * before a retry.
    */
   readonly allowImpersonation?: boolean
 }
 
-/** События сетевого слоя. */
+/** Network-layer events. */
 export interface NetworkEventMap {
-  /** Активная сеть изменена. */
   'network:changed': { readonly chainId: ChainId }
-  /** Список доступных сетей изменён. */
   'network:listChanged': { readonly chainIds: readonly ChainId[] }
 }

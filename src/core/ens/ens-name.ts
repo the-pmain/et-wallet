@@ -1,61 +1,65 @@
 import { ens_beautify, ens_normalize } from '@adraffy/ens-normalize'
 
 /**
- * Приведение ENS-имени к каноническому виду по ENSIP-15.
+ * Canonical ENS name form per ENSIP-15.
  *
- * ПОЧЕМУ ЭТО ВОПРОС БЕЗОПАСНОСТИ, А НЕ УДОБСТВА. Узел ENS — это хэш
- * от байтов имени. Имя `vitаlik.eth`, где третья буква «а» кириллическая,
- * выглядит на экране неотличимо от `vitalik.eth`, но даёт другой узел
- * и, следовательно, другого получателя. Средства уйдут тому, кто
- * зарегистрировал похожее имя, и вернуть их будет невозможно.
+ * WHY THIS IS A SECURITY QUESTION, NOT A CONVENIENCE ONE. An ENS
+ * node is a hash of the name's bytes. A look-alike of `vitalik.eth`
+ * whose third letter is a Cyrillic a (U+0430) looks on screen
+ * indistinguishable from the Latin spelling, but yields a different
+ * node and therefore a different recipient. Funds go to whoever
+ * registered the look-alike, and they cannot be returned.
  *
- * ПОЧЕМУ БИБЛИОТЕКА, А НЕ СВОЙ КОД. ENSIP-15 — это UTS-46 плюс правила
- * смешения письменностей, таблицы допустимых символов, множество
- * игнорируемых знаков и обработка эмодзи с вариационными селекторами.
- * Ошибка в любой из таблиц означает ровно ту подмену, ради которой
- * стандарт и написан. `@adraffy/ens-normalize` — эталонная реализация,
- * на которую опираются ethers и сам интерфейс ENS.
+ * WHY A LIBRARY, NOT OUR OWN CODE. ENSIP-15 is UTS-46 plus
+ * script-mixing rules, allowed-character tables, a set of
+ * ignored marks, and emoji handling with variation selectors.
+ * An error in any table is exactly the substitution the
+ * standard exists to stop. `@adraffy/ens-normalize` is the
+ * reference implementation that ethers and the ENS UI itself
+ * rely on.
  *
- * ЧТО ЗАЩИТА ЛОВИТ, А ЧТО НЕТ. Ловит смешение письменностей внутри
- * метки: `vitаlik` с кириллической «а» отвергается с указанием причины.
- * НЕ ловит имя, целиком записанное другой письменностью и похожее
- * на латинское: набор букв одной системы — законное имя, и запретить
- * его нельзя. Отсюда {@link isAsciiEnsName} и оговорка в интерфейсе.
+ * WHAT THE DEFENCE CATCHES, AND WHAT IT DOES NOT. It catches
+ * mixed scripts inside a label: `vitalik` with a Cyrillic a (U+0430)
+ * is rejected with a reason. It does NOT catch a name written
+ * entirely in another script that looks Latin: a run of one
+ * script is a legitimate name and cannot be forbidden. Hence
+ * {@link isAsciiEnsName} and the caveat in the UI.
  *
- * ЧТО ДОБАВЛЕНО СВЕРХ БИБЛИОТЕКИ. Три собственные проверки, которых
- * в ENSIP-15 нет, потому что стандарт нормализует метки, а не решает,
- * что годится в получатели:
+ * WHAT WAS ADDED ON TOP OF THE LIBRARY. Three checks of our
+ * own that ENSIP-15 does not have, because the standard
+ * normalizes labels and does not decide what is fit to be
+ * a recipient:
  *
- * 1. Не меньше двух меток. `eth` нормализуется успешно, но домен
- *    верхнего уровня получателем быть не может.
- * 2. Предел длины. Имя приходит и из обратной записи, то есть
- *    от постороннего контракта; хэшировать строку неограниченной
- *    длины по требованию чужого кода незачем.
- * 3. Пустой ввод отвергается: библиотека нормализует его в пустую
- *    строку, а namehash от неё — корень всего дерева.
+ * 1. At least two labels. `eth` normalizes successfully, but
+ *    a top-level domain cannot be a recipient.
+ * 2. A length cap. The name also arrives from a reverse record,
+ *    i.e. from a third-party contract; hashing an unbounded
+ *    string at a stranger's request is unnecessary.
+ * 3. Empty input is rejected: the library normalizes it to an
+ *    empty string, and the namehash of that is the root of
+ *    the whole tree.
  */
 
 /**
- * Предел длины имени.
+ * Name length cap.
  *
- * Собственное ограничение, а не правило ENS. Настоящие имена короче
- * на порядки; значение выбрано как заведомо достаточное.
+ * Our own limit, not an ENS rule. Real names are orders of
+ * magnitude shorter; the value was chosen as ample.
  */
 const MAX_NAME_LENGTH = 255
 
-/** Наименьшее число меток: имя и домен. */
+/** Fewest labels: name and domain. */
 const MIN_LABEL_COUNT = 2
 
-/** Символы вне ASCII. */
 const NON_ASCII = /[^ -~]/u
 
 /**
- * Похоже ли введённое на ENS-имя.
+ * Whether the input looks like an ENS name.
  *
- * Нужна разделению ввода: пользователь вводит либо адрес, либо имя,
- * и обращаться к сети имеет смысл только во втором случае. Проверка
- * намеренно грубая — она отвечает на вопрос «что пользователь имел
- * в виду», а не «годится ли это к разрешению».
+ * Needed to split input: the user types either an address or
+ * a name, and talking to the network only makes sense in the
+ * second case. The check is deliberately coarse — it answers
+ * "what the user meant", not "whether this is fit to resolve".
  */
 export function looksLikeEnsName(value: string): boolean {
   const trimmed = value.trim()
@@ -64,10 +68,10 @@ export function looksLikeEnsName(value: string): boolean {
 }
 
 /**
- * Приводит имя к каноническому виду — тому, который хэшируется.
+ * Brings the name to the canonical form — the one that is hashed.
  *
- * @returns Нормализованное имя либо `null`, если оно не проходит
- *          ENSIP-15 либо не годится в получатели.
+ * @returns The normalized name, or `null` if it fails ENSIP-15
+ *          or is not fit to be a recipient.
  */
 export function normalizeEnsName(value: string): string | null {
   const trimmed = value.trim()
@@ -81,9 +85,10 @@ export function normalizeEnsName(value: string): string | null {
   try {
     normalized = ens_normalize(trimmed)
   } catch {
-    /* Причина отказа содержит фрагмент введённого имени и в журнал
-       не пишется: имя получателя — сведения о том, кому пользователь
-       собирается платить. Интерфейсу достаточно факта отказа. */
+    /* The rejection reason contains a fragment of the typed name
+       and is not written to the log: the recipient name is who
+       the user intends to pay. The UI only needs the fact of
+       rejection. */
     return null
   }
 
@@ -95,33 +100,32 @@ export function normalizeEnsName(value: string): string | null {
 }
 
 /**
- * Готовит нормализованное имя к показу.
+ * Prepares a normalized name for display.
  *
- * Отличается от канонической формы обработкой эмодзи: нормализация
- * снимает вариационные селекторы, чтобы разные записи одного эмодзи
- * давали один узел, а показывать эмодзи следует в цветном начертании.
- * Хэшировать результат нельзя — он даст другой узел.
+ * Differs from the canonical form in emoji handling: normalization
+ * strips variation selectors so different writings of one emoji
+ * yield one node, but an emoji should be shown in its colour form.
+ * The result must not be hashed — it would yield a different node.
  */
 export function beautifyEnsName(name: string): string {
   try {
     return ens_beautify(name)
   } catch {
-    /* Имя уже прошло нормализацию, поэтому отказ здесь означал бы
-       расхождение внутри библиотеки. Показываем каноническую форму:
-       она верна, просто менее нарядна. */
+    /* The name already passed normalization, so a failure here
+       would mean a discrepancy inside the library. Show the
+       canonical form: it is correct, just less ornate. */
     return name
   }
 }
 
 /**
- * Состоит ли имя только из символов ASCII.
+ * Whether the name is ASCII-only.
  *
- * ЗАЧЕМ ЭТО ЗНАТЬ ИНТЕРФЕЙСУ. ENSIP-15 запрещает смешивать письменности
- * внутри метки, но не запрещает имя, целиком записанное другой
- * письменностью. Кириллическое имя, по начертанию совпадающее
- * с латинским, — законное имя, принадлежащее другому человеку.
- * Запретить такие имена нельзя; можно сказать пользователю, что перед
- * ним не латиница, и предложить сверить адрес.
+ * WHY THE UI NEEDS THIS. ENSIP-15 forbids mixing scripts inside
+ * a label, but not a name written entirely in another script.
+ * A Cyrillic name that looks Latin is a legitimate name belonging
+ * to someone else. Such names cannot be forbidden; the user can
+ * be told this is not Latin and asked to check the address.
  */
 export function isAsciiEnsName(name: string): boolean {
   return !NON_ASCII.test(name)

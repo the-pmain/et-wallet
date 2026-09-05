@@ -2,82 +2,83 @@ import type { IPriceQuote } from '@/core/price'
 import type { IToken } from '@/core/token'
 
 /**
- * Одна позиция портфеля.
+ * One portfolio position.
  *
- * ТРИ РАЗНЫХ «НЕИЗВЕСТНО» РАЗЛИЧАЮТСЯ. Баланс может быть не получен
- * (`balance: null`), курс может быть неизвестен (`quote: null`),
- * и только при наличии обоих появляется оценка (`value`). Сведение
- * этих случаев к нулю показало бы уверенное «ноль» там, где кошелёк
- * ничего не знает, — а для владельца средств это сообщение о пропаже.
+ * THREE DIFFERENT "UNKNOWNS" ARE DISTINGUISHED. The balance may not
+ * have been obtained (`balance: null`), the rate may be unknown
+ * (`quote: null`), and only when both are present does a valuation
+ * appear (`value`). Collapsing these cases to zero would show a
+ * confident "zero" where the wallet knows nothing — and to the
+ * owner of the funds that reads as a disappearance.
  */
 export interface IPortfolioPosition {
   readonly token: IToken
 
-  /** Баланс в минимальных единицах. `null` — получить не удалось. */
+  /** Balance in smallest units. `null` — could not be obtained. */
   readonly balance: bigint | null
 
-  /** Котировка. `null` — курс неизвестен. */
+  /** Quote. `null` — the rate is unknown. */
   readonly quote: IPriceQuote | null
 
   /**
-   * Оценка стоимости позиции.
+   * Valuation of the position.
    *
-   * `null`, если неизвестен баланс либо курс. Число с плавающей
-   * точкой — сознательно: это величина для показа, из неё не строится
-   * ни одна транзакция.
+   * `null` if the balance or the rate is unknown. A floating-point
+   * number on purpose: this is a display quantity, and no
+   * transaction is built from it.
    */
   readonly value: number | null
 
   /**
-   * Доля в портфеле от нуля до единицы.
+   * Share of the portfolio, from zero to one.
    *
-   * `null` для позиций без оценки: доля от неизвестной величины
-   * неизвестна, и подставить сюда ноль значило бы объявить позицию
-   * пренебрежимой.
+   * `null` for positions without a valuation: a share of an unknown
+   * quantity is unknown, and putting zero here would declare the
+   * position negligible.
    */
   readonly share: number | null
 }
 
 /**
- * Сводка портфеля.
+ * Portfolio summary.
  *
- * ОЦЕНКА СЧИТАЕТСЯ ТОЛЬКО ПО ИЗВЕСТНОМУ. Позиции без курса либо без
- * баланса в сумму не входят и перечисляются отдельно: сумма, в которую
- * молча не вошла половина активов, — это неверная сумма, выданная
- * за верную.
+ * THE VALUATION IS COUNTED ONLY FROM WHAT IS KNOWN. Positions
+ * without a rate or without a balance are left out of the total and
+ * listed separately: a total that silently omitted half the assets
+ * is a wrong total presented as a right one.
  */
 export interface IPortfolioSummary {
-  /** Оценка стоимости учтённых позиций. */
+  /** Valuation of the positions that were counted. */
   readonly totalValue: number
 
   /**
-   * Оценка суточной давности при том же составе.
+   * Valuation of one day ago at the same composition.
    *
-   * `null`, если ни по одной учтённой позиции не известно суточное
-   * изменение курса.
+   * `null` if no counted position has a known 24-hour rate change.
    */
   readonly previousValue: number | null
 
   /**
-   * Изменение оценки за сутки в деньгах и процентах.
+   * Change of the valuation over a day, in money and percent.
    *
-   * ЭТО ИЗМЕНЕНИЕ КУРСОВ, А НЕ ИЗМЕНЕНИЕ ПОРТФЕЛЯ. Расчёт исходит
-   * из неизменного состава: покупки, продажи и переводы за сутки
-   * в него не входят. Назвать это «изменением стоимости портфеля»
-   * значило бы приписать пользователю доход, которого он не получал.
+   * THIS IS A CHANGE OF RATES, NOT A CHANGE OF THE PORTFOLIO. The
+   * calculation assumes an unchanged composition: buys, sells, and
+   * transfers during the day are not in it. Calling this "portfolio
+   * value change" would credit the user with income they did not
+   * receive.
    */
   readonly change24hValue: number | null
   readonly change24hPercent: number | null
 
-  /** Позиции в порядке убывания оценки; позиции без оценки — в конце. */
+  /** Positions by descending valuation; positions without one at the end. */
   readonly positions: readonly IPortfolioPosition[]
 
-  /** Сколько позиций не вошло в оценку из-за неизвестного курса. */
+  /** How many positions were left out of the valuation for an unknown rate. */
   readonly positionsWithoutPrice: number
 
-  /** Сколько позиций не вошло в оценку из-за неполученного баланса. */
+  /** How many positions were left out because the balance was not obtained. */
   readonly positionsWithoutBalance: number
 
-  /** Момент самой старой из использованных котировок. `null`, если оценки нет. */
+  /** Instant of the oldest quote used. `null` if there is no valuation. */
   readonly oldestQuoteAt: number | null
 }

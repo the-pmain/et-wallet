@@ -11,22 +11,22 @@ import {
 interface I18nProviderProps {
   children: ReactNode
 
-  /** Язык интерфейса. Сейчас поддержан один. */
+  /** Interface language. Only one is supported today. */
   defaultLanguage?: Language
 }
 
 /**
- * Провайдер локализации.
+ * Locale provider.
  *
- * ЯЗЫК ОДИН, И ВЫБОРА В ИНТЕРФЕЙСЕ НЕТ. Кошелёк говорит по-английски:
- * это язык стандартов, названий сетей и сообщений узлов, а смешение
- * с переводом порождало бы фразы вроде «Недостаточно средств для gas».
- * Механизм подстановки сохранён — он понадобится, когда языков станет
- * больше.
+ * THERE IS ONE LANGUAGE, AND NO PICKER IN THE UI. The wallet speaks
+ * English: that is the language of standards, network names, and node
+ * messages, and mixing it with a translation would produce phrases
+ * like "Insufficient funds for gas" mixed with another language. The substitution machinery is
+ * kept — it will be needed when there are more languages.
  *
- * ЯЗЫК ПРОСТАВЛЯЕТСЯ В `lang` КОРНЕВОГО ЭЛЕМЕНТА. Это не косметика:
- * экранный диктор выбирает по нему произношение, а браузер — правила
- * переноса.
+ * THE LANGUAGE IS SET ON THE ROOT ELEMENT'S `lang`. That is not
+ * cosmetics: the screen reader picks pronunciation from it, and the
+ * browser picks hyphenation rules.
  */
 export function I18nProvider({ children, defaultLanguage }: I18nProviderProps) {
   const language = defaultLanguage ?? DEFAULT_LANGUAGE

@@ -1,39 +1,36 @@
 import { BUILT_IN_CHAIN_ID, findVerifiedToken, type Address, type ChainId } from '@/core'
 
 /**
- * Знаки монет, вложенные в сборку.
+ * Coin marks bundled with the build.
  *
- * ФАЙЛАМИ, А НЕ ВСТРОЕННОЙ РАЗМЕТКОЙ. Знаки нарисованы разными
- * редакторами и содержат внутренние классы вроде `.st0`. Встроенные
- * в одну страницу, они переопределяли бы друг друга: у двух знаков
- * `.st0` — разные цвета. Отдельный файл — отдельный документ,
- * и столкновения невозможны.
+ * Files, not inlined markup. Marks from different editors share
+ * internal classes like `.st0` with different colors; inlined on one
+ * page they would override each other. A separate file is a separate
+ * document, so collisions cannot happen.
  *
- * ЗАПРОС УХОДИТ К СВОЕМУ ЖЕ ПРОИСХОЖДЕНИЮ. Боевая политика
- * безопасности разрешает `img-src 'self' data: blob:`, и файл из
- * собственной сборки ей отвечает. Стороннее хранилище логотипов было
- * бы заблокировано браузером — и правильно: по набору запрошенных
- * картинок его оператор узнал бы состав портфеля владельца и связал
- * бы его с IP-адресом.
+ * The request goes to our own origin. Production CSP allows
+ * `img-src 'self' data: blob:`. A third-party logo host would be
+ * blocked — correctly: the set of requested images would reveal the
+ * owner's portfolio and tie it to an IP.
  */
 const LOGO_BASE = '/logos'
 
-/** Знак монеты: основной файл и, если нужен, вариант для тёмной темы. */
+/** Coin mark: primary file and, if needed, a dark-theme variant. */
 export interface ITokenLogo {
   readonly src: string
 
   /**
-   * Вариант для тёмной темы. `null` — знак читается на обеих.
+   * Dark-theme variant. `null` means the mark reads on both.
    *
-   * Нужен там, где официальный знак одноцветный и тёмный: ромб эфира
-   * нарисован серыми тонами от `#141414` и на тёмном фоне пропадает.
-   * Светлый вариант получен инверсией светлоты, то есть соотношение
-   * граней сохранено — это тот же знак, а не другой рисунок.
+   * Needed when the official mark is monochrome and dark: Ethereum's
+   * diamond is painted in greys from `#141414` and vanishes on a dark
+   * background. The light variant is a lightness invert, so the facet
+   * ratios stay — the same mark, not a different drawing.
    */
   readonly srcOnDark: string | null
 }
 
-/** Монеты, чей знак не читается на тёмном фоне. */
+/** Coins whose mark does not read on a dark background. */
 const DARK_VARIANTS: Readonly<Record<string, string>> = {
   eth: 'eth-on-dark',
 }
@@ -48,15 +45,14 @@ function logo(name: string): ITokenLogo {
 }
 
 /**
- * Знак по обозначению ПРОВЕРЕННОГО токена.
+ * Mark keyed by a VERIFIED token's ticker.
  *
- * Ключ — обозначение из встроенного реестра, а не из контракта:
- * реестр заполняется вручную и сверен с живым узлом, тогда как
- * обозначение в контракте пишет его автор.
+ * The key is the built-in registry symbol, not the contract's: the
+ * registry is filled by hand and checked against a live node, while
+ * the contract symbol is written by its author.
  *
- * Обёрнутые версии носят знак исходного актива: WETH — знак эфира,
- * WBTC — биткоина. Это не упрощение, а правда о содержимом: обёртка
- * представляет ровно этот актив в отношении один к одному.
+ * Wrapped versions wear the underlying mark: WETH is ether, WBTC is
+ * bitcoin. That is the content, not a shortcut — the wrap is 1:1.
  */
 const LOGO_BY_VERIFIED_SYMBOL: Readonly<Record<string, string>> = {
   USDC: 'usdc',
@@ -72,7 +68,7 @@ const LOGO_BY_VERIFIED_SYMBOL: Readonly<Record<string, string>> = {
   WAVAX: 'avax',
 }
 
-/** Знак нативной валюты сети. У неё нет адреса контракта. */
+/** Native-currency mark for a chain. It has no contract address. */
 const LOGO_BY_CHAIN: ReadonlyMap<ChainId, string> = new Map([
   [BUILT_IN_CHAIN_ID.Ethereum, 'eth'],
   [BUILT_IN_CHAIN_ID.Optimism, 'eth'],
@@ -84,22 +80,15 @@ const LOGO_BY_CHAIN: ReadonlyMap<ChainId, string> = new Map([
 ])
 
 /**
- * Находит знак монеты. `null` — знака нет, рисуется отпечаток адреса.
+ * Find a coin mark. `null` means none — the address fingerprint is drawn.
  *
- * ЗНАК ПОЛАГАЕТСЯ ТОЛЬКО ПРОВЕРЕННОМУ КОНТРАКТУ, И ЭТО ГЛАВНОЕ ЗДЕСЬ.
- *
- * Выпустить контракт с обозначением `USDC` может кто угодно и почти
- * бесплатно. Знак, выданный по обозначению, добавил бы подделке ровно
- * ту убедительность, которой ей не хватает, — и работал бы против
- * владельца средств.
- *
- * Ключом служит адрес контракта: он проходит через встроенный реестр,
- * и обозначение берётся оттуда, а не из контракта. Поэтому настоящий
- * USDC получает знак, а поддельный с тем же обозначением — прежний
- * цветной кружок. Разница видна с одного взгляда, тогда как прежде
- * оба выглядели одинаково и различались лишь пометкой рядом.
- *
- * То есть знак здесь не украшение, а ещё один признак подлинности.
+ * A mark is granted only to a verified contract. Anyone can mint a
+ * `USDC` ticker almost for free. A mark keyed by ticker would give a
+ * fake the credibility it lacks. The key is the contract address,
+ * looked up in the built-in registry; the symbol is taken from there.
+ * Real USDC gets the mark; a fake with the same ticker keeps the
+ * colored circle. The mark is another authenticity signal, not
+ * decoration.
  */
 export function findTokenLogo(chainId: ChainId | null, address: Address | null): ITokenLogo | null {
   if (chainId === null) {

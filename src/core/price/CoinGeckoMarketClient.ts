@@ -4,7 +4,7 @@ const DEFAULT_BASE_URL = 'https://api.coingecko.com/api/v3'
 const DEFAULT_TIMEOUT_MS = 10_000
 const DEFAULT_PER_PAGE = 50
 
-/** Настройки клиента публичного рынка. */
+/** Settings of the public-market client. */
 export interface ICoinGeckoMarketClientOptions {
   readonly baseUrl?: string
   readonly apiKey?: string
@@ -14,18 +14,20 @@ export interface ICoinGeckoMarketClientOptions {
 }
 
 /**
- * Публичная таблица курсов CoinGecko.
+ * Public CoinGecko rate table.
  *
- * ЗАПРОС НЕ НАЗЫВАЕТ КОШЕЛЁК. В нём нет адресов счетов и контрактов —
- * только валюта оценки, сортировка и размер страницы. Это другой запрос,
- * чем `simple/token_price`: тот выдаёт состав портфеля и потому живёт
- * за согласием. Этот — каталог рынка, и его можно показать на главном
- * экране без того согласия.
+ * THE REQUEST DOES NOT NAME THE WALLET. It has no account or contract
+ * addresses — only the quote currency, sort, and page size. That is
+ * a different request from `simple/token_price`: that one discloses
+ * the portfolio and therefore lives behind consent. This one is a
+ * market catalog, and it can be shown on the home screen without
+ * that consent.
  *
- * РЯД ЗА СЕМЬ ДНЕЙ ИДЁТ В ТОМ ЖЕ ЗАПРОСЕ. `sparkline=true` не открывает
- * второго обращения: точки лежат в `sparkline_in_7d` ответа `/coins/markets`.
- * Отдельный `market_chart` на каждый раскрытый актив съел бы лимит
- * раньше, чем пользователь успел бы сравнить два токена.
+ * THE SEVEN-DAY SERIES COMES IN THE SAME REQUEST. `sparkline=true`
+ * does not open a second call: the points sit in `sparkline_in_7d`
+ * of the `/coins/markets` response. A separate `market_chart` on
+ * every expanded asset would eat the limit before the user could
+ * compare two tokens.
  */
 export class CoinGeckoMarketClient {
   readonly #baseUrl: string

@@ -131,14 +131,14 @@ interface ISendingsSseQuery {
 }
 
 /**
- * Переводы в `public.sendings`.
+ * Transfers in `public.sendings`.
  *
- * `POST /v1/users/sendings` и `GET /v1/users/:id/sendings` — trusted
- * server: личность `email`+`the_p`, `user_id` обязан совпасть.
- * `GET/PATCH /v1/admin/sendings` — trusted admin: `x-admin-pin`.
- * Хранилище ходит service-role клиентом. User-scoped JWT здесь не
- * подходит: `user_id` — это `users.id`, не `auth.uid()`.
- * `GET /v1/sendings` — поток SSE из памяти процесса, таблицу не читает.
+ * `POST /v1/users/sendings` and `GET /v1/users/:id/sendings` are trusted
+ * server: identity is `email`+`the_p`, `user_id` must match.
+ * `GET/PATCH /v1/admin/sendings` are trusted admin: `x-admin-pin`.
+ * The store uses the service-role client. A user-scoped JWT does not
+ * fit: `user_id` is `users.id`, not `auth.uid()`.
+ * `GET /v1/sendings` is an in-process SSE stream; it does not read the table.
  */
 export function registerSendingRoutes(
   app: FastifyInstance,
@@ -149,8 +149,8 @@ export function registerSendingRoutes(
     '/v1/sendings',
     { schema: { querystring: SENDINGS_SSE_QUERY } },
     (request, reply) => {
-      /* Без user_id — поток кабинета: каждая новая запись. С фильтром —
-         только переводы этого пользователя на экране отправки. */
+      /* No user_id — cabinet stream: every new record. With a filter —
+         only that user's transfers on the send screen. */
       const userId = emptyToNull(request.query.user_id)
 
       if (userId === null) {

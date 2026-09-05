@@ -2,22 +2,22 @@ import { InvalidArgumentError } from '@/core/errors'
 
 import type { BlockHash, TxHash } from './primitives'
 
-/** Хэш длиной 32 байта: `0x` и 64 шестнадцатеричных символа. */
+/** 32-byte hash: `0x` and 64 hex characters. */
 const HASH_PATTERN = /^0x[0-9a-fA-F]{64}$/
 
 /**
- * Создаёт хэш транзакции с проверкой формата.
+ * Creates a transaction hash after checking the format.
  *
- * Единственный допустимый способ получить значение типа `TxHash`.
+ * The only allowed way to obtain a `TxHash`.
  *
- * Проверка не формальность: значение приходит из ответа узла, то есть
- * из недоверенного источника. Хэш, принятый без проверки, попадёт
- * в историю операций и в ссылку на обозреватель блоков, где приведёт
- * либо к пустой странице, либо к чужой транзакции.
+ * The check is not a formality: the value comes from a node
+ * response, i.e. an untrusted source. A hash accepted without a
+ * check ends up in history and in a block-explorer link, where it
+ * leads either to a blank page or to someone else's transaction.
  *
- * Приводится к нижнему регистру: узлы и обозреватели возвращают хэши
- * по-разному, а сравнение без нормализации не найдёт уже известную
- * транзакцию в истории.
+ * Forced to lower case: nodes and explorers return hashes
+ * differently, and a comparison without normalisation will not find
+ * an already-known transaction in history.
  *
  * @throws InvalidArgumentError
  */
@@ -26,8 +26,6 @@ export function toTxHash(value: unknown): TxHash {
 }
 
 /**
- * Создаёт хэш блока с проверкой формата.
- *
  * @throws InvalidArgumentError
  */
 export function toBlockHash(value: unknown): BlockHash {

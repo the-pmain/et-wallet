@@ -5,53 +5,53 @@ import { InvalidArgumentError } from '@/core/errors'
 import { MAX_UINT256, toTokenUnits, toWei } from './amount'
 
 describe('toWei', () => {
-  it('принимает bigint, number и строку', () => {
+  it('accepts bigint, number, and string', () => {
     expect(toWei(1n)).toBe(1n)
     expect(toWei(1000)).toBe(1000n)
     expect(toWei('1000000000000000000')).toBe(1_000_000_000_000_000_000n)
   })
 
-  it('принимает ноль', () => {
+  it('accepts zero', () => {
     expect(toWei(0)).toBe(0n)
   })
 
-  it('принимает максимум, представимый в EVM', () => {
+  it('accepts the maximum representable in the EVM', () => {
     expect(toWei(MAX_UINT256)).toBe(MAX_UINT256)
   })
 
-  it('отвергает отрицательные значения', () => {
-    /* В EVM отрицательных сумм не существует: знак при кодировании
-       превратился бы в огромное положительное число. */
+  it('rejects negative values', () => {
+    /* Negative amounts do not exist in the EVM: the sign would
+       become a huge positive number on encode. */
     expect(() => toWei(-1n)).toThrow(InvalidArgumentError)
     expect(() => toWei('-1')).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает значения сверх 2^256-1', () => {
+  it('rejects values beyond 2^256-1', () => {
     expect(() => toWei(MAX_UINT256 + 1n)).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает дробные значения', () => {
-    /* Wei неделим. Округление здесь означало бы молчаливое изменение
-       суммы перевода. */
+  it('rejects fractional values', () => {
+    /* Wei is indivisible. Rounding here would silently change the
+       transfer amount. */
     expect(() => toWei(1.5)).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает number вне безопасного диапазона', () => {
-    /* BigInt(2**53 + 1) молча даёт уже потерявшее точность значение —
-       случай опаснее дробного, потому что не заметен. */
+  it('rejects a number outside the safe range', () => {
+    /* BigInt(2**53 + 1) silently yields an already-imprecise value —
+       more dangerous than a fraction, because it is not visible. */
     expect(() => toWei(Number.MAX_SAFE_INTEGER + 2)).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает нечисловые строки', () => {
-    expect(() => toWei('много')).toThrow(InvalidArgumentError)
+  it('rejects non-numeric strings', () => {
+    expect(() => toWei('many')).toThrow(InvalidArgumentError)
   })
 
-  it('отвергает NaN и бесконечность', () => {
+  it('rejects NaN and infinity', () => {
     expect(() => toWei(Number.NaN)).toThrow(InvalidArgumentError)
     expect(() => toWei(Number.POSITIVE_INFINITY)).toThrow(InvalidArgumentError)
   })
 
-  it('сохраняет точность на значениях выше 2^53', () => {
+  it('keeps precision on values above 2^53', () => {
     const huge = '123456789012345678901234567890'
 
     expect(toWei(huge).toString()).toBe(huge)
@@ -59,11 +59,11 @@ describe('toWei', () => {
 })
 
 describe('toTokenUnits', () => {
-  it('принимает те же значения, что и toWei', () => {
+  it('accepts the same values as toWei', () => {
     expect(toTokenUnits('1000000')).toBe(1_000_000n)
   })
 
-  it('отвергает отрицательные значения', () => {
+  it('rejects negative values', () => {
     expect(() => toTokenUnits(-1n)).toThrow(InvalidArgumentError)
   })
 })

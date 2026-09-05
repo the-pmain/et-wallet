@@ -1,47 +1,46 @@
 /**
- * Единая точка доступа к параметрам среды выполнения.
+ * Single access point for runtime parameters.
  *
- * Компоненты и сервисы не читают `import.meta.env` напрямую: это скрытая
- * зависимость от сборщика, которая ломает юнит-тесты и делает невозможным
- * повторное использование кода вне Vite (например, в service worker расширения).
+ * Components and services do not read `import.meta.env` directly: that is a
+ * hidden bundler dependency that breaks unit tests and blocks reuse outside
+ * Vite (for example in an extension service worker).
  */
 export const APP_CONFIG = {
-  /** Отображаемое имя приложения. */
   name: 'ETWallet',
 
-  /** Подпись рядом со знаком в шапке и боковой панели. */
+  /** Caption next to the mark in the header and sidebar. */
   brandLabel: 'ET WALLET',
 
-  /** Версия из package.json, подставленная на этапе сборки. */
+  /** Version from package.json, injected at build time. */
   version: __APP_VERSION__,
 
-  /** Режим разработки: включает диагностический вывод и dev-инструменты. */
+  /** Development mode: enables diagnostics and dev tools. */
   isDevelopment: import.meta.env.DEV,
 
-  /** Production-режим: любые отладочные ветки должны быть выключены. */
+  /** Production mode: debug branches must stay off. */
   isProduction: import.meta.env.PROD,
 
   /**
-   * Спрашивать ли слова seed-фразы после её показа.
+   * Whether to quiz seed-phrase words after they are shown.
    *
-   * ВЫКЛЮЧЕНО ПО РЕШЕНИЮ ВЛАДЕЛЬЦА. Здесь, а не в `test-mode.ts`:
-   * там живут временные послабления для ускоренного тестирования, и
-   * боевая сборка с ними не собирается вовсе. Это же решение
-   * постоянное и относится к устройству продукта.
+   * DISABLED BY THE OWNER. Lives here, not in `test-mode.ts`: that file
+   * holds temporary relaxations for faster testing, and a production
+   * build with them enabled does not compile at all. This decision is
+   * permanent and is part of the product.
    *
-   * ЧЕМ ЖЕРТВУЕМ, СКАЗАНО ПРЯМО. Проверка была единственным местом,
-   * где кошелёк убеждался, что фразу действительно записали, а не
-   * пролистали. Предупреждение читают глазами, проверка заставляет
-   * взять бумагу. Без неё возможен кошелёк у человека, не записавшего
-   * фразу нигде: потеря устройства означает потерю средств
-   * безвозвратно и без обращения куда бы то ни было.
+   * WHAT IS GIVEN UP. The quiz was the only place the wallet checked
+   * that the phrase was written down rather than skipped. A warning is
+   * read with the eyes; a quiz forces paper. Without it a wallet can
+   * exist for someone who never wrote the phrase down: losing the
+   * device then means losing funds with no one to ask.
    *
-   * ЧТО ОСТАЁТСЯ ПРЕГРАДОЙ. Отметка «я записал фразу и понимаю, что
-   * без неё доступ к средствам не восстановить» обязательна и без
-   * проверки: кнопка создания без неё недоступна.
+   * WHAT STILL STANDS IN THE WAY. The checkbox “I have written the
+   * phrase down and understand that without it access cannot be
+   * restored” is required even without the quiz: create stays disabled
+   * until it is checked.
    *
-   * ВОЗВРАТ — СМЕНА ЭТОГО ЗНАЧЕНИЯ. Экран проверки и разбор ответов
-   * не удалены и остаются покрытыми тестами.
+   * TO RESTORE, CHANGE THIS VALUE. The quiz screen and answer parsing
+   * are not deleted and stay covered by tests.
    */
   requiresSeedConfirmation: false,
 } as const

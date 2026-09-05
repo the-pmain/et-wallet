@@ -11,38 +11,40 @@ import type {
 } from './types'
 
 /**
- * Управление аккаунтами кошелька.
+ * Wallet account management.
  *
- * Сервис работает с ПУБЛИЧНОЙ проекцией ключей: адресами, именами,
- * порядком отображения. Ни один его метод не возвращает секрет — кроме
- * `exportPrivateKey`, который требует и пароля, и разрешения от `ExportGuard`.
+ * The service works with the PUBLIC projection of keys: addresses,
+ * names, display order. None of its methods returns a secret —
+ * except `exportPrivateKey`, which requires both a password and a
+ * permit from `ExportGuard`.
  *
- * ДВА ИСТОЧНИКА АККАУНТОВ, и различие между ними определяет поведение:
+ * TWO ACCOUNT SOURCES, and the difference between them defines
+ * behaviour:
  *
- * | Источник       | Ключ восстановим из seed | Удаление |
- * | -------------- | ------------------------ | -------- |
- * | HD-дерево      | да                       | невозможно, только скрытие |
- * | Импортированный| нет                      | возможно, необратимо |
+ * | Source       | Key recoverable from seed | Removal |
+ * | ------------ | ------------------------- | ------- |
+ * | HD tree      | yes                       | impossible, hide only |
+ * | Imported     | no                        | possible, irreversible |
  *
- * Метаданные аккаунтов хранятся зашифрованными. Адреса сами по себе
- * не секрет, но их список связывает все аккаунты одного пользователя,
- * поэтому заблокированный кошелёк их не раскрывает.
+ * Account metadata is stored encrypted. Addresses themselves are
+ * not a secret, but their list ties every account of one user, so
+ * a locked wallet does not reveal them.
  */
 export interface IAccountManager extends IEventSource<AccountEventMap> {
   /**
-   * Загружает аккаунты из хранилища.
+   * Loads accounts from storage.
    *
-   * @throws WalletLockedError если хранилище заблокировано.
+   * @throws WalletLockedError if storage is locked.
    */
   init(): Promise<void>
 
-  /** Все аккаунты, включая скрытые, в пользовательском порядке. */
+  /** Every account, including hidden ones, in user order. */
   list(): readonly IAccount[]
 
-  /** Только видимые аккаунты. Именно этот список показывается в интерфейсе. */
+  /** Visible accounts only. This is the list shown in the UI. */
   listVisible(): readonly IAccount[]
 
-  /** Активный аккаунт. `null`, если аккаунтов ещё нет. */
+  /** Active account. `null` if there are no accounts yet. */
   getActive(): IAccount | null
 
   getById(id: AccountId): IAccount | null
@@ -50,95 +52,97 @@ export interface IAccountManager extends IEventSource<AccountEventMap> {
   getByAddress(address: Address): IAccount | null
 
   /**
-   * Меняет активный аккаунт.
+   * Changes the active account.
    *
-   * Скрытый аккаунт активным не становится: он не показан в интерфейсе,
-   * и пользователь не понял бы, откуда уходят средства.
+   * A hidden account does not become active: it is not shown in the
+   * UI, and the user would not understand where the funds leave from.
    *
    * @throws AccountNotFoundError, InvalidArgumentError
    */
   setActive(id: AccountId): Promise<void>
 
   /**
-   * Выводит очередной аккаунт из HD-дерева.
+   * Derives the next account from the HD tree.
    *
-   * Индекс адреса выбирается как следующий после максимального
-   * из уже созданных, а не как число аккаунтов: удалить HD-аккаунт нельзя,
-   * но можно скрыть, и подсчёт по количеству дал бы повторный индекс.
+   * The address index is chosen as the one after the maximum already
+   * created, not as the account count: an HD account cannot be
+   * deleted, but it can be hidden, and counting by quantity would
+   * reuse an index.
    *
    * @throws WalletLockedError
    */
   create(params?: ICreateAccountParams): Promise<IAccount>
 
   /**
-   * Импортирует аккаунт по приватному ключу.
+   * Imports an account from a private key.
    *
-   * Ключ сохраняется зашифрованным и с этого момента существует
-   * в единственном экземпляре: из seed-фразы он не восстанавливается.
+   * The key is stored encrypted and from that moment exists in a
+   * single copy: it is not recovered from the seed phrase.
    *
-   * @throws AccountAlreadyExistsError если адрес уже добавлен.
-   * @throws InvalidPrivateKeyError при непригодном ключе.
+   * @throws AccountAlreadyExistsError if the address is already added.
+   * @throws InvalidPrivateKeyError for an unfit key.
    * @throws WalletLockedError
    */
   importPrivateKey(params: IImportPrivateKeyParams): Promise<IAccount>
 
   /**
-   * Переименовывает аккаунт.
+   * Renames an account.
    *
-   * Имя нормализуется: удаляются управляющие символы, схлопываются
-   * пробелы, проверяется длина.
+   * The name is normalised: control characters are stripped, spaces
+   * are collapsed, length is checked.
    *
    * @throws AccountNotFoundError, InvalidArgumentError
    */
   rename(id: AccountId, name: string): Promise<void>
 
   /**
-   * Скрывает или показывает аккаунт.
+   * Hides or shows an account.
    *
-   * Скрытие — единственный доступный способ убрать HD-аккаунт из списка.
-   * Активный аккаунт скрыть нельзя: интерфейс остался бы без выбранного
-   * отправителя.
+   * Hiding is the only available way to remove an HD account from
+   * the list. The active account cannot be hidden: the UI would be
+   * left without a chosen sender.
    *
    * @throws AccountNotFoundError, InvalidArgumentError
    */
   setHidden(id: AccountId, hidden: boolean): Promise<void>
 
   /**
-   * Удаляет импортированный аккаунт вместе с его ключом.
+   * Removes an imported account together with its key.
    *
-   * НЕОБРАТИМАЯ ОПЕРАЦИЯ. Импортированный ключ не восстанавливается
-   * из seed-фразы: после удаления доступ к средствам на этом адресе
-   * теряется, если ключ не сохранён отдельно.
+   * IRREVERSIBLE. An imported key is not recovered from the seed
+   * phrase: after removal, access to funds on that address is lost
+   * unless the key is saved separately.
    *
-   * Пароль обязателен именно поэтому.
+   * The password is required for exactly that reason.
    *
-   * @throws AccountNotRemovableError для аккаунтов из HD-дерева.
+   * @throws AccountNotRemovableError for HD-tree accounts.
    * @throws InvalidPasswordError, AccountNotFoundError
    */
   remove(id: AccountId, password: string): Promise<void>
 
   /**
-   * Меняет порядок отображения.
+   * Changes display order.
    *
-   * Список обязан содержать идентификаторы всех существующих аккаунтов:
-   * частичный порядок оставил бы часть аккаунтов без позиции.
+   * The list must contain the identifiers of every existing account:
+   * a partial order would leave some accounts without a position.
    *
    * @throws InvalidArgumentError
    */
   reorder(orderedIds: readonly AccountId[]): Promise<void>
 
   /**
-   * Выгружает приватный ключ аккаунта.
+   * Exports an account private key.
    *
-   * ТРЕБУЕТ ДВУХ НЕЗАВИСИМЫХ ПОДТВЕРЖДЕНИЙ, и каждое закрывает свой риск:
+   * REQUIRES TWO INDEPENDENT CONFIRMATIONS, each closing its own
+   * risk:
    *
-   * - **пароль** — доказывает, что за устройством сейчас владелец,
-   *   а не тот, кому оставили разблокированный кошелёк;
-   * - **разрешение `ExportGuard`** — доказывает, что пользователю показали
-   *   уровень риска, включая случай, когда выдача ключа вместе с ранее
-   *   выданным xpub раскрывает весь аккаунт.
+   * - **password** — proves the owner is at the device now, not
+   *   someone left with an unlocked wallet;
+   * - **`ExportGuard` permit** — proves the user was shown the risk
+   *   level, including the case where revealing the key together
+   *   with a previously issued xpub discloses the whole account.
    *
-   * Возвращённый буфер вызывающий обязан затереть в блоке `finally`.
+   * The caller must wipe the returned buffer in a `finally` block.
    *
    * @throws InvalidPasswordError, ExportNotPermittedError, AccountNotFoundError
    */
@@ -146,10 +150,10 @@ export interface IAccountManager extends IEventSource<AccountEventMap> {
 }
 
 /**
- * Долговременное хранение метаданных аккаунтов.
+ * Long-term storage of account metadata.
  *
- * Секретов не содержит: приватные ключи импортированных аккаунтов хранятся
- * отдельно и никогда не попадают в эту структуру.
+ * Contains no secrets: private keys of imported accounts are stored
+ * separately and never enter this structure.
  */
 export interface IAccountRepository {
   findAll(): Promise<readonly IAccount[]>

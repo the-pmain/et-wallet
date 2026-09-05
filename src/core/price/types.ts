@@ -1,10 +1,10 @@
 import type { Address, ChainId, Timestamp } from '@/core/types'
 
 /**
- * Валюта оценки.
+ * Valuation currency.
  *
- * Пока одна. Перечисление, а не строка, чтобы добавление второй валюты
- * было изменением одного места, а не поиском по всему коду.
+ * Only one for now. An enum, not a string, so adding a second
+ * currency is a change in one place, not a search across the code.
  */
 export const FIAT_CURRENCY = {
   Usd: 'usd',
@@ -13,38 +13,38 @@ export const FIAT_CURRENCY = {
 export type FiatCurrency = (typeof FIAT_CURRENCY)[keyof typeof FIAT_CURRENCY]
 
 /**
- * Котировка одного актива.
+ * Quote of one asset.
  *
- * ВСЕ ПОЛЯ, КРОМЕ ЦЕНЫ, МОГУТ ОТСУТСТВОВАТЬ. Источник курсов не обязан
- * знать суточное изменение: у только что выпущенного токена его нет,
- * а у малоликвидного оно бессмысленно. `null` означает «неизвестно»
- * и обязан показываться прочерком, а не нулём: «курс не изменился»
- * и «изменение неизвестно» — разные утверждения.
+ * EVERY FIELD EXCEPT THE PRICE MAY BE MISSING. A price source is
+ * not obliged to know the daily change: a just-issued token has
+ * none, and for an illiquid one it is meaningless. `null` means
+ * "unknown" and must be shown as a dash, not zero: "the rate did
+ * not change" and "the change is unknown" are different claims.
  */
 export interface IPriceQuote {
   /**
-   * Цена одной целой единицы актива.
+   * Price of one whole unit of the asset.
    *
-   * Число с плавающей точкой — сознательно. Это оценка для показа,
-   * а не расчётная величина: из неё не формируется ни одна транзакция.
-   * Суммы, которые подписываются, считаются в минимальных единицах
-   * целыми числами и через курсы не проходят никогда.
+   * A floating-point number — deliberately. This is an estimate for
+   * display, not a computed quantity: no transaction is formed from
+   * it. Amounts that are signed are counted in smallest units as
+   * integers and never pass through rates.
    */
   readonly price: number
 
-  /** Изменение курса за сутки в процентах. `null`, если источник его не дал. */
+  /** Daily rate change in percent. `null` if the source did not give it. */
   readonly change24hPercent: number | null
 
-  /** Момент, на который источник считает котировку действительной. */
+  /** Instant at which the source considers the quote valid. */
   readonly updatedAt: Timestamp
 }
 
 /**
- * Ключ котировки.
+ * Quote key.
  *
- * Пара «сеть + адрес контракта» обязательна: один и тот же адрес
- * в разных сетях — разные активы. `null` в адресе означает нативную
- * валюту сети.
+ * The pair "network + contract address" is required: the same
+ * address on different networks is different assets. `null` in the
+ * address means the network's native currency.
  */
 export interface IPriceRef {
   readonly chainId: ChainId
@@ -52,15 +52,15 @@ export interface IPriceRef {
 }
 
 /**
- * Строковый ключ котировки для словарей.
+ * String quote key for maps.
  *
- * Объекты в качестве ключей `Map` сравниваются по ссылке, а не по
- * содержимому: два одинаковых по смыслу `IPriceRef` дали бы две разные
- * записи и промах кэша на каждом запросе.
+ * Objects used as `Map` keys are compared by reference, not
+ * contents: two `IPriceRef` that mean the same would give two
+ * different entries and a cache miss on every request.
  */
 export function priceRefKey(ref: IPriceRef): string {
   return `${ref.chainId.toString()}:${ref.address === null ? 'native' : ref.address.toLowerCase()}`
 }
 
-/** Котировки, найденные источником. Ключ — результат `priceRefKey`. */
+/** Quotes found by the source. The key is the result of `priceRefKey`. */
 export type PriceMap = ReadonlyMap<string, IPriceQuote>

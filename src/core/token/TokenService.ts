@@ -38,19 +38,19 @@ import {
 const SERVICE_NAME = 'TokenService'
 
 /**
- * Предел числа десятичных знаков.
+ * Cap on the number of decimal places.
  *
- * Стандарт объявляет `decimals` как `uint8`, то есть до 255. Значение
- * выше 36 не встречается ни у одного действующего токена и почти
- * наверняка означает ошибку либо намеренную порчу: возведение десяти
- * в такую степень превращает любой баланс в неразличимый ноль.
+ * The standard declares `decimals` as `uint8`, i.e. up to 255. A
+ * value above 36 is seen on no live token and almost certainly means
+ * an error or deliberate corruption: raising ten to that power turns
+ * any balance into an indistinguishable zero.
  */
 const MAX_DECIMALS = 36
 
-/** Глубина поиска входящих переводов при обнаружении токенов. */
+/** How far back incoming transfers are searched when detecting tokens. */
 const DETECT_WINDOW_BLOCKS = 10_000n
 
-/** Зависимости сервиса. */
+/** Service dependencies. */
 export interface ITokenServiceDependencies {
   readonly repository: ITokenRepository
   readonly resolver: IProviderResolver
@@ -60,24 +60,24 @@ export interface ITokenServiceDependencies {
 }
 
 /**
- * Управление списком отслеживаемых токенов.
+ * Managing the list of tracked tokens.
  *
- * МЕТАДАННЫЕ ЧИТАЮТСЯ ИЗ КОНТРАКТА, А НЕ ПРИНИМАЮТСЯ НА ВЕРУ. Число
- * десятичных знаков определяет порядок величины показанной суммы: токен
- * с шестью знаками, записанный как восемнадцатизначный, покажет одну
- * миллионную настоящего баланса. Пользователь, вводящий это значение
- * вручную, ошибётся; сайт, предлагающий его, может ошибиться намеренно.
+ * METADATA IS READ FROM THE CONTRACT, NOT TAKEN ON FAITH. The number
+ * of decimals sets the order of magnitude of the shown amount: a
+ * six-decimal token recorded as eighteen-decimal shows one millionth
+ * of the real balance. A user typing that value by hand will err; a
+ * site offering it may err on purpose.
  *
- * ПЕРЕОПРЕДЕЛЕНИЕ СИМВОЛА РАЗРЕШЕНО, ПЕРЕОПРЕДЕЛЕНИЕ ЗНАКОВ — НЕТ.
- * Символ — подпись на экране, и пользователь вправе назвать токен так,
- * как ему удобно. Число знаков — арифметика, и расхождение с контрактом
- * означает неверную сумму.
+ * A SYMBOL OVERRIDE IS ALLOWED, A DECIMALS OVERRIDE IS NOT. The
+ * symbol is a label on screen, and the user may name a token as they
+ * like. Decimals are arithmetic, and a mismatch with the contract
+ * means a wrong amount.
  *
- * ВСЕ ДОБАВЛЕННЫЕ ТОКЕНЫ ПОМЕЧАЮТСЯ НЕПРОВЕРЕННЫМИ. Встроенного списка
- * нет намеренно: вписать адреса известных токенов по памяти значит
- * рискнуть пометить мошеннический контракт как проверенный, а это
- * опаснее отсутствия пометки вовсе. Курируемый список требует сверки
- * с авторитетным источником.
+ * EVERY ADDED TOKEN IS MARKED UNVERIFIED. There is no built-in list
+ * on purpose: writing known-token addresses from memory risks marking
+ * a fraudulent contract as verified, which is more dangerous than no
+ * mark at all. A curated list needs a check against an authoritative
+ * source.
  */
 export class TokenService implements ITokenService {
   readonly #repository: ITokenRepository
@@ -95,8 +95,8 @@ export class TokenService implements ITokenService {
     },
   })
 
-  /* Список держится в памяти: он нужен интерфейсу постоянно, а расшифровка
-     хранилища на каждый рендер недопустима. */
+  /* The list stays in memory: the UI needs it constantly, and
+     decrypting storage on every render is not allowed. */
   readonly #tokens = new Map<ChainId, readonly IToken[]>()
 
   #initialized = false
@@ -115,10 +115,10 @@ export class TokenService implements ITokenService {
     for (const network of this.#networks.list()) {
       const stored = await this.#repository.findAll(network.chainId)
 
-      /* Проверенность пересчитывается при каждом чтении: список живёт
-         в коде и меняется вместе с приложением, а запись, помеченная
-         год назад, осталась бы проверенной навсегда — в том числе
-         после исключения контракта из списка. */
+      /* Verification is recomputed on every read: the list lives in
+         code and changes with the app, and a record marked a year ago
+         would stay verified forever — including after the contract
+         was dropped from the list. */
       this.#tokens.set(network.chainId, stored.map(withVerification))
     }
 
@@ -126,11 +126,12 @@ export class TokenService implements ITokenService {
   }
 
   /**
-   * Отслеживаемые токены сети, включая нативную валюту.
+   * Tracked tokens of the network, including the native currency.
    *
-   * Нативная валюта синтезируется из конфигурации сети и всегда идёт
-   * первой: она есть в любой сети и не может быть убрана. Единый список
-   * избавляет интерфейс от двух разных путей показа одного и того же.
+   * The native currency is synthesized from network config and always
+   * comes first: it exists on every network and cannot be removed. A
+   * single list saves the UI from two different ways of showing the
+   * same thing.
    */
   list(chainId: ChainId): readonly IToken[] {
     this.#assertInitialized()
@@ -149,8 +150,8 @@ export class TokenService implements ITokenService {
       name: network.nativeCurrency.name,
       decimals: network.nativeCurrency.decimals,
       logoUri: null,
-      /* Нативная валюта — часть конфигурации сети, а не пользовательская
-         добавка: помечать её как непроверенную было бы неверно. */
+      /* The native currency is part of network config, not a user
+         addition: marking it unverified would be wrong. */
       isCustom: false,
       isVerified: true,
       addedAt: 0 as Timestamp,
@@ -178,9 +179,10 @@ export class TokenService implements ITokenService {
 
     const metadata = await this.fetchMetadata(params.chainId, params.address)
 
-    /* Число знаков из параметров сверяется, а не подставляется:
-       расхождение с контрактом означает сумму, неверную на порядки,
-       и молчаливо предпочесть чужое значение нельзя. */
+    /* Decimals from the params are checked, not substituted: a
+       mismatch with the contract means an amount wrong by orders of
+       magnitude, and silently preferring the foreign value is not
+       allowed. */
     if (params.decimals !== undefined && params.decimals !== metadata.decimals) {
       throw new InvalidTokenContractError(
         params.address,
@@ -190,10 +192,10 @@ export class TokenService implements ITokenService {
     }
 
     /*
-      ПРОВЕРКА НА ПОДДЕЛКУ ВЫПОЛНЯЕТСЯ ПОСЛЕ ЧТЕНИЯ КОНТРАКТА И ДО
-      СОХРАНЕНИЯ. Сравнивать до чтения нечего: символ и имя сообщает
-      сам контракт, и заявленные пользователем значения к делу
-      не относятся.
+      THE IMPERSONATION CHECK RUNS AFTER READING THE CONTRACT AND
+      BEFORE PERSIST. There is nothing to compare before the read:
+      the contract itself reports the symbol and name, and values
+      claimed by the user are irrelevant.
     */
     const impersonation = findTokenImpersonation({
       chainId: params.chainId,
@@ -215,11 +217,11 @@ export class TokenService implements ITokenService {
 
     const verified = findVerifiedToken(params.chainId, params.address)
 
-    /* РАСХОЖДЕНИЕ СО СПИСКОМ НЕ ЗАМАЛЧИВАЕТСЯ. Контракт с обновляемой
-       реализацией вправе изменить символ — так уже произошло с мостом
-       Tether, — а список в коде мог устареть. Помечать такую запись
-       проверенной значило бы поручиться за то, что изменилось
-       без нашего ведома. */
+    /* A MISMATCH WITH THE LIST IS NOT SILENCED. A contract with an
+       upgradable implementation may change its symbol — that already
+       happened with the Tether bridge — and the list in code may be
+       stale. Marking such a record verified would mean vouching for
+       something that changed without our knowledge. */
     const matchesList =
       verified !== null &&
       verified.symbol === metadata.symbol &&
@@ -264,8 +266,9 @@ export class TokenService implements ITokenService {
     this.#assertInitialized()
 
     if (ref.address === null) {
-      /* Нативная валюта не убирается: она есть в сети всегда, и её
-         отсутствие в списке означало бы, что баланс сети неизвестен. */
+      /* The native currency is not removed: it always exists on the
+         network, and its absence from the list would mean the
+         network balance is unknown. */
       throw new UnsupportedTokenStandardError(TOKEN_STANDARD.Native)
     }
 
@@ -286,13 +289,13 @@ export class TokenService implements ITokenService {
   }
 
   /**
-   * Читает метаданные контракта без добавления в список.
+   * Reads contract metadata without adding it to the list.
    *
-   * ЧИСЛО ЗНАКОВ ОБЯЗАТЕЛЬНО. Контракт, не отвечающий на `decimals()`,
-   * отвергается: без этого значения любая показанная сумма — выдумка.
-   * Символ и имя, напротив, объявлены стандартом необязательными,
-   * и их отсутствие заменяется усечённым адресом — он хуже читается,
-   * но не искажает ни одной величины.
+   * DECIMALS ARE REQUIRED. A contract that does not answer
+   * `decimals()` is rejected: without that value any shown amount is
+   * invented. Symbol and name, by contrast, are optional in the
+   * standard, and their absence is replaced with a truncated address
+   * — it reads worse, but it does not distort any quantity.
    */
   async fetchMetadata(chainId: ChainId, address: Address): Promise<ITokenMetadata> {
     const provider = await this.#connect(chainId)
@@ -329,17 +332,18 @@ export class TokenService implements ITokenService {
   }
 
   /**
-   * Обнаруживает токены, приходившие на адрес.
+   * Discovers tokens that have arrived at an address.
    *
-   * НАЙДЕННОЕ НЕ ДОБАВЛЯЕТСЯ АВТОМАТИЧЕСКИ. Прислать на чужой адрес токен
-   * с именем известного проекта может кто угодно и почти бесплатно.
-   * Автодобавление превратило бы кошелёк в площадку показа мошеннических
-   * названий, причём с видом одобрения: раз показано — значит, признано.
+   * WHAT IS FOUND IS NOT ADDED AUTOMATICALLY. Anyone can send a
+   * token named after a known project to a foreign address, almost
+   * for free. Auto-adding would turn the wallet into a billboard for
+   * fraudulent names, with a look of approval: if it is shown, it is
+   * recognized.
    *
-   * ОГРАНИЧЕНИЕ ИСТОЧНИКА. Поиск идёт по журналам узла, а публичные узлы
-   * часто отвергают выборку без указания контракта. Отказ доводится
-   * до вызывающего кода, а не подменяется пустым списком: «токенов нет»
-   * и «узнать не удалось» — разные утверждения.
+   * SOURCE LIMIT. The search goes through node logs, and public
+   * nodes often refuse a query without a contract. The refusal is
+   * surfaced to the caller, not replaced with an empty list: "no
+   * tokens" and "could not find out" are different statements.
    */
   async detect(chainId: ChainId, owner: Address): Promise<readonly ITokenMetadata[]> {
     const provider = await this.#connect(chainId)
@@ -351,8 +355,9 @@ export class TokenService implements ITokenService {
           found.push(await this.fetchMetadata(chainId, contract))
         }
       } catch {
-        /* Контракт, не отвечающий на стандартные вызовы, просто не токен
-           ERC-20. Отказ одного не должен прерывать обход остальных. */
+        /* A contract that does not answer standard calls is simply
+           not an ERC-20 token. One refusal must not stop walking
+           the rest. */
         continue
       }
     }
@@ -382,10 +387,10 @@ export class TokenService implements ITokenService {
   }
 
   /**
-   * Читает число десятичных знаков.
+   * Reads the number of decimals.
    *
-   * @throws InvalidTokenContractError если функции нет либо значение
-   *         выходит за разумные пределы.
+   * @throws InvalidTokenContractError if the function is missing or
+   *         the value is outside reasonable bounds.
    */
   async #readDecimals(provider: IProvider, address: Address): Promise<number> {
     let raw: bigint
@@ -409,10 +414,10 @@ export class TokenService implements ITokenService {
   }
 
   /**
-   * Читает текстовое поле, подставляя запасное значение при отказе.
+   * Reads a text field, substituting a fallback on refusal.
    *
-   * Символ и имя объявлены стандартом необязательными, и контракт вправе
-   * их не реализовывать. Отказ добавить такой токен был бы чрезмерным.
+   * Symbol and name are optional in the standard, and a contract may
+   * omit them. Refusing to add such a token would be excessive.
    */
   async #readText(
     provider: IProvider,
@@ -431,7 +436,7 @@ export class TokenService implements ITokenService {
     }
   }
 
-  /** Контракты, присылавшие переводы на адрес. */
+  /** Contracts that have sent transfers to the address. */
   async #findIncomingContracts(provider: IProvider, owner: Address): Promise<readonly Address[]> {
     const latest = await provider.getBlockNumber()
     const fromBlock = latest > DETECT_WINDOW_BLOCKS ? latest - DETECT_WINDOW_BLOCKS : 0n
@@ -442,8 +447,8 @@ export class TokenService implements ITokenService {
       topics: [TRANSFER_TOPIC, null, addressToTopic(owner)],
     })
 
-    /* Повторы убираются по адресу в нижнем регистре: один контракт
-       присылает десятки переводов, а метаданные у него одни. */
+    /* Duplicates are dropped by lowercase address: one contract
+       sends dozens of transfers, and its metadata is the same. */
     const unique = new Map<string, Address>()
 
     for (const log of logs) {
@@ -472,7 +477,7 @@ export class TokenService implements ITokenService {
   }
 }
 
-/** Совпадает ли токен со ссылкой. Нативная валюта опознаётся по `null`. */
+/** Whether a token matches a ref. Native currency is recognized by `null`. */
 function matches(token: IToken, ref: ITokenRef): boolean {
   if (ref.address === null || token.address === null) {
     return ref.address === null && token.address === null
@@ -481,17 +486,17 @@ function matches(token: IToken, ref: ITokenRef): boolean {
   return areAddressesEqual(token.address, ref.address)
 }
 
-/** Усечённый адрес как запасное имя токена. */
+/** Truncated address as a fallback token name. */
 function shortAddress(address: Address): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
 
 /**
- * Проставляет признак проверенности прочитанной записи.
+ * Sets the verification flag on a read record.
  *
- * Сверяется только адрес: символ и число знаков в хранилище — те,
- * что вернул контракт при добавлении, и повторная сверка с ними
- * потребовала бы обращения к узлу при каждом чтении списка.
+ * Only the address is checked: the symbol and decimals in storage
+ * are what the contract returned on add, and re-checking them would
+ * require a node call on every list read.
  */
 function withVerification(token: IToken): IToken {
   if (token.address === null) {

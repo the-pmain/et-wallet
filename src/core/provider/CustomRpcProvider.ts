@@ -9,37 +9,37 @@ import { RPC_PROVIDER_ID, type IRpcEndpoint, type IRpcProvider } from './rpc-end
 const PROVIDER_NAME = 'Your own node'
 
 /**
- * Предел числа адресов на сеть.
+ * Cap on addresses per network.
  *
- * Ограничение против засорения хранилища и против бесконечного перебора
- * при подключении: каждый неотвечающий адрес добавляет задержку.
+ * Limits storage clutter and endless rotation on connect: each
+ * unanswered address adds delay.
  */
 const MAX_ENDPOINTS_PER_NETWORK = 8
 
 /**
- * Адреса RPC, добавленные пользователем.
+ * RPC addresses added by the user.
  *
- * ЧТО ЭТО ЗАКРЫВАЕТ. Встроенные сети намеренно неизменяемы: перезаписанный
- * в хранилище адрес основной сети применялся бы при каждом запуске, и это
- * готовый приём подмены. Но из-за этого у пользователя не было способа
- * указать собственный узел для Ethereum — то есть единственного способа
- * не раскрывать свои адреса стороннему оператору.
+ * WHAT THIS CLOSES. Built-in networks are immutable on purpose: an
+ * overwritten mainnet address in storage would be applied on every
+ * launch, which is a ready impersonation trick. But that left the
+ * user with no way to point Ethereum at their own node — the only
+ * way not to disclose their addresses to a third-party operator.
  *
- * Здесь пользовательские адреса хранятся ОТДЕЛЬНО от конфигурации сети
- * и лишь дополняют её. Конфигурация встроенной сети остаётся неизменяемой,
- * подменить её через этот путь нельзя: убрав пользовательский адрес,
- * кошелёк возвращается к встроенному списку.
+ * User addresses are stored SEPARATELY from network config and only
+ * supplement it. Built-in network config stays immutable; it cannot
+ * be swapped through this path: remove the user address and the
+ * wallet returns to the built-in list.
  *
- * ПОЧЕМУ ШИФРУЕТСЯ. Адрес собственного узла — это учётные данные.
- * Пользователь вставит сюда строку вида `https://…/v2/<ключ>` от своей
- * учётной записи у провайдера, а часто и адрес домашнего узла, который
- * сам по себе раскрывает местоположение. Открытое хранение такой строки
- * равносильно хранению пароля открытым текстом.
+ * WHY IT IS ENCRYPTED. An own-node URL is credentials. The user will
+ * paste a string like `https://…/v2/<key>` from their provider
+ * account, and often a home-node address that itself reveals
+ * location. Storing that string in the clear is the same as storing
+ * a password in the clear.
  *
- * ПРОВЕРКА ПОДЛИННОСТИ УЗЛА ЗДЕСЬ НЕ ВЫПОЛНЯЕТСЯ. Источник умеет только
- * хранить и отдавать адреса; сверка `eth_chainId` требует соединения
- * и выполняется в `RpcManager` до сохранения. Разделение намеренное:
- * иначе хранилище зависело бы от транспорта.
+ * NODE AUTHENTICITY IS NOT CHECKED HERE. The source only stores and
+ * returns addresses; verifying `eth_chainId` needs a connection and
+ * is done in `RpcManager` before persist. The split is deliberate:
+ * otherwise storage would depend on transport.
  */
 export class CustomRpcProvider implements IRpcProvider {
   readonly id = RPC_PROVIDER_ID.Custom
@@ -47,16 +47,16 @@ export class CustomRpcProvider implements IRpcProvider {
 
   readonly #storage: ISecureStorage
 
-  /* Адреса держатся в памяти: перебор выполняется при каждом подключении,
-     а расшифровка на каждое обращение к сети недопустима. Хранилище
-     читается один раз при `init()` и пишется при изменениях. */
+  /* Addresses stay in memory: rotation runs on every connect, and
+     decrypting on every network call is not allowed. Storage is
+     read once in `init()` and written on changes. */
   readonly #endpoints = new Map<ChainId, readonly string[]>()
 
   constructor(storage: ISecureStorage) {
     this.#storage = storage
   }
 
-  /** Загружает сохранённые адреса. Вызывается при открытии сессии. */
+  /** Loads saved addresses. Called when a session opens. */
   async init(networks: readonly INetworkConfig[]): Promise<void> {
     this.#endpoints.clear()
 
@@ -84,16 +84,16 @@ export class CustomRpcProvider implements IRpcProvider {
     }))
   }
 
-  /** Адреса сети в виде строк. Нужен `RpcManager` для проверки повторов. */
+  /** Network addresses as strings. `RpcManager` needs this to check duplicates. */
   listUrls(chainId: ChainId): readonly string[] {
     return this.#endpoints.get(chainId) ?? []
   }
 
   /**
-   * Добавляет адрес.
+   * Adds an address.
    *
-   * Проверяется только формат: схема обязана быть `https` либо `wss`.
-   * Подлинность узла проверяет `RpcManager` до вызова этого метода.
+   * Only format is checked: the scheme must be `https` or `wss`.
+   * Node authenticity is checked by `RpcManager` before this method.
    *
    * @throws InvalidRpcUrlError, InsecureRpcUrlError, InvalidArgumentError
    */
@@ -119,7 +119,7 @@ export class CustomRpcProvider implements IRpcProvider {
     await this.#persist(chainId, [...existing, url])
   }
 
-  /** Удаляет адрес. Отсутствующий адрес — не ошибка. */
+  /** Removes an address. A missing address is not an error. */
   async remove(chainId: ChainId, url: string): Promise<void> {
     const remaining = this.listUrls(chainId).filter((candidate) => candidate !== url)
 

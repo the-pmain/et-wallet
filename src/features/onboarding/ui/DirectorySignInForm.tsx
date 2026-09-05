@@ -13,10 +13,11 @@ interface DirectorySignInFormProps {
 }
 
 /**
- * Форма входа по почте и `the_p`.
+ * Sign-in form using email and `the_p`.
  *
- * Кнопка недоступна только пока поля пустые. Неверная почта не глотается
- * молча: после нажатия показывается сообщение, и запрос не уходит.
+ * The button is disabled only while fields are empty. A bad email is
+ * not swallowed silently: after click a message is shown and the
+ * request does not leave.
  */
 export function DirectorySignInForm({
   error,

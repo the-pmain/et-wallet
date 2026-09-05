@@ -1,7 +1,8 @@
 /**
- * EventSource для jsdom: настоящего потока нет, проверяется адрес
- * и закрытие. Экземпляры копятся, чтобы тест экрана отправки и кабинета
- * видел подключение без сети. `emit` подставляет кадр именованного события.
+ * EventSource for jsdom: there is no real stream; the URL and close
+ * are checked. Instances accumulate so send-screen and cabinet tests
+ * see a connection without a network. `emit` injects a named-event
+ * frame.
  */
 export class TestEventSource {
   static readonly CONNECTING = 0

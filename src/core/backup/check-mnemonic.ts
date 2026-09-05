@@ -3,22 +3,23 @@ import type { IMnemonicService } from '@/core/mnemonic'
 import type { IMnemonicCheck } from './contracts'
 
 /**
- * Проверяет фразу перед импортом.
+ * Checks a phrase before import.
  *
- * СВОБОДНАЯ ФУНКЦИЯ, А НЕ МЕТОД. Проверка нужна в двух местах с разными
- * возможностями: на экране импорта, где кошелька ещё нет и `BackupManager`
- * создать не из чего, и внутри самого `BackupManager`. Метод потребовал бы
- * либо второй реализации, либо создания менеджера ради одного вызова.
+ * A FREE FUNCTION, NOT A METHOD. The check is needed in two places
+ * with different capabilities: on the import screen, where there is
+ * no wallet yet and nothing to build a `BackupManager` from, and
+ * inside `BackupManager` itself. A method would require either a
+ * second implementation or creating the manager for one call.
  *
- * ИСКЛЮЧЕНИЙ НЕ БРОСАЕТ. Вызывается на каждое нажатие клавиши: исключение
- * на недописанной фразе означало бы ошибку в консоли на каждую букву.
+ * DOES NOT THROW. Called on every keystroke: an exception on an
+ * unfinished phrase would mean a console error on every letter.
  */
 export function checkMnemonic(phrase: string, mnemonicService: IMnemonicService): IMnemonicCheck {
   const validation = mnemonicService.validate(phrase)
 
   if (!validation.isValid) {
-    /* Слабость энтропии проверяется только у действительной фразы:
-       у недействительной энтропии просто нет. */
+    /* Entropy weakness is checked only for a valid phrase: an
+       invalid one has no entropy at all. */
     return { ...validation, isGuessable: false }
   }
 
@@ -26,23 +27,26 @@ export function checkMnemonic(phrase: string, mnemonicService: IMnemonicService)
 }
 
 /**
- * Состоит ли энтропия фразы из одинаковых байтов.
+ * Whether the phrase entropy consists of identical bytes.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Общеизвестные тестовые фразы — `abandon ... about`
- * и подобные — это ровно нулевая энтропия, оформленная по BIP-39.
- * Их приватные ключи известны каждому, а поступления на их адреса
- * выводятся ботами за секунды. Импорт такой фразы с намерением хранить
- * на ней средства — потеря средств, отложенная до первого поступления.
+ * WHY THIS IS NEEDED. Well-known test phrases — `abandon ... about`
+ * and the like — are exactly zero entropy dressed as BIP-39. Their
+ * private keys are known to everyone, and deposits to their
+ * addresses are swept by bots in seconds. Importing such a phrase
+ * intending to hold funds on it is a loss delayed until the first
+ * deposit.
  *
- * ПОЧЕМУ СРАВНЕНИЕ ЭНТРОПИИ, А НЕ СПИСОК ФРАЗ. Список пришлось бы
- * выписать по памяти — а константы, непроверяемые чтением, в этом проекте
- * запрещены: ошибка в одном слове превратила бы защиту в её видимость.
- * Свойство «все байты энтропии одинаковы» вычисляется и покрывает все
- * 256 таких наборов сразу, для любой длины фразы и любого словаря.
+ * WHY COMPARE ENTROPY, NOT A PHRASE LIST. A list would have to be
+ * written from memory — and constants that cannot be checked by
+ * reading are forbidden in this project: an error in one word would
+ * turn the protection into its appearance. The property "every
+ * entropy byte is the same" is computed and covers all 256 such
+ * sets at once, for any phrase length and any wordlist.
  *
- * ЭТО ПРЕДУПРЕЖДЕНИЕ, А НЕ ЗАПРЕТ. Импорт тестовой фразы — обычная работа
- * разработчика, и отказ выполнять её был бы ошибкой. Решение остаётся
- * за владельцем; наше дело — чтобы оно было осознанным.
+ * THIS IS A WARNING, NOT A BAN. Importing a test phrase is ordinary
+ * developer work, and refusing to do it would be a mistake. The
+ * decision stays with the owner; our job is that it is a conscious
+ * one.
  */
 function hasTrivialEntropy(phrase: string, mnemonicService: IMnemonicService): boolean {
   let mnemonic
@@ -50,10 +54,10 @@ function hasTrivialEntropy(phrase: string, mnemonicService: IMnemonicService): b
   try {
     mnemonic = mnemonicService.fromPhrase(phrase)
   } catch {
-    /* Фраза прошла `validate`, но не прошла `fromPhrase`. Расхождение
-       возможно только при ошибке в самой библиотеке; предупреждение
-       о слабой энтропии в этом случае не выдаётся, а причину отказа
-       сообщит импорт. */
+    /* The phrase passed `validate` but not `fromPhrase`. Divergence
+       is possible only on a bug in the library itself; a weak-
+       entropy warning is not issued in that case, and import will
+       report the refusal reason. */
     return false
   }
 
@@ -72,7 +76,7 @@ function hasTrivialEntropy(phrase: string, mnemonicService: IMnemonicService): b
   }
 }
 
-/** Все ли байты буфера равны между собой. Пустой буфер однородным не считается. */
+/** Whether every byte of the buffer is equal. An empty buffer is not uniform. */
 function isUniform(bytes: Uint8Array): boolean {
   const first = bytes[0]
 

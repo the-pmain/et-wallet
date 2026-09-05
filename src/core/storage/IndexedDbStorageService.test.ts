@@ -8,14 +8,14 @@ import { IndexedDbStorageService } from './IndexedDbStorageService'
 import { toStorageKey } from './StorageKeys'
 import { STORAGE_NAMESPACE, type IStorageMigration } from './types'
 
-const KEY = toStorageKey('проба')
-const OTHER_KEY = toStorageKey('вторая')
+const KEY = toStorageKey('probe')
+const OTHER_KEY = toStorageKey('second')
 
 /**
- * Каждая проверка работает со своей базой.
+ * Each check uses its own database.
  *
- * Общая база означала бы, что проверки видят записи друг друга и порядок
- * их выполнения влияет на результат.
+ * A shared database would mean checks see each other's records and
+ * the order they run in would affect the result.
  */
 let databaseNumber = 0
 
@@ -23,7 +23,7 @@ function createStorage(migrations?: readonly IStorageMigration[]): IndexedDbStor
   databaseNumber += 1
 
   return new IndexedDbStorageService({
-    databaseName: `тест-${String(databaseNumber)}`,
+    databaseName: `test-${String(databaseNumber)}`,
     ...(migrations === undefined ? {} : { migrations }),
   })
 }
@@ -34,49 +34,49 @@ beforeEach(() => {
   storage = createStorage()
 })
 
-describe('IndexedDbStorageService: чтение и запись', () => {
-  it('возвращает записанное значение', async () => {
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, { значение: 42 })
+describe('IndexedDbStorageService: read and write', () => {
+  it('returns the written value', async () => {
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, { value: 42 })
 
-    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toEqual({ значение: 42 })
+    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toEqual({ value: 42 })
   })
 
-  it('отсутствующая запись даёт null, а не исключение', async () => {
+  it('a missing record yields null, not an exception', async () => {
     await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBeNull()
   })
 
-  it('перезапись заменяет значение', async () => {
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'первое')
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'второе')
+  it('a later write replaces the value', async () => {
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'first')
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'second')
 
-    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('второе')
+    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('second')
   })
 
-  it('удаление убирает запись', async () => {
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'значение')
+  it('remove deletes the record', async () => {
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'value')
     await storage.remove(STORAGE_NAMESPACE.Settings, KEY)
 
     await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBeNull()
   })
 
-  it('has различает наличие и отсутствие', async () => {
+  it('has distinguishes presence from absence', async () => {
     await expect(storage.has(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe(false)
 
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'значение')
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'value')
 
     await expect(storage.has(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe(true)
   })
 
-  it('has не считает записанный null отсутствием', async () => {
-    /* `null` — это записанное значение, а не пустое место. Смешение
-       этих случаев в кошельке означало бы «настройка не задана» там,
-       где она задана явно. */
+  it('has does not treat a stored null as absence', async () => {
+    /* `null` is a stored value, not an empty slot. Mixing those cases
+       in a wallet would mean "setting is unset" where it was set
+       explicitly. */
     await storage.set(STORAGE_NAMESPACE.Settings, KEY, null)
 
     await expect(storage.has(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe(true)
   })
 
-  it('перечисляет ключи пространства имён', async () => {
+  it('lists keys of a namespace', async () => {
     await storage.set(STORAGE_NAMESPACE.Settings, KEY, 1)
     await storage.set(STORAGE_NAMESPACE.Settings, OTHER_KEY, 2)
 
@@ -85,215 +85,216 @@ describe('IndexedDbStorageService: чтение и запись', () => {
     )
   })
 
-  it('очищает одно пространство имён, не трогая другие', async () => {
-    /* Очистка кэша балансов не имеет права задеть хранилище ключей. */
-    await storage.set(STORAGE_NAMESPACE.BalanceCache, KEY, 'кэш')
-    await storage.set(STORAGE_NAMESPACE.Vault, KEY, 'секрет')
+  it('clears one namespace without touching others', async () => {
+    /* Clearing the balance cache must not touch the key vault. */
+    await storage.set(STORAGE_NAMESPACE.BalanceCache, KEY, 'cache')
+    await storage.set(STORAGE_NAMESPACE.Vault, KEY, 'secret')
 
     await storage.clear(STORAGE_NAMESPACE.BalanceCache)
 
     await expect(storage.get(STORAGE_NAMESPACE.BalanceCache, KEY)).resolves.toBeNull()
-    await expect(storage.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBe('секрет')
+    await expect(storage.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBe('secret')
   })
 
-  it('одинаковые ключи в разных пространствах не пересекаются', async () => {
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'настройка')
-    await storage.set(STORAGE_NAMESPACE.Accounts, KEY, 'аккаунт')
+  it('the same keys in different namespaces do not collide', async () => {
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'setting')
+    await storage.set(STORAGE_NAMESPACE.Accounts, KEY, 'account')
 
-    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('настройка')
-    await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBe('аккаунт')
-  })
-})
-
-describe('IndexedDbStorageService: типы значений кошелька', () => {
-  it('сохраняет bigint без потери точности', async () => {
-    /* Суммы в кошельке — `bigint`. Через JSON их пришлось бы кодировать
-       вручную, а приведение к `number` молча портит значение начиная
-       с 2^53. Структурное клонирование IndexedDB сохраняет их как есть. */
-    const огромное = 2n ** 200n + 12345n
-
-    await storage.set(STORAGE_NAMESPACE.Transactions, KEY, { value: огромное })
-
-    const прочитано = await storage.get<{ value: bigint }>(STORAGE_NAMESPACE.Transactions, KEY)
-
-    expect(прочитано?.value).toBe(огромное)
-    expect(typeof прочитано?.value).toBe('bigint')
-  })
-
-  it('сохраняет двоичные данные', async () => {
-    /* Соль, вектор инициализации и шифротекст — байтовые массивы. */
-    const байты = new Uint8Array([0, 1, 2, 255])
-
-    await storage.set(STORAGE_NAMESPACE.Vault, KEY, байты)
-
-    const прочитано = await storage.get<Uint8Array>(STORAGE_NAMESPACE.Vault, KEY)
-
-    expect([...(прочитано ?? [])]).toEqual([0, 1, 2, 255])
-  })
-
-  it('возвращает копию, а не ссылку на записанный объект', async () => {
-    /* Настоящее хранилище сериализует значение. Реализация,
-       возвращающая ту же ссылку, скрыла бы ошибки общего состояния. */
-    const записанное = { вложенное: { число: 1 } }
-
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, записанное)
-    записанное.вложенное.число = 2
-
-    const прочитано = await storage.get<typeof записанное>(STORAGE_NAMESPACE.Settings, KEY)
-
-    expect(прочитано?.вложенное.число).toBe(1)
+    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('setting')
+    await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBe('account')
   })
 })
 
-describe('IndexedDbStorageService: сохранность между сессиями', () => {
-  it('данные переживают пересоздание объекта', async () => {
-    /* Главное свойство постоянного хранилища и единственная причина,
-       по которой оно заменило хранилище в памяти. */
-    const имя = `тест-переживание-${String(databaseNumber)}`
-    const первое = new IndexedDbStorageService({ databaseName: имя })
+describe('IndexedDbStorageService: wallet value types', () => {
+  it('stores bigint without losing precision', async () => {
+    /* Wallet amounts are `bigint`. Through JSON they would have to be
+       encoded by hand, and casting to `number` silently corrupts the
+       value from 2^53. IndexedDB structured clone keeps them as-is. */
+    const huge = 2n ** 200n + 12345n
 
-    await первое.set(STORAGE_NAMESPACE.Vault, KEY, 'зашифрованная фраза')
+    await storage.set(STORAGE_NAMESPACE.Transactions, KEY, { value: huge })
 
-    const второе = new IndexedDbStorageService({ databaseName: имя })
+    const read = await storage.get<{ value: bigint }>(STORAGE_NAMESPACE.Transactions, KEY)
 
-    await expect(второе.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBe('зашифрованная фраза')
+    expect(read?.value).toBe(huge)
+    expect(typeof read?.value).toBe('bigint')
   })
 
-  it('сброс удаляет всё', async () => {
-    await storage.set(STORAGE_NAMESPACE.Vault, KEY, 'секрет')
+  it('stores binary data', async () => {
+    /* Salt, IV, and ciphertext are byte arrays. */
+    const bytes = new Uint8Array([0, 1, 2, 255])
+
+    await storage.set(STORAGE_NAMESPACE.Vault, KEY, bytes)
+
+    const read = await storage.get<Uint8Array>(STORAGE_NAMESPACE.Vault, KEY)
+
+    expect([...(read ?? [])]).toEqual([0, 1, 2, 255])
+  })
+
+  it('returns a copy, not a reference to the written object', async () => {
+    /* Real storage serializes the value. An implementation that
+       returned the same reference would hide shared-state bugs. */
+    const written = { nested: { number: 1 } }
+
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, written)
+    written.nested.number = 2
+
+    const read = await storage.get<typeof written>(STORAGE_NAMESPACE.Settings, KEY)
+
+    expect(read?.nested.number).toBe(1)
+  })
+})
+
+describe('IndexedDbStorageService: durability across sessions', () => {
+  it('data survives recreating the object', async () => {
+    /* The main property of persistent storage and the only reason it
+       replaced in-memory storage. */
+    const name = `test-survival-${String(databaseNumber)}`
+    const first = new IndexedDbStorageService({ databaseName: name })
+
+    await first.set(STORAGE_NAMESPACE.Vault, KEY, 'encrypted phrase')
+
+    const second = new IndexedDbStorageService({ databaseName: name })
+
+    await expect(second.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBe('encrypted phrase')
+  })
+
+  it('destroy deletes everything', async () => {
+    await storage.set(STORAGE_NAMESPACE.Vault, KEY, 'secret')
     await storage.destroy()
 
     await expect(storage.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBeNull()
   })
 })
 
-describe('IndexedDbStorageService: транзакции', () => {
-  it('записи транзакции видны после её завершения', async () => {
+describe('IndexedDbStorageService: transactions', () => {
+  it('transaction writes are visible after it finishes', async () => {
     await storage.transaction([STORAGE_NAMESPACE.Accounts], async (transaction) => {
-      await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'первый')
-      await transaction.set(STORAGE_NAMESPACE.Accounts, OTHER_KEY, 'второй')
+      await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'first')
+      await transaction.set(STORAGE_NAMESPACE.Accounts, OTHER_KEY, 'second')
     })
 
-    await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBe('первый')
-    await expect(storage.get(STORAGE_NAMESPACE.Accounts, OTHER_KEY)).resolves.toBe('второй')
+    await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBe('first')
+    await expect(storage.get(STORAGE_NAMESPACE.Accounts, OTHER_KEY)).resolves.toBe('second')
   })
 
-  it('исключение откатывает все записи транзакции', async () => {
-    /* Добавление аккаунта меняет и хранилище ключей, и список аккаунтов.
-       Запись только одного из двух оставляет кошелёк в противоречивом
-       состоянии: аккаунт виден, а подписать им нечем. */
+  it('an exception rolls back every write of the transaction', async () => {
+    /* Adding an account changes both the key vault and the account
+       list. Writing only one of the two leaves the wallet
+       inconsistent: the account is visible and there is nothing to
+       sign with. */
     await expect(
       storage.transaction([STORAGE_NAMESPACE.Accounts], async (transaction) => {
-        await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'записано')
+        await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'written')
 
-        throw new Error('сбой посреди записи')
+        throw new Error('failure mid-write')
       }),
-    ).rejects.toThrow('сбой посреди записи')
+    ).rejects.toThrow('failure mid-write')
 
     await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBeNull()
   })
 
-  it('откат не затрагивает записи, сделанные до транзакции', async () => {
-    await storage.set(STORAGE_NAMESPACE.Accounts, OTHER_KEY, 'прежнее')
+  it('rollback does not touch writes made before the transaction', async () => {
+    await storage.set(STORAGE_NAMESPACE.Accounts, OTHER_KEY, 'previous')
 
     await expect(
       storage.transaction([STORAGE_NAMESPACE.Accounts], async (transaction) => {
-        await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'новое')
+        await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'new')
 
-        throw new Error('сбой')
+        throw new Error('failure')
       }),
     ).rejects.toThrow()
 
-    await expect(storage.get(STORAGE_NAMESPACE.Accounts, OTHER_KEY)).resolves.toBe('прежнее')
+    await expect(storage.get(STORAGE_NAMESPACE.Accounts, OTHER_KEY)).resolves.toBe('previous')
   })
 
-  it('транзакция охватывает несколько пространств имён', async () => {
+  it('a transaction spans several namespaces', async () => {
     await storage.transaction(
       [STORAGE_NAMESPACE.Accounts, STORAGE_NAMESPACE.Vault],
       async (transaction) => {
-        await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'аккаунт')
-        await transaction.set(STORAGE_NAMESPACE.Vault, KEY, 'ключ')
+        await transaction.set(STORAGE_NAMESPACE.Accounts, KEY, 'account')
+        await transaction.set(STORAGE_NAMESPACE.Vault, KEY, 'key')
       },
     )
 
-    await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBe('аккаунт')
-    await expect(storage.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBe('ключ')
+    await expect(storage.get(STORAGE_NAMESPACE.Accounts, KEY)).resolves.toBe('account')
+    await expect(storage.get(STORAGE_NAMESPACE.Vault, KEY)).resolves.toBe('key')
   })
 
-  it('транзакция возвращает результат обработчика', async () => {
-    const результат = await storage.transaction(
+  it('a transaction returns the handler result', async () => {
+    const result = await storage.transaction(
       [STORAGE_NAMESPACE.Settings],
       async (transaction) => {
         await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 7)
 
-        return 'готово'
+        return 'done'
       },
     )
 
-    expect(результат).toBe('готово')
+    expect(result).toBe('done')
   })
 
-  it('чтение внутри транзакции видит её собственные записи', async () => {
-    const прочитано = await storage.transaction(
+  it('a read inside a transaction sees its own writes', async () => {
+    const read = await storage.transaction(
       [STORAGE_NAMESPACE.Settings],
       async (transaction) => {
-        await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 'внутри')
+        await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 'inside')
 
         return await transaction.get<string>(STORAGE_NAMESPACE.Settings, KEY)
       },
     )
 
-    expect(прочитано).toBe('внутри')
+    expect(read).toBe('inside')
   })
 })
 
-describe('IndexedDbStorageService: миграции', () => {
-  it('выполняет шаг при первом открытии', async () => {
+describe('IndexedDbStorageService: migrations', () => {
+  it('runs a step on first open', async () => {
     const migrated = createStorage([
       {
         version: 1,
-        description: 'заполняет настройку по умолчанию',
+        description: 'fills the default setting',
         migrate: async (transaction) => {
-          await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 'из миграции')
+          await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 'from migration')
         },
       },
     ])
 
     await migrated.init()
 
-    await expect(migrated.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('из миграции')
+    await expect(migrated.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('from migration')
   })
 
-  it('не выполняет шаг повторно', async () => {
-    /* Прерывание работы браузера посреди обновления не должно приводить
-       к повторному применению необратимого изменения. */
-    const имя = `тест-миграция-${String(databaseNumber)}`
-    let вызовов = 0
+  it('does not run a step twice', async () => {
+    /* Interrupting the browser mid-upgrade must not re-apply an
+       irreversible change. */
+    const name = `test-migration-${String(databaseNumber)}`
+    let calls = 0
 
-    const шаг: IStorageMigration = {
+    const step: IStorageMigration = {
       version: 1,
-      description: 'считает вызовы',
+      description: 'counts calls',
       migrate: async (transaction) => {
-        вызовов += 1
-        await transaction.set(STORAGE_NAMESPACE.Settings, KEY, вызовов)
+        calls += 1
+        await transaction.set(STORAGE_NAMESPACE.Settings, KEY, calls)
       },
     }
 
-    await new IndexedDbStorageService({ databaseName: имя, migrations: [шаг] }).init()
-    await new IndexedDbStorageService({ databaseName: имя, migrations: [шаг] }).init()
+    await new IndexedDbStorageService({ databaseName: name, migrations: [step] }).init()
+    await new IndexedDbStorageService({ databaseName: name, migrations: [step] }).init()
 
-    expect(вызовов).toBe(1)
+    expect(calls).toBe(1)
   })
 
-  it('сбой миграции не оставляет частичных изменений', async () => {
+  it('a failed migration leaves no partial changes', async () => {
     const migrated = createStorage([
       {
         version: 1,
-        description: 'падает посреди работы',
+        description: 'fails mid-work',
         migrate: async (transaction) => {
-          await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 'частично')
+          await transaction.set(STORAGE_NAMESPACE.Settings, KEY, 'partial')
 
-          throw new Error('данные не разобраны')
+          throw new Error('data was not parsed')
         },
       },
     ])
@@ -301,24 +302,24 @@ describe('IndexedDbStorageService: миграции', () => {
     await expect(migrated.init()).rejects.toThrow(MigrationFailedError)
   })
 
-  it('шаги выполняются по возрастанию версии', async () => {
-    const порядок: number[] = []
+  it('steps run in ascending version order', async () => {
+    const order: number[] = []
 
     const migrated = createStorage([
       {
         version: 2,
-        description: 'второй',
+        description: 'second',
         migrate: () => {
-          порядок.push(2)
+          order.push(2)
 
           return Promise.resolve()
         },
       },
       {
         version: 1,
-        description: 'первый',
+        description: 'first',
         migrate: () => {
-          порядок.push(1)
+          order.push(1)
 
           return Promise.resolve()
         },
@@ -327,42 +328,42 @@ describe('IndexedDbStorageService: миграции', () => {
 
     await migrated.init()
 
-    expect(порядок).toEqual([1, 2])
+    expect(order).toEqual([1, 2])
   })
 })
 
-describe('IndexedDbStorageService: открытие', () => {
-  it('повторный init не открывает базу заново', async () => {
+describe('IndexedDbStorageService: open', () => {
+  it('a second init does not reopen the database', async () => {
     await storage.init()
 
     await expect(storage.init()).resolves.toBeUndefined()
   })
 
-  it('работает без явного init', async () => {
-    /* Требование «вызвать init раньше всех» нарушается при добавлении
-       нового потребителя, и нарушение выглядит как пустое хранилище —
-       то есть как кошелёк, потерявший данные. */
-    await expect(storage.set(STORAGE_NAMESPACE.Settings, KEY, 'без init')).resolves.toBeUndefined()
-    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('без init')
+  it('works without an explicit init', async () => {
+    /* The requirement "call init before everyone else" is broken when
+       a new consumer is added, and the break looks like empty storage
+       — i.e. a wallet that lost its data. */
+    await expect(storage.set(STORAGE_NAMESPACE.Settings, KEY, 'without init')).resolves.toBeUndefined()
+    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('without init')
   })
 })
 
-describe('IndexedDbStorageService: база прежней сборки', () => {
-  it('недостающее хранилище создаётся, а не приводит к отказу', async () => {
+describe('IndexedDbStorageService: database from an older build', () => {
+  it('a missing store is created instead of causing a failure', async () => {
     /*
-      ЭТО СЛУЧИЛОСЬ ЖИВЬЁМ. Область была добавлена в перечень, а версия
-      схемы выводится из числа миграций и осталась прежней: у базы,
-      созданной предыдущей сборкой, `onupgradeneeded` не срабатывал,
-      хранилище не появлялось, и кошелёк переставал открываться —
-      у всех, кто пользовался им раньше, и только у них. На новой базе
-      всё выглядело исправным, поэтому ни один прежний тест этого
-      не показывал.
+      THIS HAPPENED LIVE. A namespace was added to the list, and the
+      schema version is derived from the number of migrations and
+      stayed the same: on a database created by the previous build
+      `onupgradeneeded` did not fire, the store did not appear, and
+      the wallet stopped opening — for everyone who had used it
+      before, and only for them. On a fresh database everything
+      looked fine, so no earlier test showed this.
     */
-    const имя = `старая-база-${String(Date.now())}`
+    const name = `old-database-${String(Date.now())}`
 
-    /* База предыдущей сборки: одно хранилище из многих. */
+    /* Database of the previous build: one store of many. */
     await new Promise<void>((resolve, reject) => {
-      const request = globalThis.indexedDB.open(имя, 1)
+      const request = globalThis.indexedDB.open(name, 1)
 
       request.onupgradeneeded = () => {
         request.result.createObjectStore(STORAGE_NAMESPACE.Settings)
@@ -374,27 +375,27 @@ describe('IndexedDbStorageService: база прежней сборки', () => 
       }
 
       request.onerror = () => {
-        reject(request.error ?? new Error('база не открылась'))
+        reject(request.error ?? new Error('the database did not open'))
       }
     })
 
-    const обновлённое = new IndexedDbStorageService({ databaseName: имя })
+    const updated = new IndexedDbStorageService({ databaseName: name })
 
-    await обновлённое.set(STORAGE_NAMESPACE.NetworksEncrypted, KEY, 'значение')
+    await updated.set(STORAGE_NAMESPACE.NetworksEncrypted, KEY, 'value')
 
-    await expect(обновлённое.get(STORAGE_NAMESPACE.NetworksEncrypted, KEY)).resolves.toBe(
-      'значение',
+    await expect(updated.get(STORAGE_NAMESPACE.NetworksEncrypted, KEY)).resolves.toBe(
+      'value',
     )
   })
 
-  it('данные прежней сборки при этом не теряются', async () => {
-    /* Пересоздать базу целиком было бы проще всего и означало бы
-       потерю зашифрованной фразы: восстановить её без seed-фразы
-       нельзя. */
-    const имя = `старая-база-с-данными-${String(Date.now())}`
+  it('data from the older build is not lost', async () => {
+    /* Recreating the database wholesale would be simplest and would
+       mean losing the encrypted phrase: it cannot be restored without
+       the seed phrase. */
+    const name = `old-database-with-data-${String(Date.now())}`
 
     await new Promise<void>((resolve, reject) => {
-      const request = globalThis.indexedDB.open(имя, 1)
+      const request = globalThis.indexedDB.open(name, 1)
 
       request.onupgradeneeded = () => {
         request.result.createObjectStore(STORAGE_NAMESPACE.Settings)
@@ -406,7 +407,7 @@ describe('IndexedDbStorageService: база прежней сборки', () => 
           .transaction(STORAGE_NAMESPACE.Settings, 'readwrite')
           .objectStore(STORAGE_NAMESPACE.Settings)
 
-        store.put('старое значение', KEY)
+        store.put('old value', KEY)
 
         store.transaction.oncomplete = () => {
           database.close()
@@ -415,30 +416,31 @@ describe('IndexedDbStorageService: база прежней сборки', () => 
       }
 
       request.onerror = () => {
-        reject(request.error ?? new Error('база не открылась'))
+        reject(request.error ?? new Error('the database did not open'))
       }
     })
 
-    const обновлённое = new IndexedDbStorageService({ databaseName: имя })
+    const updated = new IndexedDbStorageService({ databaseName: name })
 
-    await expect(обновлённое.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('старое значение')
+    await expect(updated.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('old value')
   })
 })
 
-describe('IndexedDbStorageService: повторное открытие после починки', () => {
-  it('второй запуск после починки схемы открывается', async () => {
+describe('IndexedDbStorageService: reopen after a repair', () => {
+  it('a second launch after a schema repair opens', async () => {
     /*
-      ЭТО ВТОРАЯ ЧАСТЬ ТОЙ ЖЕ ОШИБКИ, И ОДНА ПРОВЕРКА ЕЁ НЕ ЛОВИЛА.
-      Починка недостающего хранилища повышает версию базы. Собственная
-      версия схемы выводится из числа миграций и остаётся прежней,
-      поэтому следующий запуск просил версию меньше существующей —
-      а такой запрос браузер отвергает целиком. Первый запуск лечился,
-      второй переставал открываться.
+      THIS IS THE SECOND HALF OF THE SAME BUG, AND ONE CHECK DID NOT
+      CATCH IT. Repairing a missing store raises the database version.
+      Our schema version is derived from the number of migrations and
+      stays the same, so the next launch asked for a version lower
+      than the existing one — and the browser rejects that request
+      wholesale. The first launch was healed, the second stopped
+      opening.
     */
-    const имя = `починенная-база-${String(Date.now())}`
+    const name = `repaired-database-${String(Date.now())}`
 
     await new Promise<void>((resolve, reject) => {
-      const request = globalThis.indexedDB.open(имя, 1)
+      const request = globalThis.indexedDB.open(name, 1)
 
       request.onupgradeneeded = () => {
         request.result.createObjectStore(STORAGE_NAMESPACE.Settings)
@@ -450,29 +452,29 @@ describe('IndexedDbStorageService: повторное открытие посл�
       }
 
       request.onerror = () => {
-        reject(request.error ?? new Error('база не открылась'))
+        reject(request.error ?? new Error('the database did not open'))
       }
     })
 
-    /* Первый запуск: недостающие хранилища создаются, версия растёт. */
-    const первый = new IndexedDbStorageService({ databaseName: имя })
+    /* First launch: missing stores are created, the version grows. */
+    const first = new IndexedDbStorageService({ databaseName: name })
 
-    await первый.set(STORAGE_NAMESPACE.NetworksEncrypted, KEY, 'значение')
+    await first.set(STORAGE_NAMESPACE.NetworksEncrypted, KEY, 'value')
 
-    /* Второй запуск — новый экземпляр, как после перезагрузки страницы. */
-    const второй = new IndexedDbStorageService({ databaseName: имя })
+    /* Second launch — a new instance, as after a page reload. */
+    const second = new IndexedDbStorageService({ databaseName: name })
 
-    await expect(второй.get(STORAGE_NAMESPACE.NetworksEncrypted, KEY)).resolves.toBe('значение')
+    await expect(second.get(STORAGE_NAMESPACE.NetworksEncrypted, KEY)).resolves.toBe('value')
   })
 
-  it('база более новой версии открывается без понижения', async () => {
-    /* Версия могла уйти вперёд и по другой причине — например, сборкой,
-       которая новее установленной. Понизить её нельзя, а работать
-       с ней можно. */
-    const имя = `будущая-база-${String(Date.now())}`
+  it('a newer-version database opens without being lowered', async () => {
+    /* The version may have moved ahead for another reason — for
+       example a build newer than the installed one. It cannot be
+       lowered, and it can still be used. */
+    const name = `future-database-${String(Date.now())}`
 
     await new Promise<void>((resolve, reject) => {
-      const request = globalThis.indexedDB.open(имя, 7)
+      const request = globalThis.indexedDB.open(name, 7)
 
       request.onupgradeneeded = () => {
         for (const namespace of Object.values(STORAGE_NAMESPACE)) {
@@ -486,14 +488,14 @@ describe('IndexedDbStorageService: повторное открытие посл�
       }
 
       request.onerror = () => {
-        reject(request.error ?? new Error('база не открылась'))
+        reject(request.error ?? new Error('the database did not open'))
       }
     })
 
-    const storage = new IndexedDbStorageService({ databaseName: имя })
+    const storage = new IndexedDbStorageService({ databaseName: name })
 
-    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'работает')
+    await storage.set(STORAGE_NAMESPACE.Settings, KEY, 'works')
 
-    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('работает')
+    await expect(storage.get(STORAGE_NAMESPACE.Settings, KEY)).resolves.toBe('works')
   })
 })

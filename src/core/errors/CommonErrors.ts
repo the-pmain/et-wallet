@@ -1,19 +1,16 @@
 import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 
-/** Ошибки общего назначения, не привязанные к конкретному домену. */
-
 /**
- * Аргумент не удовлетворяет контракту метода.
+ * An argument does not satisfy the method contract.
  *
- * Отличие от ошибок предметной области: это дефект вызывающего кода либо
- * непрошедший валидацию пользовательский ввод, а не штатное состояние
- * системы. В журнале такие ошибки заслуживают отдельного внимания.
+ * Distinct from domain errors: this is a caller defect or failed
+ * user-input validation, not a normal system state. In the log these
+ * errors deserve separate attention.
  */
 export class InvalidArgumentError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidArgument
 
-  /** Имя аргумента, не прошедшего проверку. */
   readonly argument: string
 
   constructor(argument: string, reason: string) {
@@ -23,11 +20,11 @@ export class InvalidArgumentError extends AppError {
 }
 
 /**
- * Обращение к сервису до вызова его `init()`.
+ * A service was used before `init()` was called.
  *
- * Явная ошибка лучше молчаливого возврата пустого результата: сервис,
- * который «работает» с незагруженным состоянием, даёт кошельку показать
- * пустой список сетей вместо сообщения о проблеме инициализации.
+ * An explicit error is better than silently returning empty: a service
+ * that "works" with unloaded state would let the wallet show an empty
+ * network list instead of an initialisation problem.
  */
 export class NotInitializedError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NotInitialized

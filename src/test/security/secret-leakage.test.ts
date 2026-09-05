@@ -22,16 +22,16 @@ import {
 const PASSWORD = 'Korova-7-Luna!'
 const EMAIL = 'owner@example.com'
 
-/** Первое слово тестовой фразы. Ищется в сыром хранилище как маркер утечки. */
+/** First word of the test phrase. Searched in raw storage as a leak marker. */
 const PHRASE_MARKER = 'abandon'
 
 let services: ITestAppServices
 
 /**
- * Собирает всё, что лежит в хранилище, в одну строку.
+ * Collects everything in storage into one string.
  *
- * Обходятся все пространства имён: утечка в любом из них равносильна
- * утечке вообще, а проверка одного создавала бы ложное спокойствие.
+ * Every namespace is walked: a leak in any of them is a leak,
+ * and checking one would create false calm.
  */
 async function dumpStorage(storage: MemoryStorageService): Promise<string> {
   const parts: string[] = []
@@ -49,8 +49,8 @@ beforeEach(() => {
   services = createTestAppServices()
 })
 
-describe('Секреты не попадают в хранилище открытым текстом', () => {
-  it('seed-фраза записана только зашифрованной', async () => {
+describe('Secrets do not reach storage in plaintext', () => {
+  it('the seed phrase is stored only encrypted', async () => {
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD, EMAIL)
 
     const dump = await dumpStorage(services.storage)
@@ -59,29 +59,30 @@ describe('Секреты не попадают в хранилище откры�
     expect(dump).not.toContain(TEST_MNEMONIC)
   })
 
-  it('пароль нигде не сохраняется', async () => {
-    /* Хранилище держит проверочный блок, расшифровываемый паролем,
-       но не сам пароль: иначе смысл вывода ключа пропадает. */
+  it('the password is stored nowhere', async () => {
+    /* The store holds a verifier block decryptable with the
+       password, but not the password itself: otherwise deriving
+       a key would be pointless. */
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD, EMAIL)
 
     expect(await dumpStorage(services.storage)).not.toContain(PASSWORD)
   })
 
-  it('адрес почты записан зашифрованным', async () => {
-    /* Это персональные данные, связывающие устройство с личностью. */
+  it('the email address is stored encrypted', async () => {
+    /* Personal data that ties the device to a person. */
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD, EMAIL)
 
     expect(await dumpStorage(services.storage)).not.toContain(EMAIL)
   })
 
-  it('имена полей значения тоже не раскрываются', async () => {
-    /* Наблюдатель не должен узнавать даже структуру записи: сама
-       по себе она подсказывает, что искать. */
+  it('value field names are not revealed either', async () => {
+    /* An observer must not learn even the record shape: that
+       alone hints what to look for. */
     const storage = new InMemoryStorageService()
     const secure = new SecureStorage(storage, new FastEncryptionService())
 
     await secure.initialize(PASSWORD)
-    await secure.set(STORAGE_NAMESPACE.Vault, toStorageKey('проба'), {
+    await secure.set(STORAGE_NAMESPACE.Vault, toStorageKey('probe'), {
       privateKey: '0xdeadbeef',
     })
 
@@ -91,7 +92,7 @@ describe('Секреты не попадают в хранилище откры�
     expect(dump).not.toContain('deadbeef')
   })
 
-  it('заблокированное хранилище не отдаёт записанное', async () => {
+  it('a locked store does not return what was written', async () => {
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
     services.onboarding.lock()
 
@@ -101,16 +102,16 @@ describe('Секреты не попадают в хранилище откры�
   })
 })
 
-describe('Секреты не попадают в журнал', () => {
-  it('поля с секретными именами заменяются пометкой', () => {
+describe('Secrets do not reach the log', () => {
+  it('fields with secret names are replaced by a marker', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      new ConsoleLogger({ minimumLevel: LOG_LEVEL.Warn }).warn('проба', {
+      new ConsoleLogger({ minimumLevel: LOG_LEVEL.Warn }).warn('probe', {
         privateKey: '0xdeadbeef',
         mnemonic: TEST_MNEMONIC,
         password: PASSWORD,
-        seed: 'что-то',
+        seed: 'something',
       })
 
       const printed = JSON.stringify(warn.mock.calls)
@@ -123,13 +124,13 @@ describe('Секреты не попадают в журнал', () => {
     }
   })
 
-  it('адрес почты скрывается по виду значения, а не по имени поля', () => {
-    /* Адрес попадает в журнал как имя аккаунта — под именем `name`,
-       которое секретным не выглядит. */
+  it('hides an email by the look of the value, not the field name', () => {
+    /* The address reaches the log as an account name — under
+       `name`, which does not look secret. */
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      new ConsoleLogger({ minimumLevel: LOG_LEVEL.Warn }).warn('проба', { name: EMAIL })
+      new ConsoleLogger({ minimumLevel: LOG_LEVEL.Warn }).warn('probe', { name: EMAIL })
 
       expect(JSON.stringify(warn.mock.calls)).not.toContain(EMAIL)
     } finally {
@@ -137,11 +138,11 @@ describe('Секреты не попадают в журнал', () => {
     }
   })
 
-  it('адрес кошелька усекается', () => {
+  it('truncates a wallet address', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      new ConsoleLogger({ minimumLevel: LOG_LEVEL.Warn }).warn('проба', {
+      new ConsoleLogger({ minimumLevel: LOG_LEVEL.Warn }).warn('probe', {
         owner: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
       })
 
@@ -154,21 +155,21 @@ describe('Секреты не попадают в журнал', () => {
   })
 })
 
-describe('Секреты не выживают в сериализации состояния', () => {
-  it('буфер секрета не раскрывается ни строкой, ни JSON', () => {
-    /* Подстановка объекта в шаблон и отладочный дамп состояния —
-       два самых частых способа случайно напечатать ключ. */
-    const secret = SecretBuffer.copyOf(new TextEncoder().encode('очень-секретно'))
+describe('Secrets do not survive state serialization', () => {
+  it('a secret buffer is not revealed as a string or as JSON', () => {
+    /* Interpolating an object into a template and dumping state
+       are the two most common ways to print a key by accident. */
+    const secret = SecretBuffer.copyOf(new TextEncoder().encode('very-confidential'))
 
     try {
-      expect(`${secret as unknown as string}`).not.toContain('секретно')
-      expect(JSON.stringify({ secret })).not.toContain('секретно')
+      expect(`${secret as unknown as string}`).not.toContain('confidential')
+      expect(JSON.stringify({ secret })).not.toContain('confidential')
     } finally {
       secret.wipe()
     }
   })
 
-  it('затирание обнуляет байты, а не только помечает буфер', () => {
+  it('wiping zeros the bytes, not only marks the buffer', () => {
     const bytes = new Uint8Array([1, 2, 3, 4])
     const secret = SecretBuffer.copyOf(bytes)
     const view = secret.bytes
@@ -178,9 +179,9 @@ describe('Секреты не выживают в сериализации со�
     expect([...view]).toEqual([0, 0, 0, 0])
   })
 
-  it('снимок сессии не содержит ни фразы, ни ключей', async () => {
-    /* Снимок уходит в дерево React и попадает в любой отладочный дамп
-       состояния. */
+  it('a session snapshot contains neither the phrase nor keys', async () => {
+    /* The snapshot goes into the React tree and into any debug
+       state dump. */
     services.providerFactory.configure({ balance: 0n as Wei })
     await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD, EMAIL)
     await services.session.open()

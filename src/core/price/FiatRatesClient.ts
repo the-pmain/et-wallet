@@ -5,7 +5,7 @@ const DIRECT_SOURCES = [
   'https://api.frankfurter.dev/v1/latest?from=USD&to=EUR,GBP',
 ] as const
 
-/** Курсы к доллару. */
+/** Rates against the dollar. */
 export interface IFetchedFiatRates {
   readonly EUR: number
   readonly GBP: number
@@ -14,16 +14,16 @@ export interface IFetchedFiatRates {
 export interface IFiatRatesClientOptions {
   readonly timeoutMs?: number
   readonly fetchImpl?: typeof fetch
-  /** Полные URL источников. По умолчанию — `/v1/fiat-rates`, затем Frankfurter. */
+  /** Full source URLs. Default — `/v1/fiat-rates`, then Frankfurter. */
   readonly sources?: readonly string[]
 }
 
 /**
- * Курсы фиатных валют к доллару.
+ * Fiat rates against the dollar.
  *
- * Сначала спрашивает свой сервер (`/v1/fiat-rates`), затем Frankfurter
- * напрямую. Так курсы работают и в dev через прокси Vite, и в сборке
- * с одного origin, и без сервера — по запасным адресам ECB.
+ * Asks the own server first (`/v1/fiat-rates`), then Frankfurter
+ * directly. So rates work in dev through the Vite proxy, in a
+ * same-origin build, and without a server — via ECB fallback URLs.
  */
 export class FiatRatesClient {
   readonly #sources: readonly string[]

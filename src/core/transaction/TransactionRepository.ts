@@ -11,15 +11,15 @@ import {
 } from './types'
 
 /**
- * Запись истории в виде, пригодном для JSON.
+ * A history record in a JSON-fit form.
  *
- * ПОЧЕМУ НУЖЕН ОТДЕЛЬНЫЙ ТИП. `JSON.stringify` выбрасывает исключение
- * на `bigint`, а не преобразует его. Полагаться на автоматическую
- * сериализацию доменной записи нельзя: добавление ещё одного денежного
- * поля молча сломало бы сохранение истории.
+ * WHY A SEPARATE TYPE. `JSON.stringify` throws on `bigint` instead
+ * of converting it. Relying on automatic serialization of the
+ * domain record is not allowed: adding one more money field would
+ * silently break history persistence.
  *
- * Все крупные числа хранятся десятичными строками. Шестнадцатеричная запись
- * была бы компактнее, но требует согласия о знаке и о ведущих нулях.
+ * All large numbers are stored as decimal strings. Hex would be
+ * more compact, but needs agreement on sign and leading zeros.
  */
 interface IStoredRecord {
   readonly hash: string
@@ -38,16 +38,15 @@ interface IStoredRecord {
   readonly replacedBy: string | null
 
   /**
-   * Число подтверждений.
+   * Confirmation count.
    *
-   * Необязательно ради записей, сохранённых до появления отслеживания:
-   * прочитанные без него считаются неподтверждёнными, а не портят
-   * разбор. Кошелёк обязан открывать хранилище, созданное прежней
-   * версией, — иначе обновление приложения означало бы потерю истории.
+   * Optional for records saved before tracking existed: those read
+   * without it are treated as unconfirmed, and do not break
+   * parsing. The wallet must open storage created by a previous
+   * version — otherwise an app update would mean lost history.
    */
   readonly confirmations?: number
 
-  /** Параметры исходной транзакции. Необязательны у прежних записей. */
   readonly data?: string | null
   readonly gasLimit?: string | null
   readonly maxFeePerGas?: string | null
@@ -56,24 +55,26 @@ interface IStoredRecord {
 }
 
 /**
- * История транзакций в зашифрованном хранилище.
+ * Transaction history in encrypted storage.
  *
- * ПОЧЕМУ ШИФРУЕТСЯ. Сама по себе транзакция публична: она лежит в блокчейне
- * и видна любому. Но список транзакций кошелька связывает между собой все
- * адреса пользователя и раскрывает контрагентов, суммы и время активности.
- * Заблокированный кошелёк не должен сообщать этого.
+ * WHY IT IS ENCRYPTED. A transaction is public by itself: it sits
+ * on the chain and is visible to anyone. But the wallet's
+ * transaction list ties together every user address and reveals
+ * counterparties, amounts, and times of activity. A locked wallet
+ * must not disclose that.
  *
- * КЛЮЧ ЗАПИСИ — ХЭШ, А НЕ ПОРЯДКОВЫЙ НОМЕР. Хэш уникален и известен заранее,
- * поэтому повторное сохранение той же транзакции обновляет запись, а не
- * создаёт дубль. Порядковый номер потребовал бы отдельного счётчика,
- * который расходится при параллельной записи.
+ * THE RECORD KEY IS THE HASH, NOT AN ORDINAL. The hash is unique
+ * and known in advance, so saving the same transaction again
+ * updates the record instead of creating a duplicate. An ordinal
+ * would need a separate counter that drifts under concurrent writes.
  *
- * ОГРАНИЧЕНИЕ ТЕКУЩЕГО ЭТАПА. Репозиторий хранит только транзакции,
- * отправленные этим кошельком. Полная история адреса, включая входящие
- * переводы, из узла не читается: `eth_getLogs` отдаёт лишь события
- * контрактов, а переводы нативной валюты событий не порождают. Для полной
- * истории нужен внешний индексатор, а это раскрытие всех адресов
- * пользователя стороннему сервису — решение, требующее согласия владельца.
+ * LIMIT OF THE CURRENT STAGE. The repository stores only
+ * transactions sent by this wallet. The full history of an
+ * address, including incoming transfers, is not read from the
+ * node: `eth_getLogs` returns only contract events, and native
+ * transfers emit none. Full history needs an external indexer,
+ * and that discloses every user address to a third-party service
+ * — a decision that requires the owner's consent.
  */
 export class TransactionRepository implements ITransactionRepository {
   readonly #storage: ISecureStorage
@@ -86,9 +87,9 @@ export class TransactionRepository implements ITransactionRepository {
     const index = await this.#readIndex()
     const hashes = index.byOwner[ownerKey(address, chainId)]
 
-    /* Отсутствие ключа означает «этот адрес в индексе не встречался».
-       Это не то же самое, что «индекса нет»: он уже построен выше,
-       и построение читает всё, что есть в хранилище. */
+    /* Absence of the key means "this address was not seen in the
+       index". That is not the same as "there is no index": it was
+       already built above, and the build reads everything in storage. */
     const records = await this.#readByHashes(hashes ?? [])
 
     return [...records].sort((left, right) => right.submittedAt - left.submittedAt)
@@ -113,10 +114,10 @@ export class TransactionRepository implements ITransactionRepository {
   }
 
   async findUnsettled(maxConfirmations: number): Promise<readonly ITransactionRecord[]> {
-    /* Читаются только незавершённые: их единицы, тогда как всех записей
-       могут быть тысячи. Слежение обращается сюда каждые двенадцать
-       секунд, и полное чтение стоило бы десятков миллисекунд
-       расшифровки на каждом проходе. */
+    /* Only unsettled records are read: there are few of them, while
+       all records may be thousands. Tracking hits this every twelve
+       seconds, and a full read would cost tens of milliseconds of
+       decryption on every pass. */
     const index = await this.#readIndex()
     const records = await this.#readByHashes(index.unsettled)
 
@@ -125,21 +126,22 @@ export class TransactionRepository implements ITransactionRepository {
         return true
       }
 
-      /* Замещённая транзакция окончательна: её место занято, и вернуть
-         её в цепь нечем. */
+      /* A replaced transaction is final: its slot is taken, and
+         there is nothing to put it back on the chain with. */
       if (record.status === TRANSACTION_STATUS.Replaced) {
         return false
       }
 
-      /* Включённая в блок, но неглубоко: реорганизация ещё возможна. */
+      /* Included in a block, but not deep: a reorg is still possible. */
       return record.confirmations < maxConfirmations
     })
   }
 
   async save(record: ITransactionRecord): Promise<void> {
-    /* ЗАПИСЬ СОХРАНЯЕТСЯ ПЕРВОЙ. Индекс — ускоритель, а не источник
-       истины: запись без индекса найдётся при его перестроении,
-       а индекс без записи означал бы ссылку в пустоту. */
+    /* THE RECORD IS SAVED FIRST. The index is an accelerator, not
+       the source of truth: a record without an index is found when
+       it is rebuilt, and an index without a record would be a
+       pointer into the void. */
     await this.#storage.set(STORAGE_NAMESPACE.Transactions, recordKey(record.hash), encode(record))
     await this.#updateIndex(record)
   }
@@ -169,26 +171,26 @@ export class TransactionRepository implements ITransactionRepository {
       return
     }
 
-    /* Индекс перестраивается целиком, а не правится точечно: удаление
-       редкое, а построение по уже прочитанным записям ничего не стоит. */
+    /* The index is rebuilt in full, not patched: deletion is rare,
+       and building from already-read records costs nothing. */
     await this.#writeIndex(
       buildIndex(records.filter((record) => !removed.has(record.hash.toLowerCase()))),
     )
   }
 
   /**
-   * Индекс: где искать записи, не читая их все.
+   * Index: where to find records without reading them all.
    *
-   * ЗАЧЕМ. Записи лежат зашифрованными по одной, и полное чтение
-   * расшифровывает каждую. Замер до появления индекса: сто записей —
-   * восемь миллисекунд, пятьсот — семьдесят. Слежение спрашивало
-   * незавершённые каждые двенадцать секунд, поэтому цена росла линейно
-   * и платилась постоянно.
+   * WHY. Records sit encrypted one by one, and a full read decrypts
+   * each. Measurement before the index: a hundred records — eight
+   * milliseconds, five hundred — seventy. Tracking asked for
+   * unsettled every twelve seconds, so the cost grew linearly and
+   * was paid constantly.
    *
-   * ИНДЕКС — УСКОРИТЕЛЬ, А НЕ ИСТОЧНИК ИСТИНЫ. Его отсутствие ничего
-   * не теряет: он перестраивается полным чтением — тем самым, что было
-   * единственным путём раньше. Поэтому запись сохраняется первой,
-   * а индекс обновляется после неё.
+   * THE INDEX IS AN ACCELERATOR, NOT THE SOURCE OF TRUTH. Its
+   * absence loses nothing: it is rebuilt by a full read — the
+   * same path that was the only one before. Therefore the record
+   * is saved first, and the index is updated after it.
    */
   async #readIndex(): Promise<IStoredIndex> {
     const stored = await this.#storage.get<IStoredIndex>(STORAGE_NAMESPACE.Transactions, INDEX_KEY)
@@ -197,8 +199,8 @@ export class TransactionRepository implements ITransactionRepository {
       return stored
     }
 
-    /* Индекса нет либо его формат сменился. Перестроение — единственный
-       способ не потерять записи, сделанные прежней версией. */
+    /* There is no index, or its format changed. Rebuilding is the
+       only way not to lose records made by a previous version. */
     const index = buildIndex(await this.#readAll())
 
     await this.#writeIndex(index)
@@ -210,7 +212,6 @@ export class TransactionRepository implements ITransactionRepository {
     await this.#storage.set(STORAGE_NAMESPACE.Transactions, INDEX_KEY, index)
   }
 
-  /** Вносит запись в индекс, не перечитывая остальные. */
   async #updateIndex(record: ITransactionRecord): Promise<void> {
     const index = await this.#readIndex()
     const key = ownerKey(record.from, record.chainId)
@@ -221,8 +222,8 @@ export class TransactionRepository implements ITransactionRepository {
       ? index.byOwner
       : { ...index.byOwner, [key]: [...owned, hash] }
 
-    /* Завершённые уходят из списка слежения и перестают читаться
-       на каждом его проходе. */
+    /* Settled records leave the watch list and stop being read
+       on every pass. */
     const unsettled = isUnsettled(record)
       ? index.unsettled.includes(hash)
         ? index.unsettled
@@ -232,7 +233,6 @@ export class TransactionRepository implements ITransactionRepository {
     await this.#writeIndex({ version: INDEX_VERSION, byOwner, unsettled })
   }
 
-  /** Читает записи по списку хэшей, пропуская исчезнувшие. */
   async #readByHashes(hashes: readonly string[]): Promise<readonly ITransactionRecord[]> {
     const records: ITransactionRecord[] = []
 
@@ -242,9 +242,9 @@ export class TransactionRepository implements ITransactionRepository {
         toStorageKey(`tx.${hash}`),
       )
 
-      /* Записи может не быть: индекс переживает удаление, сделанное
-         в обход репозитория. Ссылка в пустоту не ошибка — она просто
-         пропускается. */
+      /* The record may be gone: the index outlives a deletion done
+         around the repository. A pointer into the void is not an
+         error — it is simply skipped. */
       if (stored !== null) {
         records.push(decode(stored))
       }
@@ -258,8 +258,8 @@ export class TransactionRepository implements ITransactionRepository {
     const records: ITransactionRecord[] = []
 
     for (const key of keys) {
-      /* Индекс лежит в том же пространстве и записью транзакции
-         не является. */
+      /* The index lives in the same namespace and is not a
+         transaction record. */
       if (key === INDEX_KEY) {
         continue
       }
@@ -331,55 +331,52 @@ function decode(stored: IStoredRecord): ITransactionRecord {
   }
 }
 
-/** Читает необязательное большое число. */
 function toBigIntOrNull(value: string | null | undefined): bigint | null {
   return value === null || value === undefined ? null : BigInt(value)
 }
 
-/** Версия формата индекса. Смена значения перестраивает его. */
+/** Index format version. Changing the value rebuilds it. */
 const INDEX_VERSION = 1
 
-/** Ключ записи индекса. Отличается от ключей транзакций префиксом. */
 const INDEX_KEY = toStorageKey('index.v1')
 
-/** Индекс в хранилище. */
 interface IStoredIndex {
   readonly version: number
 
-  /** Хэши по ключу «сеть плюс адрес отправителя». */
   readonly byOwner: Readonly<Record<string, readonly string[]>>
 
-  /** Хэши записей, за которыми ещё следят. */
   readonly unsettled: readonly string[]
 }
 
-/** Ключ владельца: сеть и адрес в нижнем регистре. */
 function ownerKey(address: Address, chainId: ChainId): string {
   return `${chainId.toString()}:${address.toLowerCase()}`
 }
 
 /**
- * Глубина, начиная с которой запись выпадает из индекса слежения.
+ * Depth from which a record drops out of the watch index.
  *
- * НАМЕРЕННО БОЛЬШЕ ЛЮБОГО ПРАКТИЧЕСКОГО ПОРОГА. Порог задаёт слой
- * транзакций (сейчас три подтверждения) и вправе его менять; индекс
- * переживает такие изменения только если отсеивает заведомо большее.
- * Двенадцать блоков — глубина, ниже которой реорганизации в сетях EVM
- * после перехода на Proof-of-Stake не наблюдаются.
+ * DELIBERATELY ABOVE ANY PRACTICAL THRESHOLD. The transaction
+ * layer sets the threshold (currently three confirmations) and
+ * may change it; the index survives those changes only if it
+ * filters something strictly larger. Twelve blocks is a depth
+ * below which reorgs on EVM networks after the move to
+ * Proof-of-Stake are not observed.
  *
- * ЗАПАС РАБОТАЕТ В БЕЗОПАСНУЮ СТОРОНУ: в индексе остаются лишние
- * записи, а не пропадают нужные. Лишняя стоит одного чтения на проход,
- * пропавшая означала бы, что кошелёк перестал следить за транзакцией.
+ * THE MARGIN WORKS IN THE SAFE DIRECTION: extra records stay
+ * in the index, needed ones do not vanish. An extra costs one
+ * read per pass; a missing one would mean the wallet stopped
+ * watching a transaction.
  */
 const INDEX_SETTLED_DEPTH = 12
 
 /**
- * Нужно ли следить за записью дальше.
+ * Whether the record still needs watching.
  *
- * Отсеивается только окончательное: замещённые записи и те, что ушли
- * в цепь достаточно глубоко. Без второго условия индекс слежения
- * совпадал бы со всей историей, и выигрыш от него исчез бы: замер
- * показывал те же тридцать миллисекунд на пятистах записях.
+ * Only the final is filtered out: replaced records and those that
+ * went deep enough on the chain. Without the second condition the
+ * watch index would match the whole history, and its gain would
+ * vanish: measurement showed the same thirty milliseconds on five
+ * hundred records.
  */
 function isUnsettled(record: ITransactionRecord): boolean {
   if (record.status === TRANSACTION_STATUS.Replaced) {
@@ -393,7 +390,6 @@ function isUnsettled(record: ITransactionRecord): boolean {
   return record.confirmations < INDEX_SETTLED_DEPTH
 }
 
-/** Строит индекс по полному набору записей. */
 function buildIndex(records: readonly ITransactionRecord[]): IStoredIndex {
   const byOwner: Record<string, string[]> = {}
   const unsettled: string[] = []

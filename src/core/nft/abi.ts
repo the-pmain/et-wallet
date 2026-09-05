@@ -10,48 +10,41 @@ import {
 import type { Address, HexString } from '@/core/types'
 
 /**
- * Кодирование вызовов коллекционных контрактов.
+ * Encoding of collectible-contract calls.
  *
- * ПОЧЕМУ ПРИМИТИВЫ БЕРУТСЯ ИЗ МОДУЛЯ ТОКЕНОВ. `functionSelector`,
- * `decodeUint` и `decodeString` описывают кодировку ABI, а не стандарт
- * ERC-20: они одинаковы для любого контракта. Копия здесь означала бы
- * два места, где живёт одна и та же кодировка, и расхождение между ними
- * при первой же правке.
+ * WHY PRIMITIVES ARE TAKEN FROM THE TOKEN MODULE. `functionSelector`,
+ * `decodeUint`, and `decodeString` describe ABI encoding, not the
+ * ERC-20 standard: they are the same for any contract. A copy here
+ * would mean two places for the same encoding, and they would
+ * diverge on the first edit.
  *
- * ЗДЕСЬ ЛЕЖИТ ТОЛЬКО ТО, ЧЕГО В ТОМ МОДУЛЕ НЕТ: аргументы-числа
- * и вызовы с несколькими аргументами. У ERC-20 таких вызовов
- * не встречается.
+ * ONLY WHAT THAT MODULE DOES NOT HAVE LIVES HERE: numeric arguments
+ * and multi-argument calls. ERC-20 has no such calls.
  */
 
-/** `ownerOf(uint256)` — владелец предмета ERC-721. */
 export const OWNER_OF_SELECTOR = functionSelector('ownerOf(uint256)')
 
-/** `tokenURI(uint256)` — ссылка на описание предмета ERC-721. */
 export const TOKEN_URI_SELECTOR = functionSelector('tokenURI(uint256)')
 
-/** `balanceOf(address,uint256)` — количество предметов ERC-1155 у владельца. */
 export const ERC1155_BALANCE_OF_SELECTOR = functionSelector('balanceOf(address,uint256)')
 
-/** `supportsInterface(bytes4)` — объявленная поддержка интерфейса (ERC-165). */
 export const SUPPORTS_INTERFACE_SELECTOR = functionSelector('supportsInterface(bytes4)')
 
-/** `safeTransferFrom(address,address,uint256)` — передача предмета ERC-721. */
 export const SAFE_TRANSFER_721_SELECTOR = functionSelector(
   'safeTransferFrom(address,address,uint256)',
 )
 
-/** `safeTransferFrom(address,address,uint256,uint256,bytes)` — передача ERC-1155. */
 export const SAFE_TRANSFER_1155_SELECTOR = functionSelector(
   'safeTransferFrom(address,address,uint256,uint256,bytes)',
 )
 
 /**
- * Кодирует вызов `supportsInterface(bytes4)`.
+ * Encodes a `supportsInterface(bytes4)` call.
  *
- * Аргумент `bytes4` выравнивается ВПРАВО от начала слова, в отличие
- * от чисел и адресов: короткие байтовые типы дополняются нулями справа.
- * Перепутанное выравнивание даёт вызов про другой интерфейс и молчаливое
- * «не поддерживается».
+ * A `bytes4` argument is padded to the RIGHT of the word start,
+ * unlike numbers and addresses: short byte types are zero-padded
+ * on the right. Mixed-up padding calls a different interface and
+ * silently yields "not supported".
  */
 export function encodeSupportsInterface(interfaceId: string): HexString {
   const id = interfaceId.startsWith('0x') ? interfaceId.slice(2) : interfaceId
@@ -60,28 +53,28 @@ export function encodeSupportsInterface(interfaceId: string): HexString {
 }
 
 /**
- * Кодирует передачу предмета ERC-721.
+ * Encodes an ERC-721 item transfer.
  *
- * ИСПОЛЬЗУЕТСЯ БЕЗОПАСНЫЙ ВАРИАНТ. Обычный `transferFrom` отправляет
- * предмет любому адресу, включая контракт, который не умеет их
- * принимать: предмет попадает туда навсегда. `safeTransferFrom`
- * спрашивает у контракта-получателя подтверждение и откатывается,
- * если его нет. Отправку обычному адресу это не усложняет.
+ * THE SAFE VARIANT IS USED. Plain `transferFrom` sends the item to
+ * any address, including a contract that cannot accept it: the item
+ * stays there forever. `safeTransferFrom` asks the recipient
+ * contract for confirmation and reverts if there is none. Sending
+ * to an ordinary address is not made harder by that.
  */
 export function encodeSafeTransfer721(from: Address, to: Address, tokenId: bigint): HexString {
   return `0x${SAFE_TRANSFER_721_SELECTOR}${encodeAddressWord(from)}${encodeAddressWord(to)}${encodeUintWord(tokenId)}` as HexString
 }
 
 /**
- * Кодирует передачу предметов ERC-1155.
+ * Encodes an ERC-1155 item transfer.
  *
- * ПОСЛЕДНИЙ АРГУМЕНТ — БАЙТЫ ПЕРЕМЕННОЙ ДЛИНЫ, и кодируются они иначе,
- * чем остальные: на его месте стоит смещение до данных, а сами данные
- * лежат в конце. Кошелёк передаёт пустую строку — дополнительных
- * сведений получателю он не сообщает.
+ * THE LAST ARGUMENT IS VARIABLE-LENGTH BYTES, and is encoded
+ * differently from the rest: its slot holds an offset to the data,
+ * and the data itself sits at the end. The wallet passes an empty
+ * string — it tells the recipient nothing extra.
  *
- * Смещение равно ста шестидесяти байтам: пять слов до него — отправитель,
- * получатель, номер, количество и само смещение.
+ * The offset is one hundred and sixty bytes: five words before it
+ * are sender, recipient, id, amount, and the offset itself.
  */
 export function encodeSafeTransfer1155(
   from: Address,
@@ -96,17 +89,18 @@ export function encodeSafeTransfer1155(
 }
 
 /**
- * Читает получателя из данных безопасной передачи.
+ * Reads the recipient from safe-transfer call data.
  *
- * ЗАЧЕМ ЧИТАТЬ ТО, ЧТО САМИ СОБРАЛИ. Экран подтверждения обязан
- * показывать содержимое подписываемой транзакции, а не значения полей
- * формы: тогда совпадение показанного с подписываемым следует
- * из устройства экрана.
+ * WHY READ BACK WHAT WE ASSEMBLED. The confirmation screen must
+ * show the contents of the transaction being signed, not the form
+ * field values: then the match between what is shown and what is
+ * signed follows from how the screen is built.
  *
- * Позиция получателя у обоих стандартов одна: второе слово после
- * селектора. Различаются они дальше — номером и количеством.
+ * The recipient's position is the same in both standards: the
+ * second word after the selector. They differ further on — id
+ * and amount.
  *
- * @returns `null`, если данные не являются безопасной передачей.
+ * @returns `null` if the data is not a safe transfer.
  */
 export function decodeSafeTransferRecipient(data: HexString): Address | null {
   const body = strip(data)
@@ -116,8 +110,8 @@ export function decodeSafeTransferRecipient(data: HexString): Address | null {
     return null
   }
 
-  /* Второе слово после селектора: у обоих стандартов получатель стоит
-     именно там. Различаются они дальше — номером и количеством. */
+  /* Second word after the selector: in both standards the recipient
+     sits there. They differ further on — id and amount. */
   return readAddressWord(
     body.slice(SELECTOR_LENGTH + WORD_LENGTH, SELECTOR_LENGTH + WORD_LENGTH * 2),
   )

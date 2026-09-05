@@ -15,7 +15,7 @@ const CHAIN_ID = toChainId(1n)
 const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 
 function endpoint(url: string): IRpcEndpoint {
-  return { url, providerId: RPC_PROVIDER_ID.Public, providerName: 'Тест' }
+  return { url, providerId: RPC_PROVIDER_ID.Public, providerName: 'Test' }
 }
 
 const ENDPOINTS = [
@@ -24,24 +24,24 @@ const ENDPOINTS = [
   endpoint('https://c.example'),
 ]
 
-/** Поведение узла-дублёра в конкретном тесте. */
+/** Stub-node behaviour for a given test. */
 interface INodeBehaviour {
-  /** Отказ при подключении. */
+  /** Fail while connecting. */
   readonly failOnConnect?: boolean
-  /** Отказ транспорта при каждом вызове. */
+  /** Transport failure on every call. */
   readonly failTransport?: boolean
 
-  /** Узел не умеет `eth_simulateV1`, оставаясь исправным в остальном. */
+  /** Node cannot do `eth_simulateV1` but is otherwise healthy. */
   readonly failSimulate?: boolean
-  /** Ответ узла с ошибкой JSON-RPC. */
+  /** Node answers with a JSON-RPC error. */
   readonly rpcError?: boolean
 
   /**
-   * Отказ ТОЛЬКО на выборке журналов при исправном узле в остальном.
+   * Fail ONLY on log queries while the node stays healthy otherwise.
    *
-   * Именно так ведут себя публичные узлы: измерено живьём — «408» и
-   * «403» на `eth_getLogs` у двух узлов, отдававших баланс в ту же
-   * секунду.
+   * That is how public nodes behave: measured live — "408" and "403"
+   * on `eth_getLogs` from two nodes that were serving balance in the
+   * same second.
    */
   readonly failLogs?: boolean
 
@@ -77,14 +77,14 @@ class StubProvider implements IProvider {
 
   request<TResult>(request: { method: string }): Promise<TResult> {
     if (request.method !== 'eth_simulateV1') {
-      return Promise.reject(new Error('не поддержано'))
+      return Promise.reject(new Error('not supported'))
     }
 
     this.simulateCalls += 1
 
     return this.#behaviour.failSimulate === true
       ? Promise.reject(new RpcError(-32601, 'the method does not exist'))
-      : Promise.resolve('симуляция' as TResult)
+      : Promise.resolve('simulation' as TResult)
   }
 
   getChainId(): Promise<ChainId> {
@@ -121,7 +121,7 @@ class StubProvider implements IProvider {
     return Promise.resolve('0x' as HexString)
   }
 
-  /** Байт-код по адресу. Обычный адрес: проверок контракта в этих тестах нет. */
+  /** Bytecode at an address. Ordinary address: these tests do not check contracts. */
   getCode(): Promise<HexString> {
     return Promise.resolve('0x' as HexString)
   }
@@ -130,7 +130,7 @@ class StubProvider implements IProvider {
   }
 
   getFeeData(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   sendRawTransaction(): Promise<TxHash> {
@@ -207,8 +207,8 @@ beforeEach(() => {
   created = []
 })
 
-describe('FailoverProvider: подключение', () => {
-  it('использует первый адрес списка', async () => {
+describe('FailoverProvider: connect', () => {
+  it('uses the first address in the list', async () => {
     behaviours.set('https://a.example', { balance: 5n })
 
     const provider = createProvider()
@@ -217,7 +217,7 @@ describe('FailoverProvider: подключение', () => {
     expect(provider.rpcUrl).toBe('https://a.example')
   })
 
-  it('переходит к следующему адресу, если первый не подключается', async () => {
+  it('moves to the next address if the first does not connect', async () => {
     behaviours.set('https://a.example', { failOnConnect: true })
     behaviours.set('https://b.example', { balance: 7n })
 
@@ -227,7 +227,7 @@ describe('FailoverProvider: подключение', () => {
     expect(provider.rpcUrl).toBe('https://b.example')
   })
 
-  it('отказывает, когда не подключается ни один адрес', async () => {
+  it('fails when no address connects', async () => {
     for (const item of ENDPOINTS) {
       behaviours.set(item.url, { failOnConnect: true })
     }
@@ -237,7 +237,7 @@ describe('FailoverProvider: подключение', () => {
     )
   })
 
-  it('разделяет одно подключение между параллельными вызовами', async () => {
+  it('shares one connection among concurrent calls', async () => {
     behaviours.set('https://a.example', { balance: 1n })
 
     const provider = createProvider()
@@ -247,7 +247,7 @@ describe('FailoverProvider: подключение', () => {
     expect(created).toHaveLength(1)
   })
 
-  it('сообщает действующий адрес с указанием источника', async () => {
+  it('reports the active address with its source', async () => {
     behaviours.set('https://a.example', { balance: 1n })
 
     const provider = createProvider()
@@ -258,20 +258,20 @@ describe('FailoverProvider: подключение', () => {
   })
 })
 
-describe('FailoverProvider: отказ узла посреди работы', () => {
-  it('переключается на резервный адрес и возвращает результат', async () => {
+describe('FailoverProvider: node failure mid-session', () => {
+  it('switches to a backup address and returns the result', async () => {
     behaviours.set('https://a.example', { failTransport: true })
     behaviours.set('https://b.example', { balance: 42n })
 
     const provider = createProvider()
 
-    /* Ровно то, чего не умел прежний перебор: узел, отказавший после
-       подключения, обрекал все вызовы до конца сессии. */
+    /* Exactly what the old rotation could not do: a node that failed
+       after connect doomed every call for the rest of the session. */
     expect(await provider.getBalance(OWNER)).toBe(42n)
     expect(provider.rpcUrl).toBe('https://b.example')
   })
 
-  it('закрывает соединение с отказавшим узлом', async () => {
+  it('closes the connection to the failed node', async () => {
     behaviours.set('https://a.example', { failTransport: true })
     behaviours.set('https://b.example', { balance: 1n })
 
@@ -280,7 +280,7 @@ describe('FailoverProvider: отказ узла посреди работы', ()
     expect(created[0]?.isActive).toBe(false)
   })
 
-  it('не возвращается к отказавшему адресу при следующем вызове', async () => {
+  it('does not return to a failed address on the next call', async () => {
     behaviours.set('https://a.example', { failTransport: true })
     behaviours.set('https://b.example', { balance: 1n })
 
@@ -289,11 +289,11 @@ describe('FailoverProvider: отказ узла посреди работы', ()
     await provider.getBalance(OWNER)
     await provider.getBalance(OWNER)
 
-    /* Повтор на уже отказавшем адресе только удлинил бы ожидание. */
+    /* Retrying an address that already failed would only lengthen the wait. */
     expect(created.filter((stub) => stub.rpcUrl === 'https://a.example')).toHaveLength(1)
   })
 
-  it('уведомляет о смене узла', async () => {
+  it('notifies about a node change', async () => {
     behaviours.set('https://a.example', { failTransport: true })
     behaviours.set('https://b.example', { balance: 1n })
 
@@ -304,7 +304,7 @@ describe('FailoverProvider: отказ узла посреди работы', ()
     expect(onSwitch).toHaveBeenCalledTimes(1)
   })
 
-  it('отказывает, когда резервных адресов не осталось', async () => {
+  it('fails when no backup addresses remain', async () => {
     for (const item of ENDPOINTS) {
       behaviours.set(item.url, { failTransport: true })
     }
@@ -314,7 +314,7 @@ describe('FailoverProvider: отказ узла посреди работы', ()
     )
   })
 
-  it('признаёт себя непригодным, исчерпав список', async () => {
+  it('reports itself unfit after exhausting the list', async () => {
     for (const item of ENDPOINTS) {
       behaviours.set(item.url, { failTransport: true })
     }
@@ -323,24 +323,26 @@ describe('FailoverProvider: отказ узла посреди работы', ()
 
     await expect(provider.getBalance(OWNER)).rejects.toBeInstanceOf(ProviderUnavailableError)
 
-    /* Иначе `RpcManager` оставил бы пустышку в кэше, и кошелёк сообщал
-       бы о недоступной сети при исправных узлах до перезагрузки. */
+    /* Otherwise `RpcManager` would keep an empty shell in cache, and
+       the wallet would report the network unavailable with healthy
+       nodes until reload. */
     expect(provider.isActive).toBe(false)
   })
 })
 
 /**
- * Отказ на журналах — приговор запросу, а не узлу.
+ * A log failure condemns the request, not the node.
  *
- * Поведение проверено на живых узлах: `eth.drpc.org` отвечал «408», а
- * `ethereum-rpc.publicnode.com` — «403: нужен архивный токен», причём
- * оба в ту же секунду отдавали баланс. Обычный перебор вычёркивал бы
- * по узлу за каждый заход в историю и оставил бы кошелёк без соединения.
+ * Behaviour checked on live nodes: `eth.drpc.org` answered "408" and
+ * `ethereum-rpc.publicnode.com` answered "403: archive token required",
+ * while both served balance in the same second. Ordinary rotation would
+ * drop a node on every history visit and leave the wallet with no
+ * connection.
  */
-describe('FailoverProvider: выборка журналов', () => {
+describe('FailoverProvider: log query', () => {
   const ANY_FILTER = { fromBlock: 0n, toBlock: 1n }
 
-  it('оставляет узел в работе, когда тот отказал только на журналах', async () => {
+  it('keeps the node in service when it refused only logs', async () => {
     for (const item of ENDPOINTS) {
       behaviours.set(item.url, { failLogs: true })
     }
@@ -350,41 +352,41 @@ describe('FailoverProvider: выборка журналов', () => {
 
     await expect(provider.getLogs(ANY_FILTER)).rejects.toBeInstanceOf(RpcError)
 
-    /* Главное в этой проверке: узел остался рабочим. Ради истории
-       нельзя лишать кошелёк баланса и отправки. */
+    /* The point of this check: the node stayed working. History must
+       not cost the wallet its balance and send. */
     expect(await provider.getBalance(OWNER)).toBe(3n)
     expect(provider.rpcUrl).toBe('https://a.example')
   })
 
-  it('спрашивает симуляцию у соседа, когда действующий узел её не умеет', async () => {
-    /* Живое измерение: шлюз, отдающий журналы, отказывает в симуляции,
-       а узел, выполняющий симуляцию, не отдаёт журналов. Без опроса
-       соседей одно из двух всегда оставалось бы недоступным. */
+  it('asks a neighbor for simulation when the active node cannot do it', async () => {
+    /* Live measurement: a gateway that serves logs refuses simulation,
+       and a node that simulates does not serve logs. Without neighbor
+       probing, one of the two would always stay unavailable. */
     behaviours.set('https://a.example', { failSimulate: true, balance: 3n })
 
     const provider = createProvider()
 
-    expect(await provider.request({ method: 'eth_simulateV1', params: [] })).toBe('симуляция')
+    expect(await provider.request({ method: 'eth_simulateV1', params: [] })).toBe('simulation')
 
-    /* Действующий узел не сменился: он исправен, просто не умеет
-       именно этого вызова. */
+    /* The active node did not change: it is healthy, it just cannot
+       do this particular call. */
     expect(provider.rpcUrl).toBe('https://a.example')
     expect(await provider.getBalance(OWNER)).toBe(3n)
   })
 
-  it('берёт журналы у соседа, когда действующий узел в них отказал', async () => {
+  it('takes logs from a neighbor when the active node refused them', async () => {
     behaviours.set('https://a.example', { failLogs: true, balance: 3n })
 
     const provider = createProvider()
 
     expect(await provider.getLogs(ANY_FILTER)).toStrictEqual([])
 
-    /* Сосед ответил, но действующим не стал: его спросили и отпустили. */
+    /* The neighbor answered but did not become active: it was asked and released. */
     expect(provider.rpcUrl).toBe('https://a.example')
     expect(created.find((stub) => stub.rpcUrl === 'https://b.example')?.logCalls).toBe(1)
   })
 
-  it('закрывает временное соединение с соседом', async () => {
+  it('closes the temporary neighbor connection', async () => {
     behaviours.set('https://a.example', { failLogs: true })
 
     await createProvider().getLogs(ANY_FILTER)
@@ -392,62 +394,63 @@ describe('FailoverProvider: выборка журналов', () => {
     expect(created.find((stub) => stub.rpcUrl === 'https://b.example')?.isActive).toBe(false)
   })
 
-  it('доводит ошибку действующего узла, когда отказали все', async () => {
+  it('surfaces the active node error when every node refused', async () => {
     for (const item of ENDPOINTS) {
       behaviours.set(item.url, { failLogs: true })
     }
 
-    /* Наружу уходит ответ того узла, с которым кошелёк работает,
-       а не случайного соседа, опрошенного последним. */
+    /* What surfaces is the answer of the node the wallet is using,
+       not a random neighbor probed last. */
     await expect(createProvider().getLogs(ANY_FILTER)).rejects.toMatchObject({ rpcCode: -32602 })
   })
 })
 
-describe('FailoverProvider: ошибка узла не является отказом транспорта', () => {
-  it('не переключается, когда узел ответил ошибкой', async () => {
+describe('FailoverProvider: a node error is not a transport failure', () => {
+  it('does not switch when the node answered with an error', async () => {
     behaviours.set('https://a.example', { rpcError: true })
     behaviours.set('https://b.example', { balance: 1n })
 
     const provider = createProvider()
 
-    /* Узел, который ответил, работает. Второй ответит то же самое:
-       недостаток средств не зависит от того, кого спрашивать. */
+    /* The node that answered is working. A second one would say the
+       same: insufficient funds does not depend on whom you ask. */
     await expect(provider.getBalance(OWNER)).rejects.toBeInstanceOf(InsufficientFundsError)
     expect(created).toHaveLength(1)
   })
 
-  it('доводит исходную ошибку до вызывающего кода', async () => {
+  it('surfaces the original error to the caller', async () => {
     behaviours.set('https://a.example', { rpcError: true })
 
     await expect(createProvider().getBalance(OWNER)).rejects.not.toBeInstanceOf(RpcError)
   })
 })
 
-describe('FailoverProvider: отправка транзакции', () => {
-  it('не повторяет отправку на другом узле', async () => {
+describe('FailoverProvider: transaction send', () => {
+  it('does not retry the send on another node', async () => {
     behaviours.set('https://a.example', { failTransport: true })
     behaviours.set('https://b.example', {})
 
     const provider = createProvider()
 
-    /* Судьба первой отправки неизвестна: узел мог принять транзакцию
-       и не успеть ответить. Второй узел вернул бы «already known»,
-       и кошелёк показал бы отказ по принятой транзакции. */
+    /* The fate of the first send is unknown: the node may have accepted
+       the transaction and failed to reply. The second node would return
+       "already known", and the wallet would show a failure for an
+       accepted transaction. */
     await expect(provider.sendRawTransaction('0xsigned' as HexString)).rejects.toBeInstanceOf(
       ProviderUnavailableError,
     )
     expect(created).toHaveLength(1)
   })
 
-  it('отправляет через действующий узел', async () => {
+  it('sends through the active node', async () => {
     behaviours.set('https://a.example', {})
 
     expect(await createProvider().sendRawTransaction('0xsigned' as HexString)).toBe('0xhash')
   })
 })
 
-describe('FailoverProvider: уничтожение', () => {
-  it('закрывает действующее соединение', async () => {
+describe('FailoverProvider: destroy', () => {
+  it('closes the active connection', async () => {
     behaviours.set('https://a.example', { balance: 1n })
 
     const provider = createProvider()
@@ -459,7 +462,7 @@ describe('FailoverProvider: уничтожение', () => {
     expect(created[0]?.isActive).toBe(false)
   })
 
-  it('отказывает в вызовах после уничтожения', async () => {
+  it('rejects calls after destroy', async () => {
     const provider = createProvider()
     provider.destroy()
 

@@ -1,6 +1,6 @@
 import type { FastifyRequest } from 'fastify'
 
-/** Маршруты JSON-API. Остальное может быть статикой кошелька. */
+/** JSON API routes. Everything else may be wallet static files. */
 export function isApiUrl(url: string): boolean {
   const path = url.split('?')[0] ?? ''
 
@@ -8,12 +8,12 @@ export function isApiUrl(url: string): boolean {
 }
 
 /**
- * Запрос к файлу сборки, а не к маршруту приложения.
+ * A request for a build file, not an app route.
  *
- * Имя с точкой (`index-….js`, `robots.txt`) — это файл. Без точки
- * (`/wallet`, `/admin`) — маршрут `BrowserRouter`. Для файла нельзя
- * отдавать `index.html`: браузер тогда видит HTML с MIME модуля
- * и отказывается его исполнять.
+ * A name with a dot (`index-….js`, `robots.txt`) is a file. Without
+ * (`/wallet`, `/admin`) is a `BrowserRouter` route. A file must not
+ * get `index.html`: the browser would then see HTML with a module
+ * MIME type and refuse to execute it.
  */
 export function isStaticAssetUrl(url: string): boolean {
   const path = url.split('?')[0] ?? ''
@@ -23,21 +23,22 @@ export function isStaticAssetUrl(url: string): boolean {
 }
 
 /**
- * Политика для JSON.
+ * Policy for JSON.
  *
- * Ответ не должен исполняться как страница: если браузер ошибётся
- * типом, исполнять в нём будет нечего.
+ * The response must not execute as a page: if the browser guesses
+ * the type wrong, there is nothing to run.
  */
 export const API_CONTENT_SECURITY_POLICY =
   "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 /**
- * Политика страницы кошелька.
+ * Wallet page policy.
  *
- * Совпадает с production-сборкой (`build/csp-plugin.ts`), плюс
- * `frame-ancestors` — её метатег не умеет. `upgrade-insecure-requests`
- * только на HTTPS: иначе `http://127.0.0.1:8080/` уехал бы на https
- * и страница не открылась бы.
+ * Matches the production build (`build/csp-plugin.ts`), plus
+ * `frame-ancestors` — the meta tag cannot do that.
+ * `upgrade-insecure-requests` only on HTTPS: otherwise
+ * `http://127.0.0.1:8080/` would jump to https and the page
+ * would not open.
  */
 export function pageContentSecurityPolicy(https: boolean): string {
   const directives = [
@@ -77,7 +78,7 @@ export function isHttpsRequest(request: FastifyRequest): boolean {
   return value === 'https'
 }
 
-/** Убирает принудительный переход на HTTPS из метатега CSP сборки. */
+/** Strips forced HTTPS upgrade from the built CSP meta tag. */
 export function htmlForTransport(html: string, https: boolean): string {
   if (https) {
     return html

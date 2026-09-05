@@ -1,21 +1,22 @@
 import { InsecureRpcUrlError, InvalidArgumentError, InvalidRpcUrlError } from '@/core/errors'
 
 /**
- * Протоколы, допустимые для RPC-эндпоинта.
+ * Protocols allowed for an RPC endpoint.
  *
- * Открытый HTTP исключён категорически. Посредник в незащищённом канале
- * подменяет баланс, nonce, цену газа и результат вызова контракта —
- * пользователь подписывает транзакцию, отличную от показанной на экране.
- * Это не теоретический риск: публичные точки доступа Wi-Fi и корпоративные
- * прокси перехватывают HTTP штатно.
+ * Plain HTTP is excluded outright. A middleman on an unprotected
+ * channel substitutes the balance, nonce, gas price, and contract
+ * call result — the user signs a transaction different from the
+ * one shown on screen. This is not a theoretical risk: public
+ * Wi-Fi access points and corporate proxies intercept HTTP as
+ * a matter of course.
  */
 const ALLOWED_PROTOCOLS: readonly string[] = ['https:', 'wss:']
 
 /**
- * Проверяет пригодность RPC-адреса.
+ * Checks that an RPC address is fit to use.
  *
- * @throws InvalidRpcUrlError если строка не разбирается как URL.
- * @throws InsecureRpcUrlError если протокол не входит в список разрешённых.
+ * @throws InvalidRpcUrlError if the string does not parse as a URL.
+ * @throws InsecureRpcUrlError if the protocol is not on the allowed list.
  */
 export function assertValidRpcUrl(value: string): void {
   let url: URL
@@ -32,10 +33,10 @@ export function assertValidRpcUrl(value: string): void {
 }
 
 /**
- * Проверяет список RPC-адресов сети.
+ * Checks a network's RPC address list.
  *
- * Пустой список отвергается: сеть без единого узла нефункциональна,
- * и обнаружить это лучше при добавлении, а не при первой транзакции.
+ * An empty list is rejected: a network with no node is unusable,
+ * and that is better found at add time than on the first transaction.
  *
  * @throws InvalidArgumentError, InvalidRpcUrlError, InsecureRpcUrlError
  */
@@ -50,12 +51,13 @@ export function assertValidRpcUrls(values: readonly string[]): void {
 }
 
 /**
- * Проверяет адрес обозревателя блоков.
+ * Checks a block-explorer address.
  *
- * Требование `https` здесь мягче по последствиям, чем для RPC: обозреватель
- * не влияет на подписываемые данные. Но ссылка по HTTP из кошелька —
- * это переход, который может быть перехвачен и подменён фишинговой копией
- * обозревателя, где пользователю покажут «успешную» транзакцию.
+ * Requiring `https` here has milder consequences than for RPC: the
+ * explorer does not affect signed data. But an HTTP link from the
+ * wallet is a navigation that can be intercepted and replaced with
+ * a phishing copy of the explorer, where the user is shown a
+ * "successful" transaction.
  *
  * @throws InvalidRpcUrlError, InsecureRpcUrlError
  */

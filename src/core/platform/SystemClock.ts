@@ -3,16 +3,16 @@ import type { Timestamp, Unsubscribe } from '@/core/types'
 import type { IClock } from './Clock'
 
 /**
- * Часы поверх системного времени и таймеров платформы.
+ * Clock over system time and platform timers.
  *
- * Единственная боевая реализация `IClock`. Прикладной код обращается
- * к времени только через внедрённый экземпляр — прямые вызовы `Date.now`
- * делают поведение автоблокировки непроверяемым тестами.
+ * The only production `IClock`. Application code talks to time only
+ * through the injected instance — direct `Date.now` calls make
+ * auto-lock untestable.
  *
- * ОТМЕНА ВМЕСТО ИДЕНТИФИКАТОРА. Методы возвращают функцию отмены, а не число:
- * тип идентификатора таймера различается в браузере и в Node, и вызывающий
- * код не должен о нём знать. Дополнительно это исключает ошибку «отменил
- * чужой таймер по совпавшему числу».
+ * CANCEL INSTEAD OF AN ID. The methods return a cancel function, not
+ * a number: the timer-id type differs in the browser and in Node,
+ * and the caller must not know it. It also rules out "cancelled
+ * someone else's timer because the numbers matched".
  */
 export class SystemClock implements IClock {
   now(): Timestamp {

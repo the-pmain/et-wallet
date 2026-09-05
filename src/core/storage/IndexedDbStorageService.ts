@@ -17,60 +17,60 @@ import {
   type StorageNamespace,
 } from './types'
 
-/** Имя базы по умолчанию. */
+/** Default database name. */
 const DEFAULT_DATABASE_NAME = 'etwallet'
 
-/** Настройки хранилища. */
+/** Storage settings. */
 export interface IIndexedDbStorageOptions {
   /**
-   * Имя базы данных.
+   * Database name.
    *
-   * Задаётся ради тестов: каждая проверка работает со своей базой,
-   * иначе они видели бы данные друг друга.
+   * Set for tests: each check uses its own database, otherwise they
+   * would see each other's data.
    */
   readonly databaseName?: string
 
   /**
-   * Шаги миграции схемы, по возрастанию версии.
+   * Schema-migration steps, in ascending version order.
    *
-   * ТРЕБОВАНИЕ К РЕАЛИЗАЦИИ ШАГА, НАРУШЕНИЕ КОТОРОГО НЕЗАМЕТНО.
-   * Внутри миграции можно ожидать только операции этого же хранилища.
-   * Любое другое ожидание — обращение к сети, таймер, чтение файла —
-   * отпускает транзакцию IndexedDB: браузер завершает её, как только
-   * очередь микрозадач опустела без незакрытых запросов. Дальнейшие
-   * записи такой миграции молча потеряются.
+   * IMPLEMENTATION REQUIREMENT WHOSE VIOLATION IS INVISIBLE.
+   * Inside a migration you may only await operations of this same
+   * storage. Any other await — a network call, a timer, a file read —
+   * releases the IndexedDB transaction: the browser commits it as soon
+   * as the microtask queue is empty with no outstanding requests.
+   * Later writes of that migration are silently lost.
    */
   readonly migrations?: readonly IStorageMigration[]
 }
 
 /**
- * Постоянное хранилище поверх IndexedDB.
+ * Persistent storage on top of IndexedDB.
  *
- * ПОЧЕМУ IndexedDB, А НЕ localStorage. Запрет на `localStorage` действует
- * в проекте с первого этапа и вынесен в правило ESLint: он синхронен,
- * хранит только строки, доступен любому скрипту страницы и отсутствует
- * в service worker manifest v3. Здесь важно ещё одно: IndexedDB
- * сериализует значения структурным клонированием, а оно **сохраняет
- * `bigint` и `Uint8Array` без потерь**. Через JSON суммы кошелька
- * пришлось бы кодировать вручную, и ошибка в кодеке означала бы молча
- * испорченный баланс.
+ * WHY IndexedDB, NOT localStorage. The ban on `localStorage` has been
+ * in the project from stage one and is an ESLint rule: it is
+ * synchronous, stores only strings, is visible to any page script,
+ * and is absent in a service-worker manifest v3. Another reason
+ * matters here: IndexedDB serializes values by structured clone,
+ * which **keeps `bigint` and `Uint8Array` lossless**. Through JSON,
+ * wallet amounts would have to be encoded by hand, and a codec bug
+ * would mean a silently corrupted balance.
  *
- * ЧТО ЭТОТ СЛОЙ НЕ ДЕЛАЕТ: не шифрует. Шифрование выполняет
- * `SecureStorage` до записи. Иначе хранилище начало бы само решать,
- * что считать секретом.
+ * WHAT THIS LAYER DOES NOT DO: it does not encrypt. Encryption is
+ * done by `SecureStorage` before write. Otherwise storage would start
+ * deciding for itself what counts as a secret.
  *
- * ОТКРЫТИЕ ЛЕНИВОЕ И ОДНОКРАТНОЕ. База открывается при первом
- * обращении, а не отдельным вызовом в точке входа. Требование «вызвать
- * `init` раньше всех» неизбежно нарушается при добавлении нового
- * потребителя, и нарушение проявляется как пустое хранилище —
- * то есть как потерянный кошелёк. `init` остаётся доступным
- * и идемпотентным для тех, кому нужно открыть базу заранее.
+ * OPENING IS LAZY AND ONCE. The database opens on first use, not via
+ * a separate call at the entry point. The requirement "call `init`
+ * before everyone else" is inevitably broken when a new consumer is
+ * added, and the break shows up as empty storage — i.e. a lost
+ * wallet. `init` stays available and idempotent for those who need
+ * the database opened early.
  *
- * ХРАНИЛИЩЕ БРАУЗЕРА МОЖЕТ БЫТЬ ОЧИЩЕНО БЕЗ СПРОСА. При нехватке места
- * браузер вправе вытеснить данные сайта, а для кошелька это значит
- * потерю зашифрованной seed-фразы. Поэтому при открытии запрашивается
- * постоянное хранение; результат доступен через {@link durability}
- * и обязан быть показан пользователю, если разрешение не получено.
+ * BROWSER STORAGE MAY BE CLEARED WITHOUT ASKING. When space is short
+ * the browser may evict site data, and for a wallet that means losing
+ * the encrypted seed phrase. So on open, persistent storage is
+ * requested; the result is available via {@link durability} and must
+ * be shown to the user if permission was not granted.
  */
 export class IndexedDbStorageService implements IStorageService {
   readonly #databaseName: string
@@ -80,9 +80,10 @@ export class IndexedDbStorageService implements IStorageService {
   #opening: Promise<IDBDatabase> | null = null
 
   /**
-   * Браузер обещал не вытеснять данные.
+   * The browser promised not to evict the data.
    *
-   * `false` до открытия базы и в средах, где обещание недоступно.
+   * `false` until the database is opened and in environments where
+   * the promise is unavailable.
    */
   #isPersistent = false
 
@@ -92,8 +93,8 @@ export class IndexedDbStorageService implements IStorageService {
       (left, right) => left.version - right.version,
     )
 
-    /* Версия схемы на единицу больше последней миграции: первая версия
-       занята созданием хранилищ, которое миграцией не является. */
+    /* Schema version is one above the last migration: version one is
+       taken by creating stores, which is not a migration. */
     this.#schemaVersion =
       this.#migrations.reduce((maximum, migration) => Math.max(maximum, migration.version), 0) + 1
   }
@@ -104,9 +105,9 @@ export class IndexedDbStorageService implements IStorageService {
 
   async get<TValue>(namespace: StorageNamespace, key: StorageKey): Promise<TValue | null> {
     try {
-      /* IndexedDB отдаёт значение как `any`: содержимое записи ему
-         неизвестно. Сужение до `unknown` возвращает проверку типов
-         вызывающему коду, вместо того чтобы молча пропустить что угодно. */
+      /* IndexedDB returns the value as `any`: it does not know the
+         record contents. Narrowing to `unknown` returns type checking
+         to the caller, instead of silently accepting anything. */
       const value: unknown = await this.#read<unknown>(namespace, (store) => store.get(key))
 
       return value === undefined ? null : (value as TValue)
@@ -133,8 +134,9 @@ export class IndexedDbStorageService implements IStorageService {
 
   async has(namespace: StorageNamespace, key: StorageKey): Promise<boolean> {
     try {
-      /* Читается ключ, а не значение: запись кошелька может весить
-         килобайты, и проверять её наличие расшифровкой незачем. */
+      /* The key is read, not the value: a wallet record can be
+         kilobytes, and there is no need to decrypt it just to check
+         that it exists. */
       return (await this.#read(namespace, (store) => store.getKey(key))) !== undefined
     } catch (error) {
       throw new StorageReadFailedError(key, { cause: error })
@@ -160,15 +162,15 @@ export class IndexedDbStorageService implements IStorageService {
   }
 
   /**
-   * Выполняет операции атомарно.
+   * Runs operations atomically.
    *
-   * ОТКАТ ВЫПОЛНЯЕТ САМА IndexedDB. Исключение внутри обработчика
-   * приводит к `abort`, и записи, сделанные до него, не сохраняются.
-   * Своего снимка не делается: он был бы копией данных в памяти
-   * и разошёлся бы с базой при параллельной записи.
+   * IndexedDB ITSELF ROLLS BACK. An exception inside the handler
+   * causes `abort`, and writes made before it are not saved. No
+   * snapshot of our own is taken: it would be an in-memory copy and
+   * would drift from the database under a concurrent write.
    *
-   * Ограничение то же, что у миграций: внутри обработчика можно ожидать
-   * только операции этого хранилища.
+   * Same limit as migrations: inside the handler you may only await
+   * operations of this storage.
    */
   async transaction<TResult>(
     namespaces: readonly StorageNamespace[],
@@ -183,10 +185,10 @@ export class IndexedDbStorageService implements IStorageService {
     try {
       result = await handler(wrapTransaction(transaction))
     } catch (error) {
-      /* Обещание завершения гасится до прерывания: `abort` заставит его
-         отклониться, а ждать его здесь никто не будет — наружу уходит
-         исходная причина. Незамеченный отказ обещания в браузере даёт
-         событие `unhandledrejection`, а в Node способен уронить процесс. */
+      /* The completion promise is swallowed before abort: `abort`
+         will reject it, and nobody waits for it here — the original
+         cause goes out. An unnoticed rejected promise in the browser
+         fires `unhandledrejection`, and in Node can crash the process. */
       completion.catch(() => undefined)
       abortQuietly(transaction)
 
@@ -207,18 +209,18 @@ export class IndexedDbStorageService implements IStorageService {
 
     const { usage, quota } = await storage.estimate()
 
-    /* «Неизвестно» не подменяется нулём: ноль занятого места
-       и отсутствие сведений — разные утверждения, и второе, показанное
-       как первое, успокаивает без оснований. */
+    /* "Unknown" is not replaced with zero: zero used space and a lack
+       of information are different statements, and showing the second
+       as the first reassures without grounds. */
     return usage === undefined || quota === undefined ? null : { usage, quota }
   }
 
   /**
-   * Насколько надёжно хранилище удерживает данные.
+   * How reliably storage holds data.
    *
-   * База открывается, если ещё не открыта: разрешение на постоянное
-   * хранение запрашивается там же, и отвечать до этого значило бы
-   * пугать владельца состоянием, которого уже нет.
+   * The database is opened if it is not already: persistent-storage
+   * permission is requested there, and answering before that would
+   * scare the owner with a state that is already gone.
    */
   async durability(): Promise<StorageDurability> {
     await this.#open()
@@ -243,9 +245,9 @@ export class IndexedDbStorageService implements IStorageService {
           new StorageUnavailableError('the database was not deleted', { cause: request.error }),
         )
       }
-      /* Удаление ждёт закрытия всех соединений. Другая вкладка, держащая
-         базу открытой, заблокирует его — и это не ошибка, а причина,
-         которую нужно назвать. */
+      /* Deletion waits for every connection to close. Another tab
+         holding the database open will block it — that is not an
+         error, it is a reason that must be named. */
       request.onblocked = () => {
         reject(
           new StorageUnavailableError(
@@ -256,15 +258,15 @@ export class IndexedDbStorageService implements IStorageService {
     })
   }
 
-  /** Открывает базу, создавая хранилища и выполняя миграции. */
+  /** Opens the database, creating stores and running migrations. */
   async #open(): Promise<IDBDatabase> {
     this.#opening ??= this.#openOnce()
 
     try {
       return await this.#opening
     } catch (error) {
-      /* Неудачное открытие не запоминается: следующая попытка должна
-         открыть базу заново, а не получить сохранённый отказ. */
+      /* A failed open is not remembered: the next attempt must open
+         the database again, not receive a stored refusal. */
       this.#opening = null
 
       throw error
@@ -286,26 +288,27 @@ export class IndexedDbStorageService implements IStorageService {
       }
 
       /*
-        ДЕЙСТВИТЕЛЬНАЯ ВЕРСИЯ УШЛА ВПЕРЁД НАШЕЙ.
+        THE ACTUAL VERSION HAS MOVED PAST OURS.
 
-        Собственная версия выводится из числа миграций, а база могла
-        подняться выше — например, при создании хранилища, добавленного
-        без миграции, либо после работы более новой сборки. Запрос
-        меньшей версии браузер отвергает целиком, и кошелёк переставал
-        открываться: первый запуск чинил схему и поднимал версию,
-        второй просил прежнюю и получал отказ.
+        Our version is derived from the number of migrations, and the
+        database may have gone higher — for example when a store was
+        added without a migration, or after a newer build ran. Asking
+        for a lower version is rejected wholesale by the browser, and
+        the wallet stopped opening: the first launch repaired the
+        schema and raised the version, the second asked for the old
+        one and was refused.
 
-        Понизить версию нельзя и не нужно: база с лишними хранилищами
-        работоспособна. Открываем ту, что есть.
+        Lowering the version is impossible and unnecessary: a database
+        with extra stores still works. Open the one that is there.
       */
       return await this.#openAtVersion(null)
     }
   }
 
   /**
-   * Открывает базу заданной версии.
+   * Opens the database at the given version.
    *
-   * @param version `null` — открыть с существующей версией.
+   * @param version `null` — open at the existing version.
    */
   async #openAtVersion(version: number | null): Promise<IDBDatabase> {
     return await new Promise<IDBDatabase>((resolve, reject) => {
@@ -343,28 +346,29 @@ export class IndexedDbStorageService implements IStorageService {
       request.onsuccess = () => {
         const database = request.result
 
-        /* Другая вкладка обновила схему: держать открытым соединение
-           со старой версией нельзя — оно заблокирует обновление. */
+        /* Another tab updated the schema: keeping a connection on the
+           old version open is not allowed — it would block the upgrade. */
         database.onversionchange = () => {
           database.close()
           this.#opening = null
         }
 
         /*
-          БАЗА, СОЗДАННАЯ ПРЕЖНЕЙ СБОРКОЙ, МОЖЕТ НЕ ИМЕТЬ НОВЫХ ХРАНИЛИЩ.
+          A DATABASE CREATED BY AN OLDER BUILD MAY LACK NEW STORES.
 
-          Список хранилищ выводится из перечня областей, а версия схемы —
-          из числа миграций. Добавление области без миграции оставляло
-          версию прежней, и `onupgradeneeded` у существующей базы
-          не срабатывал: хранилище не создавалось, а чтение из него
-          отказывало. Кошелёк переставал открываться у всех, кто
-          пользовался им до обновления, — и только у них, поэтому
-          на новой базе всё выглядело исправным.
+          The store list is derived from the namespace list, and the
+          schema version from the number of migrations. Adding a
+          namespace without a migration left the version unchanged,
+          and `onupgradeneeded` did not fire on an existing database:
+          the store was not created, and reading from it failed. The
+          wallet stopped opening for everyone who had used it before
+          the update — and only for them, so a fresh database looked
+          fine.
 
-          Здесь недостача обнаруживается и исправляется сама: база
-          переоткрывается со следующей версией, и хранилища создаются
-          обычным путём. Полагаться на то, что о версии не забудут,
-          нельзя — забывают именно так.
+          Here the shortage is detected and repaired: the database is
+          reopened at the next version, and stores are created the
+          usual way. Relying on people not forgetting the version is
+          not enough — that is exactly how they forget.
         */
         const hasAllStores = [...Object.values(STORAGE_NAMESPACE)].every((namespace) =>
           database.objectStoreNames.contains(namespace),
@@ -376,8 +380,8 @@ export class IndexedDbStorageService implements IStorageService {
           return
         }
 
-        /* Версия только растёт: понизить её нельзя, а забрать
-           существующую и прибавить единицу можно всегда. */
+        /* Version only grows: it cannot be lowered, but taking the
+           existing one and adding one always works. */
         const target = Math.max(database.version + 1, this.#schemaVersion)
 
         database.close()
@@ -402,7 +406,7 @@ export class IndexedDbStorageService implements IStorageService {
     })
   }
 
-  /** Выполняет непримененные шаги миграции в транзакции обновления. */
+  /** Runs unapplied migration steps in the upgrade transaction. */
   async #runMigrations(upgrade: IDBTransaction, fromVersion: number): Promise<void> {
     const wrapped = wrapTransaction(upgrade)
 
@@ -420,11 +424,11 @@ export class IndexedDbStorageService implements IStorageService {
   }
 
   /**
-   * Просит браузер не вытеснять данные.
+   * Asks the browser not to evict the data.
    *
-   * Отказ не является ошибкой: в приватном окне и без взаимодействия
-   * пользователя разрешение не выдаётся, а кошелёк обязан работать
-   * и там. Результат запоминается, чтобы интерфейс мог предупредить.
+   * A refusal is not an error: in a private window and without user
+   * interaction the permission is not granted, and the wallet must
+   * still work there. The result is remembered so the UI can warn.
    */
   async #requestPersistence(): Promise<void> {
     const storage: StorageManager | undefined = globalThis.navigator?.storage
@@ -440,7 +444,7 @@ export class IndexedDbStorageService implements IStorageService {
     }
   }
 
-  /** Читает из одного хранилища. */
+  /** Reads from one store. */
   async #read<TResult>(
     namespace: StorageNamespace,
     operation: (store: IDBObjectStore) => IDBRequest<TResult>,
@@ -451,7 +455,7 @@ export class IndexedDbStorageService implements IStorageService {
     return await promisify(operation(transaction.objectStore(namespace)))
   }
 
-  /** Пишет в одно хранилище и дожидается завершения транзакции. */
+  /** Writes to one store and waits for the transaction to finish. */
   async #write(
     namespace: StorageNamespace,
     operation: (store: IDBObjectStore) => IDBRequest,
@@ -462,20 +466,20 @@ export class IndexedDbStorageService implements IStorageService {
 
     await promisify(operation(transaction.objectStore(namespace)))
 
-    /* Ожидание завершения транзакции, а не только запроса: успешный
-       запрос ещё не означает записанных данных — транзакция может
-       быть прервана нехваткой квоты. */
+    /* Wait for the transaction to finish, not just the request: a
+       successful request does not yet mean the data is written — the
+       transaction may still be aborted for quota. */
     await completion
   }
 }
 
 /**
- * Превращает ключ IndexedDB в ключ хранилища.
+ * Turns an IndexedDB key into a storage key.
  *
- * Хранилище использует только строковые ключи — их задаёт
- * `toStorageKey`. Числа, даты и составные ключи, допустимые
- * в IndexedDB, здесь появиться не могут, и превращать их в строку
- * вслепую значило бы получить `[object Object]` вместо имени записи.
+ * Storage uses only string keys — they are produced by `toStorageKey`.
+ * Numbers, dates, and composite keys, which IndexedDB allows, cannot
+ * appear here, and blindly stringifying them would yield
+ * `[object Object]` instead of a record name.
  */
 function toStorageKeyFromIdb(key: IDBValidKey): StorageKey {
   if (typeof key !== 'string') {
@@ -485,7 +489,7 @@ function toStorageKeyFromIdb(key: IDBValidKey): StorageKey {
   return key as StorageKey
 }
 
-/** Превращает запрос IndexedDB в обещание. */
+/** Turns an IndexedDB request into a promise. */
 async function promisify<TResult>(request: IDBRequest<TResult>): Promise<TResult> {
   return await new Promise<TResult>((resolve, reject) => {
     request.onsuccess = () => {
@@ -498,10 +502,10 @@ async function promisify<TResult>(request: IDBRequest<TResult>): Promise<TResult
 }
 
 /**
- * Обещание завершения транзакции.
+ * Promise of transaction completion.
  *
- * Создаётся ДО первой операции: обработчики, назначенные после
- * завершения транзакции, уже не вызовутся, и ожидание повисло бы.
+ * Created BEFORE the first operation: handlers assigned after the
+ * transaction finishes will never fire, and the wait would hang.
  */
 function trackCompletion(transaction: IDBTransaction): Promise<void> {
   return new Promise<void>((resolve, reject) => {
@@ -518,21 +522,21 @@ function trackCompletion(transaction: IDBTransaction): Promise<void> {
 }
 
 /**
- * Прерывает транзакцию, не заслоняя исходную причину.
+ * Aborts a transaction without hiding the original cause.
  *
- * `abort` бросает, если транзакция уже завершена. Эта ошибка не имеет
- * отношения к тому, из-за чего откатывались, и подменять ею настоящую
- * причину нельзя.
+ * `abort` throws if the transaction is already finished. That error
+ * has nothing to do with why we were rolling back, and it must not
+ * replace the real cause.
  */
 function abortQuietly(transaction: IDBTransaction): void {
   try {
     transaction.abort()
   } catch {
-    /* Транзакция уже закрыта — откатывать нечего. */
+    /* The transaction is already closed — nothing to roll back. */
   }
 }
 
-/** Оборачивает транзакцию IndexedDB в контракт хранилища. */
+/** Wraps an IndexedDB transaction in the storage contract. */
 function wrapTransaction(transaction: IDBTransaction): IStorageTransaction {
   const store = (namespace: StorageNamespace): IDBObjectStore => transaction.objectStore(namespace)
 
@@ -564,11 +568,11 @@ function wrapTransaction(transaction: IDBTransaction): IStorageTransaction {
 }
 
 /**
- * Отказ «запрошенная версия меньше существующей».
+ * Refusal "the requested version is lower than the existing one".
  *
- * Отдельный случай, а не общая неудача открытия: он означает базу,
- * созданную более новой сборкой либо уже починенную, и работать с ней
- * можно — в отличие от повреждённой или недоступной.
+ * A distinct case, not a generic open failure: it means a database
+ * created by a newer build or already repaired, and it can be used —
+ * unlike a corrupted or unavailable one.
  */
 function isVersionTooLow(error: unknown): boolean {
   const cause = error instanceof StorageUnavailableError ? error.cause : error

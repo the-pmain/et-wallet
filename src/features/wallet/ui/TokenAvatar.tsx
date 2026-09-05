@@ -4,18 +4,18 @@ import { cn } from '@/shared/lib/utils'
 import { findTokenLogo } from '../lib/token-logo'
 
 interface TokenAvatarProps {
-  /** Адрес контракта. `null` для нативной валюты. */
+  /** Contract address. `null` for native currency. */
   readonly address: string | null
 
-  /** Символ токена. Первые буквы становятся монограммой. */
+  /** Token symbol. The first letters become the monogram. */
   readonly symbol: string
 
   /**
-   * Сеть, в которой действует контракт.
+   * Chain the contract lives on.
    *
-   * Без неё знак не ищется вовсе: один и тот же адрес в разных сетях —
-   * разные контракты, и знак, выданный по одному адресу без указания
-   * сети, мог бы достаться чужому токену.
+   * Without it the mark is not looked up at all: the same address on
+   * different chains is different contracts, and a mark granted by
+   * address alone could go to someone else's token.
    */
   readonly chainId?: ChainId | null
 
@@ -23,40 +23,34 @@ interface TokenAvatarProps {
 }
 
 /**
- * Знак токена.
+ * Token mark.
  *
- * ПОЧЕМУ НЕ ЗАГРУЖАЕТСЯ НАСТОЯЩИЙ ЛОГОТИП. Три независимые причины,
- * каждой из которых достаточно.
+ * Why a live logo is not loaded. Three independent reasons, each
+ * enough on its own.
  *
- * Первая — политика безопасности. Боевой CSP приложения разрешает
- * изображения только из собственной сборки и из `data:`. Запрос
- * к стороннему хранилищу логотипов будет заблокирован браузером,
- * а ослаблять политику ради украшения недопустимо.
+ * First — CSP. Production allows images only from our build and
+ * `data:`. A third-party logo host would be blocked, and weakening
+ * the policy for decoration is not allowed.
  *
- * Вторая — приватность. По набору запрошенных логотипов оператор
- * хранилища узнаёт состав портфеля пользователя и связывает его
- * с IP-адресом. Кошелёк, вся остальная работа которого выстроена
- * вокруг неразглашения, не может открывать такую утечку ради картинки.
+ * Second — privacy. The set of requested logos tells the host the
+ * user's portfolio and ties it to an IP. A wallet built around
+ * non-disclosure cannot open that leak for a picture.
  *
- * Третья — подделки. Мошеннический контракт с символом `USDC`
- * и настоящим логотипом USDC неотличим от оригинала.
+ * Third — fakes. A fraudulent contract with ticker `USDC` and the
+ * real USDC logo is indistinguishable from the original.
  *
- * ЧТО ИЗМЕНИЛОСЬ. Первые две причины остаются в силе и запрещают
- * загрузку знака из сети; знаки теперь лежат в самой сборке, и ни
- * одного стороннего запроса не возникает.
+ * What changed. The first two still forbid a network fetch; marks
+ * now live in the build, so no third-party request happens.
  *
- * Третья причина переворачивается, если знак выдаётся не по символу,
- * а по паре «сеть и адрес контракта», сверенной со встроенным
- * реестром. Тогда настоящий USDC знак получает, а поддельный с тем же
- * символом — нет, и разница видна с одного взгляда. Прежде оба
- * выглядели одинаково, и различала их только пометка рядом.
+ * The third flips if the mark is granted by (chain, contract)
+ * checked against the built-in registry, not by ticker. Real USDC
+ * gets the mark; a fake with the same ticker does not. The mark
+ * became an authenticity signal instead of bait. See
+ * `findTokenLogo`.
  *
- * Знак стал признаком подлинности вместо приманки. Подробнее —
- * в `findTokenLogo`.
- *
- * ОСТАЛЬНЫЕ ТОКЕНЫ СОХРАНЯЮТ ОТПЕЧАТОК АДРЕСА: цвет выводится из
- * адреса, автор контракта не может выбрать его произвольно, и два
- * разных контракта выглядят по-разному даже при совпадающих символах.
+ * Other tokens keep an address fingerprint: color is derived from
+ * the address, the contract author cannot pick it, and two
+ * different contracts look different even with matching tickers.
  */
 export function TokenAvatar({ address, symbol, chainId, className }: TokenAvatarProps) {
   const hue = address === null ? NATIVE_HUE : hashAddress(address) % 360
@@ -64,26 +58,26 @@ export function TokenAvatar({ address, symbol, chainId, className }: TokenAvatar
   const logo = findTokenLogo(chainId ?? null, (address as Address | null) ?? null)
 
   if (logo !== null) {
-    /* `object-contain` обязателен: три знака из восьми не квадратные —
-       ромб эфира, знак Tether, знак POL. В квадратной рамке без него
-       их растянуло бы, а растянутый фирменный знак хуже отсутствующего.
+    /* `object-contain` is required: three of eight marks are not
+       square (ether diamond, Tether, POL). A square frame without
+       it would stretch them, and a stretched brand mark is worse
+       than none.
 
-       Пустое описание, а не имя монеты: обозначение и название стоят
-       в той же строке текстом, и повторять их голосом — заставлять
-       слушать одно дважды.
+       Empty alt, not the coin name: ticker and name already sit
+       as text in the same row; voicing them twice is noise.
 
-       Размеры заданы атрибутами: без них строка списка дёргалась бы
-       в момент появления знака. Отложенная загрузка не нужна — файл
-       лежит в своей же сборке и весит около килобайта. */
+       Size is set by attributes: without them the list row jumped
+       when the mark appeared. Lazy load is unnecessary — the file
+       is in our build and is about a kilobyte. */
     const common = cn('size-9 shrink-0 object-contain', className)
 
     if (logo.srcOnDark === null) {
       return <img src={logo.src} alt="" aria-hidden width={36} height={36} className={common} />
     }
 
-    /* Два изображения вместо выбора темы из кода: тема переключается
-       классом на корневом элементе, и правило CSS не зависит ни от
-       состояния, ни от порядка отрисовки. */
+    /* Two images instead of picking the theme in code: the theme
+       switches by a class on the root, and the CSS rule depends on
+       neither state nor paint order. */
     return (
       <>
         <img
@@ -124,21 +118,20 @@ export function TokenAvatar({ address, symbol, chainId, className }: TokenAvatar
 }
 
 /**
- * Оттенок нативной валюты.
+ * Native-currency hue.
  *
- * Фиксированный и совпадающий с фирменным: нативная валюта — часть
- * конфигурации сети, а не произвольный контракт, и выделять её
- * постоянным цветом уместно.
+ * Fixed and matching the brand: native currency is part of the
+ * network config, not an arbitrary contract, so a constant color
+ * is appropriate.
  */
 const NATIVE_HUE = 293
 
 /**
- * Свёртка адреса в число.
+ * Fold the address into a number.
  *
- * Алгоритм FNV-1a: детерминированный и хорошо перемешивающий короткие
- * строки. Криптографическая стойкость не требуется и не подразумевается —
- * от свёртки нужна только различимость цветов. Использовать её
- * для чего-либо ещё нельзя.
+ * FNV-1a: deterministic, mixes short strings well. Cryptographic
+ * strength is neither required nor implied — only color
+ * distinctness. Do not reuse this hash for anything else.
  */
 function hashAddress(address: string): number {
   const normalized = address.toLowerCase()

@@ -2,40 +2,38 @@ import type { ISecretBuffer } from '@/core/encryption'
 import type { Address, DerivationPath, KeyringId } from '@/core/types'
 
 /**
- * Тип набора ключей.
+ * Kind of keyring.
  *
- * Это не декоративная метка, а определяющая характеристика: способ подписи
- * принципиально разный, и без явного различения аппаратные кошельки
- * встроить невозможно.
+ * This is not a decorative label: the signing method is
+ * fundamentally different, and without an explicit distinction
+ * hardware wallets cannot be integrated.
  *
- * | Тип          | Где ключ                 | Как подписывает                    |
+ * | Type         | Where the key lives      | How it signs                       |
  * |--------------|--------------------------|------------------------------------|
- * | Hd           | в памяти, разблокирован  | локально                           |
- * | PrivateKey   | в памяти, разблокирован  | локально                           |
- * | Ledger/Trezor| никогда не покидает      | по USB/HID, подтверждение на экране|
- * | WatchOnly    | отсутствует              | не может подписывать вообще        |
+ * | Hd           | in memory, unlocked      | locally                            |
+ * | PrivateKey   | in memory, unlocked      | locally                            |
+ * | Ledger/Trezor| never leaves the device  | over USB/HID, confirm on the screen|
+ * | WatchOnly    | absent                   | cannot sign at all                 |
  */
 export const KEYRING_TYPE = {
-  /** HD-дерево, выведенное из мнемонической фразы (BIP-39 + BIP-32). */
+  /** HD tree derived from a mnemonic (BIP-39 + BIP-32). */
   Hd: 'hd',
-  /** Единичный импортированный приватный ключ. */
+  /** A single imported private key. */
   PrivateKey: 'private-key',
-  /** Аппаратный кошелёк Ledger. */
   Ledger: 'ledger',
-  /** Аппаратный кошелёк Trezor. */
   Trezor: 'trezor',
-  /** Наблюдение за чужим адресом. Подпись невозможна. */
+  /** Watching a foreign address. Signing is impossible. */
   WatchOnly: 'watch-only',
 } as const
 
 export type KeyringType = (typeof KEYRING_TYPE)[keyof typeof KEYRING_TYPE]
 
 /**
- * Возможности набора ключей.
+ * Capabilities of a keyring.
  *
- * Проверяются ДО показа пользователю формы подписи. Иначе интерфейс
- * предложит подписать сообщение аккаунтом, который физически на это
- * не способен, и ошибка всплывёт после заполнения формы.
+ * Checked BEFORE the sign form is shown to the user. Otherwise the
+ * UI would offer to sign a message with an account that physically
+ * cannot, and the error would surface after the form is filled.
  */
 export interface IKeyringCapabilities {
   readonly canSignTransaction: boolean
@@ -43,68 +41,64 @@ export interface IKeyringCapabilities {
   readonly canSignTypedData: boolean
 
   /**
-   * Возможен ли экспорт приватного ключа.
+   * Whether a private key can be exported.
    *
-   * Для аппаратных кошельков всегда `false`: ключ физически не покидает
-   * устройство. Это не ограничение реализации, а свойство устройства.
+   * Always `false` for hardware wallets: the key physically never
+   * leaves the device. That is a property of the device, not an
+   * implementation limit.
    */
   readonly canExportPrivateKey: boolean
 
-  /** Возможно ли добавление новых аккаунтов выводом из того же корня. */
+  /** Whether new accounts can be added by deriving from the same root. */
   readonly canDeriveAccounts: boolean
 
-  /** Требуется ли физическое подтверждение операции на устройстве. */
+  /** Whether the operation needs a physical confirmation on the device. */
   readonly requiresPhysicalConfirmation: boolean
 }
 
-/** Сериализованное состояние набора ключей внутри зашифрованного хранилища. */
+/** Serialized keyring state inside the encrypted vault. */
 export interface ISerializedKeyring {
   readonly id: KeyringId
   readonly type: KeyringType
 
   /**
-   * Данные, специфичные для типа.
+   * Type-specific data.
    *
-   * Для HD — мнемоника и число выведенных аккаунтов. Для аппаратного —
-   * только пути деривации и адреса, без какого-либо секрета.
+   * For HD — the mnemonic and the number of derived accounts. For
+   * hardware — only derivation paths and addresses, with no secret.
    */
   readonly data: Readonly<Record<string, unknown>>
 }
 
-/** Параметры создания HD-набора. */
 export interface IHdKeyringOptions {
-  /** Мнемоническая фраза. Передаётся буфером, а не строкой. */
+  /** Mnemonic phrase. Passed as a buffer, not a string. */
   readonly mnemonic: ISecretBuffer
-  /** Базовый путь деривации. По умолчанию `m/44'/60'/0'/0`. */
+  /** Base derivation path. Default `m/44'/60'/0'/0`. */
   readonly basePath?: DerivationPath
-  /** Сколько аккаунтов вывести сразу. */
   readonly accountCount?: number
 }
 
-/** Параметры импорта одиночного ключа. */
 export interface IPrivateKeyKeyringOptions {
   readonly privateKey: ISecretBuffer
 }
 
-/** Параметры подключения аппаратного кошелька. */
 export interface IHardwareKeyringOptions {
   readonly type: typeof KEYRING_TYPE.Ledger | typeof KEYRING_TYPE.Trezor
   readonly basePath: DerivationPath
-  /** Адреса, выбранные пользователем из списка на устройстве. */
+  /** Addresses the user picked from the list on the device. */
   readonly addresses: readonly Address[]
 }
 
-/** Параметры добавления наблюдаемого адреса. */
 export interface IWatchOnlyKeyringOptions {
   readonly address: Address
 }
 
 /**
- * Размеченное объединение параметров создания набора ключей.
+ * Discriminated union of keyring-creation parameters.
  *
- * Объединение вместо набора необязательных полей: оно не позволяет передать
- * мнемонику вместе с параметрами Ledger и делает невалидные комбинации
- * невыразимыми в типах.
+ * A union instead of a bag of optional fields: it forbids passing
+ * a mnemonic together with Ledger parameters and makes invalid
+ * combinations inexpressible in the types.
  */
 export type KeyringCreationOptions =
   | ({ readonly type: typeof KEYRING_TYPE.Hd } & IHdKeyringOptions)

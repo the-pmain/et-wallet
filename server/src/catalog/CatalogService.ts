@@ -27,7 +27,7 @@ import {
   validateTokens,
 } from './validate.ts'
 
-/** Содержимое каталога. Внедряется, чтобы тест мог подставить своё. */
+/** Catalog contents. Injected so a test can supply its own. */
 export interface ICatalogData {
   readonly networks: readonly INetworkEntry[]
   readonly rpcEndpoints: readonly IRpcEntry[]
@@ -36,7 +36,7 @@ export interface ICatalogData {
   readonly releases: IReleaseCatalog
 }
 
-/** Каталог из репозитория. */
+/** Catalog from the repository. */
 export const REPOSITORY_CATALOG: ICatalogData = {
   networks: NETWORKS,
   rpcEndpoints: RPC_ENDPOINTS,
@@ -46,16 +46,16 @@ export const REPOSITORY_CATALOG: ICatalogData = {
 }
 
 /**
- * Доступ к каталогу.
+ * Catalog access.
  *
- * ПРОВЕРКА ВЫПОЛНЯЕТСЯ В КОНСТРУКТОРЕ, А НЕ ПРИ ПЕРВОМ ЗАПРОСЕ.
- * Сервис с испорченным каталогом обязан не подняться: отказ при старте
- * виден тому, кто разворачивает сервис, а ошибка в выдаче не видна
- * никому, пока не станет поздно.
+ * VALIDATION RUNS IN THE CONSTRUCTOR, NOT ON THE FIRST REQUEST.
+ * A service with a corrupt catalog must not start: a startup refusal
+ * is seen by whoever deploys the service; an error in the response
+ * is seen by nobody until it is too late.
  *
- * ДАННЫЕ НЕИЗМЕНЯЕМЫ ВО ВРЕМЯ РАБОТЫ. Изменение каталога — это выпуск
- * новой версии сервиса, а не запись в базу: правка адреса контракта
- * обязана проходить через ревью и историю правок.
+ * DATA IS IMMUTABLE AT RUNTIME. Changing the catalog is a new service
+ * release, not a database write: a contract-address edit must go
+ * through review and history.
  */
 export class CatalogService {
   readonly #data: ICatalogData
@@ -73,7 +73,6 @@ export class CatalogService {
     this.#knownChains = knownChains
   }
 
-  /** Известна ли сеть каталогу. */
   hasNetwork(chainId: bigint): boolean {
     return this.#knownChains.has(chainId)
   }
@@ -96,11 +95,12 @@ export class CatalogService {
   }
 
   /**
-   * Рекомендуемые токены сети.
+   * Recommended tokens for a network.
    *
-   * Пустой список у известной сети означает «подтверждённых рекомендаций
-   * нет», а не «токенов не существует». Разницу обязан передать клиент:
-   * иначе пользователь прочитает пустоту как утверждение.
+   * An empty list for a known network means "no confirmed
+   * recommendations", not "tokens do not exist". The client must
+   * convey that difference: otherwise the user reads emptiness as
+   * a claim.
    */
   listTokens(chainId: bigint): readonly ITokenResponse[] {
     return this.#data.tokens
@@ -117,11 +117,10 @@ export class CatalogService {
   }
 
   /**
-   * Действующие уведомления.
+   * Active notifications.
    *
-   * @param now Текущий момент. Передаётся снаружи, чтобы поведение
-   *        на границе срока проверялось тестом, а не наблюдалось
-   *        однажды в проде.
+   * @param now Current instant. Passed in so expiry-boundary behavior
+   *        is tested, not observed once in production.
    */
   listNotifications(now: Date): readonly INotificationResponse[] {
     const moment = now.getTime()
@@ -139,13 +138,12 @@ export class CatalogService {
   }
 
   /**
-   * Состояние версии клиента.
+   * Client version status.
    *
-   * @param clientVersion Версия, о которой спрашивает клиент. `null`,
-   *        если она не сообщена: тогда сравнивать не с чем, и признаки
-   *        остаются `null`. «Не знаем» нельзя подменять ни на «всё
-   *        в порядке», ни на «пора обновляться» — оба ответа были бы
-   *        утверждением из ничего.
+   * @param clientVersion Version the client asks about. `null` if
+   *        unreported: then there is nothing to compare, and flags
+   *        stay `null`. "We do not know" must not become "all is well"
+   *        or "time to update" — both would be a claim from nothing.
    */
   getVersionStatus(clientVersion: string | null): IVersionResponse {
     const { latest, minSupported, advisory } = this.#data.releases

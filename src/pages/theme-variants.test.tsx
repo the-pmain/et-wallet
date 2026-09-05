@@ -20,8 +20,8 @@ beforeEach(() => {
   services = createTestAppServices()
 })
 
-describe('Этюды темы главного экрана', () => {
-  it('открывает MetaMask-этюд без разблокировки', async () => {
+describe('Home-screen theme studies', () => {
+  it('opens the MetaMask study without unlocking', async () => {
     window.history.replaceState(null, '', '/variant-1')
     renderApp()
 
@@ -30,7 +30,7 @@ describe('Этюды темы главного экрана', () => {
     expect(screen.getByRole('navigation', { name: 'MetaMask sections' })).toBeInTheDocument()
   })
 
-  it('открывает Trust Wallet-этюд без разблокировки', async () => {
+  it('opens the Trust Wallet study without unlocking', async () => {
     window.history.replaceState(null, '', '/variant-2')
     renderApp()
 
@@ -39,7 +39,7 @@ describe('Этюды темы главного экрана', () => {
     expect(screen.getByRole('navigation', { name: 'Trust Wallet sections' })).toBeInTheDocument()
   })
 
-  it('открывает кабинетный этюд без разблокировки', async () => {
+  it('opens the cabinet study without unlocking', async () => {
     window.history.replaceState(null, '', '/variant-3')
     renderApp()
 
@@ -48,7 +48,7 @@ describe('Этюды темы главного экрана', () => {
     expect(screen.getAllByText('ET WALLET').length).toBeGreaterThan(0)
   })
 
-  it('переключает этюды и оставляет кнопки макета пустыми', async () => {
+  it('switches studies and leaves mock buttons inert', async () => {
     const user = userEvent.setup()
 
     window.history.replaceState(null, '', '/variant-1')

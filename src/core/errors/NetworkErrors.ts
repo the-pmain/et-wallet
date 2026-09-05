@@ -1,9 +1,6 @@
 import { AppError } from './AppError'
 import { ERROR_CODE, type ErrorCode } from './ErrorCode'
 
-/** Ошибки сетевого слоя и взаимодействия с RPC-узлами. */
-
-/** Сеть с указанным chainId не зарегистрирована. */
 export class NetworkNotFoundError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NetworkNotFound
 
@@ -12,7 +9,6 @@ export class NetworkNotFoundError extends AppError {
   }
 }
 
-/** Сеть с таким chainId уже добавлена. */
 export class NetworkAlreadyExistsError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NetworkAlreadyExists
 
@@ -22,12 +18,12 @@ export class NetworkAlreadyExistsError extends AppError {
 }
 
 /**
- * Попытка изменить или удалить встроенную сеть.
+ * Attempt to change or remove a built-in network.
  *
- * Встроенные сети неизменяемы сознательно. Возможность отредактировать
- * chainId или RPC основной сети через интерфейс добавления сети —
- * известный приём фишинга: пользователю предлагают «ускорить Ethereum»,
- * подменяя узел на подконтрольный.
+ * Built-in networks are immutable on purpose. Being able to edit the
+ * mainnet chainId or RPC through the add-network UI is a known phishing
+ * trick: the user is offered to "speed up Ethereum" while the node is
+ * swapped for a controlled one.
  */
 export class BuiltInNetworkImmutableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.BuiltInNetworkImmutable
@@ -38,10 +34,10 @@ export class BuiltInNetworkImmutableError extends AppError {
 }
 
 /**
- * RPC-адрес не является корректным URL.
+ * The RPC address is not a valid URL.
  *
- * Отделено от {@link InsecureRpcUrlError}: разбор строки не удался вовсе,
- * поэтому говорить о протоколе бессмысленно.
+ * Separate from {@link InsecureRpcUrlError}: the string did not parse
+ * at all, so talking about the protocol is meaningless.
  */
 export class InvalidRpcUrlError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InvalidRpcUrl
@@ -52,12 +48,12 @@ export class InvalidRpcUrlError extends AppError {
 }
 
 /**
- * RPC-адрес использует незащищённый протокол.
+ * The RPC address uses an insecure protocol.
  *
- * Открытый HTTP означает, что посредник в канале способен подменить баланс,
- * nonce, цену газа и результат вызова контракта. Пользователь подпишет
- * транзакцию, отличную от той, которую видит на экране. Допустимы только
- * `https:` и `wss:`.
+ * Plain HTTP means a channel intermediary can swap the balance, nonce,
+ * gas price, and contract-call result. The user would sign a
+ * transaction other than the one they see on screen. Only `https:`
+ * and `wss:` are allowed.
  */
 export class InsecureRpcUrlError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.InsecureRpcUrl
@@ -68,23 +64,21 @@ export class InsecureRpcUrlError extends AppError {
 }
 
 /**
- * Узел сообщил chainId, отличный от ожидаемого.
+ * The node reported a chainId other than the expected one.
  *
- * Наиболее опасная ошибка сетевого слоя. Подменённый или ошибочно
- * настроенный узел заставляет кошелёк подписать транзакцию для одной сети,
- * тогда как пользователю показана другая. Полученная подпись может быть
- * повторно проиграна в целевой сети.
+ * The most dangerous network-layer error. A swapped or misconfigured
+ * node makes the wallet sign a transaction for one network while the
+ * user is shown another. The resulting signature can be replayed on
+ * the target network.
  *
- * Обработка: немедленный разрыв соединения с узлом. Продолжение работы
- * при несовпадении недопустимо ни при каких условиях.
+ * Handling: drop the node connection immediately. Continuing on a
+ * mismatch is forbidden in every case.
  */
 export class ChainIdMismatchError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.ChainIdMismatch
 
-  /** Ожидаемый идентификатор сети из конфигурации. */
   readonly expected: bigint
 
-  /** Идентификатор, фактически сообщённый узлом. */
   readonly actual: bigint
 
   constructor(expected: bigint, actual: bigint) {
@@ -98,36 +92,32 @@ export class ChainIdMismatchError extends AppError {
 }
 
 /**
- * Добавляемая сеть носит имя встроенной, но обслуживает другую цепь.
+ * The network being added wears a built-in name but serves another chain.
  *
- * Основной приём подмены сети. Сайт предлагает добавить сеть с привычным
- * именем и собственным идентификатором; сверка chainId с узлом её
- * пропускает, потому что узел честно сообщает свой идентификатор.
- * В шапке кошелька появляется знакомое имя, и пользователь подписывает
- * перевод, считая его отправкой в основную сеть.
+ * The main network-spoofing trick. A site offers to add a network with
+ * a familiar name and its own identifier; a chainId check against the
+ * node lets it through because the node honestly reports its id.
+ * The wallet header shows a familiar name, and the user signs a
+ * transfer thinking it is going to mainnet.
  *
- * Обработка: показать пользователю, за какую сеть выдаёт себя
- * добавляемая, и добавить только по явному согласию — параметром
- * `allowImpersonation`.
+ * Handling: show the user which network the addition impersonates, and
+ * add it only on explicit consent — the `allowImpersonation` parameter.
  */
 export class NetworkImpersonationError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.NetworkImpersonation
 
-  /** Имя встроенной сети, которое присвоила себе добавляемая. */
   readonly impersonatedName: string
 
-  /** Идентификатор подлинной встроенной сети с таким именем. */
   readonly impersonatedChainId: bigint
 
   /**
-   * Имя записано буквами других алфавитов.
+   * The name is written with letters from other alphabets.
    *
-   * ОТЛИЧИЕ, КОТОРОЕ ОБЯЗАНО ДОЙТИ ДО ЧЕЛОВЕКА. При совпадении
-   * по буквам он видит два одинаковых названия и понимает сообщение
-   * сразу. При подмене похожими символами он видит два ВИЗУАЛЬНО
-   * ОДИНАКОВЫХ названия и сообщение «имя занято» — без объяснения оно
-   * выглядит ошибкой кошелька, то есть поводом нажать «добавить
-   * всё равно».
+   * A DISTINCTION THAT MUST REACH THE PERSON. On a letter-for-letter
+   * match they see two identical names and understand the message at
+   * once. On a lookalike-character swap they see two VISUALLY
+   * IDENTICAL names and a "name taken" message — without explanation
+   * it looks like a wallet bug, i.e. a reason to press "add anyway".
    */
   readonly foreignCharacters: readonly string[]
 
@@ -154,17 +144,17 @@ export class NetworkImpersonationError extends AppError {
 }
 
 /**
- * Узел не ответил.
+ * The node did not answer.
  *
- * ПОЧЕМУ ТЕКСТ ЗАМЕНЯЕМ. Ошибка возникает в двух разных положениях:
- * когда перебор дошёл до конца списка — и тогда адресов действительно
- * не осталось, — и когда конкретный узел не дал ответа на конкретный
- * запрос, а остальные адреса целы. Один текст на оба случая
- * оказывается неправдой в одном из них: сообщение об исчерпанном
- * списке доходило до экрана истории при двух исправных узлах.
+ * WHY THE TEXT IS REPLACEABLE. The error arises in two different
+ * situations: when the list has been exhausted — and then there
+ * really are no addresses left — and when one node failed one request
+ * while the other addresses are fine. One text for both is a lie in
+ * one of them: an "exhausted list" message reached the history screen
+ * with two healthy nodes.
  *
- * Поэтому вызывающий код, знающий подробность, передаёт `reason`.
- * Без неё остаётся прежний текст — он верен для исчерпанного списка.
+ * So a caller that knows the detail passes `reason`. Without it the
+ * old text remains — it is correct for an exhausted list.
  */
 export class ProviderUnavailableError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.ProviderUnavailable
@@ -177,19 +167,17 @@ export class ProviderUnavailableError extends AppError {
 }
 
 /**
- * Узел вернул ошибку JSON-RPC.
+ * The node returned a JSON-RPC error.
  *
- * Поле `rpcCode` сохраняется отдельно: коды JSON-RPC стандартизованы,
- * и обработка обязана опираться на них, а не на текст сообщения,
- * который у разных реализаций узлов различается.
+ * `rpcCode` is kept separately: JSON-RPC codes are standardised, and
+ * handling must rely on them, not on the message text, which differs
+ * across node implementations.
  */
 export class RpcError extends AppError {
   readonly code: ErrorCode = ERROR_CODE.RpcError
 
-  /** Числовой код ошибки JSON-RPC, возвращённый узлом. */
   readonly rpcCode: number
 
-  /** Дополнительные данные узла. Структура не стандартизована. */
   readonly data: unknown
 
   constructor(rpcCode: number, message: string, data?: unknown) {

@@ -1,14 +1,15 @@
 import { cva } from 'class-variance-authority'
 
 /**
- * Варианты оформления метки.
+ * Badge appearance variants.
  *
- * Вынесены в отдельный файл от компонента: React Fast Refresh корректно
- * работает только тогда, когда модуль экспортирует исключительно компоненты.
+ * Extracted from the component: React Fast Refresh works correctly
+ * only when a module exports components alone.
  *
- * Набор вариантов повторяет смысловые уровни палитры. Отдельного «синего»
- * или «зелёного» варианта нет намеренно: цвет в кошельке означает уровень
- * риска, и метка, окрашенная ради красоты, размывает это значение.
+ * The set follows the semantic levels of the palette. There is no
+ * separate “blue” or “green” variant on purpose: in this wallet
+ * color means risk level, and a badge colored for looks blurs that
+ * meaning.
  */
 export const badgeVariants = cva(
   'inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-colors [&>svg]:size-3',

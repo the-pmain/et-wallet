@@ -1,82 +1,78 @@
 import { KDF_ALGORITHM, type IKdfParams } from './types'
 
 /**
- * Версия формата зашифрованного контейнера.
+ * Encrypted-container format version.
  *
- * Проверяется ДО попытки расшифровки. Контейнер с версией новее
- * поддерживаемой приводит к отказу в работе, а не к попытке прочитать
- * его «как получится»: неверная интерпретация с последующей перезаписью
- * означает безвозвратную потерю ключей.
+ * Checked BEFORE any decrypt attempt. A container newer than this build
+ * fails closed, not read "as best we can": a wrong interpretation
+ * followed by a rewrite means irreversible key loss.
  */
 export const PAYLOAD_VERSION = 1
 
 /**
- * Число итераций PBKDF2.
+ * PBKDF2 iteration count.
  *
- * 600 000 для HMAC-SHA256 — действующая рекомендация OWASP. Столько же
- * применяет MetaMask начиная с 2023 года.
+ * 600 000 for HMAC-SHA256 is the current OWASP recommendation. MetaMask
+ * has used the same figure since 2023.
  *
- * Значение подбирается не по вкусу, а по стоимости перебора. Каждое
- * удвоение итераций удваивает и время разблокировки, и стоимость атаки.
- * Порядок 10^5 даёт задержку в сотни миллисекунд на современном устройстве —
- * незаметно для пользователя и заметно для перебирающего.
+ * The value is chosen by attack cost, not taste. Doubling iterations
+ * doubles both unlock time and attack cost. On the order of 10^5 the
+ * delay is hundreds of milliseconds on a modern device — unnoticed by
+ * the user, noticed by a guesser.
  *
- * Число ВОЗРАСТАЕТ со временем вслед за ростом вычислительных мощностей.
- * Старые хранилища остаются читаемыми: параметры сохраняются рядом
- * с шифротекстом, а `needsUpgrade` обнаруживает устаревшие при разблокировке.
+ * The number GROWS over time with compute. Old vaults stay readable:
+ * parameters are stored next to the ciphertext, and `needsUpgrade`
+ * spots stale ones at unlock.
  */
 export const PBKDF2_ITERATIONS = 600_000
 
 /**
- * Хэш-функция PBKDF2.
+ * PBKDF2 hash.
  *
- * SHA-256, а не SHA-512, сознательно: рекомендация OWASP по числу итераций
- * дана именно для SHA-256, а на 64-битных платформах SHA-512 быстрее,
- * что играет на руку атакующему с GPU при равном числе итераций.
+ * SHA-256, not SHA-512, on purpose: the OWASP iteration count is for
+ * SHA-256, and on 64-bit platforms SHA-512 is faster, which helps a
+ * GPU attacker at the same iteration count.
  */
 export const PBKDF2_HASH = 'SHA-256'
 
 /**
- * Длина соли в байтах.
+ * Salt length in bytes.
  *
- * Соль генерируется заново для каждого контейнера. Её назначение —
- * сделать бесполезными предвычисленные таблицы: без соли одна таблица
- * вскрывала бы все кошельки со слабыми паролями сразу.
+ * A fresh salt is generated per container. Its job is to make
+ * precomputed tables useless: without a salt, one table would crack
+ * every weak-password wallet at once.
  */
 export const SALT_LENGTH = 32
 
 /**
- * Длина вектора инициализации AES-GCM в байтах.
+ * AES-GCM IV length in bytes.
  *
- * 96 бит — размер, для которого режим определён напрямую. Более длинный
- * IV предварительно хэшируется (лишняя работа без выигрыша), более
- * короткий снижает стойкость.
+ * 96 bits is the size for which the mode is defined directly. A longer
+ * IV is hashed first (extra work, no gain); a shorter one weakens the
+ * mode.
  *
- * ОГРАНИЧЕНИЕ СЛУЧАЙНОГО IV. При случайном 96-битном IV вероятность
- * коллизии становится заметной после примерно 2^32 операций с одним
- * ключом. Для хранилища кошелька это недостижимо: ключ живёт одну сессию,
- * а число записей за сессию измеряется сотнями.
+ * RANDOM-IV LIMIT. With a random 96-bit IV, collision probability
+ * becomes noticeable after about 2^32 operations with one key. For a
+ * wallet vault that is unreachable: the key lives one session, and
+ * writes per session are in the hundreds.
  */
 export const IV_LENGTH = 12
 
-/** Длина ключа AES в байтах. 32 байта — AES-256. */
+/** AES key length in bytes. 32 bytes is AES-256. */
 export const KEY_LENGTH = 32
 
-/** Длина тега аутентификации GCM в битах. 128 — максимум и значение по умолчанию. */
+/** GCM authentication-tag length in bits. 128 is the maximum and the default. */
 export const AUTH_TAG_BITS = 128
 
-/** Имя алгоритма шифрования в терминах Web Crypto. */
 export const AES_GCM = 'AES-GCM'
 
-/** Имя алгоритма вывода ключа в терминах Web Crypto. */
 export const PBKDF2 = 'PBKDF2'
 
 /**
- * Параметры KDF, применяемые к новым контейнерам.
+ * KDF parameters applied to new containers.
  *
- * Соль сюда не входит: она генерируется отдельно на каждую операцию
- * шифрования. Функция принимает соль параметром, чтобы исключить
- * случайное переиспользование одного значения.
+ * Salt is not included: it is generated per encryption. The function
+ * takes salt as an argument so one value cannot be reused by accident.
  */
 export function createDefaultKdfParams(salt: Uint8Array): IKdfParams {
   return {

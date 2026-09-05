@@ -7,20 +7,20 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { htmlForTransport, isHttpsRequest, pageContentSecurityPolicy } from '../lib/ui.ts'
 
 /**
- * Раздача собранного кошелька с того же источника, что и `/v1`.
+ * Serves the built wallet from the same origin as `/v1`.
  *
- * `BrowserRouter` ходит на `/wallet`, `/admin` и остальные пути
- * приложения. Неизвестный путь без `/v1` отдаёт `index.html`:
- * обновление страницы не должно показывать JSON 404.
+ * `BrowserRouter` hits `/wallet`, `/admin` and the other app paths.
+ * An unknown path without `/v1` gets `index.html`: a page refresh
+ * must not show a JSON 404.
  */
 export async function registerUi(app: FastifyInstance, staticRoot: string): Promise<void> {
   await app.register(fastifyStatic, {
     root: staticRoot,
     prefix: '/',
-    /* `true`: файлы ищутся в момент запроса. `false` снимал снимок
-       каталога при старте, и после `npm run build` новые имена с
-       отпечатком уходили в HTML-заглушку с MIME `text/html` —
-       браузер отказывался исполнять модуль. */
+    /* `true`: files are looked up at request time. `false` snapped
+       the directory at start, and after `npm run build` new hashed
+       names fell through to the HTML stub with MIME `text/html` —
+       the browser refused to execute the module. */
     wildcard: true,
     index: false,
     decorateReply: true,
@@ -45,8 +45,8 @@ export async function registerUi(app: FastifyInstance, staticRoot: string): Prom
   })
 
   app.get('/robots.txt', async (_request, reply) => {
-    /* Явный маршрут, а не статика: неизвестный GET отдаёт index.html,
-       и робот получил бы HTML вместо запрета обхода. */
+    /* Explicit route, not static: an unknown GET serves index.html,
+       and a robot would get HTML instead of a crawl ban. */
     const body = await readFile(join(staticRoot, 'robots.txt'), 'utf8')
 
     void reply

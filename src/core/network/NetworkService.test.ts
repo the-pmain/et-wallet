@@ -44,8 +44,8 @@ interface ITestContext {
 }
 
 async function createContext(storage = new InMemoryStorageService()): Promise<ITestContext> {
-  /* Сети хранятся зашифрованными: репозиторий получает защищённое
-     хранилище поверх той же памяти, что видит проверка. */
+  /* Networks are stored encrypted: the repository gets a secure store
+     over the same memory the check can see. */
   const repository = new NetworkRepository(await createSecureMemoryStorage(storage))
   const providerFactory = new FakeProviderFactory()
   const logger = new NullLogger()
@@ -65,37 +65,37 @@ async function createContext(storage = new InMemoryStorageService()): Promise<IT
   }
 }
 
-describe('NetworkService: инициализация', () => {
+describe('NetworkService: initialisation', () => {
   let context: ITestContext
 
   beforeEach(async () => {
     context = await createContext()
   })
 
-  it('до init() отказывает в доступе к активной сети', () => {
+  it('refuses access to the active network before init()', () => {
     expect(() => context.service.getActive()).toThrow(NotInitializedError)
   })
 
-  it('загружает встроенные сети', async () => {
+  it('loads built-in networks', async () => {
     await context.service.init()
 
     expect(context.service.list()).toHaveLength(BUILT_IN_NETWORKS.length)
   })
 
-  it('выбирает сеть по умолчанию при первом запуске', async () => {
+  it('selects the default network on first launch', async () => {
     await context.service.init()
 
     expect(context.service.getActive().chainId).toBe(DEFAULT_CHAIN_ID)
   })
 
-  it('идемпотентен при повторном вызове', async () => {
+  it('is idempotent on a second call', async () => {
     await context.service.init()
     await context.service.init()
 
     expect(context.service.list()).toHaveLength(BUILT_IN_NETWORKS.length)
   })
 
-  it('восстанавливает сохранённый выбор активной сети', async () => {
+  it('restores the saved active-network choice', async () => {
     await context.service.init()
     await context.service.switchTo(BUILT_IN_CHAIN_ID.Polygon)
 
@@ -105,7 +105,7 @@ describe('NetworkService: инициализация', () => {
     expect(restored.service.getActive().chainId).toBe(BUILT_IN_CHAIN_ID.Polygon)
   })
 
-  it('игнорирует сохранённый выбор несуществующей сети', async () => {
+  it('ignores a saved choice of a missing network', async () => {
     await context.repository.setActiveChainId(toChainId(999999))
     await context.service.init()
 
@@ -113,12 +113,12 @@ describe('NetworkService: инициализация', () => {
   })
 })
 
-describe('NetworkService: защита встроенных сетей от подмены', () => {
-  it('игнорирует сохранённую копию встроенной сети', async () => {
+describe('NetworkService: protecting built-in networks from impersonation', () => {
+  it('ignores a stored copy of a built-in network', async () => {
     const storage = new InMemoryStorageService()
     const repository = new NetworkRepository(await createSecureMemoryStorage(storage))
 
-    /* Имитация подмены: в хранилище лежит Ethereum с чужим RPC. */
+    /* Impersonation stand-in: storage holds Ethereum with a foreign RPC. */
     const tampered: INetworkConfig = {
       chainId: BUILT_IN_CHAIN_ID.Ethereum,
       name: 'Ethereum',
@@ -139,7 +139,7 @@ describe('NetworkService: защита встроенных сетей от по
     expect(ethereum?.rpcUrls).not.toContain('https://attacker.example.com')
   })
 
-  it('сообщает в журнал об отброшенной записи', async () => {
+  it('logs the discarded record', async () => {
     const storage = new InMemoryStorageService()
     const repository = new NetworkRepository(await createSecureMemoryStorage(storage))
     const [ethereum] = BUILT_IN_NETWORKS
@@ -155,7 +155,7 @@ describe('NetworkService: защита встроенных сетей от по
   })
 })
 
-describe('NetworkService: переключение сетей', () => {
+describe('NetworkService: switching networks', () => {
   let context: ITestContext
 
   beforeEach(async () => {
@@ -163,13 +163,13 @@ describe('NetworkService: переключение сетей', () => {
     await context.service.init()
   })
 
-  it('меняет активную сеть', async () => {
+  it('changes the active network', async () => {
     await context.service.switchTo(BUILT_IN_CHAIN_ID.Arbitrum)
 
     expect(context.service.getActive().chainId).toBe(BUILT_IN_CHAIN_ID.Arbitrum)
   })
 
-  it('порождает событие network:changed', async () => {
+  it('emits a network:changed event', async () => {
     const listener = vi.fn()
     context.service.on('network:changed', listener)
 
@@ -178,7 +178,7 @@ describe('NetworkService: переключение сетей', () => {
     expect(listener).toHaveBeenCalledExactlyOnceWith({ chainId: BUILT_IN_CHAIN_ID.Base })
   })
 
-  it('не порождает событие при переключении на уже активную сеть', async () => {
+  it('does not emit an event when switching to the already active network', async () => {
     const listener = vi.fn()
     context.service.on('network:changed', listener)
 
@@ -187,24 +187,24 @@ describe('NetworkService: переключение сетей', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('сохраняет выбор в хранилище', async () => {
+  it('persists the choice in storage', async () => {
     await context.service.switchTo(BUILT_IN_CHAIN_ID.Optimism)
 
     await expect(context.repository.getActiveChainId()).resolves.toBe(BUILT_IN_CHAIN_ID.Optimism)
   })
 
-  it('отказывает в переключении на незарегистрированную сеть', async () => {
+  it('refuses a switch to an unregistered network', async () => {
     await expect(context.service.switchTo(toChainId(999999))).rejects.toThrow(NetworkNotFoundError)
   })
 
-  it('не меняет активную сеть при отказе', async () => {
+  it('does not change the active network on refusal', async () => {
     await expect(context.service.switchTo(toChainId(999999))).rejects.toThrow()
 
     expect(context.service.getActive().chainId).toBe(DEFAULT_CHAIN_ID)
   })
 })
 
-describe('NetworkService: добавление сети', () => {
+describe('NetworkService: adding a network', () => {
   let context: ITestContext
 
   beforeEach(async () => {
@@ -212,7 +212,7 @@ describe('NetworkService: добавление сети', () => {
     await context.service.init()
   })
 
-  it('добавляет пользовательскую сеть', async () => {
+  it('adds a custom network', async () => {
     const added = await context.service.add(customNetworkParams())
 
     expect(added.chainId).toBe(CUSTOM_CHAIN_ID)
@@ -220,7 +220,7 @@ describe('NetworkService: добавление сети', () => {
     expect(context.service.getByChainId(CUSTOM_CHAIN_ID)).not.toBeNull()
   })
 
-  it('сохраняет сеть в хранилище', async () => {
+  it('persists the network in storage', async () => {
     await context.service.add(customNetworkParams())
 
     const restored = await createContext(context.storage)
@@ -229,7 +229,7 @@ describe('NetworkService: добавление сети', () => {
     expect(restored.service.getByChainId(CUSTOM_CHAIN_ID)?.name).toBe('Local Node')
   })
 
-  it('порождает событие network:listChanged', async () => {
+  it('emits a network:listChanged event', async () => {
     const listener = vi.fn()
     context.service.on('network:listChanged', listener)
 
@@ -238,36 +238,37 @@ describe('NetworkService: добавление сети', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
-  it('отвергает сеть с уже существующим идентификатором', async () => {
+  it('rejects a network whose identifier already exists', async () => {
     await expect(
       context.service.add(customNetworkParams({ chainId: BUILT_IN_CHAIN_ID.Ethereum })),
     ).rejects.toThrow(NetworkAlreadyExistsError)
   })
 
-  it('отвергает сеть, носящую имя встроенной', async () => {
-    /* Сверка chainId с узлом этого не поймает: узел честно подтвердит
-       свой идентификатор. Совпадение имени — единственный признак. */
+  it('rejects a network that bears a built-in name', async () => {
+    /* Checking chainId with the node will not catch this: the node
+       will honestly confirm its identifier. A name match is the only
+       signal. */
     await expect(context.service.add(customNetworkParams({ name: 'Ethereum' }))).rejects.toThrow(
       NetworkImpersonationError,
     )
   })
 
-  it('не обращается к узлу, обнаружив подмену имени', async () => {
+  it('does not talk to the node after detecting a name impersonation', async () => {
     const before = context.providerFactory.createdCount
 
     await expect(
       context.service.add(customNetworkParams({ name: 'Ethereum' })),
     ).rejects.toBeInstanceOf(NetworkImpersonationError)
 
-    /* Проверка имени бесплатна и выполняется первой: незачем ждать
-       ответа узла, чтобы отвергнуть заведомо опасную конфигурацию. */
+    /* The name check is free and runs first: there is no need to wait
+       for the node to reject a configuration that is already unsafe. */
     expect(context.providerFactory.createdCount).toBe(before)
   })
 
-  it('называет сеть, за которую выдаёт себя добавляемая', async () => {
+  it('names the network the addition is posing as', async () => {
     try {
       await context.service.add(customNetworkParams({ name: 'Polygon' }))
-      expect.unreachable('добавление должно было завершиться отказом')
+      expect.unreachable('add should have been refused')
     } catch (error) {
       expect(error).toBeInstanceOf(NetworkImpersonationError)
       expect((error as NetworkImpersonationError).impersonatedChainId).toBe(
@@ -276,30 +277,30 @@ describe('NetworkService: добавление сети', () => {
     }
   })
 
-  it('добавляет одноимённую сеть по явному согласию', async () => {
+  it('adds a same-named network on explicit consent', async () => {
     const added = await context.service.add(
       customNetworkParams({ name: 'Ethereum', allowImpersonation: true }),
     )
 
-    /* Согласие обязано быть отдельным действием, но запрещать операцию
-       совсем нельзя: у пользователя может быть законная причина. */
+    /* Consent must be a separate action, but the operation cannot be
+       banned outright: the user may have a lawful reason. */
     expect(added.name).toBe('Ethereum')
     expect(added.chainId).toBe(CUSTOM_CHAIN_ID)
   })
 
-  it('не считает подменой сеть с уникальным именем', async () => {
+  it('does not treat a uniquely named network as impersonation', async () => {
     await expect(
       context.service.add(customNetworkParams({ name: 'My Private Chain' })),
     ).resolves.toBeDefined()
   })
 
-  it('отвергает незащищённый RPC-адрес', async () => {
+  it('rejects an insecure RPC URL', async () => {
     await expect(
       context.service.add(customNetworkParams({ rpcUrls: ['http://node.example.com'] })),
     ).rejects.toThrow(InsecureRpcUrlError)
   })
 
-  it('отвергает незащищённый адрес обозревателя', async () => {
+  it('rejects an insecure explorer URL', async () => {
     await expect(
       context.service.add(
         customNetworkParams({ blockExplorerUrls: ['http://explorer.example.com'] }),
@@ -307,7 +308,7 @@ describe('NetworkService: добавление сети', () => {
     ).rejects.toThrow(InsecureRpcUrlError)
   })
 
-  it('не обращается к узлу, если адреса не прошли проверку', async () => {
+  it('does not talk to the node if the URLs failed the check', async () => {
     await expect(
       context.service.add(customNetworkParams({ rpcUrls: ['http://node.example.com'] })),
     ).rejects.toThrow()
@@ -315,13 +316,13 @@ describe('NetworkService: добавление сети', () => {
     expect(context.providerFactory.createdCount).toBe(0)
   })
 
-  it('отвергает сеть, если узел сообщает чужой chainId', async () => {
+  it('rejects the network if the node reports a foreign chainId', async () => {
     context.providerFactory.configure({ reportedChainId: toChainId(1) })
 
     await expect(context.service.add(customNetworkParams())).rejects.toThrow(ChainIdMismatchError)
   })
 
-  it('не сохраняет сеть при несовпадении chainId', async () => {
+  it('does not persist the network when chainId mismatches', async () => {
     context.providerFactory.configure({ reportedChainId: toChainId(1) })
 
     await expect(context.service.add(customNetworkParams())).rejects.toThrow()
@@ -330,13 +331,13 @@ describe('NetworkService: добавление сети', () => {
     await expect(context.repository.findByChainId(CUSTOM_CHAIN_ID)).resolves.toBeNull()
   })
 
-  it('закрывает соединение после проверки', async () => {
+  it('closes the connection after the check', async () => {
     await context.service.add(customNetworkParams())
 
     expect(context.providerFactory.lastProvider?.isActive).toBe(false)
   })
 
-  it('закрывает соединение даже при несовпадении chainId', async () => {
+  it('closes the connection even when chainId mismatches', async () => {
     context.providerFactory.configure({ reportedChainId: toChainId(1) })
 
     await expect(context.service.add(customNetworkParams())).rejects.toThrow()
@@ -345,7 +346,7 @@ describe('NetworkService: добавление сети', () => {
   })
 })
 
-describe('NetworkService: удаление сети', () => {
+describe('NetworkService: removing a network', () => {
   let context: ITestContext
 
   beforeEach(async () => {
@@ -354,29 +355,29 @@ describe('NetworkService: удаление сети', () => {
     await context.service.add(customNetworkParams())
   })
 
-  it('удаляет пользовательскую сеть', async () => {
+  it('removes a custom network', async () => {
     await context.service.remove(CUSTOM_CHAIN_ID)
 
     expect(context.service.getByChainId(CUSTOM_CHAIN_ID)).toBeNull()
   })
 
-  it('удаляет запись из хранилища', async () => {
+  it('removes the record from storage', async () => {
     await context.service.remove(CUSTOM_CHAIN_ID)
 
     await expect(context.repository.findByChainId(CUSTOM_CHAIN_ID)).resolves.toBeNull()
   })
 
-  it('отказывает в удалении встроенной сети', async () => {
+  it('refuses to remove a built-in network', async () => {
     await expect(context.service.remove(BUILT_IN_CHAIN_ID.Ethereum)).rejects.toThrow(
       BuiltInNetworkImmutableError,
     )
   })
 
-  it('отказывает в удалении незарегистрированной сети', async () => {
+  it('refuses to remove an unregistered network', async () => {
     await expect(context.service.remove(toChainId(999999))).rejects.toThrow(NetworkNotFoundError)
   })
 
-  it('переключается на сеть по умолчанию при удалении активной', async () => {
+  it('switches to the default network when the active one is removed', async () => {
     await context.service.switchTo(CUSTOM_CHAIN_ID)
     await context.service.remove(CUSTOM_CHAIN_ID)
 
@@ -384,7 +385,7 @@ describe('NetworkService: удаление сети', () => {
   })
 })
 
-describe('NetworkService: изменение сети', () => {
+describe('NetworkService: updating a network', () => {
   let context: ITestContext
 
   beforeEach(async () => {
@@ -393,13 +394,13 @@ describe('NetworkService: изменение сети', () => {
     await context.service.add(customNetworkParams())
   })
 
-  it('меняет имя пользовательской сети', async () => {
-    const updated = await context.service.update(CUSTOM_CHAIN_ID, { name: 'Новое имя' })
+  it('changes the name of a custom network', async () => {
+    const updated = await context.service.update(CUSTOM_CHAIN_ID, { name: 'New name' })
 
-    expect(updated.name).toBe('Новое имя')
+    expect(updated.name).toBe('New name')
   })
 
-  it('не меняет идентификатор сети', async () => {
+  it('does not change the network identifier', async () => {
     const updated = await context.service.update(CUSTOM_CHAIN_ID, {
       chainId: toChainId(777),
       name: 'Impersonation',
@@ -409,13 +410,13 @@ describe('NetworkService: изменение сети', () => {
     expect(context.service.getByChainId(toChainId(777))).toBeNull()
   })
 
-  it('отказывает в изменении встроенной сети', async () => {
+  it('refuses to update a built-in network', async () => {
     await expect(
       context.service.update(BUILT_IN_CHAIN_ID.Ethereum, { name: 'Fake Ethereum' }),
     ).rejects.toThrow(BuiltInNetworkImmutableError)
   })
 
-  it('отвергает незащищённый RPC-адрес', async () => {
+  it('rejects an insecure RPC URL', async () => {
     await expect(
       context.service.update(CUSTOM_CHAIN_ID, { rpcUrls: ['http://node.example.com'] }),
     ).rejects.toThrow(InsecureRpcUrlError)

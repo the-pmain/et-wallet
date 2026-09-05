@@ -1,121 +1,128 @@
 # Wallet
 
-Некастодиальный криптовалютный кошелёк. Разрабатывается с нуля.
+A non-custodial cryptocurrency wallet. Built from scratch.
 
-Некастодиальный означает, что приватные ключи и seed-фраза никогда не покидают
-устройство пользователя и не передаются ни на какой сервер. Ответственность за
-сохранность средств полностью лежит на клиентском коде — это определяет все
-архитектурные решения в проекте.
+Non-custodial means that private keys and the seed phrase never leave
+the user's device and are never sent to any server. Responsibility for
+keeping funds safe rests entirely on the client code — that fact
+shapes every architectural decision in the project.
 
-## Текущее состояние
+## Current status
 
-Пройдено 25 этапов, идёт доработка по итогам аудита. Работают:
-создание и восстановление кошелька, аккаунты, сети и выбор RPC-узла,
-балансы, токены, история переводов, отправка нативной валюты,
-токенов ERC-20 и коллекционных предметов ERC-721/ERC-1155,
-отслеживание судьбы отправленных транзакций, ускорение и отмена
-застрявших, портфель с оценкой, подключение приложений по WalletConnect,
-имена ENS, резервное копирование секретов, модуль безопасности.
+Twenty-five stages are complete; work continues from the audit findings. Working today:
+wallet creation and recovery, accounts, networks and RPC endpoint selection,
+balances, tokens, transfer history, sending native currency,
+ERC-20 tokens and ERC-721/ERC-1155 collectibles,
+tracking the fate of sent transactions, speeding up and canceling
+stuck ones, a valued portfolio, connecting apps via WalletConnect,
+ENS names, secret backup, and the security module.
 
-Хранилище **постоянное**: кошелёк переживает перезагрузку вкладки
-и открывается тем же паролем.
+Storage is **persistent**: the wallet survives a tab reload
+and unlocks with the same password.
 
-**Пользоваться с настоящими средствами пока рано.** Нет списка
-проверенных контрактов и управления выданными разрешениями; список
-коллекционных предметов ограничен окном в десять тысяч блоков.
+**It is too early to use this with real funds.** There is no list
+of verified contracts and no management of granted allowances; the
+collectibles list is limited to a ten-thousand-block window.
 
-Полная картина с оценками и порядком дальнейших работ — в
-[AUDIT.md](AUDIT.md). Реестр отложенных задач — в
+The full picture with scores and the order of remaining work is in
+[AUDIT.md](AUDIT.md). The backlog of deferred tasks is in
 [TECH_DEBT.md](TECH_DEBT.md).
 
-| Проверка | Значение |
+| Check | Value |
 | --- | --- |
-| Модульных и интеграционных тестов | 1952 |
-| Сквозных тестов (Chromium) | 26 |
-| Покрытие операторов | 86.73% |
-| Начальная загрузка | 190.61 КБ gzip |
-| Уязвимости зависимостей | 0 |
-| Хранилище | IndexedDB, постоянное |
+| Unit and integration tests | 1952 |
+| End-to-end tests (Chromium) | 26 |
+| Statement coverage | 86.73% |
+| Initial load | 190.61 KB gzip |
+| Dependency vulnerabilities | 0 |
+| Storage | IndexedDB, persistent |
 
 ---
 
-## Чему приходится доверять
+## What you have to trust
 
-Кошелёк работает как веб-страница: его код загружается с сервера при
-каждом открытии. Захвативший сервер или домен подменяет код, а
-подменённый код **и есть кошелёк** — он соберёт seed-фразы у всех, кто
-откроет страницу, и никакое шифрование внутри этому не помешает.
+The wallet runs as a web page: its code is loaded from the server
+every time it is opened. Anyone who seizes the server or the domain
+replaces the code, and the replaced code **is the wallet** — it will
+collect seed phrases from everyone who opens the page, and no amount
+of encryption inside the app can stop that.
 
-Это свойство любого веб-кошелька, а не особенность этого. Расширения
-браузера ставятся один раз и не перезагружаются при каждом открытии —
-поэтому кошельки обычно делают расширениями.
+This is a property of any web wallet, not a peculiarity of this one.
+Browser extensions are installed once and are not re-downloaded on
+every open — that is why wallets are usually shipped as extensions.
 
-Экран «What you are trusting» в приложении говорит об этом прямо:
-что защищено, что защитить нельзя и что с этим делать. Он доступен
-с первого экрана, до создания кошелька, и из настроек.
+The "What you are trusting" screen in the app says this plainly:
+what is protected, what cannot be protected, and what to do about it.
+It is available from the first screen, before a wallet is created,
+and from settings.
 
-**При размещении в сети** минимум: HTTPS с HSTS, неизменяемые сборки,
-домен под двухфакторной защитой с запретом переноса. Ни один из этих
-пунктов кодом кошелька не решается.
+**For a public deployment** the minimum is: HTTPS with HSTS, immutable
+builds, and a domain under two-factor protection with transfer lock.
+None of these items is solved by wallet code.
 
 ---
 
-## Размещение в сети
+## Deployment
 
-Сборка кладёт рядом с собой готовые файлы настройки:
+The build emits ready-made configuration files next to itself:
 
-| Файл | Для чего |
+| File | Purpose |
 | --- | --- |
 | `dist/_headers` | Netlify, Cloudflare Pages |
-| `dist/deploy/nginx-security.conf` | подключается через `include` внутри блока `server` |
+| `dist/deploy/nginx-security.conf` | included via `include` inside the `server` block |
 
-Оба **порождаются сборкой** из того же источника, что и метатег политики.
-Править их руками нельзя: правка потеряется, а два списка директив,
-написанные отдельно, расходятся при первом же изменении — молча.
+Both are **generated by the build** from the same source as the policy
+meta tag. They must not be edited by hand: the edit will be lost, and
+two separately written directive lists will drift on the first change —
+silently.
 
-**Почему заголовков недостаточно у метатега.** Директиву `frame-ancestors`
-метатег игнорирует. Без заголовка кошелёк можно поместить в невидимый кадр
-поверх чужой страницы, и подпись будет сделана по чужой кнопке.
+**Why a meta tag is not enough for headers.** The `frame-ancestors`
+directive is ignored in a meta tag. Without the header, the wallet can
+be placed in an invisible frame over a foreign page, and a signature
+will be made by someone else's button.
 
-**`Permissions-Policy` обязателен.** Кошелёк пользуется камерой (чтение
-ссылки подключения) и HID (аппаратный кошелёк). Размещение, оставившее
-настройки по умолчанию, отключит обе возможности молча — они просто
-перестанут работать.
+**`Permissions-Policy` is required.** The wallet uses the camera
+(reading a connection link) and HID (hardware wallet). A deployment
+that leaves the defaults will disable both capabilities silently —
+they will simply stop working.
 
-**`index.html` не хранится в кэше**, файлы `assets` хранятся вечно: их имена
-содержат отпечаток содержимого. Сохранённая надолго точка входа оставила бы
-человека на прежней сборке — включая ту, из которой исправлена уязвимость.
+**`index.html` is not cached**; `assets` files are cached forever: their
+names contain a content fingerprint. A long-lived entry point would
+leave a person on the previous build — including one from which a
+vulnerability was fixed.
 
-### Ограничение обращений к сети
+### Restricting network requests
 
-По умолчанию `connect-src` разрешает любой HTTPS, и это осознанный обмен.
-Пользователь вправе указать собственный RPC-узел, а его адрес на этапе
-сборки неизвестен. Перечень, составленный из встроенных сетей, отменил бы
-эту возможность — а она и есть главная защита приватности запросов: без
-своего узла оператор чужого видит IP и все адреса владельца.
+By default `connect-src` allows any HTTPS, and that is a deliberate
+trade-off. The user is entitled to point at their own RPC node, and
+its address is unknown at build time. A list compiled from built-in
+networks would revoke that option — and that option is the main
+privacy protection for requests: without their own node, someone
+else's operator sees the IP and every address the owner holds.
 
-Размещение, где своим узлом пользоваться не предполагают, вправе решить
-иначе:
+A deployment that does not intend to let people use their own node
+may decide otherwise:
 
 ```bash
 VITE_CSP_CONNECT_SRC="'self' https://eth.example https://polygon.example" npm run build
 ```
 
-Перечень попадёт и в метатег, и в оба файла заголовков. Обращения к прочим
-адресам браузер запретит — вместе с возможностью подключить свой узел.
+The list will land in the meta tag and in both header files. Requests
+to any other address will be blocked by the browser — together with
+the ability to connect a custom node.
 
 ---
 
-## Требования
+## Requirements
 
-| Инструмент | Версия     |
+| Tool       | Version    |
 | ---------- | ---------- |
 | Node.js    | >= 22.12.0 |
 | npm        | >= 10      |
 
 ---
 
-## Быстрый старт
+## Quick start
 
 ```bash
 npm install
@@ -125,422 +132,429 @@ npm install
 npm run dev
 ```
 
-Приложение откроется на `http://localhost:3000`.
+The app will open at `http://localhost:3000`.
 
 ---
 
-## Команды
+## Commands
 
-| Команда                 | Назначение                                                  |
-| ----------------------- | ----------------------------------------------------------- |
-| `npm run dev`           | Dev-сервер с горячей перезагрузкой                          |
-| `npm run build`         | Проверка типов и production-сборка в `dist/`                 |
-| `npm run preview`       | Локальный просмотр собранного приложения                     |
-| `npm run typecheck`     | Только проверка типов                                        |
-| `npm run lint`          | Проверка ESLint                                              |
-| `npm run lint:fix`      | Проверка ESLint с автоисправлением                           |
-| `npm run format`        | Форматирование Prettier                                      |
-| `npm run format:check`  | Проверка форматирования без изменения файлов                 |
-| `npm run test`          | Прогон тестов                                                |
-| `npm run test:watch`    | Тесты в режиме наблюдения                                    |
-| `npm run test:coverage` | Тесты с отчётом о покрытии                                   |
-| `npm run verify`        | Полная проверка: формат + линтер + типы + тесты. Гейт для CI |
-| `npm run server:dev`    | Node-процесс Fastify (`server/src`, порт 8080)               |
-| `npm start`             | Тот же процесс без `--watch`                                 |
-| `npm run fullstack`     | Сборка UI в `dist/` и запуск Fastify                         |
+| Command                 | Purpose                                                         |
+| ----------------------- | --------------------------------------------------------------- |
+| `npm run dev`           | Dev server with hot reload                                      |
+| `npm run build`         | Type check and production build into `dist/`                    |
+| `npm run preview`       | Local preview of the built app                                  |
+| `npm run typecheck`     | Type check only                                                 |
+| `npm run lint`          | ESLint check                                                    |
+| `npm run lint:fix`      | ESLint check with auto-fix                                      |
+| `npm run format`        | Prettier formatting                                             |
+| `npm run format:check`  | Format check without changing files                             |
+| `npm run test`          | Run tests                                                       |
+| `npm run test:watch`    | Tests in watch mode                                             |
+| `npm run test:coverage` | Tests with a coverage report                                    |
+| `npm run verify`        | Full check: format + linter + types + tests. The CI gate        |
+| `npm run server:dev`    | Fastify Node process (`server/src`, port 8080)                  |
+| `npm start`             | The same process without `--watch`                              |
+| `npm run fullstack`     | Build the UI into `dist/` and start Fastify                     |
 
 ---
 
-## Технологический стек
+## Tech stack
 
-| Область          | Решение                                    |
+| Area             | Choice                                     |
 | ---------------- | ------------------------------------------ |
-| Сборка           | Vite 8                                     |
+| Build            | Vite 8                                     |
 | UI               | React 19, TypeScript 6                     |
-| Стили            | TailwindCSS 4, shadcn/ui (стиль new-york)  |
-| Иконки           | lucide-react                               |
-| Тесты            | Vitest 4, Testing Library, jsdom           |
-| Качество кода    | ESLint 10 (flat config), Prettier 3        |
+| Styles           | TailwindCSS 4, shadcn/ui (new-york style)  |
+| Icons            | lucide-react                               |
+| Tests            | Vitest 4, Testing Library, jsdom           |
+| Code quality     | ESLint 10 (flat config), Prettier 3        |
 
-### О версии TypeScript
+### About the TypeScript version
 
-Используется TypeScript 6, а не вышедший TypeScript 7 (нативный порт компилятора).
-Причина: `typescript-eslint@8` объявляет поддержку `typescript >=4.8.4 <6.1.0`.
-Установка TypeScript 7 сломает типизированные правила линтера — в том числе
-`no-floating-promises`, который для кошелька критичен. Переход на 7 состоится
-отдельной задачей, когда линтер добавит поддержку.
+TypeScript 6 is used, not the released TypeScript 7 (the native
+compiler port). The reason: `typescript-eslint@8` declares support for
+`typescript >=4.8.4 <6.1.0`. Installing TypeScript 7 would break
+typed lint rules — including `no-floating-promises`, which is
+critical for a wallet. The move to 7 will be a separate task when
+the linter adds support.
 
-### Зависимости, которые пока не установлены
+### Dependencies that are not installed yet
 
-`ethers` и `zustand` в проект пока не добавлены. Это осознанное решение:
-каждая зависимость устанавливается на том этапе, где она реально используется.
+`ethers` and `zustand` have not been added to the project yet. That is
+a deliberate decision: each dependency is installed at the stage where
+it is actually used.
 
-Установлены по мере необходимости: `@scure/bip39` (модуль seed-фразы),
-`@scure/bip32`, `@noble/curves`, `@noble/hashes` (HD-кошелёк).
+Installed as needed: `@scure/bip39` (seed-phrase module),
+`@scure/bip32`, `@noble/curves`, `@noble/hashes` (HD wallet).
 
-**Отклонение от изначально заявленного стека.** Вместо `@noble/secp256k1`
-используется `@noble/curves` — именно его применяет `@scure/bip32`.
-Установка отдельного `@noble/secp256k1` дала бы две независимые реализации
-secp256k1 в одном бандле: лишний вес и два разных пути исполнения для самого
-критичного примитива.
+**Departure from the originally stated stack.** Instead of
+`@noble/secp256k1`, `@noble/curves` is used — that is what
+`@scure/bip32` uses. Installing a separate `@noble/secp256k1` would
+put two independent secp256k1 implementations in one bundle: extra
+weight and two different execution paths for the most critical
+primitive.
 
-Для кошелька это вопрос безопасности, а не аккуратности. Каждая библиотека,
-попавшая в `package.json`, — это код, который выполнится рядом с приватными
-ключами. Установка «про запас» лишает возможности осмысленно проверить пакет
-и его транзитивные зависимости в момент добавления и делает разбор
-`npm audit` бессмысленным.
-
----
-
-## Подключение приложений (WalletConnect)
-
-`core/dapp` — разбор и оценка запросов, `features/dapp` — сессии,
-транспорт и экраны. Раздел открывается из настроек.
-
-### Домен отделён от WalletConnect намеренно
-
-`ISessionTransport` — контракт транспорта; WalletConnect лишь одна его
-реализация. Причина не в красоте: у расширения появится встроенный
-провайдер (EIP-1193), работающий без всякого relay, и логика показа
-и подтверждения запроса обязана остаться той же. Побочная выгода —
-вся безопасность проверяется тестами без сети и без ключа.
-
-### Главное: пользователю показывается смысл, а не хэш
-
-Подпись нельзя отозвать. Хэш структуры не говорит человеку ничего,
-и он нажимает «подписать», потому что иначе приложение не работает.
-Так отдают **неограниченное разрешение на токены**, не увидев ни
-списания, ни комиссии: транзакции нет, средства уходят позже.
-
-Поэтому кошелёк разбирает запрос и называет последствие:
-
-| Замечание | Что означает |
-| --- | --- |
-| Разрешение на токены (`Permit`, `PermitSingle`, Permit2) | подпись позволит забрать ваши токены позже |
-| Неограниченная сумма | заберут всё и в любой момент |
-| `approve` / `setApprovalForAll` в транзакции | то же самое, но транзакцией |
-| Другая сеть | подпись может оказаться действительной там, где её не ждут |
-| Нет `verifyingContract` | непонятно, какому контракту предназначена подпись |
-| Нераспознанные данные вызова | смысл транзакции неизвестен — молчать здесь нельзя |
-| Сообщение нечитаемо | вместо текста шестнадцатеричная строка |
-
-Селекторы `approve` и `setApprovalForAll` **вычисляются**, а не
-вписаны: четыре байта, скопированные из памяти, непроверяемы при
-чтении, и ошибка отключила бы ровно то предупреждение, ради которого
-всё написано.
-
-Этим закрыты S-17…S-20 — они перестали быть долгом и стали условием
-того, чтобы сама возможность подключения не была вредной.
-
-### Что отклоняется без вопроса пользователю
-
-- **Неизвестный метод.** Подписать то, чего мы не разбираем, значит
-  подписать вслепую.
-- **Чужой отправитель.** Подписать нечем, а лишний экран приучает
-  нажимать «подтвердить», не читая.
-- **Второй запрос поверх первого.** Наложенные экраны подтверждения —
-  способ подписать не то: человек отвечает на верхний, подтверждает
-  нижний.
-
-Отказ всегда отправляется приложению явно. Молчание оставляет его
-в ожидании и подталкивает пользователя нажать ещё раз — то есть
-подписать дважды.
-
-### Библиотека грузится лениво
-
-`@walletconnect/sign-client` — около 3 МБ распакованных. Импорт
-динамический, при первом заходе в раздел. Проверено на сборке: код
-уходит **отдельным чанком** (437 kB), основной его не содержит.
-Без ключа проекта библиотека не загружается вовсе — работать всё
-равно нечем.
-
-### Что видит relay-сервер
-
-Адреса аккаунтов, метаданные каждого приложения и время каждого
-запроса. Утечка уровня индексатора истории, и об этом сказано прямо
-на экране.
+For a wallet this is a security question, not a neatness question.
+Every library that lands in `package.json` is code that will run next
+to private keys. Installing "just in case" removes the chance to
+review the package and its transitive dependencies at the moment of
+addition and makes `npm audit` meaningless.
 
 ---
 
-## Модуль безопасности
+## Connecting apps (WalletConnect)
 
-Собран в [core/security](src/core/security/) (счёт времени, обезвреживание
-текста) и [features/security](src/features/security/) (события браузера,
-настройки, компоненты). Разделение обязательное: ядро не знает о DOM
-и обязано работать в service worker расширения.
+`core/dapp` parses and scores requests; `features/dapp` covers sessions,
+transport, and screens. The section opens from settings.
 
-### Автоблокировка
+### The domain is separated from WalletConnect on purpose
 
-Разблокированный кошелёк держит в памяти корневой ключ. Пока сессия
-открыта, любой, кто получил доступ к устройству, распоряжается
-средствами без пароля. Автоблокировка ограничивает это окно **временем,
-а не доверием к обстановке**.
+`ISessionTransport` is the transport contract; WalletConnect is only
+one implementation of it. The reason is not aesthetics: the extension
+will get a built-in provider (EIP-1193) that works without any relay,
+and the logic that shows and confirms a request must stay the same.
+A side benefit is that all of the security can be tested without a
+network and without a key.
 
-За минуту до срабатывания показывается предупреждение с кнопкой
-продления: блокировка посреди заполнения формы теряет введённое,
-а без объяснения выглядит как сбой. Оставленное без внимания
-предупреждение сроку истечь не мешает.
+### The main point: the user is shown meaning, not a hash
 
-**Исключений для «важных экранов» нет.** Оговорка «не блокировать, пока
-открыта форма отправки» превратила бы защиту в необязательную:
-достаточно оставить эту форму открытой.
+A signature cannot be revoked. A structure hash tells a person nothing,
+and they press "sign" because otherwise the app does not work. That is
+how people grant an **unlimited token allowance** without seeing a
+debit or a fee: there is no transaction; the funds leave later.
 
-Движение указателя признаком присутствия **не считается** — курсор
-двигается от случайного касания стола, и такая автоблокировка
-не наступила бы на брошенном ноутбуке никогда. Переход вкладки в фон
-считается бездействием, а не активностью.
+So the wallet parses the request and names the consequence:
 
-Срок выбирается из закрытого списка (1–60 минут). Поле свободного ввода
-позволило бы назначить сутки и превратить защиту в её видимость.
-
-### Стойкость хранилища названа прямо
-
-Браузер вправе вытеснить данные сайта при нехватке места. Для обычного
-сайта это потеря кэша, для кошелька — потеря зашифрованной seed-фразы,
-то есть средств, если фраза не записана на бумаге.
-
-При открытии базы запрашивается постоянное хранение. Результат
-показывается владельцу, потому что решение о том, что с этим делать,
-принимает он. Различаются три состояния, а не два:
-
-| Состояние | Что означает |
+| Finding | What it means |
 | --- | --- |
-| Постоянное | Браузер обещал не вытеснять данные |
-| Обычное | Данные переживают перезагрузку, но браузер вправе их удалить |
-| Сессионное | Данные исчезают вместе со вкладкой |
+| Token allowance (`Permit`, `PermitSingle`, Permit2) | the signature will let someone take your tokens later |
+| Unlimited amount | they can take everything, at any time |
+| `approve` / `setApprovalForAll` in a transaction | the same thing, but as a transaction |
+| Different network | the signature may be valid where it is not expected |
+| No `verifyingContract` | it is unclear which contract the signature is for |
+| Unrecognized calldata | the meaning of the transaction is unknown — silence is not allowed here |
+| Message is unreadable | a hex string instead of text |
 
-Сведение их к одному предупреждению либо пугает без нужды, либо молчит
-там, где молчать нельзя. Разрешение на постоянное хранение выдаётся
-не сразу, а в приватном окне не выдаётся вовсе — это обычное положение
-дел, а не поломка.
+The `approve` and `setApprovalForAll` selectors are **computed**, not
+hard-coded: four bytes copied from memory cannot be verified by
+reading, and a typo would disable exactly the warning this code exists
+for.
 
-Сообщение «всё в порядке» показывается только на экране резервной
-копии: выводить его на каждом экране — способ приучить не читать
-сообщения.
+This closes S-17…S-20 — they stopped being debt and became a
+condition for the connection feature itself not to be harmful.
 
-### Ограничение попыток ввода пароля
+### What is rejected without asking the user
 
-Три попытки проходят без задержки — запас на опечатку и на забытую
-раскладку. Дальше задержка растёт: 5 с, 15 с, 1 мин, 5 мин, 15 мин
-и остаётся на пятнадцати минутах. Предел нужен: бесконечно растущая
-задержка означала бы, что владелец теряет доступ к собственным
-средствам из-за промаха.
+- **Unknown method.** Signing something we do not parse means signing
+  blind.
+- **Foreign sender.** There is nothing to sign with, and an extra
+  screen trains people to press "confirm" without reading.
+- **A second request on top of the first.** Stacked confirmation
+  screens are a way to sign the wrong thing: the person answers the
+  top one and confirms the bottom one.
 
-**Счётчик один на вход и на подтверждение перед выдачей секретов.**
-Разные счётчики означали бы, что подбирающий просто выберет форму,
-где ограничения нет.
+A rejection is always sent to the app explicitly. Silence leaves it
+waiting and nudges the user to press again — that is, to sign twice.
 
-**Счётчик лежит в незашифрованных настройках, и это вынужденно:**
-ограничитель обязан работать до разблокировки, когда ключ дешифрования
-ещё не выведен. Следствие названо прямо — тот, у кого есть доступ
-к диску, счётчик обнулит. Против такого противника ограничитель
-и не рассчитан: скопировав хранилище, он подбирает пароль у себя.
-Там работает единственное средство — 600 000 итераций PBKDF2 на каждую
-пробу.
+### The library loads lazily
 
-**Счётчик переживает перезагрузку.** Ограничитель, обнуляемый
-обновлением страницы, не ограничивает ничего: подбирающий нажимает F5
-после каждой неудачи. Это стало возможным только с постоянным
-хранилищем.
+`@walletconnect/sign-client` is about 3 MB unpacked. The import is
+dynamic, on the first visit to the section. Verified on the build: the
+code goes into a **separate chunk** (437 kB); the main chunk does not
+contain it. Without a project key the library is not loaded at all —
+there is nothing to do with it anyway.
 
-**Проверка выполняется до вывода ключа.** Иначе каждая закрытая попытка
-всё равно обходилась бы в полное вычисление PBKDF2, и ограничитель
-превратился бы в способ нагрузить процессор владельца.
+### What the relay server sees
 
-**Экран показывает обратный отсчёт, а не молчаливый отказ.** Форма,
-переставшая принимать пароль без объяснения, отправляет владельца
-искать несуществующую поломку. Отсчёт идёт по тем же внедрённым часам,
-по которым ограничитель считает срок: системный таймер рядом с ними был
-бы вторым источником времени и разошёлся бы с первым.
-
-### Повторный ввод пароля перед подписью
-
-Защищает от того, кто получил доступ к **уже разблокированному**
-кошельку. Пароль здесь не второй фактор, а подтверждение присутствия
-владельца в момент действия.
-
-Включено по умолчанию: защита, выключенная по умолчанию, защитой
-не является. Отключается в настройках — это выбор владельца средств,
-и последствие названо прямо, а не спрятано.
-
-**Спрашивается и при подписи по запросу приложения.** Раньше не
-спрашивался вовсе, и это было хуже всего: удалённый запрос приходит
-от постороннего приложения, а собственная отправка — от владельца
-за устройством. Требовать подтверждение у второго и не требовать
-у первого значит защищать слабее там, где опаснее.
-
-**Настройка одна на оба пути.** Два переключателя означали бы, что
-владелец защитил отправку, не заметив, что подпись по запросу осталась
-открытой.
-
-**Ограничитель попыток здесь тот же, что у входа** — см. ниже:
-без общего счётчика подбирающий выбрал бы форму без ограничения.
-
-### Недоверенный текст
-
-Символ и имя токена задаёт автор контракта, имя сети — тот, кто её
-добавил, текст уведомления приходит со справочного сервиса. Юникод
-позволяет переопределить направление письма (U+202E) и вставить
-невидимые символы (U+200B), делая подделку визуально неотличимой
-от оригинала. Так подделывают токены в интерфейсах кошельков.
-
-**Скрытые символы не удаляются молча.** Удалив невидимку, мы сделали бы
-подделку неотличимой от оригинала — ровно то, чего добивался её автор.
-Символ заменяется видимым маркером, а строка помечается значком.
-
-Коды в регулярных выражениях записаны escape-последовательностями:
-невидимый символ в исходнике непроверяем при чтении ровно по той
-причине, по которой опасен.
-
-### Предупреждение о получателе
-
-| Признак | Чем грозит |
-| --- | --- |
-| Адрес сжигания | средства уйдут безвозвратно |
-| Перевод самому себе | вероятная ошибка при выборе аккаунта |
-| Без контрольной суммы EIP-55 | опечатка не обнаруживается |
-| **Получатель — контракт** | монеты, отправленные контракту, который их не принимает, теряются безвозвратно |
-
-Последняя проверка требует обращения к узлу (`eth_getCode`) и потому
-выполняется один раз на шаге подтверждения, а не на каждое нажатие
-клавиши. Отказ узла даёт «проверить не удалось», а не «получатель
-обычный»: второе успокаивало бы без оснований.
-
-### Единое подтверждение необратимых действий
-
-Компонент `DangerConfirm`: заголовок, последствие, обязательная отметка,
-и **отмена оформлена как основное действие**. Разное оформление
-одинаковых по последствиям действий учит запоминать вид, а не смысл;
-оформление, приглашающее нажать опасное, — это подталкивание к потере
-средств.
-
-### Очистка памяти
-
-`withSecret` / `withSecretSync` затирают буфер в любом случае, включая
-исключение. Забытый `finally` не даёт ни ошибки компиляции, ни падения
-теста — он молча оставляет ключ в памяти; функция превращает правило
-в конструкцию.
-
-Скопированный адрес удаляется из буфера обмена через минуту — и только
-если там всё ещё наше значение: стирать чужое содержимое кошелёк права
-не имеет. Это смягчение, а не защита: тот, кто читает буфер в момент
-копирования, прочтёт его в любом случае.
-
-Строку в JavaScript затереть невозможно — она живёт до сборки мусора.
-Это ограничение среды, и оно названо, а не замолчано.
-
-### Защита от XSS и CSP
-
-К прежним мерам (React, запрет `innerHTML` и `localStorage` правилами
-ESLint) добавлены:
-
-- **Trusted Types** (`require-trusted-types-for 'script'`) — запрет
-  присваивания строк в места, ведущие к исполнению кода. Правило ESLint
-  действует на наш код, эта директива — и на зависимости, включая
-  будущие. **Проверено на боевой сборке:** приложение работает,
-  `innerHTML` блокируется браузером;
-- `worker-src 'none'` — воркеров нет, а разрешение `blob:` позволяло бы
-  запустить в воркере код, собранный из строки, в обход `script-src`;
-- `child-src`, `media-src`, `manifest-src` закрыты явно: `default-src`
-  покрывает не все типы ресурсов.
-
-`connect-src` по-прежнему разрешает любой HTTPS, и **сузить его нельзя**:
-пользователь вправе указать собственный RPC-узел, адрес которого
-на этапе сборки неизвестен. Перечень из встроенных сетей отменил бы
-главную защиту приватности запросов.
+Account addresses, metadata of every app, and the time of every
+request. A leak at the level of a history indexer, and the screen says
+so plainly.
 
 ---
 
-## Проверки
+## Security module
+
+Built in [core/security](src/core/security/) (timekeeping, neutralizing
+text) and [features/security](src/features/security/) (browser events,
+settings, components). The split is mandatory: the core does not know
+about the DOM and must work in an extension service worker.
+
+### Auto-lock
+
+An unlocked wallet holds the root key in memory. While the session is
+open, anyone who gains access to the device can dispose of funds
+without the password. Auto-lock limits that window **by time, not by
+trust in the surroundings**.
+
+One minute before it fires, a warning is shown with an extend button:
+locking in the middle of filling a form loses what was typed, and
+without an explanation it looks like a crash. A warning left unattended
+does not stop the deadline from expiring.
+
+**There are no exceptions for "important screens".** A caveat of "do
+not lock while the send form is open" would turn the protection into
+an optional one: it would be enough to leave that form open.
+
+Pointer movement is **not** treated as a sign of presence — the cursor
+moves from an accidental bump of the desk, and such an auto-lock would
+never fire on a laptop left unattended. Moving the tab to the
+background counts as inactivity, not activity.
+
+The timeout is chosen from a closed list (1–60 minutes). A free-form
+field would let someone set a day and turn the protection into the
+appearance of protection.
+
+### Storage durability is named plainly
+
+The browser is entitled to evict a site's data when space is short.
+For an ordinary site that is a lost cache; for a wallet it is the loss
+of the encrypted seed phrase — that is, the funds — if the phrase was
+not written down on paper.
+
+When the database is opened, persistent storage is requested. The
+result is shown to the owner, because the decision about what to do
+with it is theirs. Three states are distinguished, not two:
+
+| State | What it means |
+| --- | --- |
+| Persistent | The browser promised not to evict the data |
+| Ordinary | The data survives a reload, but the browser may delete it |
+| Session | The data disappears with the tab |
+
+Collapsing them into a single warning either scares without need or
+stays silent where silence is not allowed. Permission for persistent
+storage is not granted immediately, and in a private window it is not
+granted at all — that is the normal state of affairs, not a breakage.
+
+The "everything is fine" message is shown only on the backup screen:
+putting it on every screen is a way to train people not to read
+messages.
+
+### Password attempt limiting
+
+Three attempts pass with no delay — a margin for a typo and a forgotten
+keyboard layout. After that the delay grows: 5 s, 15 s, 1 min, 5 min,
+15 min, and stays at fifteen minutes. A cap is required: an endlessly
+growing delay would mean the owner loses access to their own funds
+because of a slip.
+
+**The counter is the same for unlock and for confirmation before
+releasing secrets.** Separate counters would mean a guesser simply
+picks the form that has no limit.
+
+**The counter lives in unencrypted settings, and that is forced:**
+the limiter must work before unlock, when the decryption key has not
+been derived yet. The consequence is stated plainly — someone with
+disk access will zero the counter. The limiter is not designed against
+that adversary: having copied the store, they guess the password on
+their own machine. The only defense that works there is 600,000
+PBKDF2 iterations on every try.
+
+**The counter survives a reload.** A limiter that resets on a page
+refresh limits nothing: a guesser presses F5 after every failure.
+This became possible only with persistent storage.
+
+**The check runs before key derivation.** Otherwise every rejected
+attempt would still cost a full PBKDF2 computation, and the limiter
+would become a way to load the owner's CPU.
+
+**The screen shows a countdown, not a silent refusal.** A form that
+stops accepting the password with no explanation sends the owner
+looking for a breakage that does not exist. The countdown uses the
+same injected clock the limiter uses for the deadline: a system timer
+next to it would be a second time source and would drift from the
+first.
+
+### Re-entering the password before a signature
+
+Protects against someone who gained access to an **already unlocked**
+wallet. The password here is not a second factor; it is confirmation
+that the owner is present at the moment of the action.
+
+Enabled by default: a protection that is off by default is not a
+protection. It can be turned off in settings — that is the fund
+owner's choice, and the consequence is named plainly, not hidden.
+
+**It is also asked when signing a request from an app.** Previously it
+was not asked at all, and that was the worst case: a remote request
+comes from a third-party app, while a send initiated locally comes
+from the owner at the device. Requiring confirmation for the second
+and not for the first means protecting more weakly where the danger
+is greater.
+
+**One setting covers both paths.** Two toggles would mean the owner
+protected sending without noticing that request signing was left open.
+
+**The attempt limiter here is the same as at unlock** — see below:
+without a shared counter a guesser would pick the form with no limit.
+
+### Untrusted text
+
+A token's symbol and name are set by the contract author, a network
+name by whoever added it, and notification text comes from the catalog
+service. Unicode can override writing direction (U+202E) and insert
+invisible characters (U+200B), making a forgery visually
+indistinguishable from the original. That is how tokens are spoofed
+in wallet interfaces.
+
+**Hidden characters are not deleted silently.** Deleting an invisible
+character would make the forgery indistinguishable from the original —
+exactly what its author wanted. The character is replaced with a
+visible marker, and the string is flagged with an icon.
+
+Codes in regular expressions are written as escape sequences: an
+invisible character in source cannot be verified by reading for
+exactly the reason it is dangerous.
+
+### Recipient warning
+
+| Signal | What it risks |
+| --- | --- |
+| Burn address | funds will leave irreversibly |
+| Transfer to self | a likely mistake when choosing an account |
+| No EIP-55 checksum | a typo will not be detected |
+| **Recipient is a contract** | coins sent to a contract that does not accept them are lost forever |
+
+The last check requires a call to the node (`eth_getCode`) and is
+therefore performed once on the confirmation step, not on every
+keystroke. A node failure yields "could not check", not "ordinary
+recipient": the second would reassure without grounds.
+
+### Unified confirmation of irreversible actions
+
+The `DangerConfirm` component: a title, the consequence, a required
+checkbox, and **cancel styled as the primary action**. Different
+styling of actions with the same consequences trains people to
+remember the look, not the meaning; styling that invites a click on
+the dangerous action is a nudge toward losing funds.
+
+### Memory wiping
+
+`withSecret` / `withSecretSync` wipe the buffer in every case, including
+an exception. A forgotten `finally` produces neither a compile error
+nor a test failure — it silently leaves the key in memory; the
+function turns the rule into a construct.
+
+A copied address is removed from the clipboard after a minute — and
+only if our value is still there: the wallet has no right to erase
+someone else's contents. This is mitigation, not protection: whoever
+reads the clipboard at the moment of the copy will read it either way.
+
+A JavaScript string cannot be wiped — it lives until garbage
+collection. That is a platform limit, and it is named, not papered
+over.
+
+### XSS protection and CSP
+
+On top of the earlier measures (React, ESLint bans on `innerHTML` and
+`localStorage`) the following were added:
+
+- **Trusted Types** (`require-trusted-types-for 'script'`) — a ban on
+  assigning strings to sinks that lead to code execution. The ESLint
+  rule applies to our code; this directive applies to dependencies as
+  well, including future ones. **Verified on the production build:**
+  the app works, `innerHTML` is blocked by the browser;
+- `worker-src 'none'` — there are no workers, and allowing `blob:`
+  would let worker code assembled from a string run, bypassing
+  `script-src`;
+- `child-src`, `media-src`, `manifest-src` are closed explicitly:
+  `default-src` does not cover every resource type.
+
+`connect-src` still allows any HTTPS, and **it cannot be narrowed**:
+the user is entitled to point at their own RPC node, whose address is
+unknown at build time. A list from built-in networks would revoke the
+main privacy protection for requests.
+
+---
+
+## Checks
 
 ```bash
-npm run verify   # формат, линтер, типы, 1425 модульных и интеграционных проверок
-npm run e2e      # 16 сквозных проверок в настоящем браузере
+npm run verify   # format, linter, types, 1425 unit and integration checks
+npm run e2e      # 16 end-to-end checks in a real browser
 ```
 
-Покрытие: **86.73% операторов, 77.51% ветвей, 83.6% функций**
+Coverage: **86.73% statements, 77.51% branches, 83.6% functions**
 (`npm run test:coverage`).
 
-### Четыре уровня, и каждый ловит своё
+### Four levels, and each catches its own thing
 
-**Модульные.** Чистые функции и отдельные сервисы. Отдельного внимания
-стоит `request-mapping.test.ts`: разбор обращений, пришедших от чужого
-приложения, — 32 проверки на самом недоверенном входе кошелька.
-Проверяется в том числе то, что `personal_sign` и `eth_sign` принимают
-адрес и сообщение в РАЗНОМ порядке, и подстановка одного порядка
-вместо другого отвергается, а не разбирается «как получится».
+**Unit.** Pure functions and individual services. `request-mapping.test.ts`
+deserves special attention: parsing calls that arrived from a foreign
+app — 32 checks on the wallet's most untrusted input. Among other
+things it checks that `personal_sign` and `eth_sign` take the address
+and the message in a DIFFERENT order, and that substituting one order
+for the other is rejected rather than parsed "as it happens to come".
 
-**Интеграционные.** Экраны целиком: настоящее ядро, настоящее
-шифрование, дублёр только у узла сети. Сюда же
-`createAppServices.test.ts` — проверка боевой связки. Она существует
-из-за конкретного случая: на этапе 18 боевая сборка использовала пустой
-источник курсов, и ни один модульный тест этого не видел.
+**Integration.** Whole screens: a real core, real encryption, a double
+only for the network node. This also includes
+`createAppServices.test.ts` — a check of the production wiring. It
+exists because of a concrete case: at stage 18 the production build
+used an empty rate source, and no unit test saw it.
 
-**Сквозные (Playwright).** Собранное приложение в настоящем Chromium.
-Ловят класс дефектов, недоступный ни модульным проверкам, ни jsdom:
+**End-to-end (Playwright).** The built app in real Chromium. They catch
+a class of defects unreachable by unit checks or jsdom:
 
-- **отсечение неиспользуемого кода.** `"sideEffects"` в `package.json`
-  разрешает сборщику выбрасывать модули; ошибка видна только
-  в собранном виде;
-- **разбиение на чанки.** Экран, чанк которого не загрузился, в jsdom
-  выглядит исправным: там `import()` разрешается немедленно;
-- **CSP.** Политика внедряется только в боевую сборку и действует
-  только в браузере.
+- **dead-code elimination.** `"sideEffects"` in `package.json` lets the
+  bundler drop modules; the bug is visible only in the built form;
+- **chunk splitting.** A screen whose chunk failed to load looks fine
+  in jsdom: there `import()` resolves immediately;
+- **CSP.** The policy is injected only into the production build and
+  takes effect only in the browser.
 
-**Безопасности.** Каталог [src/test/security](src/test/security/) —
-сквозные инварианты, а не отдельные функции: секреты не попадают
-в хранилище, в журнал и в сериализованное состояние; заблокированный
-кошелёк не выполняет операций; выдача секрета требует пароля и согласия
-под показанным уровнем риска; подделка текста и имён не доходит
-до экрана.
+**Security.** The catalog [src/test/security](src/test/security/) —
+cross-cutting invariants, not individual functions: secrets do not
+land in storage, in the log, or in serialized state; a locked wallet
+does not perform operations; releasing a secret requires a password
+and consent under the shown risk level; forged text and names do not
+reach the screen.
 
-### Что показали сквозные проверки при первом запуске
+### What the end-to-end checks found on the first run
 
-Три настоящие находки, ни одна из которых не была видна модульным
-проверкам:
+Three real findings, none of which was visible to unit checks:
 
-1. **Язык интерфейса.** Chromium по умолчанию английский, и приложение
-   честно показывало английский. Проверки искали русские подписи.
-   Закреплено `locale: 'ru-RU'` — по той же причине, по которой язык
-   закреплён в `src/test/setup.ts`: проверка, зависящая от локали
-   машины, проверяет машину.
-2. **Нестрогий поиск заголовка.** «Подключения» находилось дважды —
-   заголовок экрана и заголовок карточки. Исправлено указанием уровня.
-3. **Нехватка процессора.** Каждая проверка разворачивает кошелёк, а это
-   два вывода ключа по 600 000 итераций PBKDF2 — операция, дорогая
-   по замыслу. Восемь браузеров разом упирались в процессор, и проверки
-   падали по времени ожидания, не имея отношения к кошельку. Ограничено
-   двумя одновременными; стабильность подтверждена тремя чистыми
-   прогонами подряд.
+1. **Interface language.** Chromium defaults to English, and the app
+   honestly showed English. The checks looked for Russian labels.
+   Fixed with `locale: 'ru-RU'` — for the same reason the language is
+   pinned in `src/test/setup.ts`: a check that depends on the machine
+   locale is checking the machine.
+2. **Loose heading search.** "Connections" was found twice — the
+   screen title and the card title. Fixed by specifying the level.
+3. **CPU starvation.** Each check unlocks a wallet, and that is two
+   key derivations of 600,000 PBKDF2 iterations — an operation that
+   is expensive by design. Eight browsers at once hit the CPU, and
+   the checks timed out with no relation to the wallet. Limited to
+   two concurrent; stability confirmed by three clean runs in a row.
 
-### Проверки, которых здесь нет намеренно
+### Checks that are absent here on purpose
 
-**«eval заблокирован политикой».** Была написана и отброшена:
-`page.evaluate` исполняется через протокол отладки, а он к политике
-страницы не относится. Сборка кода из строки внутри `page.evaluate`
-проходит независимо от CSP — такая проверка измеряла бы средство
-проверки, а не защиту. Вместо неё: отсутствие `'unsafe-eval'`
-в `script-src` и невозможность исполнить внедрённый код теми путями,
-которыми пользуется XSS, — через саму страницу.
+**"eval is blocked by the policy".** It was written and discarded:
+`page.evaluate` executes through the debug protocol, which is not
+subject to the page policy. Assembling code from a string inside
+`page.evaluate` succeeds regardless of CSP — such a check would
+measure the test tool, not the protection. Instead: the absence of
+`'unsafe-eval'` in `script-src` and the inability to execute injected
+code by the paths XSS uses — through the page itself.
 
-**Открытие сессии в `createAppServices.test.ts`.** Дошло бы до опроса
-настоящих публичных RPC: проверка зависела бы от чужой доступности
-и сообщала бы адрес кошелька постороннему оператору при каждом прогоне.
-Подставить дублёр нельзя намеренно — `createAppServices` не принимает
-аргументов, иначе подстановка была бы достижима и в боевой сборке.
-Путь целиком закреплён сквозной проверкой.
+**Opening a session in `createAppServices.test.ts`.** It would have
+reached real public RPCs: the check would depend on someone else's
+availability and would report the wallet address to a third-party
+operator on every run. A double cannot be injected on purpose —
+`createAppServices` takes no arguments, otherwise the substitution
+would be reachable in the production build as well. The path as a
+whole is pinned by an end-to-end check.
 
-### Почему повторов у сквозных проверок нет
+### Why end-to-end checks have no retries
 
-`retries: 0`. Перезапуск скрывает нестабильность вместо того, чтобы
-её показать. Для кошелька плавающая проверка опаснее падающей —
-она приучает не смотреть на результат.
+`retries: 0`. A rerun hides flakiness instead of showing it. For a
+wallet a flaky check is more dangerous than a failing one — it trains
+people not to look at the result.
 
-### Почему `npm run e2e` не входит в `npm run verify`
+### Why `npm run e2e` is not part of `npm run verify`
 
-Сквозные проверки требуют сборки и загруженного браузера (~115 МБ).
-Держать это в проверке, которая должна проходить за минуту и без сети,
-нельзя. Браузер ставится отдельно:
+End-to-end checks require a build and a downloaded browser (~115 MB).
+Keeping that in a check that must pass in a minute and without a
+network is not acceptable. The browser is installed separately:
 
 ```bash
 npx playwright install chromium
@@ -548,2115 +562,2263 @@ npx playwright install chromium
 
 ---
 
-## Оптимизация
+## Optimization
 
-Все числа ниже — измерения `npm run build` до и после, а не оценки.
+All numbers below are measurements of `npm run build` before and after,
+not estimates.
 
-### Начальная загрузка: 286.68 → 190.61 КБ gzip (−33.5%)
+### Initial load: 286.68 → 190.61 KB gzip (−33.5%)
 
-| | до | после |
+| | before | after |
 | --- | --- | --- |
-| начальный набор чанков | 868.07 КБ | 529.38 КБ |
-| он же в gzip | 286.68 КБ | 190.61 КБ |
+| initial chunk set | 868.07 KB | 529.38 KB |
+| the same, gzip | 286.68 KB | 190.61 KB |
 
-Вынесено из начальной загрузки: ethers и разбор EIP-712 (220 КБ, 69 КБ
-gzip) — грузятся при разблокировке; экраны разделов — при переходе;
-WalletConnect (437 КБ) — как и раньше, при открытии подключений.
+Moved out of the initial load: ethers and EIP-712 parsing (220 KB, 69 KB
+gzip) — loaded on unlock; section screens — on navigation;
+WalletConnect (437 KB) — as before, when connections are opened.
 
-**Что дало основной выигрыш — `"sideEffects": ["**/*.css"]` в
-`package.json`.** Без этого объявления сборщик обязан считать, что любой
-модуль может что-то делать при импорте, и не вправе выбросить неиспользуемые
-реэкспорты сборного файла `core/index.ts`. Одного значения из ядра хватало,
-чтобы в начальный чанк попало всё ядро целиком вместе с ethers.
+**What produced the main win — `"sideEffects": ["**/*.css"]` in
+`package.json`.** Without that declaration the bundler must assume that
+any module may do something on import, and it is not allowed to drop
+unused re-exports from the barrel file `core/index.ts`. A single value
+from the core was enough to pull the entire core, including ethers,
+into the initial chunk.
 
-**Что понадобилось сверх этого.** Две отложенные загрузки:
+**What was needed beyond that.** Two deferred loads:
 
-- `LazyRpcClientFactory` подгружает транспорт при первом соединении
-  с узлом. Настоящая фабрика создаётся в конструкторе сессии, то есть
-  при запуске, и тянула ethers на экраны, где сети нет вовсе;
-- `WalletSession.#buildServices` подгружает `AccountManager`
-  и `HDWalletService` в момент открытия сессии. Они тянут за собой
-  подпись, а с ней снова ethers.
+- `LazyRpcClientFactory` loads the transport on the first connection
+  to a node. The real factory was created in the session constructor,
+  i.e. at startup, and dragged ethers onto screens that have no
+  network at all;
+- `WalletSession.#buildServices` loads `AccountManager`
+  and `HDWalletService` at the moment the session opens. They pull in
+  signing, and with it ethers again.
 
-Порядок сборки сервисов и время жизни ключей при этом не изменились:
-загрузка происходит там же, где раньше происходило создание.
+The order in which services are assembled and the lifetime of keys did
+not change: the load happens in the same place where creation used to
+happen.
 
-### Что НЕ было сделано и почему
+### What was NOT done, and why
 
-**Разбиение по вендорам оказалось вредным — проверено измерением.**
-Раскладка `ethers`, `react`, `@noble`/`@scure` и значков по отдельным
-чанкам дала 329 КБ gzip вместо 286 КБ: границы чанков мешают сжатию
-и общей минификации. Приём выглядит очевидно полезным и им не является;
-эксперимент отменён.
+**Vendor splitting turned out to be harmful — verified by measurement.**
+Putting `ethers`, `react`, `@noble`/`@scure`, and icons into separate
+chunks gave 329 KB gzip instead of 286 KB: chunk boundaries hurt
+compression and shared minification. The technique looks obviously
+useful and is not; the experiment was reverted.
 
-**Подпись не переведена на асинхронную загрузку.** Формально это убрало бы
-ethers и из чанка разблокировки. Но `#withPrivateKey` синхронна намеренно:
-ключ выводится, используется и затирается в одном непрерывном участке.
-Асинхронная версия держала бы приватный ключ живым через точки ожидания.
-Оптимизация ценой безопасности оптимизацией не является.
+**Signing was not moved to an async load.** Formally that would have
+removed ethers from the unlock chunk as well. But `#withPrivateKey` is
+synchronous on purpose: the key is derived, used, and wiped in one
+uninterrupted stretch. An async version would keep the private key
+alive across await points. An optimization at the cost of security is
+not an optimization.
 
-### Экраны грузятся по требованию
+### Screens load on demand
 
-`React.lazy` для всех разделов кошелька, создания и восстановления.
-НЕ отложены четыре экрана, показываемые первыми: приветствие,
-разблокировка, восстановление доступа и главный экран. Заставка загрузки
-перед полем пароля либо вместо баланса сразу после разблокировки — это
-задержка на самом частом действии, а не оптимизация.
+`React.lazy` for every wallet section, creation, and recovery.
+Four screens shown first are NOT deferred: welcome, unlock, access
+recovery, and the home screen. A loading splash before the password
+field or instead of the balance right after unlock is a delay on the
+most frequent action, not an optimization.
 
-Одна граница `Suspense` лежит внутри оболочки кошелька: шапка и панель
-навигации при переходе остаются на месте.
+A single `Suspense` boundary sits inside the wallet shell: the header
+and navigation bar stay in place on a transition.
 
-Экраны входа импортируются из своих модулей, а не через `@/pages`:
-сборный файл статически тянет за собой все страницы сразу и обесценил бы
-отложенную загрузку.
+Onboarding screens are imported from their own modules, not through
+`@/pages`: the barrel file statically pulls every page at once and
+would defeat lazy loading.
 
-### Виртуализация — [shared/ui/virtual-list.tsx](src/shared/ui/virtual-list.tsx)
+### Virtualization — [shared/ui/virtual-list.tsx](src/shared/ui/virtual-list.tsx)
 
-История переводов доходит до сотен записей. `VirtualList` рисует только
-попавшие в видимую область.
+Transfer history reaches hundreds of rows. `VirtualList` renders only
+those that fall into the visible area.
 
-**Виртуализация включается с 51-й записи.** Короткий список остаётся
-обычным: у него работают поиск браузера, печать и выделение мышью,
-а выигрыш на трёх десятках строк неизмерим.
+**Virtualization turns on from the 51st row.** A short list stays
+ordinary: browser find, print, and mouse selection work on it, and the
+gain on three dozen rows is unmeasurable.
 
-**Что виртуализация ломает и почему здесь это допустимо.** Строк
-не существует в документе, пока они не видны: Ctrl+F их не найдёт.
-Это настоящая потеря, и она допустима ровно потому, что на экране
-истории есть собственный отбор — по направлению, виду актива и адресу
-контрагента. Список без своего поиска виртуализировать нельзя.
+**What virtualization breaks, and why it is acceptable here.** Rows do
+not exist in the document until they are visible: Ctrl+F will not find
+them. That is a real loss, and it is acceptable only because the
+history screen has its own filtering — by direction, asset type, and
+counterparty address. A list without its own search must not be
+virtualized.
 
-**Экранный диктор получает полный размер** через `aria-setsize`
-и `aria-posinset`: без них он объявил бы «список из двенадцати
-элементов» там, где их пятьсот.
+**The screen reader gets the full size** via `aria-setsize`
+and `aria-posinset`: without them it would announce "a list of twelve
+items" where there are five hundred.
 
-Прокрутка оконная, а не собственная: вторая полоса прокрутки внутри
-первой в окне шириной 360 пикселей означает, что пользователь
-прокручивает не то, что собирался.
+Scrolling is window scrolling, not a nested one: a second scrollbar
+inside the first in a 360-pixel-wide window means the user is
+scrolling something other than what they intended.
 
-### Мемоизация
+### Memoization
 
-`TransferRow` вынесена из списка и обёрнута в `memo`. Записи перевода
-неизменяемы и живут в снимке сессии, который заменяется целиком:
-при обновлении баланса или курса ссылки на прежние записи сохраняются,
-и разбор суммы с форматированием времени не выполняются заново.
-`renderItem` и `getKey` мемоизированы — новая ссылка на них перерисовала
-бы всё окно и обесценила мемоизацию строк.
+`TransferRow` is extracted from the list and wrapped in `memo`.
+Transfer records are immutable and live in a session snapshot that is
+replaced as a whole: when the balance or a rate updates, references to
+previous records are preserved, and amount parsing and time formatting
+are not redone. `renderItem` and `getKey` are memoized — a new
+reference to them would redraw the entire window and defeat row
+memoization.
 
-**Экран подтверждения перевода не мемоизирован намеренно.** Он
-показывает то, что будет подписано; лишняя перерисовка там ничего
-не стоит, а показанное устаревшее значение стоит средств.
+**The transfer confirmation screen is not memoized on purpose.** It
+shows what will be signed; an extra redraw there costs nothing, and a
+stale value on screen costs funds.
 
-### Запросы
+### Requests
 
-**Балансы токенов запрашиваются с ограничением в четыре одновременных
-вызова.** Раньше обход был строго последовательным: десять токенов —
-десять задержек сети подряд. `Promise.all` — другая крайность: публичные
-узлы отвечают отказом по превышению частоты, а десяток одновременных
-вызовов выдаёт наблюдателю весь состав портфеля одним пакетом. Отказ
-по одному токену не убирает с экрана остальные.
+**Token balances are requested with a limit of four concurrent
+calls.** Previously the walk was strictly sequential: ten tokens —
+ten network delays in a row. `Promise.all` is the other extreme:
+public nodes respond with a rate-limit refusal, and a dozen concurrent
+calls hand an observer the entire portfolio composition in one packet.
+A failure for one token does not remove the others from the screen.
 
-**Фоновый опрос останавливается, когда вкладка уходит из виду.** Это
-не только экономия лимитов: опрос скрытой вкладки продолжает сообщать
-оператору узла, что кошелёк с этим адресом открыт, пока пользователь
-занят другим. Возврат на вкладку обновляет баланс сразу, не дожидаясь
-периода опроса.
+**Background polling stops when the tab goes out of view.** This is
+not only a quota saving: polling a hidden tab keeps telling the node
+operator that a wallet with this address is open while the user is
+busy with something else. Returning to the tab refreshes the balance
+immediately, without waiting for the poll period.
 
-**Курс запрашивается по действию, а не по таймеру.** Фоновый опрос
-раз в минуту был сделан и снят. Причина не в сложности: у источника
-курсов нет потока — ни веб-сокета, ни длинного соединения, — поэтому
-«реальное время» означало бы опрос, а опрос упирается сразу в две
-стены. Первая считается: курс запрашивается отдельно для нативной
-валюты и **по одному запросу на каждый токен** (пакет больше единицы
-отвергается отказом `10012` — измерено), то есть кошелёк с тремя
-токенами тратит 240 обращений в час открытого экрана при месячном
-пределе демонстрационного ключа в 10 000. Вторая важнее: разовое
-обращение источник видит всплеском и теряет владельца из виду, а опрос
-раз в минуту превращается в непрерывный след — время начала и конца
-каждой сессии, её длительность и суточный ритм, привязанные к IP
-и к неизменному набору адресов контрактов.
+**The rate is requested on action, not on a timer.** A once-a-minute
+background poll was built and then removed. The reason is not
+complexity: the rate source has no stream — no websocket, no long
+connection — so "real time" would mean polling, and polling hits two
+walls at once. The first can be counted: the rate is requested
+separately for the native currency and **one request per token**
+(a batch larger than one is rejected with error `10012` — measured),
+so a wallet with three tokens spends 240 calls per hour of an open
+screen against a demo-key monthly limit of 10,000. The second matters
+more: a one-off call looks like a spike to the source and then the
+owner drops out of sight, while a once-a-minute poll becomes a
+continuous trail — the start and end time of every session, its
+duration, and the daily rhythm, tied to an IP and to an unchanging
+set of contract addresses.
 
-Поэтому курс обновляется при открытии кошелька, нажатии обновления,
-смене сети или аккаунта. Рядом с оценкой показано **время котировки**:
-без опроса она может быть заметно старше минуты, а живое число
-от замершего иначе неотличимо.
+So the rate is updated when the wallet is opened, when refresh is
+pressed, or when the network or account changes. Next to the valuation
+the **quote time** is shown: without polling it can be noticeably
+older than a minute, and a live number is otherwise indistinguishable
+from a frozen one.
 
-Слежение за видимостью живёт в слое интерфейса: `document` — часть DOM,
-а ядро и сессия обязаны работать там, где документа нет.
+Visibility tracking lives in the interface layer: `document` is part
+of the DOM, and the core and the session must work where there is no
+document.
 
-### Кэширование
+### Caching
 
-Что было и осталось: балансы (15 секунд свежести, устаревшее значение
-отдаётся с пометкой), курсы, имена ENS (5 минут), объединение
-одновременных запросов одного баланса в один сетевой вызов.
+What was there and remains: balances (15 seconds of freshness, a stale
+value is returned with a mark), rates, ENS names (5 minutes),
+coalescing concurrent requests for the same balance into one network
+call.
 
-Добавлено: кэш **публичной** проекции адресов HD-дерева — адрес,
-публичный ключ и путь. Узлов `HDKey` в нём нет намеренно: узел хранит
-приватный ключ, и кэшировать его значило бы держать в памяти ровно то,
-что весь остальной код старается не удерживать. Подпись всегда выводит
-ключ заново и затирает его — ускорять эту дорогу нельзя. Кэш очищается
-в `wipe()` вместе с ключами.
+Added: a cache of the **public** projection of HD-tree addresses —
+address, public key, and path. There are no `HDKey` nodes in it on
+purpose: a node holds a private key, and caching it would keep in
+memory exactly what the rest of the code tries not to retain. Signing
+always derives the key again and wipes it — that path must not be
+sped up. The cache is cleared in `wipe()` together with the keys.
 
 ---
 
-## Отслеживание отправленных транзакций — [core/transaction](src/core/transaction/)
+## Tracking sent transactions — [core/transaction](src/core/transaction/)
 
-Отправив перевод, пользователь обязан узнать его судьбу из кошелька,
-а не из обозревателя блоков. Раньше все собственные отправки помечались
-одинаково — «ждёт подтверждения» — и оставались такими навсегда.
+After sending a transfer, the user must learn its fate from the wallet,
+not from a block explorer. Previously every own send was marked the
+same way — "awaiting confirmation" — and stayed that way forever.
 
-### Четыре исхода, и все четыре означают разное
+### Four outcomes, and all four mean different things
 
-| Что видит кошелёк | Что это значит |
+| What the wallet sees | What it means |
 | --- | --- |
-| Квитанции нет, nonce не израсходован | Транзакция ещё в мемпуле |
-| Квитанции нет, nonce израсходован | Место заняла другая транзакция того же отправителя |
-| Квитанция есть, выполнение успешно | Операция состоялась |
-| Квитанция есть, выполнение откачено | **Газ списан, операции не было** |
+| No receipt, nonce not spent | The transaction is still in the mempool |
+| No receipt, nonce spent | Another transaction from the same sender took the slot |
+| Receipt present, execution succeeded | The operation took place |
+| Receipt present, execution reverted | **Gas was charged, the operation did not happen** |
 
-Откат выделен отдельно и окрашен как ошибка. Показать его наравне
-с состоявшимся переводом значит сообщить о переводе, которого не было.
+A revert is singled out and colored as an error. Showing it on a par
+with a completed transfer means reporting a transfer that did not
+happen.
 
-### Реорганизация цепи учтена, и это не формальность
+### Chain reorganization is accounted for, and that is not a formality
 
-Квитанция может исчезнуть после того, как была получена: блок,
-содержавший транзакцию, вытеснен другим. Такая запись возвращается
-в состояние ожидания — иначе кошелёк утверждал бы состоявшимся то,
-чего в цепи нет.
+A receipt can disappear after it was received: the block that
+contained the transaction was displaced by another. Such a record
+returns to the waiting state — otherwise the wallet would assert as
+final something that is not in the chain.
 
-Чтобы это работало, опрашиваются **и уже подтверждённые записи**, пока
-их глубина меньше трёх подтверждений. Первая реализация опрашивала
-только ожидающие, и обработка реорганизации оказалась мёртвым кодом:
-подтверждённая запись просто не попадала в выборку. Нашёл это тест.
+For this to work, **already confirmed records** are polled as well,
+while their depth is less than three confirmations. The first
+implementation polled only pending ones, and reorganization handling
+turned out to be dead code: a confirmed record simply never entered
+the sample. A test found that.
 
-### Три подтверждения — это не окончательность
+### Three confirmations are not finality
 
-Полной невозвратности в сетях EVM нет вовсе: реорганизация возможна
-на любой глубине, просто с быстро убывающей вероятностью. Три блока —
-граница разумного ожидания: реорганизации такой глубины после перехода
-Ethereum на Proof-of-Stake наблюдаются исключительно редко,
-а бесконечный опрос узла стоил бы лимитов и раскрывал бы активность
-кошелька.
+There is no complete irreversibility in EVM networks at all:
+reorganization is possible at any depth, just with a rapidly
+decreasing probability. Three blocks are the boundary of reasonable
+waiting: reorganizations of that depth after Ethereum's move to
+Proof-of-Stake are observed extremely rarely, and endless polling of
+the node would cost quotas and would reveal wallet activity.
 
-Глубина хранится числом, а не признаком «подтверждена»: включение
-в блок и невозвратность — разные вещи, и признак вместо числа заставил
-бы выбрать один порог и выдавать его за истину.
+Depth is stored as a number, not as a "confirmed" flag: inclusion in
+a block and irreversibility are different things, and a flag instead
+of a number would force choosing one threshold and presenting it as
+the truth.
 
-### Хэш замещающей транзакции не выдумывается
+### The replacement transaction hash is not invented
 
-Найти его можно только обходом блоков — это работа индексатора.
-Пользователю сообщается сам факт замещения, поле остаётся пустым.
+It can be found only by walking blocks — that is an indexer's job.
+The user is told the fact of replacement itself; the field stays
+empty.
 
-### Опрашиваются все сети, а не только активная
+### All networks are polled, not only the active one
 
-Транзакция не перестаёт существовать оттого, что пользователь
-переключил сеть. Обычно таких сетей ноль или одна, и стоимость опроса
-пропорциональна действительной работе.
+A transaction does not cease to exist because the user switched
+network. Usually there are zero or one such networks, and the cost of
+polling is proportional to the actual work.
 
-Слежение останавливается вместе с сессией: таймер, переживший
-блокировку, продолжал бы опрашивать узел и раскрывать оператору, что
-кошелёк с этими адресами существует.
+Tracking stops with the session: a timer that survived lock would keep
+polling the node and revealing to the operator that a wallet with
+these addresses exists.
 
 ---
 
-## Отправка токенов ERC-20 — [core/token/erc20.ts](src/core/token/erc20.ts)
+## Sending ERC-20 tokens — [core/token/erc20.ts](src/core/token/erc20.ts)
 
-Экран отправки выбирает, что уходит: нативную валюту сети или любой
-из отслеживаемых токенов. Список тот же, что на главном экране, —
-второй источник правды о составе кошелька разошёлся бы с первым.
+The send screen chooses what leaves: the network's native currency or
+any of the tracked tokens. The list is the same as on the home screen —
+a second source of truth about the wallet's composition would drift
+from the first.
 
-### Перевод токена — это вызов контракта, и экран этого не скрывает
+### A token transfer is a contract call, and the screen does not hide that
 
-| Поле транзакции | Нативная валюта | Токен ERC-20 |
+| Transaction field | Native currency | ERC-20 token |
 | --- | --- | --- |
-| `to` | получатель | **адрес контракта токена** |
-| `value` | сумма | **ноль** |
-| `data` | пусто | `transfer(получатель, количество)` |
+| `to` | recipient | **the token contract address** |
+| `value` | amount | **zero** |
+| `data` | empty | `transfer(recipient, amount)` |
 
-Человек, сверяющий адрес получателя с полем `to`, обязан понимать,
-почему они не совпадают, — иначе он решит, что кошелёк подменил адрес.
-Поэтому подтверждение показывает оба адреса и объясняет разницу,
-а не прячет контракт «для простоты».
+A person who checks the recipient address against the `to` field must
+understand why they do not match — otherwise they will decide the
+wallet swapped the address. So confirmation shows both addresses and
+explains the difference, rather than hiding the contract "for
+simplicity".
 
-### Расшифровка читается из подписываемой транзакции
+### The decode is read from the transaction being signed
 
-Получатель и сумма на экране подтверждения берутся не из полей формы,
-а разбираются обратно из `data` готовой транзакции. Совпадение
-показанного с подписываемым тогда следует из устройства экрана, а не
-из аккуратности того, кто его писал. Тем же разбором строится запись
-истории — в неё попадает ровно то, что ушло в сеть.
+The recipient and amount on the confirmation screen are taken not from
+form fields, but parsed back from the `data` of the finished
+transaction. Then the match between what is shown and what is signed
+follows from how the screen is built, not from the care of whoever
+wrote it. The same parse builds the history record — it contains
+exactly what went on-chain.
 
-### Кодирование вызова живёт в ядре
+### Call encoding lives in the core
 
-Данные вызова — единственное, что определяет получателя и сумму.
-Ошибка в них отправит токены не туда без возможности возврата, поэтому
-собирает их слой, который знает стандарт, а не форма. Сумма, не
-помещающаяся в `uint256`, отвергается: молча обрезанное значение
-отправило бы не то, что подтвердил пользователь.
+Calldata is the only thing that determines the recipient and the
+amount. An error in it will send tokens to the wrong place with no
+way back, so they are assembled by the layer that knows the standard,
+not by the form. An amount that does not fit in `uint256` is
+rejected: a silently truncated value would send something other than
+what the user confirmed.
 
-Слово адреса проверяется и при разборе: старшие двенадцать байт обязаны
-быть нулевыми. Слово, заполненное целиком, адресом не является, и
-выдавать его за адрес нельзя.
+The address word is checked on parse as well: the high twelve bytes
+must be zero. A word filled entirely is not an address, and it must
+not be presented as one.
 
-### Число знаков не додумывается
+### The number of decimals is not guessed
 
-У USDC их шесть, у большинства токенов восемнадцать. Сумма считается
-по значению, прочитанному из контракта; смена актива очищает поле суммы,
-потому что «10» при разном числе знаков означает разные величины.
+USDC has six, most tokens have eighteen. The amount is computed from
+the value read from the contract; changing the asset clears the amount
+field, because "10" at different decimal counts means different
+magnitudes.
 
-В истории символ и число знаков подставляются **только для
-отслеживаемых токенов**. Для незнакомого адреса запись показывается
-в необработанных единицах с пометкой: выдуманные восемнадцать знаков
-исказили бы сумму на порядки.
+In history the symbol and decimal count are substituted **only for
+tracked tokens**. For an unfamiliar address the record is shown in
+raw units with a mark: invented eighteen decimals would distort the
+amount by orders of magnitude.
 
-### Баланс токена проверяется до отправки
+### The token balance is checked before sending
 
-Нативных средств может хватать на комиссию, а токенов — нет; тогда
-контракт откатит вызов, газ спишется, а перевода не будет. Отказ узла
-в оценке газа сообщает лишь «вызов завершится откатом» и причину
-не называет, поэтому баланс читается отдельно. Недоступность контракта
-при этом не выдаётся за нулевой баланс: «проверить не удалось» и
-«токенов нет» — разные утверждения.
+There may be enough native funds for the fee and not enough tokens;
+then the contract reverts the call, gas is charged, and there is no
+transfer. A node's refusal in gas estimation only says "the call will
+revert" and does not name the reason, so the balance is read
+separately. Unavailability of the contract is not presented as a zero
+balance: "could not check" and "no tokens" are different statements.
 
-### Коллекционные токены сюда не входят
+### Collectible tokens are not included here
 
-ERC-721 и ERC-1155 отправлять нечем, и дело не в кодировании вызова.
-Кошелёк не читает, какие предметы принадлежат адресу, поэтому форма
-свелась бы к ручному вводу адреса контракта и номера предмета — с ценой
-опечатки в безвозвратно потерянный предмет. Сначала нужен список
-владения; он записан в [TECH_DEBT.md](TECH_DEBT.md) как A-114, отправка —
-как A-113.
+There is nothing to send ERC-721 and ERC-1155 with, and it is not
+about encoding the call. The wallet does not read which items belong
+to the address, so the form would reduce to typing a contract address
+and an item number by hand — at the price of a typo being an
+irreversibly lost item. An ownership list is needed first; it is
+recorded in [TECH_DEBT.md](TECH_DEBT.md) as A-114, sending as A-113.
 
 ---
 
-## Коллекционные токены — [core/nft](src/core/nft/)
+## Collectible tokens — [core/nft](src/core/nft/)
 
-Раздел NFT показывает предметы ERC-721 и ERC-1155, принадлежащие
-активному адресу, и позволяет их передать.
+The NFT section shows ERC-721 and ERC-1155 items belonging to the
+active address and allows transferring them.
 
-### Списка владения у узла нет — он строится в два шага
+### The node has no ownership list — it is built in two steps
 
-Узел не умеет отвечать на вопрос «что принадлежит адресу»: такого
-индекса у него нет. Кошелёк находит поступления в журналах событий,
-а затем спрашивает **у каждого контракта**, принадлежит ли предмет
-владельцу сейчас — `ownerOf` для ERC-721, `balanceOf` для ERC-1155.
+The node cannot answer the question "what belongs to this address":
+it has no such index. The wallet finds incoming transfers in event
+logs, then asks **each contract** whether the item belongs to the
+owner now — `ownerOf` for ERC-721, `balanceOf` for ERC-1155.
 
-Второй шаг обязателен. Журнал — это история: предмет, полученный вчера
-и отданный сегодня, останется в нём навсегда. Список по одним журналам
-показывал бы чужое имущество как своё.
+The second step is mandatory. A log is history: an item received
+yesterday and given away today will stay in it forever. A list from
+logs alone would show other people's property as one's own.
 
-Событие `Transfer` общее у ERC-20 и ERC-721; различаются они числом
-индексированных параметров. Считать переводы токенов предметами значило
-бы показать в галерее чужие деньги.
+The `Transfer` event is shared by ERC-20 and ERC-721; they differ in
+the number of indexed parameters. Counting token transfers as items
+would show other people's money in the gallery.
 
-### Поиск запускает владелец, открывая раздел
+### The owner starts the search by opening the section
 
-Это выборка журналов плюс до шестидесяти обращений к контрактам:
-десятки запросов и подробный след активности у оператора узла. Делать
-это при каждом входе значило бы платить за то, чего никто не просил.
+This is a log scan plus up to sixty contract calls: dozens of
+requests and a detailed activity trail at the node operator. Doing
+this on every entry would mean paying for something nobody asked for.
 
-Границы называются прямо: глубина просмотра в блоках и число
-непроверенных предметов, если их оказалось больше лимита. Молчаливое
-обрезание читается как «это всё».
+The bounds are named plainly: the lookback depth in blocks and the
+number of unchecked items if they exceeded the limit. Silent
+truncation reads as "this is everything".
 
-### Изображений нет, и это решение
+### There are no images, and that is a decision
 
-Ссылки на них задаёт автор контракта. Загрузка раскрыла бы IP-адрес
-владельца произвольному серверу и позволила бы связать его с кошельком.
-Показываются название коллекции, адрес контракта и номер предмета —
-этого достаточно, чтобы предмет опознать. Название тоже задаёт автор
-контракта, поэтому рядом всегда стоит адрес.
+Links to them are set by the contract author. Loading them would
+reveal the owner's IP address to an arbitrary server and would let it
+be tied to the wallet. The collection name, contract address, and item
+number are shown — that is enough to recognize the item. The name is
+also set by the contract author, so the address always stands next to
+it.
 
-### Передача идёт безопасным вариантом
+### Transfer uses the safe variant
 
-`safeTransferFrom`, а не `transferFrom`: второй отправит предмет и
-контракту, который не умеет их принимать, — оттуда он не вернётся
-никогда. Безопасный вариант спрашивает у контракта-получателя
-подтверждение и откатывается, если его нет.
+`safeTransferFrom`, not `transferFrom`: the second will send the item
+even to a contract that cannot accept them — from there it will never
+come back. The safe variant asks the recipient contract for
+confirmation and reverts if there is none.
 
-| Стандарт | Вызов | Что передаётся |
+| Standard | Call | What is transferred |
 | --- | --- | --- |
-| ERC-721 | `safeTransferFrom(from,to,tokenId)` | один неделимый предмет |
-| ERC-1155 | `safeTransferFrom(from,to,id,amount,data)` | заданное число экземпляров |
+| ERC-721 | `safeTransferFrom(from,to,tokenId)` | one indivisible item |
+| ERC-1155 | `safeTransferFrom(from,to,id,amount,data)` | a given number of copies |
 
-Отправитель входит в данные вызова явным аргументом: контракт разрешает
-передачу и доверенному лицу, а кошелёк передаёт только свой адрес.
+The sender enters the calldata as an explicit argument: the contract
+also allows a transfer by a trusted party, and the wallet passes only
+its own address.
 
-Принадлежность проверяется **до подписи**. Контракт отверг бы вызов
-и сам, но газ при этом списался бы, а причина осталась бы невнятной:
-список мог устареть, если предмет отдали с другого устройства.
+Ownership is checked **before signing**. The contract would reject the
+call itself, but gas would still be charged and the reason would stay
+unclear: the list may have gone stale if the item was given away from
+another device.
 
-Получатель на экране подтверждения читается из данных подписываемой
-транзакции, а не из поля формы, — как и при отправке токенов.
+The recipient on the confirmation screen is read from the calldata of
+the transaction being signed, not from the form field — as with token
+sends.
 
 ---
 
-## Ускорение и отмена зависшей транзакции — [core/transaction](src/core/transaction/)
+## Speeding up and canceling a stuck transaction — [core/transaction](src/core/transaction/)
 
-Транзакция с заниженной комиссией может стоять в очереди часами.
-Хуже другое: её номер (nonce) занят, и **ни одна следующая операция
-с этого адреса не пройдёт**, пока она не разрешится. Один застрявший
-перевод останавливает кошелёк целиком.
+A transaction with an underpriced fee can sit in the queue for hours.
+Worse is something else: its number (nonce) is taken, and **no later
+operation from this address will go through** until it is resolved.
+One stuck transfer stops the wallet entirely.
 
-Кнопки появляются в строке истории у собственных отправок, ожидающих
-блока. Чужой перевод заменить невозможно в принципе: замена
-подписывается ключом отправителя.
+Buttons appear in the history row on own sends that are waiting for a
+block. A foreign transfer cannot be replaced in principle: a
+replacement is signed with the sender's key.
 
-### Заменить — значит отправить заново с тем же номером
+### To replace means to send again with the same number
 
-Две транзакции с одним номером сосуществовать не могут: сеть примет
-одну. На этом и построены оба действия.
+Two transactions with one number cannot coexist: the network will
+accept one. Both actions are built on that.
 
-| Действие | Что уходит в сеть | Итог |
+| Action | What goes on-chain | Outcome |
 | --- | --- | --- |
-| Ускорение | Та же операция, тот же номер, комиссия выше | Перевод состоится быстрее |
-| Отмена | Перевод самому себе на ноль, тот же номер, комиссия выше | Перевод не состоится |
+| Speed up | The same operation, the same number, a higher fee | The transfer will complete faster |
+| Cancel | A zero transfer to self, the same number, a higher fee | The transfer will not complete |
 
-Ускорение повторяет **исходную** операцию: получатель, сумма, данные
-вызова и лимит газа берутся из сохранённой записи, а не считаются
-заново. Иначе под тем же номером ушла бы другая транзакция — пользователь
-ждал бы ускорения своего перевода и получил бы неизвестно что.
-Ради этого запись транзакции с этапа 26 хранит `data`, `gasLimit`
-и обе части комиссии.
+Speed-up repeats the **original** operation: recipient, amount,
+calldata, and gas limit are taken from the saved record, not
+recomputed. Otherwise a different transaction would go out under the
+same number — the user would wait for their transfer to be sped up
+and would get who-knows-what. For that reason the transaction record
+from stage 26 stores `data`, `gasLimit`, and both parts of the fee.
 
-### Отменить отправленное нельзя, и кошелёк это говорит прямо
+### Sent cannot be undone, and the wallet says so plainly
 
-Отмена — не отзыв транзакции, такой операции в блокчейне нет. Это
-попытка занять её номер другой, более дорогой. Исходная может попасть
-в блок первой; тогда перевод состоится, а «отмена» просто не будет
-принята. Экран называет это до подписи, а не после.
+Cancel is not a transaction recall; no such operation exists on a
+blockchain. It is an attempt to occupy its number with another, more
+expensive one. The original may land in a block first; then the
+transfer will complete and the "cancel" simply will not be accepted.
+The screen names this before the signature, not after.
 
-Комиссия при этом не теряется: невключённая транзакция не стоит ничего.
+The fee is not lost in that case: a transaction that was not included
+costs nothing.
 
-### Надбавка 15 %, и применяется к обеим частям комиссии
+### A 15% bump, applied to both parts of the fee
 
-Узел принимает замену только при заметно большей комиссии. У geth порог
-задаётся `txpool.pricebump` и по умолчанию равен десяти процентам.
-Ровно десять брать нельзя: целочисленное округление вниз даёт значение
-на единицу меньше порога, и узел отвечает отказом. Пятнадцать проходит
-и там, где порог поднят.
+A node accepts a replacement only at a noticeably higher fee. In geth
+the threshold is set by `txpool.pricebump` and defaults to ten
+percent. Taking exactly ten is not allowed: integer rounding down
+yields a value one below the threshold, and the node responds with a
+refusal. Fifteen succeeds even where the threshold has been raised.
 
-Надбавка применяется и к `maxFeePerGas`, и к `maxPriorityFeePerGas` —
-узел сравнивает обе. Подняв одну, замену получить не удастся.
+The bump is applied to both `maxFeePerGas` and `maxPriorityFeePerGas`
+— the node compares both. Raising one will not get a replacement
+accepted.
 
-Если сеть за это время подорожала сильнее надбавки, берётся текущее
-предложение узла: иначе ускоренная транзакция зависла бы так же, как
-исходная.
+If the network has become more expensive than the bump in the
+meantime, the node's current suggestion is used: otherwise the sped-up
+transaction would stall the same way the original did.
 
-### Отказ называет причину дословно
+### A refusal names the reason verbatim
 
-«Ускорить не удалось» без объяснения оставляет владельца наедине
-с зависшим переводом, а причины требуют разных действий:
+"Could not speed up" with no explanation leaves the owner alone with
+a stuck transfer, and the reasons require different actions:
 
-- транзакция уже в блоке — делать ничего не нужно, перевод прошёл;
-- откачена, но в блоке — номер израсходован, замена бессмысленна;
-- параметры не сохранены (запись сделана до этапа 26) — ускорение
-  невозможно, **отмена по-прежнему доступна**;
-- средств не хватает на комиссию замены.
+- the transaction is already in a block — nothing needs to be done,
+  the transfer went through;
+- reverted, but in a block — the number is spent, replacement is
+  pointless;
+- parameters were not saved (the record was made before stage 26) —
+  speed-up is impossible, **cancel is still available**;
+- there are not enough funds for the replacement fee.
 
-### Замена подписывается как обычная транзакция
+### A replacement is signed like an ordinary transaction
 
-Тот же путь `sendTransfer`, то же подтверждение паролем перед подписью.
-Отдельный путь отправки означал бы второе место, где решается,
-что подписывать, — и подтверждение пользователя можно было бы обойти.
+The same `sendTransfer` path, the same password confirmation before
+signing. A separate send path would mean a second place that decides
+what to sign — and the user's confirmation could be bypassed.
 
 ---
 
-## Имена ENS — [core/ens](src/core/ens/)
+## ENS names — [core/ens](src/core/ens/)
 
-Поле получателя принимает и адрес, и имя вида `имя.eth`. Аккаунты кошелька
-подписываются именем вместо адреса, когда имя есть и подтверждено.
+The recipient field accepts both an address and a name of the form
+`name.eth`. Wallet accounts are labeled with a name instead of an
+address when a name exists and has been confirmed.
 
-### Обратная запись ничего не доказывает — и это главное
+### A reverse record proves nothing — and that is the main point
 
-Запись `<адрес>.addr.reverse` задаёт владелец адреса, и объявить своим
-именем `binance.eth` вправе кто угодно. Кошелёк, показавший такую строку
-как есть, своим интерфейсом подписывается под подделкой.
+The `<address>.addr.reverse` record is set by the address owner, and
+anyone is entitled to declare `binance.eth` as their name. A wallet
+that showed such a string as-is would put its interface behind a
+forgery.
 
-Поэтому `lookupAddress` **обязательно** разрешает полученное имя обратно
-и сверяет адрес. Не сошлось — имя не показывается вовсе, вместо него
-остаётся адрес, а расхождение попадает в журнал: это не сбой, а попытка
-выдать себя за другого.
+So `lookupAddress` **must** resolve the obtained name forward again
+and check the address. If they do not match — the name is not shown
+at all, the address remains instead, and the mismatch goes into the
+log: this is not a glitch, it is an attempt to impersonate someone
+else.
 
-### Нормализация имени — вопрос безопасности, а не удобства
+### Name normalization is a security question, not a convenience one
 
-Узел ENS — хэш от байтов имени. `vitаlik.eth` с кириллической «а»
-на экране неотличимо от `vitalik.eth`, а даёт другой адрес.
+An ENS node is a hash of the name's bytes. `vitalik.eth` with a
+Cyrillic "a" (U+0430) is indistinguishable on screen from
+`vitalik.eth`, and yields a different address.
 
-Нормализация выполняется библиотекой **`@adraffy/ens-normalize`** —
-эталонной реализацией ENSIP-15, на которую опираются ethers и сам
-интерфейс ENS. Писать это самостоятельно нельзя: ENSIP-15 — это UTS-46,
-правила смешения письменностей, таблицы допустимых и игнорируемых
-символов и обработка эмодзи с вариационными селекторами. Ошибка в любой
-таблице означает ровно ту подмену, ради которой стандарт и написан.
+Normalization is performed by the library **`@adraffy/ens-normalize`**
+— the reference implementation of ENSIP-15 that ethers and the ENS
+interface itself rely on. Writing this by hand is not allowed:
+ENSIP-15 is UTS-46, script-mixing rules, tables of allowed and
+ignored characters, and emoji handling with variation selectors. An
+error in any table means exactly the substitution the standard was
+written to prevent.
 
-**Что защита ловит** (проверено живыми вызовами библиотеки):
+**What the protection catches** (verified with live library calls):
 
-| Ввод | Результат |
+| Input | Result |
 | --- | --- |
 | `Vitalik.ETH` | `vitalik.eth` |
-| `vitаlik.eth` (кириллическая «а») | отказ: `illegal mixture: Latin + Cyrillic` |
-| `приvет.eth` (латинская «v») | отказ: `illegal mixture: Cyrillic + Latin` |
-| `xn--80ak6aa92e.eth` | отказ: `invalid label extension` |
-| `vitalik‌.eth` (нулевой ширины пробел) | `vitalik.eth` — символ игнорируемый, второго имени не возникает |
-| `😀.eth` | принимается, к показу возвращается цветное начертание |
+| `vitalik.eth` with a Cyrillic "a" (U+0430) | reject: `illegal mixture: Latin + Cyrillic` |
+| Cyrillic "privet" with a Latin "v" | reject: `illegal mixture: Cyrillic + Latin` |
+| `xn--80ak6aa92e.eth` | reject: `invalid label extension` |
+| `vitalik.eth` with a zero-width space | `vitalik.eth` — the character is ignored, a second name is not created |
+| `😀.eth` | accepted; the display form returns the color glyph |
 | `ÅNGSTRÖM.eth` | `ångström.eth` |
 
-**Чего защита не ловит и что сделано вместо неё.** ENSIP-15 запрещает
-смешивать письменности внутри метки, но имя, целиком записанное другой
-письменностью и похожее по начертанию на латинское, остаётся законным —
-и принадлежит другому человеку. Запретить такие имена нельзя: это
-отрезало бы всех, кто пользуется своим алфавитом. Поэтому имя
-не из ASCII показывается с оговоркой «похожие по виду имена принадлежат
-разным людям — сверьте адрес». Оговорка появляется только там, где для
-неё есть основание: латинские имена её не получают, иначе она перестала
-бы читаться.
+**What the protection does not catch, and what is done instead.**
+ENSIP-15 forbids mixing scripts inside a label, but a name written
+entirely in another script and similar in appearance to a Latin one
+remains legal — and belongs to a different person. Such names cannot
+be banned: that would cut off everyone who uses their own alphabet.
+So a non-ASCII name is shown with the caveat "look-alike names belong
+to different people — check the address". The caveat appears only
+where there is a reason for it: Latin names do not get it, otherwise
+it would stop being read.
 
-**Три проверки добавлены сверх стандарта**, потому что ENSIP-15
-нормализует метки, а не решает, что годится в получатели: не меньше двух
-меток (`eth` нормализуется успешно, но доменом верхнего уровня платить
-некому), предел длины (имя приходит и из обратной записи, то есть
-от постороннего контракта) и отказ на пустой ввод (namehash от пустой
-строки — корень всего дерева).
+**Three checks are added on top of the standard**, because ENSIP-15
+normalizes labels and does not decide what is fit for a recipient: at
+least two labels (`eth` normalizes successfully, but there is no one
+to pay at a top-level domain), a length limit (a name also arrives
+from a reverse record, i.e. from a third-party contract), and a reject
+on empty input (the namehash of an empty string is the root of the
+entire tree).
 
-**Что убрано как более строгое, чем ENS.** Дефис по краю метки
-(`-shop.eth`) DNS запрещает, а ENSIP-15 допускает; собственная проверка
-здесь означала бы отказ отправить средства на существующее имя.
+**What was removed as stricter than ENS.** A hyphen at the edge of a
+label (`-shop.eth`) is forbidden by DNS and allowed by ENSIP-15; a
+custom check here would mean refusing to send funds to an existing
+name.
 
-**Цена по размеру сборки — измерена, а не оценена:** основной чанк вырос
-с 867.49 kB до 868.07 kB, gzip с 286.51 kB до 286.68 kB. Разница
-в 0.17 kB объясняется тем, что `@adraffy/ens-normalize` уже входила
-в граф зависимостей через ethers; прямой импорт лишь переиспользует
-её модуль.
+**The bundle-size cost was measured, not estimated:** the main chunk
+grew from 867.49 kB to 868.07 kB, gzip from 286.51 kB to 286.68 kB.
+The 0.17 kB difference is explained by `@adraffy/ens-normalize`
+already being in the dependency graph through ethers; a direct import
+only reuses its module.
 
-Следствие для обратного разрешения приятное: имя, не прошедшее
-нормализацию, нечем подтвердить, значит оно не показывается — подделка
-не доходит до экрана сама собой.
+A pleasant consequence for reverse resolution: a name that failed
+normalization has nothing to confirm with, so it is not shown — a
+forgery does not reach the screen on its own.
 
-### Только сеть Ethereum
+### Ethereum network only
 
-Реестр ENS существует в одной цепи. Разрешить имя, находясь в Polygon,
-можно было бы, лишь открыв второе соединение — с узлом Ethereum,
-которому при этом сообщается, какое имя ищет пользователь, считающий
-себя в другой сети. Такой запрос уходил бы незаметно для владельца,
-и решение о втором операторе принимает он, а не умолчание в коде.
-В остальных сетях поле честно сообщает, что имя разрешить нечем.
+The ENS registry exists on one chain. Resolving a name while on
+Polygon would be possible only by opening a second connection — to an
+Ethereum node that would then be told which name the user is looking
+up while believing themselves to be on another network. Such a request
+would leave without the owner's notice, and the decision about a
+second operator is theirs, not a default in the code. On other
+networks the field honestly says there is nothing to resolve the name
+with.
 
-### Ноль — это не адрес
+### Zero is not an address
 
-Реестр отвечает нулём на любой незарегистрированный узел, резолвер —
-на отсутствующую запись. Приняв этот ноль за получателя, кошелёк
-отправил бы средства в адрес сжигания. `decodeAddressWord` возвращает
-`null`, и «записи нет» никогда не превращается в адрес.
+The registry answers with zero for any unregistered node; the resolver
+does so for a missing record. Accepting that zero as a recipient, the
+wallet would send funds to a burn address. `decodeAddressWord` returns
+`null`, and "no record" never turns into an address.
 
-### Отказ узла не выдаётся за «имени не существует»
+### A node failure is not presented as "the name does not exist"
 
-Разные причины требуют от пользователя разного: в первом случае имя,
-возможно, верно, а проверить нечем; во втором — набрано неверно. Одно
-сообщение на оба случая отправило бы человека вводить адрес по памяти.
-Поэтому `resolveName` бросает исключение при отказе транспорта
-и возвращает `null` только при действительном отсутствии записи,
-а экран показывает шесть разных текстов вместо одного.
+Different reasons require different things from the user: in the first
+case the name may be correct and there is nothing to check with; in
+the second it was typed wrong. One message for both cases would send
+a person to type an address from memory. So `resolveName` throws on a
+transport failure and returns `null` only on a genuine missing record,
+and the screen shows six different texts instead of one.
 
-### Имя не заменяет адрес там, где адрес подписывается
+### A name does not replace an address where an address is being signed
 
-В шапке, в списке аккаунтов и под полем ввода имя показывается вместо
-усечённого адреса: оно короче и опознаётся вернее. На экране
-подтверждения перевода замена **запрещена** — там имя выводится над
-полным адресом вместе с оговоркой, что имя может указывать на другой
-адрес, чем вчера. Показать имя вместо подписываемого адреса — основной
-класс атак на интерфейс кошелька.
+In the header, in the account list, and under the input field a name
+is shown instead of a truncated address: it is shorter and recognized
+more reliably. On the transfer confirmation screen the substitution is
+**forbidden** — there the name is shown above the full address
+together with the caveat that the name may point to a different
+address than yesterday. Showing a name instead of the address being
+signed is the main class of attacks on a wallet interface.
 
-### Что не поддержано
+### What is not supported
 
-- **Оффчейн-резолверы (EIP-3668, CCIP-Read).** Следование за ними
-  означает HTTP-запрос по адресу, названному контрактом. Имена
-  с такими резолверами честно считаются неразрешимыми.
-- **Подстановочное разрешение ENSIP-10** (`resolve(name, data)`) —
-  по той же причине: оно обычно ведёт к оффчейн-шлюзу.
-- **Обратное разрешение контрагентов в истории.** Два обращения к узлу
-  на строку списка и подробный рассказ оператору узла о том, с кем
-  пользователь имеет дело.
+- **Off-chain resolvers (EIP-3668, CCIP-Read).** Following them means
+  an HTTP request to an address named by a contract. Names with such
+  resolvers are honestly treated as unresolvable.
+- **ENSIP-10 wildcard resolution** (`resolve(name, data)`) — for the
+  same reason: it usually leads to an off-chain gateway.
+- **Reverse resolution of counterparties in history.** Two node calls
+  per list row and a detailed account to the node operator of who the
+  user deals with.
 
-### Что проверено живым запросом, а не взято из памяти
+### What was verified with a live request, not taken from memory
 
-Адрес реестра, `namehash` и обе стороны разрешения проверены обращением
-к настоящему узлу Ethereum: `vitalik.eth` разрешается в
-`0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`, а этот адрес обратным
-разрешением даёт то же имя. Неверный адрес реестра дал бы нули на первом
-же шаге. Селекторы функций вычисляются из подписей, а не вписываются
-константами.
+The registry address, `namehash`, and both sides of resolution were
+verified by calling a real Ethereum node: `vitalik.eth` resolves to
+`0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`, and that address
+resolves back to the same name. A wrong registry address would yield
+zeros on the first step. Function selectors are computed from
+signatures, not written as constants.
 
-Нормализация проверена там же: `привет.eth` разрешается в
-`0xd776A7306ee6a060CEBB46b46D305e88fd39BA84` и получает оговорку
-о письменности, а `vitаlik.eth` с кириллической буквой отвергается
-до обращения к сети.
-
----
-
-## Резервная копия — [core/backup](src/core/backup/), [pages/BackupPage.tsx](src/pages/BackupPage.tsx)
-
-Экран `#/wallet/backup` выдаёт seed-фразу и приватный ключ активного
-аккаунта. Это самая опасная часть кошелька: всё остальное построено
-на том, что секреты не покидают зашифрованного хранилища, а здесь они
-покидают его по требованию.
-
-### Три независимых условия на каждую выдачу
-
-`BackupManager` существует ради того, чтобы ни одно из них нельзя было
-пропустить незаметно. Пропуск любого не даёт ни ошибки сборки, ни падения
-теста — он молча превращает защиту в её видимость.
-
-1. **Отметка о понимании последствий** под текстом, соответствующим
-   оценённому уровню риска. Одной кнопки недостаточно: она отсекает промах
-   пальцем, но не механическое нажатие не читая.
-2. **Повторный ввод пароля**, даже когда кошелёк разблокирован. Снятая
-   блокировка означает, что пароль вводили когда-то, а не что за устройством
-   сейчас владелец.
-3. **Запись в журнал экспортов**, из-за которой следующая выдача из того же
-   аккаунта оценивается строже.
-
-### Порядок проверок: пароль до разрешения
-
-`ExportGuard.confirm` пишет в журнал **до** выдачи разрешения — сознательный
-выбор направления ошибки, сделанный на этапе 9: лишняя запись приводит
-к более строгому предупреждению в будущем, пропущенная — к отсутствию
-предупреждения там, где оно необходимо.
-
-Отсюда порядок в `BackupManager`: сначала пароль, затем `confirm`. Обратный
-порядок означал бы запись «фраза выгружена» на каждую опечатку в пароле,
-а журнал, полный несостоявшихся выгрузок, завышал бы оценку риска
-последующих операций — то есть учил бы не читать предупреждения.
-
-Цена решения названа прямо: при выдаче приватного ключа пароль проверяется
-дважды — здесь и внутри `AccountManager`, у которого это собственная
-гарантия для всех вызывающих. Два вывода ключа из пароля по 600 000
-итераций PBKDF2 — около секунды на осознанном действии пользователя.
-
-### Область экспорта seed-фразы — весь кошелёк, а не аккаунт
-
-`WALLET_SCOPE` вместо пути `m/44'/60'/0'`. Фраза выводит все аккаунты,
-включая ещё не созданные; записав её выдачу под путём подписывающего
-аккаунта, журнал утверждал бы, что риск ограничен этим аккаунтом, — прямо
-противоположное действительности.
-
-Журнал экспортов переехал в **зашифрованное** хранилище. Секретов он
-не содержит, но сообщает наблюдателю с доступом к диску, что владелец
-выгружал seed-фразу и когда именно. Для этого зависимость `ExportAuditLog`
-сужена с `IStorageService` до трёх фактически используемых методов
-(`IExportAuditStorage`): полный интерфейс требовал бы миграций и транзакций,
-которых у `ISecureStorage` нет и не должно быть.
-
-### Копирования seed-фразы в буфер обмена нет намеренно
-
-Приватный ключ копировать можно — через `copyWithAutoClear`, с очисткой
-буфера через минуту, если пользователь не скопировал что-то ещё. Для фразы
-кнопки копирования нет вовсе: буфер обмена читают другие приложения,
-а фраза открывает весь кошелёк и не может быть сменена. Переписать
-двенадцать слов на бумагу дольше, но это единственный способ, при котором
-фраза не проходит через общую для системы область.
-
-По той же причине кнопка копирования не добавлена и на экран создания
-кошелька: закрыть долг S-45 добавлением новой возможности копировать
-означало бы ухудшить положение под видом улучшения.
-
-### Файловой резервной копии нет
-
-Зашифрованный файл с seed-фразой стоек ровно настолько, насколько стоек
-пароль, и попадает туда, куда пользователь его положит: в загрузки,
-в облачную синхронизацию папки, в корзину. Бумага такой особенности
-не имеет. Файл — это подбор пароля без ограничения скорости и без нашего
-ведома.
-
-### Проверка фразы перед импортом
-
-`checkMnemonic` — свободная функция, а не метод: проверка нужна и на экране
-импорта, где кошелька ещё нет и `BackupManager` создать не из чего.
-Результат расширяет `IMnemonicValidationResult` (длина, позиции слов вне
-словаря, машиночитаемая причина) одним полем `isGuessable`.
-
-**Как распознаётся общеизвестная тестовая фраза.** Не списком фраз,
-а свойством: все байты энтропии одинаковы. Список пришлось бы выписать
-по памяти, а константы, непроверяемые чтением, в этом проекте запрещены —
-ошибка в одном слове превратила бы защиту в её видимость. Сравнение
-энтропии покрывает все 256 таких наборов сразу, для любой длины фразы,
-и проверяется вычислением: тест строит фразу из шестнадцати нулевых байт
-и сверяет её с записанным вектором.
-
-Это **предупреждение, а не запрет**: импорт тестовой фразы — обычная работа
-разработчика, и отказ выполнять её был бы решением за владельца.
-
-**Импорта кошелька в `BackupManager` нет.** Импорт создаёт кошелёк, а
-создание кошелька выполняет онбординг. Второй путь создания означал бы
-второе место, где решается, что делать с уже существующим кошельком, —
-и второй способ затереть его поверх.
+Normalization was verified there as well: the all-Cyrillic name
+`privet.eth` (U+043F U+0440 U+0438 U+0432 U+0435 U+0442) resolves to
+`0xd776A7306ee6a060CEBB46b46D305e88fd39BA84` and receives the script
+caveat, while `vitalik.eth` with a Cyrillic letter is rejected before
+any network call.
 
 ---
 
-## Временные послабления безопасности — выключены
+## Backup — [core/backup](src/core/backup/), [pages/BackupPage.tsx](src/pages/BackupPage.tsx)
 
-Файл [src/shared/config/test-mode.ts](src/shared/config/test-mode.ts),
-константа `IS_TEST_MODE`. Сейчас **`false`**: проверка записи seed-фразы
-и вход по ней работают в полном объёме.
+The `#/wallet/backup` screen releases the seed phrase and the private
+key of the active account. This is the most dangerous part of the
+wallet: everything else is built on secrets never leaving encrypted
+storage, and here they leave it on demand.
 
-Механизм оставлен на месте — он ещё понадобится. Ниже описано, что
-именно снимается при `IS_TEST_MODE = true`.
+### Three independent conditions on every release
 
-| Что снято | Чем это грозит |
+`BackupManager` exists so that none of them can be skipped unnoticed.
+Skipping any of them produces neither a build error nor a test
+failure — it silently turns the protection into the appearance of
+protection.
+
+1. **A checkbox of understanding the consequences** under text that
+   matches the assessed risk level. A single button is not enough: it
+   cuts off a finger slip, but not a mechanical press without reading.
+2. **Re-entering the password**, even when the wallet is unlocked.
+   A lifted lock means the password was entered at some point, not
+   that the owner is at the device now.
+3. **A write to the export log**, because of which the next release
+   from the same account is scored more strictly.
+
+### Check order: password before permission
+
+`ExportGuard.confirm` writes to the log **before** granting permission
+— a conscious choice of the direction of error, made at stage 9: an
+extra record leads to a stricter warning in the future; a missed one
+leads to no warning where it is necessary.
+
+Hence the order in `BackupManager`: password first, then `confirm`.
+The reverse order would write "phrase exported" on every password
+typo, and a log full of failed exports would inflate the risk score
+of later operations — that is, would train people not to read
+warnings.
+
+The cost of the decision is named plainly: when releasing a private
+key the password is checked twice — here and inside `AccountManager`,
+which has its own guarantee for all callers. Two key derivations from
+the password at 600,000 PBKDF2 iterations — about a second on a
+deliberate user action.
+
+### The seed-phrase export scope is the whole wallet, not an account
+
+`WALLET_SCOPE` instead of the path `m/44'/60'/0'`. The phrase derives
+all accounts, including ones not yet created; recording its release
+under the signing account's path, the log would assert that the risk
+is limited to that account — the direct opposite of reality.
+
+The export log moved into **encrypted** storage. It contains no
+secrets, but it tells an observer with disk access that the owner
+exported the seed phrase and exactly when. For that, the
+`ExportAuditLog` dependency is narrowed from `IStorageService` to the
+three methods actually used (`IExportAuditStorage`): the full
+interface would require migrations and transactions that
+`ISecureStorage` does not have and must not have.
+
+### There is no seed-phrase copy to the clipboard on purpose
+
+A private key may be copied — through `copyWithAutoClear`, with the
+clipboard cleared after a minute if the user has not copied something
+else. For the phrase there is no copy button at all: other apps read
+the clipboard, and the phrase opens the entire wallet and cannot be
+changed. Rewriting twelve words on paper takes longer, but it is the
+only way in which the phrase does not pass through a system-wide
+area.
+
+For the same reason a copy button was not added on the wallet-creation
+screen either: closing debt S-45 by adding a new ability to copy
+would mean making the situation worse under the guise of an
+improvement.
+
+### There is no file backup
+
+An encrypted file with a seed phrase is only as strong as the
+password, and it ends up wherever the user puts it: in Downloads, in
+cloud folder sync, in the recycle bin. Paper has no such property.
+A file is password guessing with no rate limit and without our
+knowledge.
+
+### Phrase check before import
+
+`checkMnemonic` is a free function, not a method: the check is needed
+on the import screen as well, where there is no wallet yet and nothing
+to create a `BackupManager` from. The result extends
+`IMnemonicValidationResult` (length, positions of words outside the
+dictionary, a machine-readable reason) with one field `isGuessable`.
+
+**How a well-known test phrase is recognized.** Not by a list of
+phrases, but by a property: all entropy bytes are identical. A list
+would have to be written from memory, and constants that cannot be
+verified by reading are forbidden in this project — an error in one
+word would turn the protection into the appearance of protection.
+Comparing entropy covers all 256 such sets at once, for any phrase
+length, and is verified by computation: the test builds a phrase from
+sixteen zero bytes and checks it against a recorded vector.
+
+This is a **warning, not a ban**: importing a test phrase is ordinary
+developer work, and refusing to do it would be deciding for the
+owner.
+
+**There is no wallet import in `BackupManager`.** Import creates a
+wallet, and wallet creation is performed by onboarding. A second
+creation path would mean a second place that decides what to do with
+an already existing wallet — and a second way to overwrite it.
+
+---
+
+## Temporary security relaxations — off
+
+The file [src/shared/config/test-mode.ts](src/shared/config/test-mode.ts),
+the constant `IS_TEST_MODE`. Currently **`false`**: the seed-phrase
+write-down check and unlock-by-phrase work in full.
+
+The mechanism is left in place — it will still be needed. Below is
+exactly what is lifted when `IS_TEST_MODE = true`.
+
+| What is lifted | What that risks |
 | --- | --- |
-| Проверка записанной seed-фразы при создании | Кошелёк создаётся у человека, который фразу нигде не записал. Потеря устройства означает потерю средств безвозвратно |
-| Вход по seed-фразе (экран и маршрут) | Исчезает единственный способ восстановления. Забытый пароль означает, что расшифровать хранилище нечем |
+| Written seed-phrase check at creation | A wallet is created for a person who wrote the phrase down nowhere. Losing the device means losing the funds forever |
+| Unlock by seed phrase (screen and route) | The only recovery path disappears. A forgotten password means there is nothing to decrypt the store with |
 
-Код защит **не удалён**: он на месте и включается обратно сменой одного
-значения на `false`. Тесты снятых защит помечены `describe.skipIf`
-и вернутся вместе с флагом, а не будут восстанавливаться по памяти.
+The protection code is **not deleted**: it is in place and turns back
+on by changing a single value to `false`. Tests of the lifted
+protections are marked `describe.skipIf` and will return with the
+flag, rather than being restored from memory.
 
-Боевая сборка с включённым флагом **не запускается**:
-`assertTestModeIsDisabledInProduction` вызывается в точке входа до первой
-отрисовки. Забытый флаг — не гипотетическая оплошность, а обычный способ
-потерять чужие деньги.
-
----
-
-## Адрес почты как подпись кошелька
-
-При создании запрашивается адрес электронной почты. Он подписывает
-кошелёк в интерфейсе вместо безликого «Аккаунт 1» и вводится при входе
-вместе с паролем.
-
-### Это не учётная запись, и интерфейс говорит это прямо
-
-Сервера, который сверял бы пару «адрес — пароль», не существует
-и существовать не должно: кошелёк некастодиальный. Пароль расшифровывает
-локальное хранилище, адрес — метка. Человек, привыкший к обычным
-сервисам, ждёт восстановления по почте; узнать, что писать некому, он
-обязан на экране создания, а не после потери средств.
-
-### Адрес хранится зашифрованным, и отсюда обратный порядок проверок
-
-Адрес — персональные данные, связывающие устройство с личностью,
-поэтому он лежит в защищённом хранилище рядом с ключами. Прочитать его
-можно только после ввода пароля — значит, сверка выполняется **после**
-успешной расшифровки. Защиту от подбора даёт пароль; адрес помогает
-не перепутать кошельки.
-
-При несовпадении хранилище закрывается обратно: оставить его открытым
-значило бы, что сверка не значит ничего.
-
-### Сообщение об ошибке не различает случаи
-
-«Неверный пароль», «неверный адрес» и «хранилище повреждено» дают один
-и тот же текст. Различение подсказало бы подбирающему, что половина пары
-угадана.
+A production build with the flag on **does not start**:
+`assertTestModeIsDisabledInProduction` is called at the entry point
+before the first render. A forgotten flag is not a hypothetical slip;
+it is an ordinary way to lose other people's money.
 
 ---
 
-## Локализация
+## Email address as a wallet label
 
-Русский и английский. Механизм — [shared/i18n](src/shared/i18n/),
-переключатель — на экранах входа и в шапке кошелька.
+On creation an email address is requested. It labels the wallet in the
+interface instead of a faceless "Account 1" and is entered on unlock
+together with the password.
 
-### Без библиотеки переводов
+### This is not an account, and the interface says so plainly
 
-`i18next` с реактовской обвязкой добавляет к бандлу десятки килобайт ради
-возможностей, которых здесь нет: загрузки словарей по сети (запрещена
-политикой безопасности), сложных правил множественного числа и разбора
-ICU. Словарь и подстановка — тридцать строк.
+There is no server that would check an "address — password" pair, and
+there must not be one: the wallet is non-custodial. The password
+decrypts local storage; the address is a label. A person used to
+ordinary services expects recovery by email; they must learn there is
+nobody to write to on the creation screen, not after losing funds.
 
-### Пропущенный перевод останавливает сборку
+### The address is stored encrypted, hence the reverse check order
 
-Русский словарь объявлен первым и служит образцом типа; английский обязан
-содержать ровно те же ключи. Пустая строка на месте предупреждения
-о риске — это исчезнувшее предупреждение.
+An address is personal data that ties a device to a person, so it
+lives in protected storage next to the keys. It can be read only after
+the password is entered — so the check runs **after** a successful
+decrypt. Protection against guessing is provided by the password; the
+address helps not to mix wallets up.
 
-Подстановка значений текстовая и разметкой не становится: шаблонизатор,
-умеющий больше, открыл бы путь к подстановке разметки из перевода.
+On a mismatch the store is locked again: leaving it open would mean
+the check means nothing.
 
-### Язык проставляется в `lang` корневого элемента
+### The error message does not distinguish cases
 
-Не косметика: по нему экранный диктор выбирает произношение, а браузер —
-правила переноса. Русский текст с `lang="en"` читается вслух неразборчиво.
-
-### Тесты не зависят от локали машины
-
-jsdom сообщает `en-US`, и набор падал бы у разработчика с английской
-системой там, где у разработчика с русской проходит. Язык фиксируется
-в [src/test/setup.ts](src/test/setup.ts).
-
-### Объём
-
-Переведены экраны входа, панель и навигация. Остальные экраны остаются
-на русском и переводятся следующими этапами — см. `TECH_DEBT.md`.
+"Wrong password", "wrong address", and "store corrupted" yield the
+same text. Distinguishing them would tell a guesser that half of the
+pair has been guessed.
 
 ---
 
-## Одно приложение
+## Localization
 
-Корень репозитория — один npm-пакет. `src/` — интерфейс кошелька (Vite,
-браузер). `server/src` — Node-процесс на Fastify: каталоги, `POST /v1/users`
-и раздача собранного UI. Один `package.json`, один `npm install`.
+Russian and English. The mechanism is [shared/i18n](src/shared/i18n/);
+the switch is on the onboarding screens and in the wallet header.
 
-У слоёв разные среды исполнения и разные правила (Node-слою запрещены
-импорты библиотек подписи, кошельку — прямое обращение к `localStorage`).
-Общий `tsconfig` для браузера и Node означал бы, что ни одна из двух сред
-не проверена как следует: поэтому рядом лежат `tsconfig.app.json` и
-`tsconfig.server.json`.
+### No translation library
 
-**Кошелёк работает без Node-процесса.** Встроенный список сетей есть
-в самом клиенте. Некастодиальное приложение обязано оставаться
-работоспособным, даже когда API недоступен или враждебен.
+`i18next` with its React wrapper adds tens of kilobytes to the bundle
+for capabilities that are not here: loading dictionaries over the
+network (forbidden by the security policy), complex plural rules, and
+ICU parsing. A dictionary and substitution are thirty lines.
+
+### A missing translation stops the build
+
+The Russian dictionary is declared first and serves as the type
+template; the English one must contain exactly the same keys. An empty
+string in place of a risk warning is a vanished warning.
+
+Value substitution is textual and does not become markup: a templater
+that can do more would open a path to substituting markup from a
+translation.
+
+### The language is set on the root element's `lang`
+
+Not cosmetics: the screen reader picks pronunciation from it, and the
+browser picks hyphenation rules. Russian text with `lang="en"` is
+read aloud unintelligibly.
+
+### Tests do not depend on the machine locale
+
+jsdom reports `en-US`, and the suite would fail for a developer with
+an English system where it passes for a developer with a Russian one.
+The language is pinned in [src/test/setup.ts](src/test/setup.ts).
+
+### Scope
+
+Onboarding screens, the panel, and navigation are translated. The
+remaining screens stay in Russian and will be translated in later
+stages — see `TECH_DEBT.md`.
 
 ---
 
-## Архитектура
+## One application
 
-Слоистая структура. Зависимости направлены строго в одну сторону:
+The repository root is one npm package. `src/` is the wallet interface
+(Vite, browser). `server/src` is a Fastify Node process: catalogs,
+`POST /v1/users`, and serving the built UI. One `package.json`, one
+`npm install`.
+
+The layers have different runtimes and different rules (the Node layer
+is forbidden from importing signing libraries; the wallet is forbidden
+from touching `localStorage` directly). A shared `tsconfig` for
+browser and Node would mean neither environment is checked properly:
+that is why `tsconfig.app.json` and `tsconfig.server.json` sit side by
+side.
+
+**The wallet works without the Node process.** A built-in network list
+exists in the client itself. A non-custodial app must remain usable
+even when the API is unavailable or hostile.
+
+---
+
+## Architecture
+
+A layered structure. Dependencies point strictly one way:
 
 ```
 shared  <-  core  <-  features  <-  pages  <-  app
 ```
 
-Стрелка читается как «может импортировать». Обратные импорты запрещены
-правилом ESLint `no-restricted-imports` и приводят к ошибке линтера,
-а не к замечанию на код-ревью.
+The arrow reads as "may import". Reverse imports are forbidden by the
+ESLint rule `no-restricted-imports` and produce a linter error, not a
+code-review remark.
 
-### Назначение слоёв
+### Purpose of the layers
 
-| Слой       | Содержимое                                     | Знает о React |
-| ---------- | ---------------------------------------------- | ------------- |
-| `shared`   | Утилиты, UI-кит, конфигурация, базовые типы     | Да            |
-| `core`     | Доменное ядро: ключи, криптография, сеть, данные | **Нет**       |
-| `features` | Вертикальные срезы функциональности             | Да            |
-| `pages`    | Экраны, собранные из фич                        | Да            |
-| `app`      | Точка входа, провайдеры, глобальные стили       | Да            |
+| Layer      | Contents                                        | Knows about React |
+| ---------- | ----------------------------------------------- | ----------------- |
+| `shared`   | Utilities, UI kit, configuration, base types    | Yes               |
+| `core`     | Domain core: keys, cryptography, network, data  | **No**            |
+| `features` | Vertical slices of functionality                | Yes               |
+| `pages`    | Screens assembled from features                 | Yes               |
+| `app`      | Entry point, providers, global styles           | Yes               |
 
-### Почему `core` изолирован от React
+### Why `core` is isolated from React
 
-Три причины, каждая самостоятельная:
+Three reasons, each independent:
 
-1. **Расширение браузера.** В manifest v3 фоновая логика выполняется в service
-   worker, где нет ни DOM, ни React. Ядро, свободное от React, переносится туда
-   без переписывания. Ядро, завязанное на хуки, придётся разбирать заново.
+1. **Browser extension.** In manifest v3 background logic runs in a service
+   worker, where there is neither DOM nor React. A core free of React
+   moves there without a rewrite. A core tied to hooks would have to be
+   taken apart again.
 
-2. **Тестируемость.** Криптография и работа с ключами проверяются обычными
-   юнит-тестами без рендеринга и без тестовой среды браузера.
+2. **Testability.** Cryptography and key handling are checked with ordinary
+   unit tests without rendering and without a browser test environment.
 
-3. **Локализация секретов.** Приватные ключи существуют только внутри `core`.
-   Чем уже периметр, тем меньше мест, где ключ может случайно оказаться
-   в состоянии компонента, в логе или в снимке состояния.
+3. **Localizing secrets.** Private keys exist only inside `core`.
+   The narrower the perimeter, the fewer places a key can accidentally
+   land in component state, in a log, or in a state snapshot.
 
-### Устройство ядра
+### Core structure
 
 ```
-                       IWalletManager           фасад, единственная точка входа для UI
+                       IWalletManager           facade, the only entry point for the UI
                               │
      ┌──────────┬─────────────┼─────────────┬──────────────┬────────────────┐
      ▼          ▼             ▼             ▼              ▼                ▼
   IWallet  IAccountService INetworkService IBalanceService ITokenService ITransactionService
      │
      ▼
-  IKeyring[]                                 единственные владельцы секретов
+  IKeyring[]                                 the only owners of secrets
      │
      ▼
-  IEncryptionService, IStorageService, IProviderFactory      внедряемая инфраструктура
+  IEncryptionService, IStorageService, IProviderFactory      injectable infrastructure
 ```
 
-Три уровня работы с ключами разделены сознательно:
+Three levels of key handling are separated on purpose:
 
-| Абстракция | Отвечает за | Содержит секреты |
+| Abstraction | Responsible for | Contains secrets |
 | --- | --- | --- |
-| `IWallet` | зашифрованное хранилище, блокировка, пароль | нет |
-| `IKeyring` | подпись, деривация, экспорт ключа | **да** |
-| `IAccount` | адрес, имя, порядок, видимость | нет |
+| `IWallet` | encrypted store, lock, password | no |
+| `IKeyring` | signing, derivation, key export | **yes** |
+| `IAccount` | address, name, order, visibility | no |
 
-`IKeyring` существует потому, что способ подписи принципиально различается:
-HD-ключ подписывает локально, Ledger — по USB с подтверждением на устройстве,
-watch-only не подписывает вовсе. Без этой абстракции поддержку аппаратных
-кошельков пришлось бы встраивать условиями внутри `IWallet`.
+`IKeyring` exists because the way of signing differs in principle:
+an HD key signs locally, Ledger signs over USB with confirmation on
+the device, watch-only does not sign at all. Without this abstraction,
+hardware-wallet support would have to be embedded as conditionals
+inside `IWallet`.
 
-`INetworkConfig` и `IProvider` разделены по той же логике: первое — данные
-(сериализуемые, хранимые), второе — живое соединение с состоянием.
+`INetworkConfig` and `IProvider` are split by the same logic: the
+first is data (serializable, stored), the second is a live connection
+with state.
 
-### Поддерживаемые сети
+### Supported networks
 
-| Сеть | chainId | Валюта | Обозреватель | EIP-1559 |
+| Network | chainId | Currency | Explorer | EIP-1559 |
 | --- | --- | --- | --- | --- |
-| Ethereum | 1 | ETH | etherscan.io | да |
-| BNB Chain | 56 | BNB | bscscan.com | **нет** |
-| Polygon | 137 | POL | polygonscan.com | да |
-| Arbitrum One | 42161 | ETH | arbiscan.io | да |
-| OP Mainnet | 10 | ETH | optimistic.etherscan.io | да |
-| Base | 8453 | ETH | basescan.org | да |
-| Avalanche C-Chain | 43114 | AVAX | snowtrace.io | да |
+| Ethereum | 1 | ETH | etherscan.io | yes |
+| BNB Chain | 56 | BNB | bscscan.com | **no** |
+| Polygon | 137 | POL | polygonscan.com | yes |
+| Arbitrum One | 42161 | ETH | arbiscan.io | yes |
+| OP Mainnet | 10 | ETH | optimistic.etherscan.io | yes |
+| Base | 8453 | ETH | basescan.org | yes |
+| Avalanche C-Chain | 43114 | AVAX | snowtrace.io | yes |
 
-Справочник: [src/core/network/built-in.ts](src/core/network/built-in.ts). У каждой
-сети не менее двух независимых RPC-узлов, все адреса — строго `https`.
+Catalog: [src/core/network/built-in.ts](src/core/network/built-in.ts). Each
+network has at least two independent RPC nodes; all addresses are strictly
+`https`.
 
-**BNB Chain помечена как сеть без EIP-1559 сознательно.** Она принимает
-транзакции второго типа, но базовая комиссия там фактически фиксирована,
-а приоритетная надбавка не влияет на скорость включения в блок. Выбор
-из трёх уровней срочности, ни на что не влияющих, — обман интерфейса.
+**BNB Chain is marked as a network without EIP-1559 on purpose.** It
+accepts type-2 transactions, but the base fee there is effectively
+fixed, and the priority tip does not affect inclusion speed. A choice
+of three urgency levels that affect nothing is an interface lie.
 
-**Нативная валюта Polygon — POL**, а не MATIC: переименование состоялось
-в сентябре 2024 года.
+**Polygon's native currency is POL**, not MATIC: the rename happened
+in September 2024.
 
-### Известное ограничение: приватность публичных RPC
+### Known limitation: privacy of public RPCs
 
-Встроенные RPC-эндпоинты общедоступны и не требуют ключа API. Это означает
-конкретный компромисс: оператор узла видит IP-адрес пользователя и все его
-запросы — какие адреса проверяются, какие контракты вызываются и когда.
-Этого достаточно, чтобы связать личность с портфелем.
+Built-in RPC endpoints are publicly available and require no API key.
+That means a concrete compromise: the node operator sees the user's IP
+address and all of their requests — which addresses are checked, which
+contracts are called, and when. That is enough to tie a person to a
+portfolio.
 
-Возможность указать собственный RPC-адрес обязана появиться на этапе
-настроек. До этого приватность запросов не обеспечена.
+The ability to specify a custom RPC address must appear at the
+settings stage. Until then, request privacy is not provided.
 
-### Известное ограничение: комиссии на L2
+### Known limitation: fees on L2
 
-В Arbitrum, OP Mainnet и Base итоговая стоимость транзакции складывается
-из платы за исполнение на L2 и платы за публикацию данных на L1.
-Стандартный `eth_estimateGas` вторую составляющую не учитывает. Расчёт,
-опирающийся только на него, занизит стоимость. Учесть обязательно
-на этапе транзакций.
+On Arbitrum, OP Mainnet, and Base the final transaction cost is the
+sum of the L2 execution fee and the fee for publishing data on L1.
+Standard `eth_estimateGas` does not account for the second component.
+A calculation that relies only on it will understate the cost. This
+must be accounted for at the transaction stage.
 
-### Seed-фраза: что защищено, а что нет
+### Seed phrase: what is protected and what is not
 
-Модуль [core/mnemonic](src/core/mnemonic/) реализует BIP-39 поверх
-`@scure/bip39`. Генерация — 12 или 24 слова, импорт — все допустимые
-стандартом длины (12, 15, 18, 21, 24).
+The module [core/mnemonic](src/core/mnemonic/) implements BIP-39 on top
+of `@scure/bip39`. Generation is 12 or 24 words; import is every length
+allowed by the standard (12, 15, 18, 21, 24).
 
-**Два ограничения, которые нельзя устранить и о которых нельзя молчать.**
+**Two limits that cannot be removed and must not be left unspoken.**
 
-1. **Seed-фраза неизбежно существует в памяти в виде неочищаемой строки.**
-   `@scure/bip39` работает со строками, а строки в JavaScript иммутабельны
-   и интернируются движком — затереть их невозможно. Обойти это можно только
-   собственной реализацией BIP-39, что заведомо хуже проверенной библиотеки.
-   Код сокращает время жизни строки до одного выражения, но не устраняет её.
+1. **The seed phrase inevitably exists in memory as an uncleansable
+   string.** `@scure/bip39` works with strings, and strings in
+   JavaScript are immutable and interned by the engine — they cannot
+   be wiped. The only way around this is a custom BIP-39
+   implementation, which is strictly worse than a reviewed library.
+   The code shortens the string's lifetime to a single expression, but
+   does not eliminate it.
 
-2. **Затирание `Uint8Array` не даёт полной гарантии.** V8 использует
-   перемещающий сборщик мусора и вправе скопировать буфер, оставив прежнюю
-   копию в освобождённой странице. `SecretBuffer.wipe()` сокращает окно
-   уязвимости, но защитой от дампа памяти процесса не является.
+2. **Wiping a `Uint8Array` does not give a full guarantee.** V8 uses a
+   moving garbage collector and is entitled to copy the buffer, leaving
+   the previous copy on a freed page. `SecretBuffer.wipe()` shortens
+   the window of exposure, but is not a defense against a process
+   memory dump.
 
-**Что защищено на самом деле:**
+**What is actually protected:**
 
-- энтропия берётся только из `crypto.getRandomValues`; источник не подменяем
-  и не внедряется через зависимости;
-- нулевой буфер от неисправного генератора приводит к отказу, а не
-  к предсказуемому ключу;
-- `SecretBuffer` переопределяет `toString` и `toJSON` — секрет не утечёт
-  ни в журнал через подстановку в строку, ни в отладочный дамп состояния;
-- текст ошибок не содержит ни фразы, ни отдельных её слов; результат
-  валидации возвращает позиции ошибочных слов, а не сами слова.
+- entropy is taken only from `crypto.getRandomValues`; the source is
+  not substitutable and is not injected through dependencies;
+- a zero buffer from a faulty generator leads to a refusal, not to a
+  predictable key;
+- `SecretBuffer` overrides `toString` and `toJSON` — the secret will
+  not leak into a log via string interpolation, nor into a debug state
+  dump;
+- error text contains neither the phrase nor individual words of it;
+  the validation result returns positions of bad words, not the words
+  themselves.
 
-**Поддерживается только английский словарь.** Остальные девять словарей
-`@scure/bip39` заметно утяжелили бы бандл ради сценария, который почти
-не встречается. Фраза на другом языке будет отвергнута как некорректная.
+**Only the English wordlist is supported.** The other nine
+`@scure/bip39` wordlists would noticeably inflate the bundle for a
+scenario that almost never occurs. A phrase in another language will
+be rejected as invalid.
 
-### HD-кошелёк: пути деривации и расширенные ключи
+### HD wallet: derivation paths and extended keys
 
-Модуль [core/hdwallet](src/core/hdwallet/) реализует BIP-32 и BIP-44 поверх
-`@scure/bip32`. Путь по умолчанию — `m/44'/60'/0'/0/n`.
+The module [core/hdwallet](src/core/hdwallet/) implements BIP-32 and
+BIP-44 on top of `@scure/bip32`. The default path is `m/44'/60'/0'/0/n`.
 
-**Два несовместимых соглашения о путях.** Кошельки расходятся в том, какой
-индекс наращивать:
+**Two incompatible path conventions.** Wallets disagree on which index
+to increment:
 
-| Соглашение | Путь | Кто использует |
+| Convention | Path | Who uses it |
 | --- | --- | --- |
-| Индекс адреса | `m/44'/60'/0'/0/n` | MetaMask, Rabby, Trust Wallet |
-| Индекс аккаунта | `m/44'/60'/n'/0/0` | Ledger Live |
+| Address index | `m/44'/60'/0'/0/n` | MetaMask, Rabby, Trust Wallet |
+| Account index | `m/44'/60'/n'/0/0` | Ledger Live |
 
-Кошелёк, поддерживающий только первое, при импорте фразы из Ledger Live
-покажет пустой баланс — адреса выводятся по другой ветви дерева. Поэтому
-`accountIndex` вынесен в параметр, а не зашит константой.
+A wallet that supports only the first, when importing a phrase from
+Ledger Live, will show an empty balance — addresses are derived on a
+different branch of the tree. That is why `accountIndex` is a
+parameter, not a hard-coded constant.
 
-**`coinType` = 60 для всех EVM-сетей.** BNB Chain, Polygon, Arbitrum
-и остальные используют путь Ethereum, поэтому один аккаунт имеет один адрес
-во всех сетях. Исключение — Ethereum Classic (61) и несколько форков.
+**`coinType` = 60 for all EVM networks.** BNB Chain, Polygon, Arbitrum
+and the rest use the Ethereum path, so one account has one address
+on every network. The exception is Ethereum Classic (61) and a few
+forks.
 
-#### Расширенные ключи: три уровня опасности
+#### Extended keys: three levels of danger
 
-| Что экспортируется | Что получает владелец |
+| What is exported | What the owner gets |
 | --- | --- |
-| Адрес | ничего сверх публичной истории |
-| xpub | все адреса аккаунта и их история — риск приватности |
-| Приватный ключ адреса | средства на одном адресе |
-| **xprv** | **все адреса аккаунта, включая ещё не созданные** |
+| Address | nothing beyond the public history |
+| xpub | all account addresses and their history — a privacy risk |
+| Address private key | funds on one address |
+| **xprv** | **all account addresses, including ones not yet created** |
 
-Каждая из этих операций требует разрешения от `ExportGuard` — см. ниже.
+Each of these operations requires permission from `ExportGuard` — see
+below.
 
-#### Риск «xpub + приватный ключ» и как он закрыт
+#### The "xpub + private key" risk and how it is closed
 
-Уровни `change` и `addressIndex` по требованию BIP-44 не закалены, иначе
-xpub был бы бесполезен. Обратная сторона — арифметика несмягчённой деривации:
+The `change` and `addressIndex` levels are not hardened, as BIP-44
+requires; otherwise an xpub would be useless. The other side is the
+arithmetic of non-hardened derivation:
 
 ```
 k_child  = (IL + k_parent) mod n
 IL       = HMAC-SHA512(chainCode_parent, pubKey_parent || index)
 ```
 
-Расширенный публичный ключ содержит и `chainCode_parent`, и `pubKey_parent`.
-Значит, обладая xpub родителя и приватным ключом **любого** потомка, можно
-вычислить `k_parent = (k_child − IL) mod n`, а из него — все адреса аккаунта.
+An extended public key contains both `chainCode_parent` and
+`pubKey_parent`. So, possessing the parent's xpub and the private key
+of **any** child, one can compute `k_parent = (k_child − IL) mod n`,
+and from it — every address of the account.
 
-**Устранить это математически нельзя.** Закалённая деривация на этих уровнях
-сделала бы xpub бесполезным и, что важнее, сломала бы совместимость с BIP-44:
-seed-фраза перестала бы восстанавливаться в MetaMask, Trust и Ledger.
-Для некастодиального кошелька такая изоляция пользователя хуже исходного риска.
+**This cannot be eliminated mathematically.** Hardened derivation at
+these levels would make the xpub useless and, more importantly, would
+break BIP-44 compatibility: the seed phrase would stop restoring in
+MetaMask, Trust, and Ledger. For a non-custodial wallet such isolation
+of the user is worse than the original risk.
 
-**Масштаб ограничен одним аккаунтом.** Шаг `m/44'/60' → m/44'/60'/n'`
-закалён, поэтому подняться до seed или до соседнего аккаунта невозможно.
+**The blast radius is limited to one account.** The step
+`m/44'/60' → m/44'/60'/n'` is hardened, so climbing to the seed or to
+a neighboring account is impossible.
 
-**Что сделано вместо этого — [core/security](src/core/security/):**
+**What is done instead — [core/security](src/core/security/):**
 
-1. **Разделены подпись и экспорт.** `getPrivateKeyForSigning` обслуживает
-   внутреннюю подпись, `exportPrivateKey` — выдачу пользователю и требует
-   разрешения. До разделения один метод обслуживал обе операции, поэтому
-   аудит экспорта либо срабатывал на каждой подписи, либо не срабатывал вовсе.
+1. **Signing and export are separated.** `getPrivateKeyForSigning`
+   serves internal signing; `exportPrivateKey` serves release to the
+   user and requires permission. Before the split one method served
+   both operations, so export audit either fired on every signature or
+   did not fire at all.
 
-2. **Журнал выданных секретов** (`ExportAuditLog`). Хранит вид экспорта,
-   путь аккаунта и время. Самих секретов не содержит.
+2. **A log of released secrets** (`ExportAuditLog`). Stores the kind of
+   export, the account path, and the time. Contains no secrets
+   themselves.
 
-3. **Оценка риска** (`ExportGuard`). Экспорт, замыкающий опасную пару,
-   получает уровень `AccountCompromise`.
+3. **Risk scoring** (`ExportGuard`). An export that closes a dangerous
+   pair receives the `AccountCompromise` level.
 
-4. **Подтверждённый уровень нельзя занизить.** `confirm(request, acknowledgedRisk)`
-   отказывает, если фактический риск выше показанного пользователю. Без этой
-   проверки оценка риска осталась бы декоративной.
+4. **A confirmed level cannot be lowered.**
+   `confirm(request, acknowledgedRisk)` refuses if the actual risk is
+   higher than what was shown to the user. Without this check, risk
+   scoring would remain decorative.
 
-5. **Одноразовые разрешения** (`ExportPermit`). Привязаны к виду операции,
-   аккаунту и адресу; гасятся при использовании. Экспорт в обход оценки риска
-   невозможен — методы экспорта требуют разрешение параметром.
+5. **One-shot permits** (`ExportPermit`). Bound to the kind of
+   operation, the account, and the address; consumed on use. Export
+   that bypasses risk scoring is impossible — export methods require
+   the permit as a parameter.
 
-6. **Выделенный аккаунт наблюдения** — `m/44'/60'/1'` (`WATCH_ONLY_ACCOUNT_INDEX`).
-   xpub, выданный из него, не создаёт риска для подписывающего аккаунта
-   `m/44'/60'/0'` ни при каких обстоятельствах: уровень аккаунта закалён.
-   Это структурная изоляция, а не предупреждение.
+6. **A dedicated watch-only account** — `m/44'/60'/1'`
+   (`WATCH_ONLY_ACCOUNT_INDEX`). An xpub issued from it creates no
+   risk for the signing account `m/44'/60'/0'` under any
+   circumstances: the account level is hardened. This is structural
+   isolation, not a warning.
 
-| Ситуация | Уровень риска |
+| Situation | Risk level |
 | --- | --- |
-| xpub из аккаунта наблюдения, ключи не выдавались | `low` |
-| xpub из подписывающего аккаунта | `elevated` + рекомендация отдельного аккаунта |
-| Приватный ключ, xpub не выдавался | `elevated` |
-| Приватный ключ, xpub уже выдан | **`account-compromise`** |
-| xpub, приватный ключ уже выдан | **`account-compromise`** |
-| xprv или мнемоника | `critical` |
+| xpub from the watch-only account, no keys released | `low` |
+| xpub from the signing account | `elevated` + a recommendation of a separate account |
+| Private key, no xpub released | `elevated` |
+| Private key, xpub already released | **`account-compromise`** |
+| xpub, private key already released | **`account-compromise`** |
+| xprv or mnemonic | `critical` |
 
-### Адреса — [core/address](src/core/address/)
+### Addresses — [core/address](src/core/address/)
 
-Единственная точка вычисления и проверки адресов. Вторая независимая
-реализация недопустима: две функции вычисления адреса разойдутся,
-и кошелёк начнёт показывать разные адреса в разных местах интерфейса.
+The only point of computing and checking addresses. A second
+independent implementation is not allowed: two address-computation
+functions would drift, and the wallet would start showing different
+addresses in different places in the interface.
 
-`AddressService` реализует `IAddressService` и делегирует чистым функциям
-того же модуля — собственной логики вычисления в классе нет.
+`AddressService` implements `IAddressService` and delegates to pure
+functions of the same module — the class has no computation logic of
+its own.
 
-| Операция | Примитив |
+| Operation | Primitive |
 | --- | --- |
-| Адрес из публичного ключа | Keccak-256 от 64 байт координат |
-| Адрес из приватного ключа | secp256k1 → Keccak-256 |
-| Разворачивание сжатого ключа | восстановление точки на кривой secp256k1 |
-| Контрольная сумма | Keccak-256 + EIP-55 |
+| Address from a public key | Keccak-256 of the 64 bytes of coordinates |
+| Address from a private key | secp256k1 → Keccak-256 |
+| Expanding a compressed key | recovering the point on the secp256k1 curve |
+| Checksum | Keccak-256 + EIP-55 |
 
-#### Контрольная сумма не исправляется молча
+#### A checksum is not silently corrected
 
-Адрес EVM не имеет собственной контрольной суммы: опечатка в одном символе
-даёт другой синтаксически корректный адрес, приватного ключа к которому
-не существует ни у кого. Средства, отправленные туда, теряются безвозвратно.
+An EVM address has no checksum of its own: a typo in one character
+yields another syntactically valid address whose private key exists
+for no one. Funds sent there are lost forever.
 
-`toAddress` реализует EIP-55 и — принципиально — **отвергает** адрес
-со смешанным регистром и неверной контрольной суммой, а не приводит его
-к правильному виду. Именно в этом случае EIP-55 обязан сработать.
+`toAddress` implements EIP-55 and — as a matter of principle —
+**rejects** an address with mixed case and an incorrect checksum,
+rather than coercing it to the correct form. That is exactly the case
+EIP-55 must catch.
 
-Адрес целиком в нижнем либо целиком в верхнем регистре контрольной суммы
-не несёт, проверять нечего — он просто приводится к каноническому виду.
+An address entirely in lower case or entirely in upper case carries no
+checksum; there is nothing to check — it is simply brought to the
+canonical form.
 
-#### Приватный ключ проверяется по диапазону, а не по длине
+#### A private key is checked by range, not by length
 
-Допустимы только значения от 1 до n−1, где n — порядок группы secp256k1.
-Ключ вне диапазона не задаёт точку на кривой: его приём привёл бы к адресу,
-отличному от показанного пользователю.
+Only values from 1 to n−1 are allowed, where n is the order of the
+secp256k1 group. A key outside the range does not define a point on
+the curve: accepting it would produce an address different from the
+one shown to the user.
 
-#### Невосстановимые адреса
+#### Unrecoverable addresses
 
-`isZeroAddress` и `isBurnAddress` дают интерфейсу основание предупредить
-перед отправкой в никуда. Отправку не запрещают: сжигание бывает намеренным,
-а нулевой адрес — штатное значение поля `to` при развёртывании контракта.
+`isZeroAddress` and `isBurnAddress` give the interface grounds to warn
+before sending into nowhere. They do not forbid the send: burning can
+be intentional, and the zero address is the normal value of the `to`
+field when deploying a contract.
 
-Эвристика намеренно узкая — только нулевой адрес и `0x…dEaD`. Ложное
-срабатывание на реальном адресе получателя заставит отменить законный перевод.
+The heuristic is intentionally narrow — only the zero address and
+`0x…dEaD`. A false positive on a real recipient address would force
+canceling a legitimate transfer.
 
-### Шифрование и защищённое хранилище — [core/encryption](src/core/encryption/)
+### Encryption and protected storage — [core/encryption](src/core/encryption/)
 
-| Параметр | Значение | Обоснование |
+| Parameter | Value | Rationale |
 | --- | --- | --- |
-| KDF | PBKDF2-HMAC-SHA256 | доступен в Web Crypto нативно |
-| Итерации | 600 000 | действующая рекомендация OWASP; столько же у MetaMask |
-| Соль | 32 байта, новая на каждый контейнер | обесценивает предвычисленные таблицы |
-| Шифр | AES-256-GCM | аутентифицированное шифрование |
-| Вектор инициализации | 12 байт, новый на каждую операцию | размер, для которого GCM определён напрямую |
-| Тег аутентификации | 128 бит | максимум |
+| KDF | PBKDF2-HMAC-SHA256 | available natively in Web Crypto |
+| Iterations | 600,000 | current OWASP recommendation; the same as MetaMask |
+| Salt | 32 bytes, new per container | defeats precomputed tables |
+| Cipher | AES-256-GCM | authenticated encryption |
+| Initialization vector | 12 bytes, new per operation | the size for which GCM is defined directly |
+| Authentication tag | 128 bits | the maximum |
 
-**Заголовок контейнера аутентифицируется.** Версия формата, алгоритм шифра
-и параметры KDF передаются в AES-GCM как дополнительные аутентифицируемые
-данные. Любое их изменение ломает тег — атака понижения версии закрыта
-заранее, до появления второго алгоритма KDF.
+**The container header is authenticated.** The format version, cipher
+algorithm, and KDF parameters are passed to AES-GCM as additional
+authenticated data. Any change to them breaks the tag — a downgrade
+attack is closed in advance, before a second KDF algorithm appears.
 
-**Два режима работы.** Хранилище ключей шифруется паролем: контейнер
-самодостаточен, содержит соль и параметры. Отдельные записи шифруются
-сессионным ключом, выведенным один раз при разблокировке. Без второго
-режима каждое чтение стоило бы 600 000 итераций PBKDF2.
+**Two modes of operation.** The key store is encrypted with the
+password: the container is self-contained and holds the salt and
+parameters. Individual records are encrypted with a session key
+derived once on unlock. Without the second mode every read would cost
+600,000 PBKDF2 iterations.
 
-**Ключ не покидает Web Crypto.** Выводится с `extractable: false`, поэтому
-выгрузить его байты из JavaScript невозможно в принципе — ни отладчиком,
-ни через `JSON.stringify`. Это сильнее любого затирания буфера.
+**The key does not leave Web Crypto.** It is derived with
+`extractable: false`, so exporting its bytes from JavaScript is
+impossible in principle — neither with a debugger nor via
+`JSON.stringify`. That is stronger than any buffer wipe.
 
-#### Приватные ключи в открытом виде не хранятся
+#### Private keys are not stored in the clear
 
-`SecureStorage` — обёртка над `IStorageService`, добавляющая шифрование
-и состояние блокировки. Значение, прошедшее через `set`, попадает
-в нижележащее хранилище только внутри конверта с шифротекстом.
+`SecureStorage` is a wrapper over `IStorageService` that adds
+encryption and lock state. A value that passed through `set` reaches
+the underlying store only inside an envelope with ciphertext.
 
-Проверяется тестами напрямую: приватный ключ и мнемоническая фраза
-записываются через `SecureStorage`, после чего сырое содержимое хранилища
-проверяется на отсутствие этих значений — включая имена полей.
+This is checked by tests directly: a private key and a mnemonic phrase
+are written through `SecureStorage`, after which the raw store
+contents are checked for the absence of those values — including field
+names.
 
-Запись, положенная в обход шифрования, при чтении приводит к ошибке,
-а не возвращается молча: такое состояние означает утечку и обязано быть
-замечено.
+A record placed bypassing encryption produces an error on read, rather
+than being returned silently: such a state means a leak and must be
+noticed.
 
-**Чего слой не скрывает:** имена пространств и ключей, число записей
-и приблизительный размер значений. Наблюдатель с доступом к хранилищу
-узнает, сколько у пользователя аккаунтов, но не узнает ни адресов,
-ни ключей.
+**What the layer does not hide:** namespace and key names, the number
+of records, and the approximate size of values. An observer with
+access to the store will learn how many accounts the user has, but
+will learn neither addresses nor keys.
 
-**Ограничение по типам:** значения сериализуются через JSON, поэтому
-`bigint` не поддерживается напрямую. Денежные величины преобразуются
-в строку на уровне репозитория — как `chainId` в модуле сетей.
+**A type limitation:** values are serialized through JSON, so `bigint`
+is not supported directly. Monetary amounts are converted to a string
+at the repository level — like `chainId` in the networks module.
 
-#### Пароль остаётся строкой — и это ограничение
+#### The password remains a string — and that is a limitation
 
-Пароль приходит из поля ввода, а значение поля ввода в браузере это строка.
-Перевести её в буфер можно, но исходная строка останется в куче
-неочищаемой — как и внутри самого поля, и в истории событий DOM.
-Реальная защита здесь — стойкость KDF и короткое время жизни
-разблокированной сессии, а не притворство, что пароль защищён от дампа
-памяти.
+The password arrives from an input field, and the value of an input
+field in the browser is a string. It can be copied into a buffer, but
+the original string will remain on the heap, uncleansable — as it
+will inside the field itself and in the DOM event history. The real
+protection here is the strength of the KDF and the short lifetime of
+an unlocked session, not the pretense that the password is protected
+from a memory dump.
 
-### Транспорт к узлам — [core/provider](src/core/provider/)
+### Transport to nodes — [core/provider](src/core/provider/)
 
-`RpcClient` — единственное место в приложении, знающее о существовании
-ethers. Домен зависит от `IProvider`, поэтому замена библиотеки затрагивает
-только этот файл и отображение ошибок.
+`RpcClient` is the only place in the app that knows ethers exists.
+The domain depends on `IProvider`, so replacing the library touches
+only this file and error mapping.
 
-**Сверка chainId при подключении.** Узел, обслуживающий другую сеть,
-вернёт чужие балансы и чужой nonce, а подпись по его данным окажется
-пригодной для проигрывания в целевой сети. Несовпадение — отказ и разрыв.
+**chainId check on connect.** A node serving another network will
+return foreign balances and a foreign nonce, and a signature made from
+its data will be usable for replay on the target network. A mismatch
+is a refusal and a disconnect.
 
-**Сеть зафиксирована `staticNetwork`.** Без этого параметра ethers
-периодически перезапрашивает chainId и молча следует за узлом, сменившим
-сеть. Для кошелька такое поведение недопустимо: смена сети обязана быть
-решением пользователя.
+**The network is pinned with `staticNetwork`.** Without this parameter
+ethers periodically re-requests chainId and silently follows a node
+that changed network. For a wallet that behavior is unacceptable:
+changing network must be the user's decision.
 
-**`getNonce` всегда учитывает мемпул.** Тег `pending` зашит и не выносится
-в параметр. Значение по умолчанию (`latest`) не учитывает ожидающие
-транзакции, и новая транзакция заменила бы собой ожидающую вместо
-постановки в очередь — ошибка молчаливая, обнаруживается по пропавшему
-переводу.
+**`getNonce` always accounts for the mempool.** The `pending` tag is
+hard-wired and is not exposed as a parameter. The default (`latest`)
+does not account for pending transactions, and a new transaction would
+replace a pending one instead of queuing — a silent error, discovered
+by a vanished transfer.
 
-**Ответы узла проходят валидирующие конструкторы.** `chainId`, хэши
-транзакций и блоков, адреса. Некорректное значение попало бы в историю
-операций и в ссылку на обозреватель блоков.
+**Node responses pass through validating constructors.** `chainId`,
+transaction and block hashes, addresses. An incorrect value would land
+in the operation history and in a block-explorer link.
 
-**Ошибки ethers отображаются в доменные.** Разбор текста сообщений
-не применяется: формулировки не входят в публичный контракт ни ethers,
-ни узлов. Различаются только коды.
+**ethers errors are mapped to domain errors.** Parsing message text is
+not used: wording is not part of the public contract of either ethers
+or nodes. Only codes are distinguished.
 
-| Код ethers | Доменная ошибка |
+| ethers code | Domain error |
 | --- | --- |
 | `INSUFFICIENT_FUNDS` | `InsufficientFundsError` |
 | `NONCE_EXPIRED` | `NonceTooLowError` |
 | `REPLACEMENT_UNDERPRICED` | `TransactionUnderpricedError` |
 | `CALL_EXCEPTION` | `GasEstimationFailedError` |
 | `NETWORK_ERROR`, `TIMEOUT` | `ProviderUnavailableError` |
-| прочие с кодом JSON-RPC | `RpcError` с исходным кодом узла |
+| others with a JSON-RPC code | `RpcError` with the node's original code |
 
-`RpcClientFactory` перебирает `rpcUrls` в порядке приоритета. Узел
-с чужим chainId исключается из перебора с отдельным предупреждением
-в журнале — это либо ошибка конфигурации, либо попытка подмены.
+`RpcClientFactory` walks `rpcUrls` in priority order. A node with a
+foreign chainId is excluded from the walk with a separate warning in
+the log — that is either a configuration error or an impersonation
+attempt.
 
-### Подпись — [core/signing](src/core/signing/)
+### Signing — [core/signing](src/core/signing/)
 
-Поддержаны legacy, EIP-1559, `personal_sign` и `eth_signTypedData_v4`.
-Сериализация выполняется ethers: RLP, конверты EIP-2718, кодирование
-структур EIP-712 — подробные спецификации, ошибка в которых даёт подпись
-под данными, отличными от показанных пользователю.
+Legacy, EIP-1559, `personal_sign`, and `eth_signTypedData_v4` are
+supported. Serialization is performed by ethers: RLP, EIP-2718
+envelopes, EIP-712 structure encoding — detailed specifications, an
+error in which yields a signature over data different from what was
+shown to the user.
 
-#### Три проверки, без которых подпись небезопасна
+#### Three checks without which signing is unsafe
 
-**1. Транзакция без chainId отвергается.** Формат до EIP-155 действителен
-во всех EVM-сетях одновременно: перевод, подписанный в тестовой сети,
-повторяется злоумышленником в основной с теми же параметрами.
+**1. A transaction without chainId is rejected.** The pre-EIP-155
+format is valid on every EVM network at once: a transfer signed on a
+test network is replayed by an attacker on mainnet with the same
+parameters.
 
-**2. Ключ сверяется с полем `from`.** Адрес выводится из ключа и сравнивается
-с отправителем. Без проверки транзакция была бы корректной, но подписанной
-чужим ключом — средства ушли бы не с того аккаунта, который показан.
+**2. The key is checked against the `from` field.** The address is
+derived from the key and compared with the sender. Without the check
+the transaction would be valid but signed with the wrong key — funds
+would leave from an account other than the one shown.
 
-**3. `domain.chainId` сверяется с активной сетью.** Подпись EIP-712 привязана
-к сети только через это поле. Структура с чужим значением, подписанная
-в одной сети, предъявляется контракту в другой: пользователю показывают
-«вход на сайт», а подписанное оказывается разрешением `Permit`.
-Структура без указания сети отвергается — она действительна везде сразу.
+**3. `domain.chainId` is checked against the active network.** An
+EIP-712 signature is bound to a network only through this field. A
+structure with a foreign value, signed on one network, is presented
+to a contract on another: the user is shown "site login", and what
+was signed turns out to be a `Permit` allowance. A structure with no
+network specified is rejected — it is valid everywhere at once.
 
-#### Приватный ключ не покидает модуль
+#### The private key does not leave the module
 
-`HDWalletService` выполняет подпись сам: ключ выводится, используется
-и затирается внутри вызова. Публичный метод, отдававший ключ наружу
-«для подписи», удалён — подпись единственное, ради чего ключ нужен.
+`HDWalletService` performs the signature itself: the key is derived,
+used, and wiped inside the call. The public method that handed the key
+outward "for signing" was removed — signing is the only reason the key
+is needed.
 
-Остаётся `exportPrivateKey`, требующий разрешения от `ExportGuard`.
-Разделение намеренное: подпись и выдача секрета — операции с несопоставимыми
-последствиями.
+`exportPrivateKey` remains, requiring permission from `ExportGuard`.
+The split is intentional: signing and releasing a secret are
+operations with incomparable consequences.
 
-#### EIP-191 применяется всегда
+#### EIP-191 is always applied
 
-Префикс `\x19Ethereum Signed Message:\n<длина>` не отключается. Без него
-подписываемые байты могут оказаться корректной сериализованной транзакцией,
-и подпись «безобидного» сообщения превратится в подпись перевода средств.
+The prefix `\x19Ethereum Signed Message:\n<length>` is not disabled.
+Without it the bytes being signed may turn out to be a valid
+serialized transaction, and the signature of a "harmless" message
+becomes the signature of a funds transfer.
 
-Строка и массив байт различаются явно: dApp может прислать `0x48656c6c6f`,
-имея в виду либо байты `Hello`, либо буквально эту строку. Домен не угадывает.
+A string and a byte array are distinguished explicitly: a dApp may
+send `0x48656c6c6f` meaning either the bytes `Hello` or that string
+literally. The domain does not guess.
 
-#### Чего слой не делает
+#### What the layer does not do
 
-Не оценивает смысл подписываемого. Разрешение на неограниченное расходование
-токенов — корректная структура с правильным chainId. Разбор опасных шаблонов
-(`Permit`, `PermitSingle`, ордера маркетплейсов) — задача слоя подтверждения.
+It does not score the meaning of what is being signed. An unlimited
+token-spend allowance is a valid structure with a correct chainId.
+Parsing dangerous templates (`Permit`, `PermitSingle`, marketplace
+orders) is the job of the confirmation layer.
 
-### Аккаунты — [core/account](src/core/account/)
+### Accounts — [core/account](src/core/account/)
 
-`AccountManager` работает с публичной проекцией ключей: адресами, именами,
-порядком отображения. Секрет выдаёт единственный метод — `exportPrivateKey`.
+`AccountManager` works with the public projection of keys: addresses,
+names, display order. The only method that releases a secret is
+`exportPrivateKey`.
 
-#### Два источника аккаунтов ведут себя по-разному
+#### Two account sources behave differently
 
-| Источник | Ключ восстановим из seed | Удаление |
+| Source | Key recoverable from seed | Deletion |
 | --- | --- | --- |
-| HD-дерево | да | **невозможно**, только скрытие |
-| Импортированный ключ | нет | возможно, необратимо |
+| HD tree | yes | **impossible**, only hiding |
+| Imported key | no | possible, irreversible |
 
-**HD-аккаунт удалить нельзя** — не по решению разработчика, а по устройству
-BIP-32: тот же аккаунт появится снова при следующем восстановлении кошелька
-по той же фразе. Кнопка «удалить», которая на деле прячет запись, вводит
-пользователя в заблуждение относительно судьбы его средств.
+**An HD account cannot be deleted** — not by a developer's decision,
+but by how BIP-32 works: the same account will appear again on the
+next wallet restore from the same phrase. A "delete" button that in
+fact hides the record misleads the user about the fate of their
+funds.
 
-**Импортированный ключ удаляется вместе с аккаунтом и не восстанавливается.**
-Поэтому удаление требует пароля.
+**An imported key is deleted together with the account and is not
+restored.** That is why deletion requires the password.
 
-#### Индекс адреса — максимальный плюс один, а не число аккаунтов
+#### The address index is the maximum plus one, not the number of accounts
 
-Скрытые аккаунты остаются в списке и занимают свои индексы. Подсчёт
-по количеству дал бы повторный индекс, то есть два аккаунта с одним адресом.
+Hidden accounts remain in the list and occupy their indices. Counting
+by quantity would yield a repeated index, i.e. two accounts with one
+address.
 
-#### Экспорт ключа требует двух независимых подтверждений
+#### Key export requires two independent confirmations
 
-| Подтверждение | Что доказывает |
+| Confirmation | What it proves |
 | --- | --- |
-| Пароль | за устройством сейчас владелец, а не тот, кому оставили разблокированный кошелёк |
-| Разрешение `ExportGuard` | пользователю показали уровень риска, включая случай «xpub уже выдан» |
+| Password | the owner is at the device now, not someone left with an unlocked wallet |
+| `ExportGuard` permission | the user was shown the risk level, including the "xpub already released" case |
 
-#### Область экспорта отделена от пути деривации
+#### Export scope is separated from the derivation path
 
-Опасное сочетание «xpub плюс приватный ключ потомка» существует только внутри
-одного HD-аккаунта. Импортированный ключ не принадлежит дереву: его выдача
-не раскрывает HD-аккаунт, и наоборот.
+The dangerous combination "xpub plus a child's private key" exists
+only inside one HD account. An imported key does not belong to the
+tree: releasing it does not expose the HD account, and vice versa.
 
-Поэтому журнал экспортов ведётся по `ExportScope`, а не по пути деривации:
-для HD-аккаунта область совпадает с путём, для импортированного ключа —
-собственная. Иначе экспорт импортированного ключа помечал бы HD-аккаунт
-скомпрометированным. Ложное предупреждение здесь не безобидно: пользователь,
-приученный к ложным тревогам, перестаёт читать настоящие.
+So the export log is kept by `ExportScope`, not by derivation path:
+for an HD account the scope coincides with the path; for an imported
+key it is its own. Otherwise exporting an imported key would mark the
+HD account as compromised. A false warning here is not harmless: a
+user trained on false alarms stops reading real ones.
 
-#### Метаданные аккаунтов шифруются
+#### Account metadata is encrypted
 
-Адрес сам по себе публичен, но список адресов связывает все аккаунты одного
-пользователя, а имена («Зарплата», «Биржа») раскрывают назначение средств.
-Заблокированный кошелёк не сообщает ни того, ни другого.
+An address by itself is public, but a list of addresses ties all of
+one user's accounts together, and names ("Salary", "Exchange") reveal
+the purpose of the funds. A locked wallet reports neither.
 
-### Дизайн-система — [app/styles/index.css](src/app/styles/index.css)
+### Design system — [app/styles/index.css](src/app/styles/index.css)
 
-Палитра из трёх цветов: глубокий фиолетовый, нейтральная шкала и красный
-для необратимых действий. Ограничение не эстетическое — в кошельке цвет
-несёт смысл (опасно / безопасно / нейтрально), и четвёртый оттенок
-начинает конкурировать с предупреждениями за внимание.
+A palette of three colors: deep violet, a neutral scale, and red for
+irreversible actions. The limit is not aesthetic — in a wallet color
+carries meaning (dangerous / safe / neutral), and a fourth shade
+starts competing with warnings for attention.
 
-#### Два токена основного цвета вместо одного
+#### Two primary-color tokens instead of one
 
-| Токен | Роль | Светлая | Тёмная |
+| Token | Role | Light | Dark |
 | --- | --- | --- | --- |
-| `--primary` | заливка под белым текстом | 0.5 | 0.58 |
-| `--primary-emphasis` | текст и значки на фоне страницы | 0.5 | 0.75 |
+| `--primary` | fill under white text | 0.5 | 0.58 |
+| `--primary-emphasis` | text and icons on the page background | 0.5 | 0.75 |
 
-Одно значение не может служить обеим ролям: цвет, дающий достаточный
-контраст с белым текстом поверх себя, обязан быть тёмным, а цвет,
-читаемый как текст на тёмном фоне, — светлым. Попытка обойтись одним
-дала контраст 4.07 у подписи активного раздела при пороге 4.5 по WCAG AA;
-после разделения — 7.84 в тёмной теме и 6.56 в светлой.
+One value cannot serve both roles: a color that gives enough contrast
+with white text on top of itself must be dark, and a color readable as
+text on a dark background must be light. Trying to get by with one
+gave contrast 4.07 on the active-section label against the WCAG AA
+threshold of 4.5; after the split — 7.84 in the dark theme and 6.56
+in the light one.
 
-#### Фон тёмной темы не чёрный
+#### The dark-theme background is not black
 
-`oklch(0.16 0.018 292)` — с фиолетовым подтоном. Чистый чёрный рядом
-с цветными элементами даёт ореол по краям на OLED-экранах.
+`oklch(0.16 0.018 292)` — with a violet undertone. Pure black next to
+colored elements produces a halo at the edges on OLED screens.
 
-#### Живой фон в двух режимах
+#### A living background in two modes
 
-Три радиальных градиента, движимые исключительно `transform`, — браузер
-выполняет это на видеокарте, не перерисовывая слой. Плюс сетка
-повторяющимся градиентом и виньетка. Ноль байт трафика, ноль зависимостей.
+Three radial gradients driven exclusively by `transform` — the
+browser does this on the GPU without repainting the layer. Plus a
+grid via a repeating gradient and a vignette. Zero bytes of traffic,
+zero dependencies.
 
-Фонового видео нет и не будет: внешний файл потребовал бы запроса
-к стороннему серверу при каждом запуске, то есть сообщал бы его оператору
-IP-адрес пользователя и время открытия кошелька. Боевой CSP такой запрос
-блокирует, и это правильно. Локальное видео весило бы мегабайты
-и постоянно занимало декодер.
+There is no background video and there will not be one: an external
+file would require a request to a third-party server on every launch,
+i.e. would tell its operator the user's IP address and the time the
+wallet was opened. Production CSP blocks such a request, and that is
+correct. A local video would weigh megabytes and would occupy the
+decoder constantly.
 
-Поверх градиентов — тринадцать медленно падающих монет. Тоже чистый CSS:
-холст потребовал бы непрерывного цикла на главном потоке, а здесь
-анимируется только `transform` и `opacity`. Положения заданы списком,
-а не случайны: случайная раскладка менялась бы при каждом рендере
-и иногда сбивалась бы в кучу у одного края.
+On top of the gradients — thirteen slowly falling coins. Also pure
+CSS: a canvas would require a continuous loop on the main thread,
+and here only `transform` and `opacity` are animated. Positions are
+given by a list, not random: a random layout would change on every
+render and would sometimes pile up at one edge.
 
-Слой монет скрывается целиком при `prefers-reduced-motion`. Общего
-правила мало: оборванная анимация оставила бы монеты замершими у нижнего
-края видимой грудой.
+The coin layer is hidden entirely under `prefers-reduced-motion`. A
+shared rule is not enough: a cut-off animation would leave the coins
+frozen in a heap at the bottom edge.
 
-**За панелью кошелька работает приглушённый режим** — класс
-`.aurora-ambient`. Отказ от фона целиком давал другую крайность: рабочий
-экран выглядел чёрным полотном. Середина между «мешает читать»
-и «выглядит незаконченным» устроена так:
+**Behind the wallet panel a muted mode runs** — the class
+`.aurora-ambient`. Dropping the background entirely produced the other
+extreme: the working screen looked like a black canvas. The middle
+between "gets in the way of reading" and "looks unfinished" is
+arranged like this:
 
-| | Экраны входа | Панель кошелька |
+| | Onboarding screens | Wallet panel |
 | --- | --- | --- |
-| Непрозрачность пятен | 0.55 светлая / 1 тёмная | 0.2 светлая / 0.42 тёмная |
-| Период движения | 26–38 с | 72–104 с |
-| Падающие монеты | есть | **нет** |
-| Привязка слоя | к экрану | к окну просмотра (`fixed`) |
+| Spot opacity | 0.55 light / 1 dark | 0.2 light / 0.42 dark |
+| Motion period | 26–38 s | 72–104 s |
+| Falling coins | yes | **no** |
+| Layer attachment | to the screen | to the viewport (`fixed`) |
 
-Величины для тем заданы раздельно, а не общим множителем: на светлом
-фоне те же пятна выглядят тяжелее, и один коэффициент дал бы в одной
-теме грязь, а в другой — пустоту.
+Values for the themes are set separately, not by a shared multiplier:
+on a light background the same spots look heavier, and one
+coefficient would give dirt in one theme and emptiness in the other.
 
-Монет за панелью нет сознательно: движущийся объект позади цифры — самое
-отвлекающее, что можно поставить на экран, где эту цифру читают.
+There are no coins behind the panel on purpose: a moving object
+behind a number is the most distracting thing one can put on a screen
+where that number is being read.
 
-Слой закреплён по окну просмотра, иначе внизу длинного списка настроек
-снова открывалась бы та самая пустота.
+The layer is pinned to the viewport, otherwise at the bottom of a
+long settings list that same emptiness would open up again.
 
-**Читаемость от фона не зависит.** Весь текст лежит на непрозрачных
-карточках и панелях; проверено живьём — ни одной надписи прямо
-над градиентом, фон не перехватывает нажатия, горизонтального
-переполнения нет.
+**Readability does not depend on the background.** All text sits on
+opaque cards and panels; verified live — not a single label directly
+over the gradient, the background does not intercept clicks, there is
+no horizontal overflow.
 
-#### Переходы между экранами входа
+#### Transitions between onboarding screens
 
-Содержимое появляется со сдвигом, направление которого совпадает
-с направлением движения по истории: «вперёд» — справа, «назад» — слева.
-Направление берётся из `useNavigationType`.
+Content appears with a shift whose direction matches the direction of
+movement through history: "forward" from the right, "back" from the
+left. The direction is taken from `useNavigationType`.
 
-Фон при этом остаётся на месте — он живёт в маршруте-лейауте, а ключ
-по адресу перезапускает только внутренний блок. Смена читается как
-продолжение одного экрана, а не как загрузка нового.
+The background stays in place — it lives in the layout route, and the
+key by address restarts only the inner block. The change reads as a
+continuation of one screen, not as loading a new one.
 
-#### Шрифт подключается локально
+#### The font is loaded locally
 
-`@fontsource-variable/inter` из npm, а не Google Fonts. Внешний шрифт —
-запрос к стороннему серверу при каждом запуске и блокировка правилом
-`font-src 'self' data:`. Подмножества с `unicode-range`: браузер скачивает
-латиницу (48 КБ) и кириллицу (19 КБ), а не весь Unicode.
+`@fontsource-variable/inter` from npm, not Google Fonts. An external
+font is a request to a third-party server on every launch and a block
+by the `font-src 'self' data:` rule. Subsets with `unicode-range`:
+the browser downloads Latin (48 KB) and Cyrillic (19 KB), not the
+entire Unicode.
 
-Отдельный заголовочный шрифт не подключён: платные гарнитуры через
-сторонних распространителей — юридический риск, не оправданный разницей
-в начертании. Заголовок отличается насыщенностью и трекингом.
+A separate display font is not loaded: paid typefaces through
+third-party distributors are a legal risk not justified by a
+difference in glyph. A heading differs by weight and tracking.
 
-#### Анимации отключаются полностью при `prefers-reduced-motion`
+#### Animations are turned off entirely under `prefers-reduced-motion`
 
-Не замедляются, а именно отключаются: ни одна анимация в кошельке
-не несёт смысла, все они декоративные.
+Not slowed down, but turned off: no animation in the wallet carries
+meaning; they are all decorative.
 
-#### Фирменный знак и подготовка значков
+#### Wordmark and icon preparation
 
-В интерфейсе используется знак **без надписи**. Полный блок логотипа
-содержит слово «Wallet», набранное тёмно-синим (rgb 50, 54, 75): на фоне
-тёмной темы (rgb 38, 33, 48) оно практически неразличимо, поэтому блок
-целиком пригоден только для светлых поверхностей — витрины магазина,
-документов, печати.
+The interface uses the mark **without lettering**. The full logo lockup
+contains the word "Wallet" set in dark blue (rgb 50, 54, 75): on the
+dark-theme background (rgb 38, 33, 48) it is practically
+indistinguishable, so the lockup as a whole is fit only for light
+surfaces — a storefront, documents, print.
 
-Исходники лежат в `brand/`, а не в `public/`: содержимое `public/`
-копируется в сборку целиком, и полуторамегабайтные исходники попадали бы
-в дистрибутив, хотя никем не запрашиваются. Перенос уменьшил сборку
-с 3.8 МБ до 1.14 МБ.
+Sources live in `brand/`, not in `public/`: the contents of `public/`
+are copied into the build as a whole, and one-and-a-half-megabyte
+sources would land in the distribution even though nobody requests
+them. The move reduced the build from 3.8 MB to 1.14 MB.
 
 ```bash
 npm run icons
 ```
 
-Готовит набор 16 / 32 / 48 / 128 / 192 / 512 из `brand/icon.png`.
-Прозрачные поля обрезаются: без этого при уменьшении до 16 пикселей
-от знака осталась бы неразличимая точка в центре. Размеры 16–128 —
-требование manifest v3, где каждый нужен отдельным файлом.
+Prepares the 16 / 32 / 48 / 128 / 192 / 512 set from `brand/icon.png`.
+Transparent margins are cropped: without that, shrinking to 16 pixels
+would leave an indistinguishable dot in the center. Sizes 16–128 are
+a manifest v3 requirement, where each is needed as a separate file.
 
-Узнаваемый вид приложения — слабая, но реальная преграда для фишинговой
-копии, поэтому знак одинаков на всех экранах входа.
+A recognizable look for the app is a weak but real barrier against a
+phishing copy, so the mark is the same on every onboarding screen.
 
-### Оболочка и навигация — [app/layouts](src/app/layouts/)
+### Shell and navigation — [app/layouts](src/app/layouts/)
 
-Пять экранов разблокированного кошелька делят шапку и нижнюю панель через
-вложенный маршрут с `Outlet`. Повторение оболочки в каждой странице дало бы
-пять мест расхождения и перерисовку шапки при каждом переходе.
+Five screens of the unlocked wallet share the header and the bottom
+bar through a nested route with `Outlet`. Repeating the shell on every
+page would give five places to drift and would redraw the header on
+every transition.
 
-Экраны онбординга оболочки не имеют: до разблокировки переходить некуда,
-а панель навигации на экране пароля создала бы впечатление, что часть
-кошелька доступна без него.
+Onboarding screens have no shell: before unlock there is nowhere to
+go, and a navigation bar on the password screen would create the
+impression that part of the wallet is available without it.
 
-Прямой переход по адресу `#/wallet/settings` при заблокированном кошельке
-приводит к экрану пароля: иначе пользователь увидел бы части интерфейса,
-доступ к которым не подтверждал.
+A direct navigation to `#/wallet/settings` with a locked wallet leads
+to the password screen: otherwise the user would see parts of the
+interface whose access they had not confirmed.
 
-Пять пунктов — предел. Всплывающее окно расширения имеет ширину около
-360 пикселей; шестой пункт делает подписи нечитаемыми, а безымянные значки
-в кошельке недопустимы.
+Five items is the limit. An extension popup is about 360 pixels wide;
+a sixth item makes labels unreadable, and unlabeled icons are
+unacceptable in a wallet.
 
-### Отпечаток адреса — [features/wallet/ui/AccountAvatar.tsx](src/features/wallet/ui/AccountAvatar.tsx)
+### Address fingerprint — [features/wallet/ui/AccountAvatar.tsx](src/features/wallet/ui/AccountAvatar.tsx)
 
-Пользователь опознаёт адрес по четырём-шести символам, а подобрать адрес
-с нужными крайними символами вычислительно дёшево. Картинка зависит от всех
-сорока символов: подменённый адрес меняет её целиком, и разница заметна
-боковым зрением.
+A user recognizes an address by four to six characters, and picking an
+address with the desired edge characters is computationally cheap.
+The picture depends on all forty characters: a substituted address
+changes it entirely, and the difference is visible in peripheral
+vision.
 
-Отпечаток не заменяет сверку. Свёртка FNV-1a стойкости к подбору не даёт
-и для иных целей непригодна — от неё нужна только различимость картинок.
+The fingerprint does not replace a check. An FNV-1a fold gives no
+resistance to search and is unfit for other purposes — all that is
+needed from it is distinguishability of pictures.
 
-### Пустые состояния объясняют причину — [shared/ui/empty-state.tsx](src/shared/ui/empty-state.tsx)
+### Empty states explain the reason — [shared/ui/empty-state.tsx](src/shared/ui/empty-state.tsx)
 
-Поле `description` обязательное, а не необязательное. Пустой список без
-объяснения пользователь читает как «у меня ничего нет» — опасное прочтение,
-когда настоящая причина в том, что кошелёк ещё не умеет читать эти данные.
-Разница между «активов нет» и «активы не отслеживаются» определяет,
-побежит ли человек искать пропавшие средства.
+The `description` field is required, not optional. An empty list
+without an explanation the user reads as "I have nothing" — a
+dangerous reading when the real reason is that the wallet cannot yet
+read that data. The difference between "there are no assets" and
+"assets are not tracked" determines whether a person will run looking
+for vanished funds.
 
-Разделы Assets и NFT на текущем этапе состоят именно из таких состояний:
-балансы ERC-20 и коллекционные токены не реализованы, и списков с
-выдуманными значениями там не будет.
+The Assets and NFT sections at the current stage consist exactly of
+such states: ERC-20 balances and collectible tokens are not
+implemented, and there will be no lists with invented values there.
 
-### Экраны входа — [features/onboarding](src/features/onboarding/), [pages](src/pages/)
+### Onboarding screens — [features/onboarding](src/features/onboarding/), [pages](src/pages/)
 
-Пять экранов: приветствие, создание, восстановление, разблокировка, сброс.
-Ядро о них не знает — `OnboardingService` остаётся единственным местом,
-где интерфейс обращается к `SecureStorage` и `MnemonicService`.
+Five screens: welcome, create, restore, unlock, reset. The core does
+not know about them — `OnboardingService` remains the only place
+where the interface talks to `SecureStorage` and `MnemonicService`.
 
-#### Пароль спрашивается раньше seed-фразы
+#### The password is asked before the seed phrase
 
-Порядок выбран не для удобства. Фраза, показанная до ввода пароля, лежит
-в памяти всё время, пока пользователь придумывает пароль, — а это самая
-длинная пауза во всём потоке. Сначала пароль, потом генерация.
+The order was chosen not for convenience. A phrase shown before the
+password is entered sits in memory the whole time the user is
+inventing a password — and that is the longest pause in the entire
+flow. Password first, then generation.
 
-Сама фраза хранится в `useRef`, а не в состоянии компонента: значения
-состояния видны в инструментах разработчика React, значения ссылки — нет.
-Буфер затирается при уходе с экрана и сразу после создания кошелька.
+The phrase itself is stored in `useRef`, not in component state:
+state values are visible in React developer tools; ref values are
+not. The buffer is wiped on leaving the screen and immediately after
+the wallet is created.
 
-#### Политика пароля — [core/security/password-policy.ts](src/core/security/password-policy.ts)
+#### Password policy — [core/security/password-policy.ts](src/core/security/password-policy.ts)
 
-| Требование | Значение |
+| Requirement | Value |
 | --- | --- |
-| Минимальная длина | 12 символов |
-| Классы символов | не менее 3 из 4 |
-| Верхняя граница | 256 символов |
-| Отказ | распространённые и однообразные пароли |
+| Minimum length | 12 characters |
+| Character classes | at least 3 of 4 |
+| Upper bound | 256 characters |
+| Reject | common and uniform passwords |
 
-Проверка живёт в ядре, а не в компоненте: тот же пароль принимается при
-создании, восстановлении и смене, и три независимые реализации разошлись бы.
+The check lives in the core, not in a component: the same password is
+accepted on create, restore, and change, and three independent
+implementations would drift.
 
-Классы символов определяются свойствами Unicode (`\p{Ll}`, `\p{Lu}`), а не
-диапазоном ASCII. Иначе кириллический пароль засчитывался бы как не имеющий
-ни одной буквы — и пользователь получал бы отказ, не понимая причины.
+Character classes are defined by Unicode properties (`\p{Ll}`,
+`\p{Lu}`), not by an ASCII range. Otherwise a Cyrillic password would
+be counted as having no letters at all — and the user would get a
+refusal without understanding the reason.
 
-Верхняя граница нужна не против слабых паролей, а против отказа
-в обслуживании: PBKDF2 обрабатывает вход целиком.
+The upper bound is needed not against weak passwords, but against
+denial of service: PBKDF2 processes the entire input.
 
-#### Поля ввода отключают проверку орфографии
+#### Input fields disable spell-check
 
-`spellCheck = false` по умолчанию у `Input` и `Textarea`. Проверка орфографии
-в браузере может отправлять содержимое поля на сторонний сервер — а в этих
-полях seed-фразы и пароли.
+`spellCheck = false` by default on `Input` and `Textarea`. Browser
+spell-check may send the field contents to a third-party server — and
+these fields hold seed phrases and passwords.
 
-#### Проверка записи фразы берёт отвлекающие слова из самой фразы
+#### The phrase write-down check takes decoy words from the phrase itself
 
-Варианты, взятые из словаря, выдают себя: правильное слово выделяется среди
-чужих, и пользователь выбирает его не вспоминая. Слова из той же фразы
-неотличимы, поэтому проверяется именно порядок — то, ради чего проверка
-и нужна.
+Options taken from the dictionary give themselves away: the correct
+word stands out among strangers, and the user picks it without
+recalling. Words from the same phrase are indistinguishable, so what
+is checked is exactly the order — the thing the check exists for.
 
-Позиции и перемешивание берутся из `getRandomBytes`, а не из `Math.random`.
-Предсказание позиций само по себе безвредно, но отдельный слабый генератор
-«для несекретных нужд» рано или поздно применят не по назначению.
+Positions and shuffling are taken from `getRandomBytes`, not from
+`Math.random`. Predicting the positions is harmless by itself, but a
+separate weak generator "for non-secret needs" will sooner or later
+be applied off-purpose.
 
-Проверяются три слова из двенадцати. Полная перепечатка утомляет настолько,
-что пользователь копирует фразу через буфер обмена, и проверка становится
-формальностью.
+Three words out of twelve are checked. A full retype is tiring enough
+that the user copies the phrase through the clipboard, and the check
+becomes a formality.
 
-#### Ошибка разблокировки не уточняет причину
+#### An unlock error does not specify the reason
 
-Неверный пароль и повреждённое хранилище дают одно сообщение. Различие
-сообщало бы атакующему, что пароль угадан верно, а данные повреждены —
-то есть подсказывало бы, стоит ли продолжать перебор.
+A wrong password and a corrupted store yield one message. A
+distinction would tell an attacker that the password was guessed
+correctly and the data are damaged — i.e. would hint whether to
+continue brute force.
 
-#### Экран сброса не обещает восстановления
+#### The reset screen does not promise recovery
 
-Заголовок сразу сообщает, что пароль восстановить нельзя. Сброс требует
-и отметки в поле согласия, и ввода слова `СТЕРЕТЬ`: одна отметка ставится
-машинально.
+The heading immediately says the password cannot be recovered. Reset
+requires both a consent checkbox and typing the word `ERASE`: a
+single checkbox is ticked mechanically.
 
-### Управление сетями — [core/network](src/core/network/)
+### Network management — [core/network](src/core/network/)
 
-Добавление, удаление, переключение. Изменять и удалять встроенные сети
-нельзя: их конфигурация — часть защиты от подмены.
+Add, remove, switch. Built-in networks cannot be changed or deleted:
+their configuration is part of the defense against impersonation.
 
-#### Совпадение имени со встроенной сетью требует отдельного согласия
+#### A name match with a built-in network requires separate consent
 
-Сверка `eth_chainId` с узлом (этап 3) доказывает, что узел обслуживает
-заявленную сеть. Она **не** доказывает, что эта сеть — та, о которой
-думает пользователь.
+Checking `eth_chainId` against the node (stage 3) proves that the node
+serves the claimed network. It does **not** prove that this network is
+the one the user has in mind.
 
-Классический приём: сайт предлагает добавить сеть с именем `Ethereum`,
-но с идентификатором собственной цепи. Узел честно подтвердит свой
-chainId, проверка пройдёт, а в шапке кошелька появится привычное имя.
-Дальше пользователь подписывает перевод, считая его отправкой в основную
-сеть.
+The classic trick: a site offers to add a network named `Ethereum`,
+but with the identifier of its own chain. The node will honestly
+confirm its chainId, the check will pass, and the familiar name will
+appear in the wallet header. Then the user signs a transfer believing
+it is a send on mainnet.
 
-`findImpersonation` ловит это до обращения к узлу и приводит к
-`NetworkImpersonationError`. Добавление возможно только повторным
-вызовом с `allowImpersonation: true` — то есть после того, как
-пользователь увидел, за какую сеть выдаёт себя добавляемая.
+`findImpersonation` catches this before the node is contacted and
+leads to `NetworkImpersonationError`. Adding is possible only by a
+repeated call with `allowImpersonation: true` — i.e. after the user
+has seen which network the added one is impersonating.
 
-#### Символ валюты не проверяется, и это осознанно
+#### The currency symbol is not checked, and that is deliberate
 
-`ETH` законно используют Optimism, Arbitrum и Base — все встроенные.
-Предупреждение на каждое совпадение символа срабатывало бы почти всегда
-и почти всегда напрасно, а ложная тревога в системе безопасности хуже
-отсутствия проверки: она приучает не читать предупреждения.
+`ETH` is lawfully used by Optimism, Arbitrum, and Base — all built-in.
+A warning on every symbol match would fire almost always and almost
+always in vain, and a false alarm in a security system is worse than
+no check: it trains people not to read warnings.
 
-Совпадение имени, напротив, законным не бывает.
+A name match, by contrast, is never lawful.
 
-Чего проверка не ловит: подмену похожими символами разных алфавитов —
-`Ethereum` с кириллической `е` выглядит так же, но не совпадает ни
-по одному байту.
+What the check does not catch: impersonation with look-alike letters
+from different alphabets — `Ethereum` with a Cyrillic `e` (U+0435)
+looks the same but does not match in a single byte.
 
-#### Пользовательская сеть помечена в списке
+#### A custom network is marked in the list
 
-У встроенной сети конфигурация проверена, у добавленной вручную и узел,
-и обозреватель заданы тем, кто её добавил. Ссылка «открыть в
-обозревателе» ведёт по этому адресу — готовая площадка для фишинга,
-куда пользователь придёт по клику из кошелька. Форма добавления
-предупреждает об этом прямо.
+For a built-in network the configuration has been reviewed; for one
+added by hand both the node and the explorer are set by whoever added
+it. The "open in explorer" link goes to that address — a ready
+phishing surface the user will arrive at by a click from the wallet.
+The add form warns about this plainly.
 
-#### Удаление активной сети оставляет кошелёк работоспособным
+#### Deleting the active network leaves the wallet usable
 
-Активной становится сеть по умолчанию, соединение с удалённой
-закрывается, баланс и история перечитываются. Состояния «активной сети
-нет» не существует.
+The default network becomes active, the connection to the removed one
+is closed, the balance and history are reread. A state of "there is
+no active network" does not exist.
 
-### Выбор RPC-узла — [core/provider](src/core/provider/)
+### RPC node selection — [core/provider](src/core/provider/)
 
-Кошелёк не привязан к одному оператору узлов. Адреса собираются из
-нескольких источников, проверяются и подменяются при отказе.
+The wallet is not tied to one node operator. Addresses are collected
+from several sources, checked, and substituted on failure.
 
-#### Источник адресов — это не транспорт
+#### An address source is not a transport
 
-| Сущность | Ответственность |
+| Entity | Responsibility |
 | --- | --- |
-| `IRpcProvider` | откуда взять адреса узлов для сети |
-| `CustomRpcProvider` | адреса, добавленные пользователем |
-| `AlchemyProvider` | адреса Alchemy, по ключу API |
-| `PublicRpcProvider` | публичные адреса из конфигурации сети |
-| `RpcClient` | единственный транспорт JSON-RPC |
-| `FailoverProvider` | `IProvider`, переживающий отказ узла |
-| `RpcManager` | порядок, проверка, кэш соединений |
+| `IRpcProvider` | where to get node addresses for a network |
+| `CustomRpcProvider` | addresses added by the user |
+| `AlchemyProvider` | Alchemy addresses, by API key |
+| `PublicRpcProvider` | public addresses from the network configuration |
+| `RpcClient` | the only JSON-RPC transport |
+| `FailoverProvider` | an `IProvider` that survives a node failure |
+| `RpcManager` | order, check, connection cache |
 
-Alchemy, собственный узел пользователя и публичный узел говорят по одному
-протоколу. Отдельный класс транспорта под каждого оператора означал бы
-копию реализации JSON-RPC на источник — и ошибку, исправленную в одной
-копии из трёх.
+Alchemy, the user's own node, and a public node speak one protocol.
+A separate transport class per operator would mean a copy of the
+JSON-RPC implementation per source — and a bug fixed in one copy of
+three.
 
-#### Порядок источников выражает политику, а не механику
+#### Source order expresses policy, not mechanics
 
-1. **Собственный узел пользователя.** Выбран сознательно и единственный
-   не раскрывает адреса постороннему оператору.
-2. **Alchemy** — значение по умолчанию, когда пользователь ничего не указал.
-3. **Публичные узлы** — работают без ключа.
+1. **The user's own node.** Chosen deliberately and the only one that
+   does not reveal addresses to a third-party operator.
+2. **Alchemy** — the default when the user specified nothing.
+3. **Public nodes** — work without a key.
 
-Порядок задаётся в composition root, а не внутри перебора. Собственный
-адрес идёт впереди значения по умолчанию: подставлять умолчание вместо
-явного выбора значит отменять решение владельца средств.
+The order is set in the composition root, not inside the walk. A
+custom address goes ahead of the default: substituting the default
+for an explicit choice means canceling the fund owner's decision.
 
-#### Переключение только при отказе транспорта
+#### Switch only on a transport failure
 
-Ответ узла с ошибкой JSON-RPC переключения не вызывает. Узел, который
-ответил, работает, и второй ответит то же самое: недостаток средств
-и откат вызова не зависят от того, кого спрашивать.
+A node response with a JSON-RPC error does not cause a switch. A node
+that answered is working, and a second one will answer the same:
+insufficient funds and a call revert do not depend on whom you ask.
 
-Различие выражено типами: `ProviderUnavailableError` означает «ответа
-не было», `RpcError` — «ответ получен и он отрицательный».
+The distinction is expressed in types: `ProviderUnavailableError`
+means "there was no response", `RpcError` means "a response was
+received and it is negative".
 
-#### Отправка транзакции не повторяется на другом узле
+#### Sending a transaction is not retried on another node
 
-Причина не в идемпотентности — повторная публикация тех же подписанных
-байтов безопасна. Причина в том, что при отказе транспорта судьба первой
-отправки неизвестна: узел мог принять транзакцию и не успеть ответить.
-Второй узел вернёт «already known», и кошелёк показал бы отказ по
-фактически принятой транзакции. Пользователь обязан узнать
-о неопределённости, а не получить придуманный за него ответ.
+The reason is not idempotency — republishing the same signed bytes is
+safe. The reason is that on a transport failure the fate of the first
+send is unknown: the node may have accepted the transaction and failed
+to reply in time. A second node will return "already known", and the
+wallet would show a refusal for a transaction that was in fact
+accepted. The user must learn about the uncertainty, not receive an
+answer invented for them.
 
-#### Пользовательский адрес проверяется до сохранения
+#### A custom address is checked before saving
 
-Сначала подключение и сверка `eth_chainId`, только потом запись
-в хранилище. Обратный порядок оставил бы адрес узла чужой сети, и кошелёк
-применял бы его при каждом запуске — подписи, сделанные для другой цепи,
-пригодны для повторного проигрывания.
+First a connection and an `eth_chainId` check, only then a write to
+storage. The reverse order would leave the address of a node of a
+foreign network, and the wallet would apply it on every launch —
+signatures made for another chain are usable for replay.
 
-Причина отказа доводится до пользователя без подмены: «узел обслуживает
-другую сеть» и «узел не отвечает» требуют разных действий. Фабрика
-заворачивает первую в обобщённое «нет доступных узлов», поэтому исходная
-причина извлекается из цепочки `cause`.
+The reason for a refusal is delivered to the user without
+substitution: "the node serves another network" and "the node does
+not respond" require different actions. The factory wraps the first
+in a generic "no available nodes", so the original reason is extracted
+from the `cause` chain.
 
-#### Собственный адрес хранится зашифрованным
+#### A custom address is stored encrypted
 
-Пользователь вставляет строку вида `https://…/v2/<ключ>` от своей учётной
-записи у оператора, а нередко и адрес домашнего узла, раскрывающий
-местоположение. Открытое хранение такой строки равносильно хранению
-пароля открытым текстом.
+The user pastes a string of the form `https://…/v2/<key>` from their
+account with an operator, and often also the address of a home node
+that reveals location. Storing such a string in the clear is
+equivalent to storing a password in plaintext.
 
-По той же причине в интерфейсе и в журнале показывается только имя узла:
-путь адреса содержит ключ, а журнал попадает в отчёты об ошибках.
+For the same reason only the node name is shown in the interface and
+in the log: the path of the address contains the key, and the log
+ends up in error reports.
 
-#### Отдельное пространство имён для адресов
+#### A separate namespace for addresses
 
-`NetworkRepository.findAll` читает все ключи своего пространства и
-разбирает каждый как конфигурацию сети. Пользовательские адреса, положенные
-рядом, превратились бы в повреждённые сети в списке.
+`NetworkRepository.findAll` reads every key of its namespace and
+parses each as a network configuration. Custom addresses placed next
+to them would turn into corrupted networks in the list.
 
-#### Ключ Alchemy публичен
+#### The Alchemy key is public
 
-Vite подставляет `VITE_*` прямо в бандл: ключ виден каждому, кто откроет
-исходники страницы. Это свойство клиентских приложений, а не недосмотр.
-Ключ обязан быть ограничен доменом в панели Alchemy — иначе его используют
-посторонние и квота исчерпается. Без ключа кошелёк работает на публичных
-узлах; это рабочее состояние, а не отказ.
+Vite substitutes `VITE_*` directly into the bundle: the key is visible
+to anyone who opens the page sources. This is a property of client
+apps, not an oversight. The key must be restricted by domain in the
+Alchemy panel — otherwise outsiders will use it and the quota will
+run out. Without a key the wallet works on public nodes; that is a
+working state, not a failure.
 
-### Токены — [core/token](src/core/token/)
+### Tokens — [core/token](src/core/token/)
 
-Импорт по адресу контракта, чтение `symbol`, `name`, `decimals`
-и `balanceOf` напрямую у контракта.
+Import by contract address, reading `symbol`, `name`, `decimals`,
+and `balanceOf` directly from the contract.
 
-#### Метаданные читаются из контракта, а не принимаются на веру
+#### Metadata is read from the contract, not taken on faith
 
-Число десятичных знаков определяет порядок величины показанной суммы:
-токен с шестью знаками, записанный как восемнадцатизначный, покажет
-одну миллионную настоящего баланса. Пользователь, вводящий это значение
-вручную, ошибётся; сайт, предлагающий его, может ошибиться намеренно.
+The decimal count determines the order of magnitude of the shown
+amount: a token with six decimals recorded as eighteen-decimal will
+show one millionth of the real balance. A user entering this value
+by hand will err; a site offering it may err on purpose.
 
-Переданное число знаков сверяется с контрактом, и расхождение приводит
-к отказу. Символ, напротив, редактируется: это подпись на экране,
-а не арифметика, и пользователь вправе пометить подозрительный токен
-по-своему.
+The passed decimal count is checked against the contract, and a
+mismatch leads to a refusal. The symbol, by contrast, is editable:
+it is a label on the screen, not arithmetic, and the user is entitled
+to mark a suspicious token their own way.
 
-Контракт, не отвечающий на `decimals()`, отвергается: без этого значения
-любая показанная сумма — выдумка. Символ и имя объявлены стандартом
-необязательными, и их отсутствие заменяется усечённым адресом — он хуже
-читается, но правдив.
+A contract that does not answer `decimals()` is rejected: without
+that value any shown amount is fiction. Symbol and name are declared
+optional by the standard, and their absence is replaced with a
+truncated address — it reads worse, but it is truthful.
 
-#### Декодер понимает и `string`, и `bytes32`
+#### The decoder understands both `string` and `bytes32`
 
-Стандарт объявляет `symbol()` возвращающим строку переменной длины,
-но токены, выпущенные до окончательной редакции — MKR среди самых
-известных, — возвращают `bytes32`. Декодер, понимающий только первое,
-не добавил бы их вовсе. Различаются по длине ответа: одно слово —
-`bytes32`, два и более — строка.
+The standard declares `symbol()` as returning a variable-length
+string, but tokens issued before the final edition — MKR among the
+best known — return `bytes32`. A decoder that understands only the
+first would not add them at all. They are distinguished by response
+length: one word is `bytes32`, two or more is a string.
 
-Селекторы функций вычисляются из подписей keccak256, а не вписываются
-константами: восемь шестнадцатеричных символов из памяти непроверяемы
-при чтении кода, а ошибка в одном даёт вызов несуществующей функции.
+Function selectors are computed from keccak256 signatures, not written
+as constants: eight hex characters from memory cannot be verified by
+reading the code, and an error in one yields a call to a nonexistent
+function.
 
-#### Логотипы не загружаются извне
+#### Logos are not loaded from outside
 
-Три независимые причины, каждой достаточно:
+Three independent reasons, each sufficient:
 
-1. **CSP запрещает.** Боевая политика — `img-src 'self' data:`. Запрос
-   к стороннему хранилищу логотипов будет заблокирован браузером.
-2. **Утечка состава портфеля.** По набору запрошенных логотипов оператор
-   хранилища узнаёт, чем владеет пользователь, и связывает это с IP.
-3. **Подделки становятся убедительнее.** Мошеннический контракт
-   с символом `USDC` и настоящим логотипом USDC неотличим от оригинала.
+1. **CSP forbids it.** The production policy is `img-src 'self' data:`.
+   A request to a third-party logo store will be blocked by the
+   browser.
+2. **A leak of portfolio composition.** From the set of requested logos
+   the store operator learns what the user holds and ties it to an IP.
+3. **Forgeries become more convincing.** A fraudulent contract with
+   the symbol `USDC` and the real USDC logo is indistinguishable from
+   the original.
 
-Знак выводится из адреса контракта: автор контракта не может выбрать
-его произвольно, а два разных контракта выглядят по-разному даже
-при совпадающих символах.
+The mark is derived from the contract address: the contract author
+cannot choose it arbitrarily, and two different contracts look
+different even when the symbols match.
 
-#### Встроенного списка проверенных токенов нет
+#### There is no built-in list of verified tokens
 
-Вписать адреса известных контрактов по памяти значит рискнуть пометить
-мошеннический контракт как проверенный — это опаснее отсутствия пометки
-вовсе. Все добавленные токены помечены «непроверенный». Курируемый
-список требует сверки с авторитетным источником.
+Writing addresses of known contracts from memory means risking marking
+a fraudulent contract as verified — that is more dangerous than no
+mark at all. Every added token is marked "unverified". A curated list
+requires checking against an authoritative source.
 
-По той же причине найденные токены не добавляются автоматически:
-прислать на чужой адрес приманку с именем известного проекта может кто
-угодно и почти бесплатно, а показанный в кошельке токен выглядит
-одобренным.
+For the same reason discovered tokens are not added automatically:
+anyone can send bait named after a known project to a foreign address
+almost for free, and a token shown in the wallet looks approved.
 
-### История переводов — [core/history](src/core/history/)
+### Transfer history — [core/history](src/core/history/)
 
-Поддержаны переводы нативной валюты, токенов ERC-20 и коллекционных
-токенов ERC-721 и ERC-1155.
+Transfers of native currency, ERC-20 tokens, and ERC-721 and ERC-1155
+collectibles are supported.
 
-#### Три категории — три разных технических положения
+#### Three categories — three different technical situations
 
-| Категория | Доступна по чистому RPC | Как |
+| Category | Available over plain RPC | How |
 | --- | --- | --- |
-| ERC-20 | да, в окне блоков | `eth_getLogs`, событие `Transfer` |
-| ERC-721 / 1155 | да, в окне блоков | `Transfer`, `TransferSingle`, `TransferBatch` |
-| Нативная валюта | **нет** | события не существует |
+| ERC-20 | yes, in a block window | `eth_getLogs`, `Transfer` event |
+| ERC-721 / 1155 | yes, in a block window | `Transfer`, `TransferSingle`, `TransferBatch` |
+| Native currency | **no** | the event does not exist |
 
-Перевод нативной валюты не порождает события: в журналах его нет
-физически. Никакая настройка этого не меняет — остаётся перебор каждого
-блока целиком либо трассировка, которой публичные узлы не дают. Поэтому
-полная история требует индексатора.
+A native-currency transfer does not produce an event: it is physically
+absent from the logs. No setting changes that — what remains is
+walking every block in full or tracing, which public nodes do not
+offer. So a complete history requires an indexer.
 
-#### Два источника за одним контрактом
+#### Two sources behind one contract
 
-`LogScanHistoryProvider` работает на любом узле и без ключа, то есть
-не передаёт адрес пользователя стороннему сервису. Видит только токены
-и только недавнее окно блоков.
+`LogScanHistoryProvider` works on any node and without a key, i.e. it
+does not hand the user's address to a third-party service. It sees
+only tokens and only a recent block window.
 
-`AlchemyHistoryProvider` отдаёт полную историю всех категорий. Взамен
-оператор получает адрес и возвращает всю финансовую жизнь по нему:
-размер портфеля, контрагентов, время каждой операции — разом, а не
-по мере поступления запросов, как это происходит с обычным узлом.
-Подключается только при явно указанном ключе.
+`AlchemyHistoryProvider` returns a complete history of every category.
+In exchange the operator receives the address and returns the entire
+financial life on it: portfolio size, counterparties, the time of
+every operation — all at once, not as requests arrive, as happens
+with an ordinary node. It is connected only when a key is specified
+explicitly.
 
-Локальные отправки подмешиваются всегда: во внешний источник транзакция
-попадает после включения в блок и переиндексации, а видеть её нужно
-сразу.
+Local sends are always mixed in: a transaction reaches an external
+source after inclusion in a block and reindexing, and it needs to be
+seen immediately.
 
-#### Что показал замер на живых узлах
+#### What a measurement on live nodes showed
 
-Все точки `publicnode` — наши по умолчанию во всех сетях — отвечают
-отказом «Please specify an address in your request» на выборку журналов
-без указания контракта. Именно такая выборка нужна, чтобы найти переводы
-всех токенов сразу. `drpc.org` запрос принимает, но после серии обращений
-отвечает «Can't route your request to suitable provider».
+Every `publicnode` endpoint — our default in every network — responds
+with the refusal "Please specify an address in your request" on a log
+query without a contract. Exactly that query is needed to find
+transfers of every token at once. `drpc.org` accepts the request, but
+after a series of calls responds "Can't route your request to suitable
+provider".
 
-Практический вывод: без ключа индексатора история чаще всего недоступна.
-Это записано как A-48 и показывается пользователю, а не скрывается.
+The practical conclusion: without an indexer key history is most often
+unavailable. This is recorded as A-48 and is shown to the user, not
+hidden.
 
-#### Отказ источника не выдаётся за пустую историю
+#### A source failure is not presented as an empty history
 
-«Операций не было» и «узнать не удалось» — разные утверждения, и второе,
-выданное за первое, читается владельцем как пропажа средств. Когда все
-выборки отказали, источник выбрасывает ошибку, а экран показывает причину
-дословно и подсказывает решение: подключить свой узел либо ключ
-индексатора.
+"There were no operations" and "could not find out" are different
+statements, and the second, presented as the first, is read by the
+owner as vanished funds. When every query failed, the source throws,
+and the screen shows the reason verbatim and suggests a solution:
+connect your own node or an indexer key.
 
-#### Число знаков токена не додумывается
+#### The token decimal count is not guessed
 
-Привычные восемнадцать знаков — соглашение, а не правило: у USDC их
-шесть, у WBTC восемь. Подстановка восемнадцати для токена с шестью
-занизила бы сумму в триллион раз. При неизвестном числе знаков выводятся
-необработанные единицы с пометкой «единицы контракта».
+The familiar eighteen decimals are a convention, not a rule: USDC has
+six, WBTC has eight. Substituting eighteen for a token with six would
+understate the amount by a trillion. When the decimal count is
+unknown, raw units are shown with the mark "contract units".
 
-По той же причине сумма из ответа индексатора берётся из
-`rawContract.value` — шестнадцатеричной строки, — а не из поля `value`,
-которое приходит числом JSON: двоичная плавающая точка теряет младшие
-разряды на суммах свыше 2^53.
+For the same reason the amount from an indexer response is taken from
+`rawContract.value` — a hex string — not from the `value` field,
+which arrives as a JSON number: binary floating point loses low-order
+digits on amounts above 2^53.
 
-#### Идентификаторы событий вычисляются, а не вписываются
+#### Event identifiers are computed, not written in
 
-`keccak256` от подписи события считается при загрузке модуля. Хэш,
-скопированный из памяти, непроверяем при чтении кода: ошибка в одном
-символе даёт пустую историю без единого сообщения об ошибке. Вычисленные
-значения совпали с опубликованными в ERC-20 и ERC-1155 — это проверяется
-тестом.
+`keccak256` of the event signature is computed at module load. A hash
+copied from memory cannot be verified by reading the code: an error
+in one character yields an empty history without a single error
+message. The computed values matched those published in ERC-20 and
+ERC-1155 — that is checked by a test.
 
-ERC-20 и ERC-721 используют одно событие `Transfer` и различаются только
-числом индексированных параметров: у ERC-721 идентификатор предмета
-занимает четвёртую тему. Другого признака в событии нет.
+ERC-20 and ERC-721 use the same `Transfer` event and differ only in
+the number of indexed parameters: for ERC-721 the item identifier
+occupies the fourth topic. There is no other signal in the event.
 
-### Отбор и поиск в истории — [features/wallet/lib/transfer-filter.ts](src/features/wallet/lib/transfer-filter.ts), [pages/ActivityPage.tsx](src/pages/ActivityPage.tsx)
+### History filtering and search — [features/wallet/lib/transfer-filter.ts](src/features/wallet/lib/transfer-filter.ts), [pages/ActivityPage.tsx](src/pages/ActivityPage.tsx)
 
-Экран истории отбирает записи по виду имущества (нативная валюта, ERC-20,
-NFT), по направлению перевода и по строке поиска.
+The history screen filters records by asset type (native currency,
+ERC-20, NFT), by transfer direction, and by a search string.
 
-#### Отбор — чистая функция, а не логика внутри компонента
+#### Filtering is a pure function, not logic inside a component
 
-`filterTransfers` не знает ни о React, ни о разметке. Логику в компоненте
-нельзя проверить тестом без рендера, а ошибка здесь означает исчезновение
-операции из истории — то, что владелец средств читает как пропажу.
+`filterTransfers` knows neither about React nor about markup. Logic
+in a component cannot be tested without a render, and an error here
+means an operation disappearing from history — what the fund owner
+reads as a vanishing.
 
-#### Пустой результат отбора и пустая история — разные утверждения
+#### An empty filter result and an empty history are different statements
 
-«Операций не было» и «под условия ничего не подошло» означают разное,
-и первое, показанное вместо второго, отправляет человека искать пропавшие
-деньги. Заголовок пустого состояния задаётся вызывающим кодом именно
-поэтому.
+"There were no operations" and "nothing matched the conditions" mean
+different things, and the first, shown instead of the second, sends a
+person looking for vanished money. The empty-state heading is set by
+the caller for exactly that reason.
 
-Отдельный случай — отбор по нативной валюте при источнике, который её
-не видит. Пустой список здесь не говорит ничего о том, были такие операции
-или нет, и экран сообщает об этом прямо.
+A separate case is filtering by native currency when the source does
+not see it. An empty list here says nothing about whether such
+operations existed, and the screen says so plainly.
 
-#### Ограничения источника показываются при любом отборе
+#### Source limitations are shown under any filter
 
-Отбор применяется к уже полученным записям и ничего не запрашивает заново.
-Скрыть предупреждение об отказе узла под активным фильтром значило бы
-выдать урезанную выборку за полную.
+The filter is applied to records already obtained and requests
+nothing again. Hiding a node-failure warning under an active filter
+would mean presenting a truncated sample as complete.
 
-#### Поиск ошибается в сторону лишнего, а не недостающего
+#### Search errs toward extra, not missing
 
-Совпадение ищется по подстроке в хэше, адресах отправителя и получателя,
-адресе контракта, символе токена и идентификаторе предмета. Совпадение
-только по началу строки не нашло бы адрес, от которого пользователь помнит
-последние символы, — а именно они видны в усечённой записи адреса в списке.
+A match is sought as a substring in the hash, sender and recipient
+addresses, contract address, token symbol, and item identifier. A
+match only at the start of the string would not find an address of
+which the user remembers the last characters — and those are exactly
+what is visible in a truncated address record in the list.
 
-Лишнюю строку в выдаче человек увидит и отбросит; отсутствующую — нет,
-он прочтёт пустой список как «таких операций не было». Регистр не
-учитывается: один и тот же адрес приходит и в нижнем регистре от узла,
-и в записи с контрольной суммой EIP-55.
+An extra row in the results a person will see and discard; a missing
+one they will not — they will read an empty list as "there were no
+such operations". Case is ignored: the same address arrives both in
+lowercase from the node and in an EIP-55 checksummed record.
 
-#### Запрос не попадает ни в адресную строку, ни в хранилище
+#### The query lands neither in the address bar nor in storage
 
-Он содержит адрес контрагента, то есть сведения, по которым
-восстанавливается круг общения владельца кошелька. Адресная строка
-сохраняется в истории браузера и доступна расширениям.
+It contains a counterparty address, i.e. information from which the
+wallet owner's circle of contacts is reconstructed. The address bar
+is saved in browser history and is available to extensions.
 
-#### Перевод самому себе попадает и во «входящие», и в «исходящие»
+#### A transfer to self lands in both "incoming" and "outgoing"
 
-Он одновременно и приход, и расход. Исключение его из обоих наборов
-скрыло бы существующую операцию, а скрытая операция в истории кошелька
-хуже лишней.
+It is at once a receipt and an expense. Excluding it from both sets
+would hide an existing operation, and a hidden operation in wallet
+history is worse than an extra one.
 
-#### ERC-721 и ERC-1155 сведены в одну категорию
+#### ERC-721 and ERC-1155 are collapsed into one category
 
-Для владельца это один вид имущества; разделение по стандартам заставило бы
-его знать, каким контрактом выпущен предмет. Сам стандарт при этом остаётся
-в записи и виден в строке списка.
+For the owner this is one kind of property; splitting by standard
+would force them to know which contract issued the item. The
+standard itself remains in the record and is visible in the list
+row.
 
-#### Кнопки с одинаковой надписью получают разные доступные имена
+#### Buttons with the same label get different accessible names
 
-Значение «Все» есть и у вида имущества, и у направления. Видимая надпись
-короткая — места в окне расширения мало, — но две кнопки с доступным именем
-«Все» неразличимы для того, кто слушает страницу, а не смотрит на неё:
-`legend` скрытой группы в имя кнопки не входит.
+The value "All" exists both for asset type and for direction. The
+visible label is short — there is little room in an extension window
+— but two buttons with the accessible name "All" are indistinguishable
+to someone who listens to the page rather than looks at it: a hidden
+group's `legend` is not part of the button name.
 
-### Главный экран — [features/wallet](src/features/wallet/), [pages/DashboardPage.tsx](src/pages/DashboardPage.tsx)
+### Home screen — [features/wallet](src/features/wallet/), [pages/DashboardPage.tsx](src/pages/DashboardPage.tsx)
 
-Панель показывает баланс, аккаунты, сети, операции и быстрые действия.
+The panel shows the balance, accounts, networks, operations, and
+quick actions.
 
-#### Сессия кошелька живёт ровно между разблокировкой и блокировкой
+#### The wallet session lives exactly between unlock and lock
 
-`WalletSession` владеет выведенным из seed-фразы корневым ключом, открытыми
-соединениями с узлами и таймерами опроса. Разложить эти объекты по компонентам
-React нельзя: размонтирование дерева не гарантировано, а порядок выполнения
-очисток в `useEffect` не совпадает с порядком, в котором нужно затирать ключи.
+`WalletSession` owns the root key derived from the seed phrase, open
+connections to nodes, and poll timers. These objects cannot be
+scattered across React components: unmounting of the tree is not
+guaranteed, and the order of `useEffect` cleanups does not match the
+order in which keys must be wiped.
 
-Закрытие идёт строго по шагам: остановка опроса, разрыв соединений, затирание
-корневого ключа. Обратный порядок оставил бы работающий таймер, обращающийся
-к уничтоженным сервисам.
+Close goes strictly by steps: stop polling, drop connections, wipe
+the root key. The reverse order would leave a running timer talking
+to destroyed services.
 
-Открытие и закрытие привязаны к состоянию блокировки, а не к монтированию
-экрана: уход со страницы не должен затирать ключ и выводить его заново.
+Open and close are bound to lock state, not to mounting of a screen:
+leaving the page must not wipe the key and derive it again.
 
-#### Снимок вместо набора геттеров
+#### A snapshot instead of a set of getters
 
-`useSyncExternalStore` сравнивает результат `getSnapshot()` по ссылке.
-Геттеры, собирающие объект заново при каждом вызове, дали бы новую ссылку
-на каждом рендере и бесконечный цикл перерисовок. Сессия заменяет снимок
-целиком и только при настоящем изменении данных.
+`useSyncExternalStore` compares the result of `getSnapshot()` by
+reference. Getters that assemble an object anew on every call would
+give a new reference on every render and an infinite redraw loop.
+The session replaces the snapshot as a whole and only on a real data
+change.
 
-#### Истории входящих переводов нет и не может быть без внешнего индексатора
+#### There is no incoming-transfer history and cannot be without an external indexer
 
-Узел EVM не отдаёт историю адреса. `eth_getLogs` возвращает события
-контрактов, а перевод нативной валюты события не порождает. Показываются
-только транзакции, отправленные этим кошельком и сохранённые локально.
+An EVM node does not return an address history. `eth_getLogs` returns
+contract events, and a native-currency transfer produces no event.
+Only transactions sent by this wallet and saved locally are shown.
 
-Полная история требует стороннего индексатора (Etherscan, Alchemy, Covalent),
-которому придётся передать все адреса пользователя и который свяжет их между
-собой. Это решение принимает владелец кошелька, а не разработчик, поэтому
-пустой список сопровождается объяснением, а не заполняется молча.
+A complete history requires a third-party indexer (Etherscan, Alchemy,
+Covalent) that would have to be given every user address and that
+would tie them together. That decision is the wallet owner's, not the
+developer's, so an empty list is accompanied by an explanation rather
+than filled silently.
 
-#### Ни одно недоступное значение не подменяется нулём
+#### No unavailable value is substituted with zero
 
-| Состояние | Что показано |
+| State | What is shown |
 | --- | --- |
-| Баланс получен | значение |
-| Баланс из кэша | значение и пометка устаревания |
-| Узел не ответил | прежнее значение и причина отказа |
-| Значение ещё не получено | «Загрузка…» |
+| Balance received | the value |
+| Balance from cache | the value and a stale mark |
+| The node did not answer | the previous value and the reason for the failure |
+| The value has not been received yet | "Loading…" |
 
-Ноль — это утверждение «средств нет». Пользователь, увидевший его вместо
-недоступного баланса, решит, что средства пропали. По той же причине
-`BalanceService.getToken` отказывает, а не возвращает ноль: балансы токенов
-не реализованы, и отсутствие реализации обязано выглядеть как отсутствие
-реализации.
+Zero is the statement "there are no funds". A user who sees it in
+place of an unavailable balance will decide the funds vanished. For
+the same reason `BalanceService.getToken` refuses rather than
+returning zero: token balances are not implemented, and the absence
+of an implementation must look like the absence of an implementation.
 
-#### Показанная сумма никогда не округляется вверх
+#### A shown amount is never rounded up
 
-`formatTokenAmount` усекает дробную часть. Округление вверх показало бы
-больше средств, чем есть, и пользователь попытался бы отправить недоступную
-сумму. Остаток меньше отображаемой точности выводится как `<0.000001`,
-а не как ноль. Все вычисления на `bigint`: `Number.MAX_SAFE_INTEGER` меньше,
-чем 0.01 ETH в wei.
+`formatTokenAmount` truncates the fractional part. Rounding up would
+show more funds than there are, and the user would try to send an
+unavailable amount. A remainder smaller than the displayed precision
+is shown as `<0.000001`, not as zero. All computation is on `bigint`:
+`Number.MAX_SAFE_INTEGER` is less than 0.01 ETH in wei.
 
-#### Тестовая сеть и chainId показываются рядом с именем
+#### A test network and chainId are shown next to the name
 
-Средства в тестовой сети ничего не стоят, и незамеченное переключение
-приводит к отправке в никуда. Имя сети задаёт тот, кто её добавил, поэтому
-рядом стоит `chainId` — его подделать нельзя, он сверяется у узла при
-добавлении сети.
+Funds on a test network are worth nothing, and an unnoticed switch
+leads to a send into nowhere. The network name is set by whoever
+added it, so `chainId` stands next to it — it cannot be forged; it is
+checked at the node when the network is added.
 
-#### Экран получения показывает полный адрес
+#### The receive screen shows the full address
 
-Усечённый адрес невозможно сверить посимвольно, а именно посимвольная сверка
-защищает от подмены содержимого буфера обмена вредоносным расширением.
-При усечении в списках регистр сохраняется: он несёт контрольную сумму EIP-55.
+A truncated address cannot be checked character by character, and
+exactly a character-by-character check protects against a malicious
+extension substituting clipboard contents. When truncating in lists
+the case is preserved: it carries the EIP-55 checksum.
 
-### Отправка — [core/transaction](src/core/transaction/), [pages/SendPage.tsx](src/pages/SendPage.tsx)
+### Sending — [core/transaction](src/core/transaction/), [pages/SendPage.tsx](src/pages/SendPage.tsx)
 
-Экран проводит пользователя через три шага: форма, подтверждение, результат.
-Разделение не косметическое — на первом шаге значения ещё меняются, на втором
-объект транзакции уже неизменен, на третьем операция необратима.
+The screen walks the user through three steps: form, confirmation,
+result. The split is not cosmetic — on the first step values are still
+changing, on the second the transaction object is already immutable,
+on the third the operation is irreversible.
 
-#### Показанное совпадает с подписываемым
+#### What is shown matches what is signed
 
-`prepareTransfer` возвращает готовый к подписи объект. Экран подтверждения
-выводит поля **этого** объекта, и он же уходит в подпись без промежуточных
-пересчётов. Расхождение показанного с подписанным — основной класс атак
-на интерфейс кошелька: пользователь подтверждает одно, подписывает другое.
-Поэтому суммы, адреса, `chainId`, nonce и лимит газа читаются из одной
-структуры, а не собираются заново из полей формы.
+`prepareTransfer` returns an object ready to sign. The confirmation
+screen prints the fields of **that** object, and the same object goes
+to signing with no intermediate recomputation. A mismatch between
+what is shown and what is signed is the main class of attacks on a
+wallet interface: the user confirms one thing and signs another. So
+amounts, addresses, `chainId`, nonce, and gas limit are read from one
+structure, not reassembled from form fields.
 
-#### Сумма разбирается на строках, без чисел с плавающей точкой
+#### The amount is parsed on strings, without floating-point numbers
 
-`Number('0.1') * 1e18` даёт `100000000000000001` — на единицу больше
-запрошенного. Для денег такая погрешность недопустима.
-[parseAmount](src/features/wallet/lib/amount-input.ts) работает со строкой
-и `BigInt`. Дробная часть длиннее числа знаков токена **отвергается**,
-а не округляется: молчаливое отбрасывание разрядов означало бы отправку
-суммы, отличной от введённой.
+`Number('0.1') * 1e18` yields `100000000000000001` — one more than
+requested. For money such error is unacceptable.
+[parseAmount](src/features/wallet/lib/amount-input.ts) works with a
+string and `BigInt`. A fractional part longer than the token's
+decimal count is **rejected**, not rounded: silently dropping digits
+would mean sending an amount different from the one entered.
 
-#### Проверка средств живёт в ядре, а не в форме
+#### The funds check lives in the core, not in the form
 
-`TransactionService.prepare` сверяет баланс с суммой плюс **верхней границей**
-комиссии (`maxFeePerGas × gasLimit`), а не с ожидаемой. Транзакция, на которую
-не хватает при худшем базовом сборе, будет отвергнута узлом или зависнет
-в очереди. Проверка в форме была бы забыта при появлении второго пути
-отправки — например экрана подписи запроса от dApp.
+`TransactionService.prepare` checks the balance against the amount
+plus the **upper bound** of the fee (`maxFeePerGas × gasLimit`), not
+against the expected one. A transaction that is short at the worst
+base fee will be rejected by the node or will stall in the queue. A
+check in the form would be forgotten when a second send path appears
+— for example a screen for signing a request from a dApp.
 
-Проверено на живом узле: аккаунт с нулевым балансом получает
-«Недостаточно средств для проведения операции.» до подписи.
+Verified on a live node: an account with a zero balance gets
+"Insufficient funds to complete the operation." before signing.
 
-#### Замечания к получателю считаются по введённой строке
+#### Recipient findings are computed from the entered string
 
-[findRecipientRisks](src/core/transaction/risk.ts) принимает адрес **в том
-виде, в каком его ввёл пользователь**. Причина в том, что `toAddress`
-приводит запись к контрольной сумме EIP-55, и признак «введено без
-контрольной суммы» после нормализации теряется — предупреждение
-не появилось бы никогда.
+[findRecipientRisks](src/core/transaction/risk.ts) takes the address
+**in the form the user entered it**. The reason is that `toAddress`
+brings the record to an EIP-55 checksum, and the "entered without a
+checksum" signal is lost after normalization — the warning would
+never appear.
 
-| Замечание | Почему оно есть |
+| Finding | Why it exists |
 | --- | --- |
-| Адрес сжигания | средства уйдут безвозвратно |
-| Перевод самому себе | вероятная ошибка при выборе аккаунта |
-| Адрес без контрольной суммы | опечатка в нём не обнаруживается |
+| Burn address | funds will leave irreversibly |
+| Transfer to self | a likely mistake when choosing an account |
+| Address without a checksum | a typo in it is not detected |
 
-Это **предупреждения, а не запреты**: у каждого случая есть законное
-применение. Проверок ровно столько — срабатывающие часто и без пользы
-сюда не добавлены, потому что ложная тревога приучает не читать
-предупреждения, и настоящее останется незамеченным.
+These are **warnings, not bans**: each case has a lawful use. There
+are exactly this many checks — ones that fire often and without
+benefit were not added, because a false alarm trains people not to
+read warnings, and a real one will go unnoticed.
 
-Адрес из одних цифр считается проверенным: он неотличим от записанного
-с контрольной суммой, и требовать иного значило бы предупреждать без причины.
+An address of digits only is treated as checked: it is
+indistinguishable from one written with a checksum, and requiring
+otherwise would mean warning without a reason.
 
-#### Три уровня срочности умножают комиссию, а не задают её
+#### Three urgency levels multiply the fee, they do not set it
 
-Обычная, быстрая, срочная — это множители 100 %, 125 % и 175 % к данным узла.
-Ожидаемое время включения **не показывается**: оно зависит от загрузки сети
-в ближайшие минуты, и назвать его значило бы дать обещание, которое кошелёк
-не может выполнить.
+Normal, fast, urgent — these are multipliers of 100%, 125%, and 175%
+of the node's data. Expected inclusion time is **not shown**: it
+depends on network load in the next few minutes, and naming it would
+mean making a promise the wallet cannot keep.
 
-#### Смена сети или аккаунта сбрасывает подготовленную транзакцию
+#### Changing network or account resets the prepared transaction
 
-Готовый объект содержит `chainId`, nonce и адрес отправителя. После смены
-любого из них он перестал бы соответствовать тому, что видит пользователь.
+The finished object contains `chainId`, nonce, and the sender
+address. After any of them changes it would no longer match what the
+user sees.
 
-#### Токены с этого экрана не отправляются
+#### Tokens are not sent from this screen
 
-При переводе ERC-20 поле `to` — адрес контракта, а настоящий получатель лежит
-в данных вызова. Показать это честно требует отдельного экрана; сведение двух
-разных операций к одной форме породило бы ровно то расхождение показанного
-с подписываемым, против которого выстроен весь этот путь.
+On an ERC-20 transfer the `to` field is the contract address, and the
+real recipient lives in the calldata. Showing that honestly requires
+a separate screen; collapsing two different operations into one form
+would produce exactly the mismatch between what is shown and what is
+signed that this entire path is built against.
 
-#### Принятие узлом не означает включения в блок
+#### Acceptance by the node does not mean inclusion in a block
 
-Экран результата показывает хэш и прямо оговаривает разницу. Транзакция может
-остаться в очереди или быть вытеснена; отслеживание статуса пока не реализовано
-(см. [TECH_DEBT.md](TECH_DEBT.md)).
+The result screen shows the hash and states the difference plainly.
+The transaction may remain in the queue or be displaced; status
+tracking is not yet implemented (see [TECH_DEBT.md](TECH_DEBT.md)).
 
-### Журналирование — [core/platform/ConsoleLogger.ts](src/core/platform/ConsoleLogger.ts)
+### Logging — [core/platform/ConsoleLogger.ts](src/core/platform/ConsoleLogger.ts)
 
-Редакция секретов зашита в реализацию, а не оставлена вызывающему коду:
-правило, соблюдение которого зависит от внимательности каждого места вызова,
-нарушается при первом же добавлении нового поля в контекст.
+Redaction of secrets is built into the implementation, not left to
+calling code: a rule whose observance depends on the attentiveness of
+every call site is broken on the first addition of a new field to the
+context.
 
-| Что | Что происходит |
+| What | What happens |
 | --- | --- |
-| Поле, имя которого похоже на секрет | значение заменяется целиком |
-| Адрес EVM | усекается до первых и последних символов |
-| `bigint` | переводится в строку |
-| Уровни `Debug` и `Info` | по умолчанию не выводятся |
+| A field whose name looks like a secret | the value is replaced entirely |
+| An EVM address | truncated to the first and last characters |
+| `bigint` | converted to a string |
+| `Debug` and `Info` levels | not printed by default |
 
-Полный адрес в журнале — это идентификатор личности, связывающий пользователя
-со всей его историей операций. Журнал кошелька попадает в отчёты об ошибках
-и в консоль браузера, доступную расширениям.
+A full address in the log is a personal identifier that ties the user
+to their entire operation history. A wallet log ends up in error
+reports and in the browser console, which is available to extensions.
 
-### Внедрение зависимостей
+### Dependency injection
 
-Конструкторный DI, ручной composition root, без контейнера. Контракт —
-`IWalletCoreDependencies`, тип фабрики — `WalletCoreFactory`.
+Constructor DI, a manual composition root, no container. The contract
+is `IWalletCoreDependencies`; the factory type is `WalletCoreFactory`.
 
-Конкретные реализации выбираются в одном месте —
-[`createAppServices`](src/app/composition/createAppServices.ts). Переход
-на IndexedDB либо на `chrome.storage` в расширении затронет этот файл
-и больше ни один.
+Concrete implementations are chosen in one place —
+[`createAppServices`](src/app/composition/createAppServices.ts). A
+move to IndexedDB or to `chrome.storage` in the extension will touch
+this file and no other.
 
-Защищённое хранилище одно на всё приложение: `SecureStorage` владеет
-сессионным ключом, полученным из пароля, и второй экземпляр поверх того же
-хранилища имел бы собственный ключ и не смог бы прочитать записанное первым.
+There is one protected store for the whole app: `SecureStorage` owns
+the session key derived from the password, and a second instance over
+the same store would have its own key and would be unable to read
+what the first wrote.
 
-Боевая сборка не параметризуется дублёрами. Возможность подставить в неё
-ускоренное шифрование или поддельный узел означала бы, что такая подстановка
-достижима и в production. Тесты собирают тот же набор классов отдельно —
+The production build is not parameterized with doubles. The ability
+to inject accelerated encryption or a fake node into it would mean
+that such a substitution is reachable in production as well. Tests
+assemble the same set of classes separately —
 [`createTestAppServices`](src/test/doubles/createTestAppServices.ts).
 
-Контейнеры на декораторах отвергнуты: они требуют `emitDecoratorMetadata`
-(запрещён настройкой `erasableSyntaxOnly`), тянут `reflect-metadata` в бандл,
-исполняемый рядом с ключами, и переносят проверку зависимостей из компиляции
-в рантайм.
+Decorator containers were rejected: they require `emitDecoratorMetadata`
+(forbidden by the `erasableSyntaxOnly` setting), pull `reflect-metadata`
+into a bundle that runs next to keys, and move dependency checking
+from compile time to runtime.
 
-Источник случайности **не внедряется**: `crypto.getRandomValues` зашит жёстко.
-Возможность подменить генератор случайных чисел означает возможность сделать
-все ключи предсказуемыми.
+The randomness source is **not injected**: `crypto.getRandomValues` is
+hard-wired. The ability to substitute the random-number generator
+means the ability to make every key predictable.
 
-### Алиасы
+### Aliases
 
-В проекте ровно один алиас — `@` указывает на `src`:
+The project has exactly one alias — `@` points at `src`:
 
 ```ts
 import { Button } from '@/shared/ui'
 import { KeyringService } from '@/core'
 ```
 
-Алиасы на каждый слой (`@core`, `@features`, ...) сознательно не заводятся.
-Они дублируют информацию, уже содержащуюся в пути, требуют синхронного
-изменения трёх конфигураций (`tsconfig`, `vite`, `components.json`) и не
-поддерживаются CLI shadcn/ui, который ожидает единственный корневой алиас.
+Aliases per layer (`@core`, `@features`, ...) are deliberately not
+introduced. They duplicate information already contained in the path,
+require a synchronized change of three configurations (`tsconfig`,
+`vite`, `components.json`) and are not supported by the shadcn/ui
+CLI, which expects a single root alias.
 
-Алиас объявлен в двух местах и должен меняться в обоих одновременно:
+The alias is declared in two places and must be changed in both at
+once:
 
-- `tsconfig.app.json` — `compilerOptions.paths` (для проверки типов);
-- `vite.config.ts` — `resolve.alias` (для сборки и тестов).
+- `tsconfig.app.json` — `compilerOptions.paths` (for type checking);
+- `vite.config.ts` — `resolve.alias` (for the build and tests).
 
 ---
 
-## Структура проекта
+## Project structure
 
 ```
 wallet/
 ├─ build/
-│  └─ csp-plugin.ts             # Внедрение CSP в production-сборку
-├─ brand/                       # Исходники логотипа. В сборку не попадают
-│  ├─ icon.png                  # Знак без надписи, 1024×1024
-│  └─ logo-full.png             # Полный блок: знак, надпись, девиз
+│  └─ csp-plugin.ts             # CSP injection into the production build
+├─ brand/                       # Logo sources. Do not enter the build
+│  ├─ icon.png                  # Mark without lettering, 1024×1024
+│  └─ logo-full.png             # Full lockup: mark, lettering, motto
 ├─ scripts/
-│  └─ generate-icons.mjs        # Подготовка набора значков
+│  └─ generate-icons.mjs        # Preparing the icon set
 ├─ public/
-│  └─ icons/                    # Значки 16…512, готовятся `npm run icons`
+│  └─ icons/                    # Icons 16…512, prepared by `npm run icons`
 ├─ src/
-│  ├─ app/                      # Композиция приложения
+│  ├─ app/                      # Application composition
 │  │  ├─ composition/
-│  │  │  └─ createAppServices.ts # Выбор конкретных реализаций
+│  │  │  └─ createAppServices.ts # Choice of concrete implementations
 │  │  ├─ layouts/
-│  │  │  ├─ AppShell.tsx        # Шапка и нижняя навигация
-│  │  │  ├─ navigation.ts       # Перечень разделов
+│  │  │  ├─ AppShell.tsx        # Header and bottom navigation
+│  │  │  ├─ navigation.ts       # List of sections
 │  │  │  └─ index.ts
 │  │  ├─ providers/
-│  │  │  ├─ AppProviders.tsx    # Сборка всех провайдеров
+│  │  │  ├─ AppProviders.tsx    # Assembly of all providers
 │  │  │  ├─ ThemeProvider.tsx
 │  │  │  ├─ theme-context.ts
 │  │  │  └─ index.ts
 │  │  ├─ router/
-│  │  │  ├─ AppRouter.tsx       # HashRouter, разбор состояния кошелька
-│  │  │  ├─ routes.ts           # Адреса экранов
+│  │  │  ├─ AppRouter.tsx       # HashRouter, parsing wallet state
+│  │  │  ├─ routes.ts           # Screen addresses
 │  │  │  └─ index.ts
 │  │  ├─ styles/
-│  │  │  └─ index.css           # Tailwind, дизайн-токены, тёмная тема
-│  │  ├─ App.tsx                # Корневой компонент
+│  │  │  └─ index.css           # Tailwind, design tokens, dark theme
+│  │  ├─ App.tsx                # Root component
 │  │  ├─ App.test.tsx
-│  │  └─ main.tsx               # Точка входа
+│  │  └─ main.tsx               # Entry point
 │  │
-│  ├─ core/                     # Доменное ядро. Без React
-│  │  ├─ account/               # Аккаунты — публичная проекция ключей
-│  │  ├─ address/               # Адреса EVM, EIP-55, вывод из ключа
-│  │  ├─ balance/               # Балансы, без форматирования
-│  │  ├─ di/                    # Контракт зависимостей, composition root
-│  │  ├─ encryption/            # Шифрование через WebCrypto
-│  │  ├─ errors/                # Иерархия прикладных ошибок
-│  │  ├─ events/                # Типизированные источники событий
-│  │  ├─ hdwallet/              # BIP-32 / BIP-44: деривация ключей
-│  │  ├─ history/               # История переводов: журналы и индексатор
-│  │  ├─ keyring/               # Наборы ключей — владельцы секретов
-│  │  ├─ manager/               # WalletManager, фасад ядра
-│  │  ├─ mnemonic/              # BIP-39: генерация, валидация, seed
-│  │  ├─ network/               # Конфигурации сетей
-│  │  ├─ platform/              # Часы, журналирование
-│  │  ├─ provider/              # Транспорт, выбор и перебор RPC-узлов
-│  │  ├─ security/              # Политика экспорта секретов, аудит
-│  │  ├─ signing/               # Подпись транзакций, EIP-191, EIP-712
-│  │  ├─ storage/               # Постоянное хранилище
-│  │  ├─ token/                 # Токены ERC-20: импорт, метаданные, баланс
-│  │  ├─ transaction/           # Транзакции и подпись EIP-712
-│  │  ├─ types/                 # Примитивы предметной области
-│  │  ├─ wallet/                # Хранилище ключей и блокировка
-│  │  └─ index.ts               # Публичный API ядра
+│  ├─ core/                     # Domain core. No React
+│  │  ├─ account/               # Accounts — public projection of keys
+│  │  ├─ address/               # EVM addresses, EIP-55, derivation from a key
+│  │  ├─ balance/               # Balances, no formatting
+│  │  ├─ di/                    # Dependency contract, composition root
+│  │  ├─ encryption/            # Encryption via WebCrypto
+│  │  ├─ errors/                # Hierarchy of application errors
+│  │  ├─ events/                # Typed event sources
+│  │  ├─ hdwallet/              # BIP-32 / BIP-44: key derivation
+│  │  ├─ history/               # Transfer history: logs and indexer
+│  │  ├─ keyring/               # Key sets — owners of secrets
+│  │  ├─ manager/               # WalletManager, core facade
+│  │  ├─ mnemonic/              # BIP-39: generation, validation, seed
+│  │  ├─ network/               # Network configurations
+│  │  ├─ platform/              # Clock, logging
+│  │  ├─ provider/              # Transport, selection and failover of RPC nodes
+│  │  ├─ security/              # Secret-export policy, audit
+│  │  ├─ signing/               # Transaction signing, EIP-191, EIP-712
+│  │  ├─ storage/               # Persistent storage
+│  │  ├─ token/                 # ERC-20 tokens: import, metadata, balance
+│  │  ├─ transaction/           # Transactions and EIP-712 signing
+│  │  ├─ types/                 # Domain primitives
+│  │  ├─ wallet/                # Key store and lock
+│  │  └─ index.ts               # Public core API
 │  │
 │  ├─ features/
-│  │  ├─ onboarding/            # Создание, восстановление, разблокировка
-│  │  │  ├─ lib/                # Чистые функции формы и проверки фразы
-│  │  │  ├─ model/              # OnboardingService, контракт, контекст
-│  │  │  ├─ ui/                 # Поля пароля, показ и ввод seed-фразы
+│  │  ├─ onboarding/            # Create, restore, unlock
+│  │  │  ├─ lib/                # Pure form functions and phrase check
+│  │  │  ├─ model/              # OnboardingService, contract, context
+│  │  │  ├─ ui/                 # Password fields, seed-phrase display and input
 │  │  │  └─ index.ts
-│  │  └─ wallet/                # Сессия разблокированного кошелька
-│  │     ├─ lib/                # Форматирование сумм и адресов
-│  │     ├─ model/              # WalletSession, снимок состояния, контекст
-│  │     ├─ ui/                 # Виджеты панели, WalletProvider
+│  │  └─ wallet/                # Unlocked-wallet session
+│  │     ├─ lib/                # Amount and address formatting
+│  │     ├─ model/              # WalletSession, state snapshot, context
+│  │     ├─ ui/                 # Panel widgets, WalletProvider
 │  │     └─ index.ts
 │  │
 │  ├─ pages/
-│  │  ├─ WelcomePage.tsx        # Выбор между созданием и восстановлением
-│  │  ├─ CreateWalletPage.tsx   # Пароль, фраза, проверка записи
-│  │  ├─ ImportWalletPage.tsx   # Восстановление по seed-фразе
-│  │  ├─ UnlockWalletPage.tsx   # Ввод пароля
-│  │  ├─ ForgotPasswordPage.tsx # Сброс хранилища с подтверждением
-│  │  ├─ DashboardPage.tsx      # Главный экран кошелька
-│  │  ├─ AssetsPage.tsx         # Активы аккаунта
-│  │  ├─ NftPage.tsx            # Коллекционные токены
-│  │  ├─ ActivityPage.tsx       # История операций
-│  │  ├─ SettingsPage.tsx       # Аккаунты, сети, узлы, оформление
+│  │  ├─ WelcomePage.tsx        # Choice between create and restore
+│  │  ├─ CreateWalletPage.tsx   # Password, phrase, write-down check
+│  │  ├─ ImportWalletPage.tsx   # Restore from a seed phrase
+│  │  ├─ UnlockWalletPage.tsx   # Password entry
+│  │  ├─ ForgotPasswordPage.tsx # Store reset with confirmation
+│  │  ├─ DashboardPage.tsx      # Wallet home screen
+│  │  ├─ AssetsPage.tsx         # Account assets
+│  │  ├─ NftPage.tsx            # Collectible tokens
+│  │  ├─ ActivityPage.tsx       # Operation history
+│  │  ├─ SettingsPage.tsx       # Accounts, networks, nodes, appearance
 │  │  ├─ onboarding.test.tsx
 │  │  ├─ dashboard.test.tsx
 │  │  ├─ wallet-navigation.test.tsx
@@ -2665,15 +2827,15 @@ wallet/
 │  │
 │  ├─ shared/
 │  │  ├─ config/                # APP_CONFIG
-│  │  ├─ hooks/                 # Пусто
-│  │  ├─ lib/                   # cn() и утилиты
-│  │  ├─ theme/                 # Контракт оформления, useTheme
+│  │  ├─ hooks/                 # Empty
+│  │  ├─ lib/                   # cn() and utilities
+│  │  ├─ theme/                 # Appearance contract, useTheme
 │  │  ├─ types/                 # Brand<T, B>
-│  │  └─ ui/                    # Компоненты shadcn/ui, фирменный знак
+│  │  └─ ui/                    # shadcn/ui components, wordmark
 │  │
 │  ├─ test/
-│  │  ├─ doubles/               # Тестовые дублёры инфраструктуры
-│  │  └─ setup.ts               # Подготовка тестовой среды
+│  │  ├─ doubles/               # Test doubles for infrastructure
+│  │  └─ setup.ts               # Test-environment setup
 │  └─ vite-env.d.ts
 │
 ├─ .editorconfig
@@ -2681,7 +2843,7 @@ wallet/
 ├─ .gitignore
 ├─ .prettierignore
 ├─ .prettierrc.json
-├─ components.json              # Конфигурация CLI shadcn/ui
+├─ components.json              # shadcn/ui CLI configuration
 ├─ eslint.config.js
 ├─ index.html
 ├─ package.json
@@ -2692,139 +2854,145 @@ wallet/
 ├─ tsconfig.server.json
 ├─ vite.config.ts
 └─ server/
-   ├─ src/                      # Fastify: /v1 и раздача dist/
-   └─ supabase/                 # SQL для таблицы users
+   ├─ src/                      # Fastify: /v1 and serving dist/
+   └─ supabase/                 # SQL for the users table
 ```
 
 ---
 
-## Безопасность
+## Security
 
-Решения, зафиксированные на этапе 1. Все они принудительны — нарушение
-останавливает сборку или прогон линтера.
+Decisions fixed at stage 1. All of them are enforced — a violation
+stops the build or the linter run.
 
-### Запрет localStorage и sessionStorage
+### Ban on localStorage and sessionStorage
 
-Правило ESLint `no-restricted-globals` блокирует прямое обращение к ним.
+The ESLint rule `no-restricted-globals` blocks direct access to them.
 
-Причина: оба хранилища синхронны, доступны любому скрипту в контексте страницы
-и читаются целиком одной строкой при XSS. Кроме того, они хранят только строки,
-поэтому бинарные секреты пришлось бы кодировать в неизменяемые JS-строки,
-которые невозможно затереть в памяти. Постоянное хранилище проекта — IndexedDB
-через слой `core/storage`, всегда с шифрованием на стороне вызывающего кода.
+The reason: both stores are synchronous, available to any script in
+the page context, and are read in full with one line on XSS. Besides
+that, they store only strings, so binary secrets would have to be
+encoded into immutable JS strings that cannot be wiped in memory. The
+project's persistent store is IndexedDB through the `core/storage`
+layer, always with encryption on the caller's side.
 
-### Запрет eval и присваивания innerHTML
+### Ban on eval and innerHTML assignment
 
-Правила `no-eval`, `no-implied-eval`, `no-new-func`, `no-restricted-properties`.
-`eval` — это исполнение произвольного кода и одновременно нарушение CSP
-manifest v3, где такие вызовы запрещены платформой.
+The rules `no-eval`, `no-implied-eval`, `no-new-func`,
+`no-restricted-properties`. `eval` is execution of arbitrary code and
+at the same time a violation of manifest v3 CSP, where such calls are
+forbidden by the platform.
 
 ### Content-Security-Policy
 
-Плагин `build/csp-plugin.ts` внедряет CSP в `index.html` только при
-production-сборке (в dev строгая политика ломает HMR).
+The plugin `build/csp-plugin.ts` injects CSP into `index.html` only on
+a production build (in dev a strict policy breaks HMR).
 
-Ограничения текущей политики, которые нужно устранить позже:
+Limits of the current policy that need to be removed later:
 
-- `style-src` содержит `'unsafe-inline'` — этого требуют inline-стили Radix UI
-  и Tailwind-анимаций;
-- `connect-src` разрешает любой HTTPS — сетевого слоя ещё нет. При подключении
-  RPC список обязан быть сужен до конкретных доменов;
-- meta-тег не поддерживает `frame-ancestors`. Защиту от кликджекинга нужно
-  задать HTTP-заголовками на стороне хостинга: `Content-Security-Policy`
-  и `X-Frame-Options: DENY`.
+- `style-src` contains `'unsafe-inline'` — inline styles of Radix UI
+  and Tailwind animations require it;
+- `connect-src` allows any HTTPS — the network layer is not there yet.
+  When RPC is connected the list must be narrowed to specific domains;
+- a meta tag does not support `frame-ancestors`. Clickjacking
+  protection must be set by HTTP headers on the hosting side:
+  `Content-Security-Policy` and `X-Frame-Options: DENY`.
 
-### Ограничение вывода в консоль
+### Restricting console output
 
-Правило `no-console` разрешает только `console.warn` и `console.error`.
-Отладочный вывод в кошельке способен раскрыть адреса, суммы и фрагменты
-чувствительных данных.
+The `no-console` rule allows only `console.warn` and `console.error`.
+Debug output in a wallet can reveal addresses, amounts, and fragments
+of sensitive data.
 
-### Строгая типизация
+### Strict typing
 
-В `tsconfig.app.json` включены `strict`, `noUncheckedIndexedAccess`,
+In `tsconfig.app.json`, `strict`, `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `noPropertyAccessFromIndexSignature`,
-`erasableSyntaxOnly`. Для кошелька цена ошибки типизации — потерянные средства,
-поэтому строгость выбрана максимальная из совместимой с экосистемой.
+and `erasableSyntaxOnly` are enabled. For a wallet the cost of a
+typing error is lost funds, so strictness is set to the maximum
+compatible with the ecosystem.
 
-### Справочный сервис не получает секретов — и это проверяется
+### The catalog service does not receive secrets — and that is checked
 
-Подробности — в `server/src`; здесь — суть.
+Details are in `server/src`; here is the essence.
 
-Обещание «бэкенд никогда не получает seed-фразы, приватные ключи
-и не подписывает транзакции» ничего не стоит, пока оно устное. В сервисе
-оно обеспечено четырьмя способами, каждый из которых можно проверить
-чтением или прогоном тестов:
+The promise "the backend never receives seed phrases, private keys,
+and does not sign transactions" is worth nothing while it is verbal.
+In the service it is enforced in four ways, each of which can be
+verified by reading or by running tests:
 
-1. **Подписать нечем.** `server/src` не импортирует библиотеки
-   эллиптической кривой, BIP-32 или BIP-39. Тест падает при появлении
-   такого импорта. Кошелёк в том же `package.json` эти библиотеки
-   использует — ими пользуется только браузерный код.
-2. **Принять нечего.** Ни один маршрут не принимает произвольный JSON.
-   Схемы строгие, приведение типов и вырезание лишних полей отключены:
-   запрос, не соответствующий схеме, отвергается целиком, а не
-   исправляется молча.
-3. **Охранник на входе.** Тело, содержащее что-либо похожее
-   на приватный ключ или мнемоническую фразу, отвергается до разбора,
-   до журналирования и до сохранения. Это не спасение пользователя —
-   секрет, ушедший в сеть, уже скомпрометирован, — а способ сделать
-   ошибку заметной сразу.
-4. **Нечего связывать.** Ни один читающий маршрут не принимает адрес
-   кошелька. Идентификатор синхронизации настроек случаен и не выводится
-   ни из seed-фразы, ни из адреса: связь «идентификатор — адрес»
-   превратила бы справочный сервис в реестр «личность — портфель».
+1. **There is nothing to sign with.** `server/src` does not import
+   elliptic-curve, BIP-32, or BIP-39 libraries. A test fails if such
+   an import appears. The wallet in the same `package.json` uses those
+   libraries — only browser code uses them.
+2. **There is nothing to accept.** No route accepts arbitrary JSON.
+   Schemas are strict; type coercion and stripping of extra fields are
+   off: a request that does not match the schema is rejected as a
+   whole, not silently corrected.
+3. **A guard at the door.** A body containing anything that looks like
+   a private key or a mnemonic phrase is rejected before parsing,
+   before logging, and before saving. This is not saving the user — a
+   secret that went onto the network is already compromised — but a
+   way to make the mistake visible immediately.
+4. **There is nothing to correlate.** No read route accepts a wallet
+   address. The settings-sync identifier is random and is derived
+   neither from the seed phrase nor from the address: an
+   "identifier — address" link would turn the catalog service into a
+   "person — portfolio" registry.
 
-Оговорка, которую честнее сказать, чем умолчать: сервис не может
-проверить, что именно зашифровано в присланном шифротексте. Гарантия
-держится на том, что кошелёк не кладёт туда ключевой материал,
-а не на способности сервиса это различить.
+A caveat that is more honest to say than to omit: the service cannot
+check what exactly is encrypted in the ciphertext it was sent. The
+guarantee rests on the wallet not putting key material there, not on
+the service's ability to tell.
 
-### Уведомления сервиса — канал, который нельзя оставлять открытым
+### Service notifications — a channel that cannot be left open
 
-Текст, пришедший с сервера и показанный внутри кошелька, неотличим для
-человека от сообщения самого кошелька. Кто получит право писать туда,
-получит право обращаться к владельцам средств от их имени.
+Text that arrived from the server and is shown inside the wallet is
+indistinguishable to a person from a message of the wallet itself.
+Whoever obtains the right to write there obtains the right to address
+fund owners in their name.
 
-Поэтому уведомление — только текст: ни разметки, ни ссылок, ни кнопок
-с действиями. Проверка каталога отвергает запись, в которой встречается
-что-либо похожее на адрес, включая `example.com` без схемы. Ответ
-о версии по той же причине не содержит адреса загрузки: «скачайте
-обновление отсюда» — готовый способ увести пользователя на поддельный
-установщик.
+So a notification is text only: no markup, no links, no buttons with
+actions. Catalog validation rejects a record that contains anything
+resembling an address, including `example.com` without a scheme. The
+version response for the same reason contains no download address:
+"download the update from here" is a ready way to send the user to a
+fake installer.
 
-### Правила, действующие на всех этапах
+### Rules that apply at every stage
 
-- Собственные реализации криптографических примитивов запрещены. Только
-  WebCrypto API и библиотеки `@noble` / `@scure`.
-- Источник случайности — только `crypto.getRandomValues`. `Math.random`
-  непригоден для криптографии.
-- Денежные величины — только `bigint`. Тип `number` теряет точность
-  за пределами 2^53-1, а значения в wei доходят до 2^256-1.
-- Секреты в памяти — `Uint8Array`, а не `string`. Строки в JavaScript
-  иммутабельны, затереть их содержимое невозможно.
-- Секреты не попадают в состояние UI и в стор Zustand.
+- Custom implementations of cryptographic primitives are forbidden.
+  Only the WebCrypto API and the `@noble` / `@scure` libraries.
+- The randomness source is only `crypto.getRandomValues`. `Math.random`
+  is unfit for cryptography.
+- Monetary amounts are only `bigint`. The `number` type loses
+  precision beyond 2^53-1, and values in wei reach 2^256-1.
+- Secrets in memory are `Uint8Array`, not `string`. Strings in
+  JavaScript are immutable; their contents cannot be wiped.
+- Secrets do not land in UI state or in a Zustand store.
 
 ---
 
-## Добавление компонентов shadcn/ui
+## Adding shadcn/ui components
 
 ```bash
 npx shadcn@latest add dialog
 ```
 
-Компоненты попадут в `src/shared/ui` согласно `components.json`.
+Components will land in `src/shared/ui` according to `components.json`.
 
-Если компонент экспортирует не только React-компоненты (например, функцию
-`cva` с вариантами), вынесите её в отдельный файл рядом — иначе перестанет
-работать Fast Refresh. Пример: `button.tsx` и `button-variants.ts`.
+If a component exports more than React components (for example a `cva`
+function with variants), move it into a separate file next to it —
+otherwise Fast Refresh will stop working. Example: `button.tsx` and
+`button-variants.ts`.
 
 ---
 
-## Проверка перед коммитом
+## Pre-commit check
 
 ```bash
 npm run verify
 ```
 
-Команда последовательно выполняет проверку форматирования, линтер, проверку
-типов и тесты. Любая ошибка останавливает цепочку.
+The command sequentially runs the format check, the linter, the type
+check, and the tests. Any error stops the chain.

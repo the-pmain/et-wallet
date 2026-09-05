@@ -6,7 +6,7 @@ import { findTokenLogo } from '@/features/wallet/lib/token-logo'
 import { ADDABLE_ASSETS, addableAssetBySymbol, networkNameForChain, remoteAssetKey } from './addable-assets'
 
 describe('addable-assets', () => {
-  it('держит нативную валюту и проверенные контракты каждой встроенной сети', () => {
+  it('holds native currency and verified contracts of each built-in network', () => {
     const expected =
       BUILT_IN_NETWORKS.length +
       BUILT_IN_NETWORKS.reduce(
@@ -28,13 +28,13 @@ describe('addable-assets', () => {
     ).toBe(true)
   })
 
-  it('не повторяет одну и ту же пару сети и адреса', () => {
+  it('does not repeat the same network-and-address pair', () => {
     const keys = ADDABLE_ASSETS.map((item) => item.id)
 
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('даёт знак каждой позиции: меню не показывает монограмму вместо иконки', () => {
+  it('gives every position a mark: the menu does not show a monogram instead of an icon', () => {
     for (const item of ADDABLE_ASSETS) {
       const address = item.token.address === null ? null : toAddress(item.token.address)
 
@@ -45,7 +45,7 @@ describe('addable-assets', () => {
     }
   })
 
-  it('собирает ключ без учёта регистра адреса', () => {
+  it('builds a key without regard to address case', () => {
     expect(
       remoteAssetKey({
         chainId: '1',
@@ -60,12 +60,12 @@ describe('addable-assets', () => {
     expect(remoteAssetKey({ chainId: '1', address: null })).toBe('1:native')
   })
 
-  it('подписывает известную сеть именем, неизвестную — номером', () => {
+  it('labels a known network by name and an unknown one by number', () => {
     expect(networkNameForChain('1')).toBe('Ethereum')
     expect(networkNameForChain('999999')).toBe('Chain 999999')
   })
 
-  it('находит актив по тикеру sendings, предпочитая Ethereum', () => {
+  it('finds an asset by sendings ticker, preferring Ethereum', () => {
     const eth = addableAssetBySymbol('eth')
 
     expect(eth?.token.symbol).toBe('ETH')

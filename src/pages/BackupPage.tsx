@@ -31,7 +31,6 @@ import {
   CardTitle,
 } from '@/shared/ui'
 
-/** Что именно выгружается. */
 const TARGET = {
   Mnemonic: 'mnemonic',
   PrivateKey: 'private-key',
@@ -39,37 +38,31 @@ const TARGET = {
 
 type Target = (typeof TARGET)[keyof typeof TARGET]
 
-/** Шаг выдачи секрета. */
 const STAGE = {
-  /** Ничего не запрошено. */
   Idle: 'idle',
-  /** Показано предупреждение, ожидается отметка о понимании последствий. */
   Acknowledge: 'acknowledge',
-  /** Ожидается пароль. */
   Password: 'password',
-  /** Секрет на экране. */
   Revealed: 'revealed',
 } as const
 
 type Stage = (typeof STAGE)[keyof typeof STAGE]
 
 /**
- * Резервное копирование секретов.
+ * Backup of secrets.
  *
- * ПОЧЕМУ ЭТО ОТДЕЛЬНЫЙ ЭКРАН, А НЕ РАЗДЕЛ НАСТРОЕК. Всё остальное
- * в настройках меняет поведение кошелька; здесь секреты покидают
- * зашифрованное хранилище. Соседство с переключателем темы приучало бы
- * относиться к выдаче seed-фразы как к настройке оформления.
+ * WHY A SEPARATE SCREEN, NOT A SETTINGS SECTION. Everything else in
+ * settings changes wallet behavior; here secrets leave encrypted
+ * storage. Sitting next to the theme switch would train people to
+ * treat revealing a seed phrase like a look-and-feel setting.
  *
- * ЗА РАЗ ПОКАЗЫВАЕТСЯ ОДИН СЕКРЕТ. Экран, на котором одновременно видны
- * и фраза, и приватный ключ, превращает один случайный скриншот в потерю
- * всего кошелька вместо потери одного адреса.
+ * ONE SECRET IS SHOWN AT A TIME. A screen that shows both the phrase
+ * and a private key turns one accidental screenshot into the loss of
+ * the whole wallet instead of one address.
  *
- * ЧТО ЗАЩИЩАЕТ ВЫДАЧУ. Три независимых условия: отметка о понимании
- * последствий под текстом, соответствующим оценённому уровню риска;
- * повторный ввод пароля, даже когда кошелёк разблокирован; запись
- * в журнал экспортов, из-за которой следующая выдача из того же
- * аккаунта оценивается строже.
+ * WHAT GUARDS THE REVEAL. Three independent conditions: a
+ * consequence-acknowledgement under copy that matches the assessed
+ * risk; a password again even when the wallet is unlocked; an export
+ * log entry that makes the next reveal from the same account stricter.
  */
 export function BackupPage() {
   const session = useWallet()
@@ -86,9 +79,9 @@ export function BackupPage() {
 
   const activeAccount = snapshot.activeAccount
 
-  /* Уход с экрана убирает секрет из дерева компонентов. Затереть строку
-     этим нельзя — она живёт до сборки мусора, — но ссылка на неё
-     из состояния React не переживает экран. */
+  /* Leaving the screen drops the secret from the component tree. That
+     cannot wipe the string — it lives until GC — but the React-state
+     reference does not outlive the screen. */
   useEffect(() => {
     return () => {
       setSecret(null)
@@ -110,8 +103,8 @@ export function BackupPage() {
     try {
       const backup = session.getBackup()
 
-      /* Оценка запрашивается до показа предупреждения: разрешение
-         не выдаётся, если показанный уровень окажется ниже фактического. */
+      /* Risk is assessed before the warning is shown: a permit is not
+         issued if the shown level would be below the real one. */
       setAssessment(
         requested === TARGET.Mnemonic
           ? await backup.assessMnemonicExport()
@@ -125,13 +118,12 @@ export function BackupPage() {
   }
 
   /**
-   * Выполняет выдачу секрета после ввода пароля.
+   * Reveals the secret after the password is entered.
    *
-   * Возвращает `false` только на неверный пароль: именно этот случай
-   * форма подтверждения обязана показать сама. Любая другая причина
-   * отказа закрывает форму и выводится текстом — «неверный пароль»
-   * там, где пароль верен, отправило бы пользователя искать
-   * несуществующую ошибку.
+   * Returns `false` only for a wrong password: that case the confirm
+   * form must show itself. Any other refusal closes the form and is
+   * shown as text — "wrong password" where the password is right would
+   * send the user hunting a mistake that is not there.
    */
   const reveal = async (password: string): Promise<boolean> => {
     const risk = assessment?.risk
@@ -144,8 +136,9 @@ export function BackupPage() {
       const backup = session.getBackup()
 
       if (target === TARGET.Mnemonic) {
-        /* Буфер затирается сразу после разбора на слова: дальше нужен
-           только их строковый вид, а он всё равно неочищаем. */
+        /* The buffer is wiped right after it is split into words: only
+           the string form is needed after that, and it cannot be wiped
+           anyway. */
         setWords(
           withSecretSync(await backup.exportMnemonic(password, risk), (buffer) =>
             onboarding.toWords(buffer),
@@ -179,17 +172,17 @@ export function BackupPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Возврат и заголовок в одной строке — как на остальных
-          вложенных экранах. Прежде здесь кнопка стояла отдельной
-          строкой над заголовком: два ряда вместо одного и разный
-          вид одного и того же места на соседних экранах. */}
+      {/* Back and the title share one row, as on the other nested
+          screens. The button used to sit on its own row above the
+          title: two rows instead of one, and a different look for
+          the same place on neighboring screens. */}
       <header className="flex items-center gap-2">
         <Button asChild variant="ghost" size="icon" className="-ml-1" aria-label="Back to settings">
           <Link to="/wallet/settings">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Backup</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Backup</h1>
       </header>
 
       <Alert>
@@ -202,8 +195,8 @@ export function BackupPage() {
         </AlertDescription>
       </Alert>
 
-      {/* Состояние хранилища относится к делу прямо: именно здесь
-          владелец решает, достаточно ли защищён его кошелёк. */}
+      {/* Storage durability belongs here: this is where the owner
+          decides whether the wallet is protected enough. */}
       <StorageDurabilityAlert durability={storageDurability} showWhenPersistent />
 
       {error !== null && (
@@ -252,9 +245,9 @@ export function BackupPage() {
         </CardContent>
       </Card>
 
-      {/* Проверка копии идёт СРАЗУ ЗА ФРАЗОЙ и до приватного ключа:
-          она относится к тому же секрету и выполняется тем же человеком
-          в тот же заход — записал, проверил. */}
+      {/* Copy check sits RIGHT AFTER THE PHRASE and before the private
+          key: it belongs to the same secret and is done by the same
+          person in the same sitting — write it down, then check. */}
       <VerifyBackupCard
         onVerify={(phrase, password) => session.getBackup().verifyMnemonicBackup(phrase, password)}
       />
@@ -312,7 +305,6 @@ interface FlowProps {
   readonly onClose: () => void
 }
 
-/** Шаги выдачи seed-фразы. */
 function MnemonicFlow({
   stage,
   assessment,
@@ -340,8 +332,8 @@ function MnemonicFlow({
         action="revealing the seed phrase"
         onVerify={onReveal}
         onConfirmed={() => {
-          /* Переход выполняет сама выдача: форма подтверждает пароль,
-             но не знает, чем закончилась расшифровка. */
+          /* The reveal itself advances the stage: the form confirms
+             the password but does not know how decryption ended. */
         }}
         onCancel={onClose}
       />
@@ -355,7 +347,6 @@ function MnemonicFlow({
   return null
 }
 
-/** Шаги выдачи приватного ключа. */
 function PrivateKeyFlow({
   stage,
   assessment,
@@ -383,7 +374,7 @@ function PrivateKeyFlow({
         action="revealing the private key"
         onVerify={onReveal}
         onConfirmed={() => {
-          /* Переход выполняет сама выдача. */
+          /* The reveal itself advances the stage. */
         }}
         onCancel={onClose}
       />
@@ -405,7 +396,6 @@ function PrivateKeyFlow({
   return null
 }
 
-/** Показанная seed-фраза со списком слов и предупреждением. */
 function RevealedMnemonic({
   words,
   onClose,
@@ -429,11 +419,11 @@ function RevealedMnemonic({
         ))}
       </ol>
 
-      {/* Копирование фразы не предлагается намеренно: буфер обмена
-          доступен любому приложению и любой странице с разрешением
-          на чтение, а фраза — это весь кошелёк. Переписать двенадцать
-          слов на бумагу дольше, но это единственный способ, при котором
-          фраза не проходит через общую для системы область. */}
+      {/* Copying the phrase is deliberately not offered: the clipboard
+          is readable by any app and any page with read permission, and
+          the phrase is the whole wallet. Writing twelve words on paper
+          takes longer, but it is the only path that never puts the
+          phrase through a system-wide buffer. */}
       <Alert variant="warning">
         <AlertDescription>
           Copy the words onto paper in the same order. Copying to the clipboard is deliberately not
@@ -449,12 +439,12 @@ function RevealedMnemonic({
 }
 
 /**
- * Текст предупреждения, соответствующий оценённому уровню риска.
+ * Warning copy that matches the assessed risk level.
  *
- * ТЕКСТ ПРИВЯЗАН К УРОВНЮ, А НЕ К КНОПКЕ. Оценка может подняться от того,
- * что происходило раньше: выданный когда-то расширенный публичный ключ
- * превращает выдачу приватного ключа в выдачу всего аккаунта. Показать
- * при этом обычное предупреждение значило бы соврать.
+ * THE TEXT IS BOUND TO THE LEVEL, NOT TO THE BUTTON. The assessment
+ * can rise because of what happened earlier: an extended public key
+ * revealed once turns a private-key reveal into a reveal of the whole
+ * account. Showing the ordinary warning then would be a lie.
  */
 function riskDescription(assessment: IExportRiskAssessment, target: Target): string {
   const parts: string[] = []
@@ -484,17 +474,17 @@ function riskDescription(assessment: IExportRiskAssessment, target: Target): str
   return parts.join(' ')
 }
 
-/** Сообщение об отказе. Причина называется, если она известна. */
+/** Refusal message. The reason is named when it is known. */
 function describeError(caught: unknown): string {
   return isAppError(caught) ? caught.message : 'The operation could not be completed.'
 }
 
 /**
- * Требует наличия активного аккаунта.
+ * Requires an active account.
  *
- * Кнопка выдачи ключа при отсутствии аккаунта заблокирована, поэтому
- * сюда попасть нельзя. Проверка существует ради типа: `undefined`,
- * дошедший до менеджера, дал бы отказ с непонятным текстом.
+ * The key-reveal button is disabled when there is no account, so this
+ * path cannot be reached. The check exists for the type: `undefined`
+ * reaching the manager would refuse with an opaque message.
  */
 function requireAccountId<TId>(id: TId | undefined): TId {
   if (id === undefined) {

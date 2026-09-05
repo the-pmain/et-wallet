@@ -1,6 +1,6 @@
 import { parseRemoteSending, type IRemoteSending } from './RemoteUserDirectory'
 
-/** Почему кадр ушёл в поток `sendings`. */
+/** Why a frame was pushed into the `sendings` stream. */
 export const SENDING_SSE_TYPE = {
   Create: 'create',
   Update: 'update',
@@ -8,10 +8,7 @@ export const SENDING_SSE_TYPE = {
 
 export type SendingSseType = (typeof SENDING_SSE_TYPE)[keyof typeof SENDING_SSE_TYPE]
 
-/**
- * Кадр `event: sendings`. Те же поля, что у записи перевода,
- * плюс `type_send`.
- */
+/** `event: sendings` frame. Same fields as a transfer record, plus `type_send`. */
 export interface ISendingSseEvent extends IRemoteSending {
   readonly type_send: SendingSseType
 }
@@ -21,8 +18,8 @@ function isSendingSseType(value: unknown): value is SendingSseType {
 }
 
 /**
- * Разбирает `data` кадра SSE. Битый JSON и кадр без `type_send`
- * отбрасываются: список кабинета не должен расти от keepalive.
+ * Parse SSE frame `data`. Broken JSON and a frame without `type_send`
+ * are dropped: the cabinet list must not grow from keepalive.
  */
 export function parseSendingSseEvent(data: string): ISendingSseEvent | null {
   let payload: unknown

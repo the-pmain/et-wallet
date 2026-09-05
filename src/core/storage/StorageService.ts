@@ -7,31 +7,34 @@ import type {
 } from './types'
 
 /**
- * Постоянное хранилище приложения.
+ * Persistent application storage.
  *
- * Абстракция намеренно не упоминает IndexedDB. Реализация подменяется:
- * в веб-приложении это IndexedDB, в расширении manifest v3 — `chrome.storage`,
- * в тестах — реализация в памяти. Домен от выбора не зависит.
+ * The abstraction deliberately does not mention IndexedDB. The
+ * implementation is substituted: in the web app it is IndexedDB, in
+ * a manifest v3 extension — `chrome.storage`, in tests — an
+ * in-memory implementation. The domain does not depend on the choice.
  *
- * Почему не localStorage (правило зафиксировано ещё на этапе 1 в виде
- * запрета ESLint):
- * - синхронен и блокирует главный поток;
- * - хранит только строки, поэтому бинарные секреты пришлось бы кодировать
- *   в неочищаемые JS-строки;
- * - доступен любому скрипту страницы и вычитывается при XSS одной строкой;
- * - недоступен в service worker manifest v3.
+ * Why not localStorage (the rule was fixed at stage 1 as an ESLint
+ * ban):
+ * - it is synchronous and blocks the main thread;
+ * - it stores only strings, so binary secrets would have to be
+ *   encoded into uncleared JS strings;
+ * - it is visible to any page script and is read on XSS in one line;
+ * - it is unavailable in a service-worker manifest v3.
  *
- * Чего этот слой НЕ делает: он не шифрует. Шифрование выполняет вызывающий
- * код через `IEncryptionService` до записи. Иначе хранилище начнёт само
- * решать, что считать секретом, и граница ответственности размоется.
+ * What this layer does NOT do: it does not encrypt. Encryption is
+ * done by the caller via `IEncryptionService` before write. Otherwise
+ * storage would start deciding for itself what counts as a secret,
+ * and the responsibility boundary would blur.
  *
- * ВАЖНО про сериализацию. Домен использует `bigint` для сумм и chainId,
- * а `JSON.stringify` на `bigint` выбрасывает исключение. Реализация обязана
- * применять кодек, сохраняющий `bigint` без потери точности. Приведение
- * к `number` недопустимо: оно молча портит суммы.
+ * IMPORTANT about serialization. The domain uses `bigint` for amounts
+ * and chainId, and `JSON.stringify` throws on `bigint`. The
+ * implementation must apply a codec that keeps `bigint` without
+ * losing precision. Casting to `number` is not allowed: it silently
+ * corrupts amounts.
  */
 export interface IStorageService {
-  /** Открывает хранилище и выполняет непримененные миграции. */
+  /** Opens storage and runs unapplied migrations. */
   init(): Promise<void>
 
   get<TValue>(namespace: StorageNamespace, key: StorageKey): Promise<TValue | null>
@@ -44,41 +47,42 @@ export interface IStorageService {
 
   keys(namespace: StorageNamespace): Promise<readonly StorageKey[]>
 
-  /** Очищает одно пространство имён. */
+  /** Clears one namespace. */
   clear(namespace: StorageNamespace): Promise<void>
 
   /**
-   * Выполняет операции атомарно.
+   * Runs operations atomically.
    *
-   * Обязательна там, где несколько записей образуют одно логическое
-   * изменение. Пример: добавление аккаунта меняет и зашифрованное хранилище
-   * ключей, и список аккаунтов. Запись только одного из двух оставляет
-   * кошелёк в противоречивом состоянии — аккаунт виден, но подписать им
-   * ничего нельзя, либо ключ есть, а аккаунта нет.
+   * Required where several records form one logical change. Example:
+   * adding an account changes both the encrypted key vault and the
+   * account list. Writing only one of the two leaves the wallet
+   * inconsistent — the account is visible but cannot sign, or the
+   * key exists and the account does not.
    *
-   * Исключение внутри `handler` откатывает всю транзакцию.
+   * An exception inside `handler` rolls back the whole transaction.
    */
   transaction<TResult>(
     namespaces: readonly StorageNamespace[],
     handler: (transaction: IStorageTransaction) => Promise<TResult>,
   ): Promise<TResult>
 
-  /** Оценка занятого объёма. `null`, если браузер не предоставляет данные. */
+  /** Occupied-volume estimate. `null` if the browser provides no data. */
   estimate(): Promise<IStorageEstimate | null>
 
   /**
-   * Насколько надёжно хранилище удерживает данные.
+   * How reliably storage holds data.
    *
-   * Реализация обязана отвечать честно: завышенная оценка означает,
-   * что владелец не узнает о риске потерять кошелёк.
+   * The implementation must answer honestly: an inflated estimate
+   * means the owner will not learn about the risk of losing the
+   * wallet.
    */
   durability(): Promise<StorageDurability>
 
   /**
-   * Полностью удаляет все данные приложения.
+   * Completely deletes all application data.
    *
-   * Необратимая операция. Вызывающий код обязан получить явное подтверждение
-   * пользователя и убедиться, что резервная копия seed-фразы существует.
+   * Irreversible. The caller must get explicit user confirmation and
+   * make sure a seed-phrase backup exists.
    */
   destroy(): Promise<void>
 }

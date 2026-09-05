@@ -13,7 +13,7 @@ import {
 const HOUR = 3_600_000
 
 describe('price-series', () => {
-  it('ставит часовые метки на sparkline', () => {
+  it('puts hourly timestamps on a sparkline', () => {
     const now = 1_000_000
     const points = pointsFromSparkline([10, 11, 12], now)
 
@@ -24,7 +24,7 @@ describe('price-series', () => {
     ])
   })
 
-  it('для суток оставляет хвост ряда', () => {
+  it('for a day keeps the tail of the series', () => {
     const now = 30 * HOUR
     const points = [
       { at: 0, price: 1 },
@@ -38,7 +38,7 @@ describe('price-series', () => {
     ])
   })
 
-  it('дописывает живую цену в хвост, а не вместо середины', () => {
+  it('appends the live price to the tail, not in place of the middle', () => {
     const points = [
       { at: 1, price: 10 },
       { at: 2, price: 11 },
@@ -55,7 +55,7 @@ describe('price-series', () => {
     ])
   })
 
-  it('разбирает свечи Coinbase от новых к старым', () => {
+  it('parses Coinbase candles from newest to oldest', () => {
     const points = parseCoinbaseCandles([
       [200, 1, 3, 2, 2.5, 10],
       [100, 1, 3, 2, 2.2, 10],
@@ -65,12 +65,12 @@ describe('price-series', () => {
     expect(points[0]?.at).toBe(100_000)
   })
 
-  it('не рисует чужую пару, если монеты нет в таблице', () => {
+  it('does not draw a foreign pair if the coin is not in the table', () => {
     expect(coinbaseProductForCoinId('ethereum')).toBe('ETH-USD')
     expect(coinbaseProductForCoinId('unknown-meme')).toBeNull()
   })
 
-  it('при отказе свечей возвращает пустой ряд, а не бросает', async () => {
+  it('on candle failure returns an empty series instead of throwing', async () => {
     const points = await fetchCoinbaseCandlePoints('ETH-USD', CHART_RANGE.Hours24, {
       fetchImpl: (async () => new Response('nope', { status: 404 })) as typeof fetch,
     })

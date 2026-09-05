@@ -4,11 +4,12 @@ import { USD_ONLY_RATES, type IFiatRates } from '../lib/display-currency'
 import { appFiatRates } from '../model/fiat-rates-cache'
 
 /**
- * Курсы EUR и GBP к доллару. Пока ответа нет — единица, то есть
- * показ остаётся в долларовом номинале, а не в выдуманном курсе.
+ * EUR and GBP rates against the dollar. Until a reply arrives the
+ * rate is 1, so the display stays at the dollar face value rather
+ * than an invented rate.
  *
- * Запрос один на приложение: карточка баланса и переключение валюты
- * не ходят к источнику повторно.
+ * One request per app: the balance card and the currency switch do
+ * not hit the source again.
  */
 export function useFiatRates(): IFiatRates {
   const rates = useSyncExternalStore(

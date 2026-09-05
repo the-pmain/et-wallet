@@ -9,23 +9,22 @@ import { cspPlugin } from './build/csp-plugin'
 import { ROBOTS_TAG_VALUE, securityHeadersPlugin } from './build/security-headers-plugin'
 import packageJson from './package.json' with { type: 'json' }
 
-/** Порт dev-сервера. Фиксирован, чтобы адрес приложения был предсказуем. */
+/** Dev-server port. Fixed so the app URL is predictable. */
 const DEV_SERVER_PORT = 3000
 
 /**
- * Порт предпросмотра собранного приложения.
+ * Preview port for the built app.
  *
- * ЗАДАЁТСЯ ОКРУЖЕНИЕМ, А НЕ ЖЁСТКО. Предпросмотр — вспомогательная
- * вещь: он раздаёт статические файлы и ни к какому конкретному порту
- * не привязан. Ни обратных вызовов входа, ни вебхуков, ни списков
- * разрешённых источников на него не заведено.
+ * SET FROM THE ENVIRONMENT, NOT HARD-CODED. Preview is a helper: it
+ * serves static files and is not bound to any particular port. No
+ * sign-in callbacks, webhooks, or allow-lists point at it.
  *
- * Раньше порт не задавался вовсе, и `vite preview` брал своё
- * умолчание 4173. Занятый другим процессом, он ронял запуск целиком —
- * при том что подошёл бы любой свободный.
+ * The port used to be unset, and `vite preview` took its default 4173.
+ * When another process already held that port, the whole launch failed
+ * — even though any free port would have worked.
  *
- * Проверки Playwright сюда не заглядывают: они передают свой порт
- * ключом командной строки, а он старше значения из настроек.
+ * Playwright checks never read this: they pass their own port on the
+ * command line, which outranks the value in the config.
  */
 const PREVIEW_PORT =
   process.env.PORT === undefined || process.env.PORT === ''
@@ -42,7 +41,7 @@ export default defineConfig({
   },
 
   define: {
-    /* Версия приложения попадает в бандл на этапе сборки, чтобы UI не читал package.json. */
+    /* App version is inlined at build time so the UI never reads package.json. */
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },
 
@@ -72,10 +71,10 @@ export default defineConfig({
   },
 
   preview: {
-    /* Строгость только тогда, когда порт назначен снаружи: тихо уехать
-       на соседний порт после явного назначения — значит отдать
-       приложение по адресу, которого никто не ждёт. Без назначения
-       остаётся поведение Vite по умолчанию. */
+    /* Strict only when a port is assigned from outside: quietly sliding
+       to a neighbour after an explicit assignment would serve the app
+       at an address nobody expects. With no assignment, Vite's default
+       remains. */
     ...(PREVIEW_PORT === null ? {} : { port: PREVIEW_PORT, strictPort: true }),
     headers: {
       'X-Robots-Tag': ROBOTS_TAG_VALUE,
@@ -84,8 +83,8 @@ export default defineConfig({
 
   build: {
     target: 'es2022',
-    /* Source maps отключены в production: они упрощают анализ кода кошелька
-       и увеличивают размер артефакта. Для отладки собирайте с `--sourcemap`. */
+    /* Source maps are off in production: they make wallet code easier
+       to analyse and grow the artefact. Build with `--sourcemap` to debug. */
     sourcemap: false,
   },
 
@@ -107,14 +106,14 @@ export default defineConfig({
           css: false,
           include: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts'],
           /*
-            Предел времени на тест — 20 секунд.
+            Per-test limit is 20 seconds.
 
-            Значение по умолчанию (5 секунд) совпадало с порогом ожидания
-            Testing Library, заданным в `src/test/setup.ts`. При таком равенстве
-            тест обрывался ровно тогда, когда ожидание элемента ещё не истекло,
-            и вместо понятного «элемент не найден» приходил бесполезный
-            «тест превысил время». Общий предел обязан быть заметно больше
-            предела отдельного ожидания.
+            The default (5 seconds) matched the Testing Library wait
+            threshold in `src/test/setup.ts`. When they were equal, the
+            test aborted at the same moment the element wait had not
+            yet expired, and instead of a clear "element not found" we
+            got a useless "test timed out". The overall limit must be
+            well above any single wait.
           */
           testTimeout: 20_000,
         },

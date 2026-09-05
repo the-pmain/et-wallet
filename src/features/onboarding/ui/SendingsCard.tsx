@@ -2,16 +2,17 @@ import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { useTranslation } from '@/shared/i18n'
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
+import { cn } from '@/shared/lib/utils'
+import { Button, CABINET_SHEET, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
 
 import type { IRemoteSending } from '../model/RemoteUserDirectory'
 import { UserSendingsList } from './UserSendingsList'
 
 /**
- * Витрина переводов кабинета.
+ * Cabinet transfer showcase.
  *
- * Стоит между активами и курсами на главной: `GET /v1/users/:id/sendings`,
- * без потока SSE.
+ * Sits between assets and quotes on home: `GET /v1/users/:id/sendings`,
+ * no SSE stream.
  */
 export function SendingsCard({
   sendings,
@@ -25,9 +26,9 @@ export function SendingsCard({
   const { t } = useTranslation()
 
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader>
-        <CardTitle className="text-base font-medium text-muted-foreground">
+    <Card className={cn('min-w-0 overflow-hidden', CABINET_SHEET)}>
+      <CardHeader className="max-lg:border-b max-lg:border-border max-lg:px-1 max-lg:pb-2">
+        <CardTitle className="text-base font-medium text-muted-foreground max-lg:text-sm max-lg:font-semibold max-lg:text-foreground">
           {t('dashboard.recent')}
         </CardTitle>
       </CardHeader>

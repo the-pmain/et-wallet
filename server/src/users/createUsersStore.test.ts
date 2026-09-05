@@ -32,13 +32,13 @@ const BASE: IServerConfig = {
 }
 
 describe('createUsersStore', () => {
-  it('без ключей держит пользователей в памяти', () => {
+  it('without keys keeps users in memory', () => {
     const store = createUsersStore(BASE)
 
     expect(store.kind).toBe(USERS_STORE_KIND.Memory)
   })
 
-  it('при URL и service-role пишет в Supabase REST', () => {
+  it('with URL and service-role writes to Supabase REST', () => {
     const store = createUsersStore({
       ...BASE,
       supabaseUrl: 'https://example.supabase.co',
@@ -49,7 +49,7 @@ describe('createUsersStore', () => {
     expect(store.kind).toBe(USERS_STORE_KIND.Supabase)
   })
 
-  it('отказывается стартовать Supabase без service-role ключа', () => {
+  it('refuses to start Supabase without a service-role key', () => {
     expect(() =>
       createUsersStore({
         ...BASE,

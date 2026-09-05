@@ -13,30 +13,30 @@ interface NetworkListProps {
   readonly onRemove: (chainId: ChainId) => void
   readonly isBusy: boolean
 
-  /** Форма добавления. Раскрывается по нажатию, а не занимает место всегда. */
+  /** Add form. Expands on click instead of always taking space. */
   readonly addForm: ReactNode
 }
 
 /**
- * Список сетей: переключение, добавление, удаление.
+ * Network list: switch, add, remove.
  *
- * ТЕСТОВАЯ СЕТЬ ПОМЕЧАЕТСЯ ОТДЕЛЬНО. Средства в тестовой сети ничего не стоят,
- * и пользователь, не заметивший переключения, отправит настоящий перевод
- * в никуда либо решит, что средства пропали. Различие в оформлении здесь
- * не декоративное.
+ * A testnet is marked separately. Funds on a testnet are worth
+ * nothing; a user who misses the switch will send a real transfer
+ * into the void or think funds vanished. The visual difference is
+ * not decoration.
  *
- * chainId ПОКАЗЫВАЕТСЯ РЯДОМ С ИМЕНЕМ. Имя сети задаёт тот, кто её добавил,
- * и «Ethereum Mainnet» может оказаться чем угодно. Идентификатор подделать
- * нельзя: он проверяется у узла при добавлении сети.
+ * chainId is shown next to the name. The name is set by whoever
+ * added the network, and "Ethereum Mainnet" can be anything. The
+ * id cannot be faked: it is checked with the node on add.
  *
- * ВСТРОЕННЫЕ СЕТИ НЕ УДАЛЯЮТСЯ, И КНОПКИ У НИХ НЕТ. Их конфигурация —
- * часть защиты от подмены: удалив основную сеть, пользователь мог бы
- * добавить вместо неё одноимённую с чужим идентификатором. Отсутствие
- * кнопки понятнее, чем кнопка, отвечающая отказом.
+ * Built-in networks are not removed, and they have no button.
+ * Their config is part of impersonation defense: deleting mainnet
+ * would let the user add a same-named network with a foreign id.
+ * No button is clearer than a button that always refuses.
  *
- * ПОЛЬЗОВАТЕЛЬСКИЕ СЕТИ ПОМЕЧЕНЫ. Различие между проверенной встроенной
- * конфигурацией и добавленной вручную важнее, чем кажется: у второй
- * и узел, и обозреватель заданы тем, кто её добавил.
+ * Custom networks are marked. The gap between a verified built-in
+ * config and a hand-added one matters: the latter's node and
+ * explorer were set by whoever added it.
  */
 export function NetworkList({
   networks,

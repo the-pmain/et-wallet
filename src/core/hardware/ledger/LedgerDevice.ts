@@ -20,34 +20,33 @@ import {
 import { HardwareDeviceError } from './errors'
 import { encodeDerivationPath } from './path'
 
-/** Длина каждой половины подписи. */
 const COMPONENT_LENGTH = 32
 
-/** Длина ответа на подпись: признак чётности и две половины. */
+/** Signature response length: parity flag plus two halves. */
 const SIGNATURE_RESPONSE_LENGTH = 1 + COMPONENT_LENGTH * 2
 
-/** Длина адреса в ответе устройства: сорок знаков без префикса. */
+/** Address length in the device response: forty characters, no prefix. */
 const ADDRESS_TEXT_LENGTH = 40
 
 /**
- * Аппаратный кошелёк Ledger.
+ * Ledger hardware wallet.
  *
- * ЧТО ЗДЕСЬ ЕСТЬ И ЧЕГО НЕТ. Здесь протокол: составление команд,
- * разбор ответов, сборка подписи. Соединения здесь нет — оно
- * внедряется, потому что WebHID существует только в браузере, а ядро
- * обязано оставаться переносимым.
+ * WHAT IS HERE AND WHAT IS NOT. This is the protocol: building
+ * commands, parsing replies, assembling the signature. There is no
+ * connection here — it is injected, because WebHID exists only in
+ * the browser and the core must stay portable.
  *
- * ПРИЗНАК ЧЁТНОСТИ ВОССТАНАВЛИВАЕТСЯ ВОССТАНОВЛЕНИЕМ АДРЕСА, А НЕ
- * РАЗБОРОМ ОТВЕТА. Устройство возвращает поле `v`, смысл которого
- * зависит от типа транзакции, от версии прошивки и от величины
- * идентификатора сети: у больших сетей оно не помещается в байт и
- * приходит усечённым. Вместо толкования этого байта подпись
- * проверяется обоими возможными значениями чётности, и берётся то,
- * при котором восстановленный адрес совпадает с ожидаемым.
+ * PARITY IS RECOVERED BY ADDRESS RECOVERY, NOT BY PARSING THE REPLY.
+ * The device returns a `v` field whose meaning depends on the
+ * transaction type, firmware version, and network id size: for large
+ * networks it does not fit in a byte and arrives truncated. Instead
+ * of interpreting that byte, the signature is tried with both
+ * possible parity values, and the one whose recovered address matches
+ * the expected signer is kept.
  *
- * Это не обход трудности, а более сильная проверка: она заодно
- * подтверждает, что устройство подписало ожидаемым ключом. Не совпади
- * ни одно значение — подпись отвергается, и в сеть не уходит ничего.
+ * This is not a workaround but a stronger check: it also confirms
+ * that the device signed with the expected key. If neither value
+ * matches, the signature is rejected and nothing goes to the network.
  */
 export class LedgerDevice implements IHardwareDevice {
   readonly #transport: IApduTransport
@@ -91,15 +90,15 @@ export class LedgerDevice implements IHardwareDevice {
   }
 
   async signMessage(path: DerivationPath, message: Uint8Array): Promise<HexString> {
-    /* Копия, а не исходный буфер. Пришедший массив может быть окном
-       в чужую память либо принадлежать другому контексту исполнения,
-       и тогда проверки типов в криптографической библиотеке его
-       не признают. Хэшируются ровно те же байты. */
+    /* A copy, not the original buffer. The incoming array may be a
+       view into foreign memory or belong to another execution
+       context, and then the cryptographic library's type checks
+       will reject it. The hashed bytes are the same. */
     const bytes = Uint8Array.from(message)
 
-    /* Длина сообщения передаётся отдельным четырёхбайтовым полем перед
-       самим сообщением: устройство обязано знать её заранее, потому что
-       получает данные частями. */
+    /* Message length is sent as a separate four-byte field before
+       the message itself: the device must know it in advance because
+       it receives the data in chunks. */
     const length = new Uint8Array(4)
     const view = new DataView(length.buffer)
 
@@ -110,8 +109,9 @@ export class LedgerDevice implements IHardwareDevice {
       INS.SignPersonalMessage,
       concat(encodeDerivationPath(path), length, bytes),
       digest,
-      /* Отправитель здесь неизвестен, и адрес выясняется у самого
-         устройства: подпись сообщения не привязана к транзакции. */
+      /* The sender is unknown here; the address is asked of the
+         device itself: a message signature is not bound to a
+         transaction. */
       null,
     )
 
@@ -121,12 +121,12 @@ export class LedgerDevice implements IHardwareDevice {
   async signTypedData(path: DerivationPath, typedData: ITypedData): Promise<HexString> {
     const digest = hashTypedData(typedData)
 
-    /* Устройству отправляются два готовых хэша, а не структура целиком:
-       разбор структуры на экране поддержан не всеми версиями прошивки,
-       и попытка отправить её туда, где он не поддержан, кончается
-       отказом вместо подписи. Цена — на экране устройства человек
-       видит хэши, а не поля; разобранную структуру ему показывает
-       кошелёк. */
+    /* The device is sent two ready hashes, not the whole structure:
+       on-device structure parsing is not supported by every firmware,
+       and sending it where it is not supported ends in a refusal
+       instead of a signature. The cost is that the person sees hashes
+       on the device screen, not fields; the wallet shows the decoded
+       structure. */
     const { domainSeparator, messageHash } = hashTypedDataParts(typedData)
 
     const signature = await this.#sign(
@@ -140,11 +140,11 @@ export class LedgerDevice implements IHardwareDevice {
   }
 
   /**
-   * Отправляет данные частями и собирает подпись.
+   * Sends data in chunks and assembles the signature.
    *
-   * ЧАСТИ НЕ ПЕРЕКРЫВАЮТСЯ И НЕ ТЕРЯЮТСЯ: устройство складывает их
-   * подряд и подписывает то, что получилось. Ошибка в разбиении
-   * означала бы подпись под другими байтами, чем показанные.
+   * CHUNKS DO NOT OVERLAP AND ARE NOT LOST: the device concatenates
+   * them and signs what it got. A split error would mean a signature
+   * over different bytes than those shown.
    */
   async #sign(
     instruction: number,
@@ -169,11 +169,11 @@ export class LedgerDevice implements IHardwareDevice {
 }
 
 /**
- * Собирает подпись из ответа устройства.
+ * Assembles a signature from the device reply.
  *
- * @throws HardwareDeviceError если ни одно значение чётности не даёт
- *         ожидаемого адреса: подпись не принадлежит запрошенному ключу
- *         либо испорчена.
+ * @throws HardwareDeviceError if neither parity value yields the
+ *         expected address: the signature does not belong to the
+ *         requested key, or it is corrupted.
  */
 export function buildSignature(
   response: Uint8Array,
@@ -204,7 +204,6 @@ export function buildSignature(
   )
 }
 
-/** Разбирает ответ команды чтения адреса. */
 function parseAddressResponse(response: Uint8Array) {
   const publicKeyLength = response[0] ?? 0
   const addressLengthOffset = 1 + publicKeyLength
@@ -221,13 +220,12 @@ function parseAddressResponse(response: Uint8Array) {
     throw new HardwareDeviceError('the device returned a malformed address')
   }
 
-  /* Контрольная сумма пересчитывается, а не берётся с устройства:
-     регистр в его ответе зависит от версии прошивки, а сверять адреса
-     глазами человек будет именно по нему. */
+  /* Checksum is recomputed, not taken from the device: the casing
+     in its reply depends on firmware version, and that is what a
+     person will use to check the address by eye. */
   return toAddress(`0x${text}`)
 }
 
-/** Соединяет части в один буфер. */
 function concat(...parts: readonly Uint8Array[]): Uint8Array {
   const total = parts.reduce((sum, part) => sum + part.length, 0)
   const result = new Uint8Array(total)
@@ -246,12 +244,12 @@ function toHex(bytes: Uint8Array): string {
 }
 
 /**
- * Две половины хэша EIP-712.
+ * The two halves of an EIP-712 hash.
  *
- * Общий хэш строится как keccak(0x1901 ‖ разделитель домена ‖ хэш
- * сообщения), и достать части из готового результата нельзя — их надо
- * посчитать теми же правилами, что и сам хэш. Обе считает ethers,
- * своей реализации хэширования здесь нет.
+ * The overall hash is keccak(0x1901 ‖ domain separator ‖ message
+ * hash), and the parts cannot be recovered from the finished result —
+ * they must be computed by the same rules as the hash itself. ethers
+ * computes both; there is no hashing implementation here.
  */
 export function hashTypedDataParts(typedData: ITypedData): {
   readonly domainSeparator: Uint8Array

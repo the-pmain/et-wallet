@@ -8,16 +8,17 @@ import { publicKeyToAddress } from './Address'
 import { PRIVATE_KEY_LENGTH, PUBLIC_KEY_FORMAT, type PublicKeyFormat } from './types'
 
 /**
- * Проверяет пригодность приватного ключа secp256k1.
+ * Checks that a secp256k1 private key is usable.
  *
- * Недостаточно проверить длину: допустимы только значения от 1 до n-1,
- * где n — порядок группы. Нулевой ключ и любое значение, не меньшее n,
- * не задают точку на кривой.
+ * Length is not enough: only values from 1 to n-1 are allowed, where
+ * n is the group order. A zero key and any value not smaller than n
+ * do not define a point on the curve.
  *
- * Проверка не декоративна. Ключ вне диапазона, принятый кошельком,
- * приведёт к одному из двух исходов: либо операция подписи упадёт
- * в неожиданном месте, либо — что хуже — приведение по модулю даст адрес,
- * отличный от показанного пользователю, и средства уйдут в никуда.
+ * The check is not decorative. A key outside the range, accepted by
+ * the wallet, leads to one of two outcomes: either signing fails in
+ * an unexpected place, or — worse — reduction modulo n yields an
+ * address different from the one shown to the user, and the funds
+ * go nowhere.
  *
  * @throws InvalidPrivateKeyError
  */
@@ -31,7 +32,7 @@ export function assertValidPrivateKey(privateKey: Uint8Array): void {
   }
 }
 
-/** Проверка без выбрасывания исключения. Для валидации по мере ввода. */
+/** Check without throwing. For validation as the user types. */
 export function isValidPrivateKey(privateKey: Uint8Array): boolean {
   try {
     assertValidPrivateKey(privateKey)
@@ -42,12 +43,12 @@ export function isValidPrivateKey(privateKey: Uint8Array): boolean {
 }
 
 /**
- * Вычисляет публичный ключ из приватного.
+ * Computes the public key from a private key.
  *
- * Принимает `ISecretBuffer`, а не сырой массив, сознательно: это
- * заставляет вызывающий код владеть секретом явно и затирать его.
- * Приём `Uint8Array` позволял бы передать сюда буфер, за жизненным
- * циклом которого никто не следит.
+ * Takes `ISecretBuffer`, not a raw array, on purpose: that forces
+ * the caller to own the secret explicitly and wipe it. Accepting
+ * `Uint8Array` would let a buffer whose lifetime nobody tracks be
+ * passed in.
  *
  * @throws InvalidPrivateKeyError, SecretBufferWipedError
  */
@@ -63,15 +64,15 @@ export function privateKeyToPublicKey(
 }
 
 /**
- * Выводит адрес EVM непосредственно из приватного ключа.
+ * Derives an EVM address directly from a private key.
  *
- * Нужен при импорте отдельного ключа: HD-дерева в этом случае нет,
- * и путь «приватный ключ -> публичный ключ -> keccak256 -> адрес»
- * проходится целиком.
+ * Needed when importing a standalone key: there is no HD tree then,
+ * and the path "private key -> public key -> keccak256 -> address"
+ * is walked in full.
  *
- * Публичный ключ запрашивается сразу в несжатой форме: именно она
- * участвует в вычислении адреса, и промежуточное разворачивание
- * сжатого ключа было бы лишней работой.
+ * The public key is requested uncompressed at once: that is the
+ * form used in the address computation, and expanding a compressed
+ * key in between would be extra work.
  *
  * @throws InvalidPrivateKeyError, SecretBufferWipedError
  */

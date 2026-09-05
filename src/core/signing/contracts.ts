@@ -3,94 +3,96 @@ import type { ISignableTransaction, ISignedTransaction, ITypedData } from '@/cor
 import type { Address, ChainId, HexString } from '@/core/types'
 
 /**
- * Данные для подписи произвольного сообщения.
+ * Data for signing an arbitrary message.
  *
- * Строка кодируется в UTF-8. Массив байт подписывается как есть.
- * Различие существенно: dApp может прислать `0x48656c6c6f`, имея в виду
- * либо байты `Hello`, либо буквально эту строку. Домен не угадывает —
- * решение принимает вызывающий, явно выбрав тип.
+ * A string is encoded as UTF-8. A byte array is signed as-is.
+ * The distinction matters: a dApp may send `0x48656c6c6f` meaning
+ * either the bytes `Hello` or that string literally. The domain does
+ * not guess — the caller decides by choosing the type.
  */
 export type SignableMessage = string | Uint8Array
 
 /**
- * Криптографическая подпись.
+ * Cryptographic signing.
  *
- * ЕДИНСТВЕННОЕ место в приложении, где приватный ключ используется
- * по назначению. Ключ передаётся параметром, не сохраняется и не
- * возвращается; вызывающий обязан затереть буфер.
+ * The ONLY place in the app where a private key is used for its
+ * purpose. The key is passed as a parameter, not stored, not
+ * returned; the caller must wipe the buffer.
  *
- * ЧЕГО СЕРВИС НЕ ДЕЛАЕТ: не решает, стоит ли подписывать. Оценка
- * содержимого — разрешение на неограниченное расходование токенов,
- * получатель из списка фишинговых адресов, подозрительная сумма —
- * задача слоя подтверждения. Здесь только корректность криптографии
- * и проверки, без которых подпись небезопасна технически.
+ * WHAT THE SERVICE DOES NOT DO: it does not decide whether to sign.
+ * Judging the contents — an unlimited token allowance, a recipient
+ * on a phishing list, a suspicious amount — is the confirmation
+ * layer's job. Here only cryptographic correctness and the checks
+ * without which a signature is technically unsafe.
  */
 export interface ISigningService {
   /**
-   * Подписывает транзакцию.
+   * Signs a transaction.
    *
-   * ПРОВЕРКИ, ВЫПОЛНЯЕМЫЕ ДО ПОДПИСИ:
+   * CHECKS RUN BEFORE SIGNING:
    *
-   * 1. `chainId` указан и положителен. Транзакция без chainId
-   *    (до EIP-155) действительна во ВСЕХ EVM-сетях одновременно:
-   *    перевод, подписанный в тестовой сети, повторяется в основной.
+   * 1. `chainId` is present and positive. A transaction without
+   *    chainId (pre-EIP-155) is valid on ALL EVM networks at once:
+   *    a transfer signed on a testnet is replayed on mainnet.
    *
-   * 2. Адрес, выведенный из ключа, совпадает с полем `from`.
-   *    Расхождение означает, что средства уйдут не с того аккаунта,
-   *    который показан пользователю.
+   * 2. The address derived from the key matches `from`. A mismatch
+   *    means funds leave an account other than the one shown to the
+   *    user.
    *
-   * 3. Набор полей соответствует типу транзакции: `gasPrice`
-   *    для legacy, `maxFeePerGas` и `maxPriorityFeePerGas` для EIP-1559.
+   * 3. The field set matches the transaction type: `gasPrice` for
+   *    legacy, `maxFeePerGas` and `maxPriorityFeePerGas` for
+   *    EIP-1559.
    *
    * @throws InvalidArgumentError, AddressChecksumMismatchError
    */
   signTransaction(transaction: ISignableTransaction, privateKey: ISecretBuffer): ISignedTransaction
 
   /**
-   * Подписывает сообщение по EIP-191 (`personal_sign`).
+   * Signs a message per EIP-191 (`personal_sign`).
    *
-   * Префикс `\x19Ethereum Signed Message:\n<длина>` применяется всегда
-   * и не отключается. Без него подписываемые байты могут оказаться
-   * корректной сериализованной транзакцией, и подпись «безобидного»
-   * сообщения превратится в подпись перевода средств.
+   * The prefix `\x19Ethereum Signed Message:\n<length>` is always
+   * applied and cannot be turned off. Without it the signed bytes
+   * could be a valid serialised transaction, and a signature of a
+   * "harmless" message would become a signature of a funds transfer.
    *
-   * @returns 65 байт подписи в шестнадцатеричном виде.
+   * @returns 65 signature bytes as hex.
    */
   signMessage(message: SignableMessage, privateKey: ISecretBuffer): HexString
 
   /**
-   * Подписывает структурированные данные (`eth_signTypedData_v4`).
+   * Signs structured data (`eth_signTypedData_v4`).
    *
-   * Опаснее подписи транзакции: подписанное сообщение предъявляется
-   * контракту позже и не отражается в истории операций кошелька.
+   * More dangerous than a transaction signature: the signed message
+   * is presented to a contract later and does not appear in the
+   * wallet's operation history.
    *
-   * `domain.chainId` сверяется с активной сетью. Структура без указания
-   * сети отвергается: она была бы действительна во всех сетях сразу.
+   * `domain.chainId` is checked against the active network. A
+   * structure without a network is rejected: it would be valid on
+   * every network at once.
    *
-   * @throws InvalidArgumentError при несовпадении сети либо нарушении структуры.
+   * @throws InvalidArgumentError on a network mismatch or a broken
+   *         structure.
    */
   signTypedData(data: ITypedData, privateKey: ISecretBuffer, expectedChainId: ChainId): HexString
 
   /**
-   * Хэш сообщения по EIP-191 без подписи.
+   * EIP-191 message hash without a signature.
    *
-   * Нужен экрану подтверждения: пользователь обязан иметь возможность
-   * сверить показанное с подписываемым.
+   * Needed by the confirmation screen: the user must be able to
+   * compare what is shown with what is signed.
    */
   hashMessage(message: SignableMessage): HexString
 
-  /** Итоговый хэш структуры EIP-712 без подписи. */
   hashTypedData(data: ITypedData): HexString
 
   /**
-   * Восстанавливает адрес подписавшего сообщение.
+   * Recovers the address that signed a message.
    *
-   * Применяется при входе на сайт через подпись и в тестах: совпадение
-   * восстановленного адреса с ожидаемым — самая сильная проверка
-   * корректности подписи.
+   * Used for site login via signature and in tests: a recovered
+   * address matching the expected one is the strongest signature
+   * check.
    */
   recoverMessageSigner(message: SignableMessage, signature: HexString): Address
 
-  /** Восстанавливает адрес подписавшего структуру EIP-712. */
   recoverTypedDataSigner(data: ITypedData, signature: HexString): Address
 }

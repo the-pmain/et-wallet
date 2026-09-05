@@ -1,10 +1,11 @@
 /**
- * Показ рыночных величин.
+ * Display of market figures.
  *
- * ЭТО НЕ `formatFiat`. Тот прячет сумму меньше цента за «< $0.01»,
- * потому что оценка портфеля такого порядка неотличима от нуля для
- * решения «отправлять или нет». Цена одной монеты — другое: $0.00000487
- * у SHIB обязана быть ценой, а не «меньше цента», иначе таблица врёт.
+ * This is not `formatFiat`. That hides sub-cent amounts behind
+ * "< $0.01" because a portfolio estimate of that order is
+ * indistinguishable from zero for a send decision. A coin price is
+ * different: SHIB at $0.00000487 must be a price, not "less than a
+ * cent", or the table lies.
  */
 
 const usdInteger = new Intl.NumberFormat('en-US', {
@@ -13,7 +14,7 @@ const usdInteger = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-/** Цена одной монеты. `null` — прочерк, не ноль. */
+/** Price of one coin. `null` is an em dash, not zero. */
 export function formatMarketPrice(value: number | null): string {
   if (value === null) {
     return '—'
@@ -29,7 +30,7 @@ export function formatMarketPrice(value: number | null): string {
   }).format(value)
 }
 
-/** Объём и капитализация без центов: в этом разряде цент ничего не значит. */
+/** Volume and market cap without cents: a cent is meaningless at that scale. */
 export function formatMarketUsd(value: number | null): string {
   if (value === null) {
     return '—'
@@ -39,11 +40,11 @@ export function formatMarketUsd(value: number | null): string {
 }
 
 /**
- * Изменение в процентах для таблицы.
+ * Percent change for the table.
  *
- * Один знак после запятой — как у источника на скрине. Знак числа
- * в строку не входит: направление несёт треугольник рядом, и плюс
- * рядом с ним читался бы как двойное утверждение.
+ * One decimal, matching the source on screen. The sign is not in the
+ * string: a triangle next to it carries direction, and a plus beside
+ * it would read as a double claim.
  */
 export function formatMarketChange(percent: number | null): string {
   if (percent === null) {
@@ -53,7 +54,7 @@ export function formatMarketChange(percent: number | null): string {
   return `${Math.abs(percent).toFixed(1)}%`
 }
 
-/** Рост после округления до показанного разряда. */
+/** Growth after rounding to the displayed digit. */
 export function isMarketChangeUp(percent: number): boolean {
   return Number(percent.toFixed(1)) >= 0
 }

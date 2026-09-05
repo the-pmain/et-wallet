@@ -14,12 +14,12 @@ const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const PEER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-/** Ответ индексатора для конкретной выборки. */
+/** Indexer reply for a given query. */
 interface IStubResponse {
   readonly sent?: readonly unknown[]
   readonly received?: readonly unknown[]
 
-  /** Ключи следующей страницы по выборкам. Отсутствие — выдача исчерпана. */
+  /** Next-page keys per query. Absence means the listing is exhausted. */
   readonly sentPageKey?: string
   readonly receivedPageKey?: string
 }
@@ -39,7 +39,7 @@ class StubProvider implements IProvider {
     this.requests.push(request)
 
     if (this.failRequest) {
-      return Promise.reject(new Error('метод не поддержан узлом'))
+      return Promise.reject(new Error('method not supported by the node'))
     }
 
     const [params] = (request.params ?? []) as readonly Record<string, unknown>[]
@@ -62,7 +62,7 @@ class StubProvider implements IProvider {
   }
 
   getBalance(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getTransactionCount(): Promise<number> {
@@ -77,7 +77,7 @@ class StubProvider implements IProvider {
     return Promise.resolve('0x' as HexString)
   }
 
-  /** Байт-код по адресу. Обычный адрес: проверок контракта в этих тестах нет. */
+  /** Bytecode at the address. An ordinary address: these tests do not check for a contract. */
   getCode(): Promise<HexString> {
     return Promise.resolve('0x' as HexString)
   }
@@ -86,11 +86,11 @@ class StubProvider implements IProvider {
   }
 
   getFeeData(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   sendRawTransaction(): Promise<never> {
-    return Promise.reject(new Error('не поддержано'))
+    return Promise.reject(new Error('not supported'))
   }
 
   getTransactionReceipt(): Promise<null> {
@@ -102,7 +102,7 @@ class StubProvider implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -120,22 +120,22 @@ beforeEach(() => {
   source = new AlchemyHistoryProvider()
 })
 
-describe('AlchemyHistoryProvider: запрос', () => {
-  it('вызывает метод индексатора', async () => {
+describe('AlchemyHistoryProvider: request', () => {
+  it('calls the indexer method', async () => {
     await source.fetch(query, node)
 
     expect(node.requests[0]?.method).toBe('alchemy_getAssetTransfers')
   })
 
-  it('делает две выборки: отправленное и полученное', async () => {
+  it('makes two queries: sent and received', async () => {
     await source.fetch(query, node)
 
-    /* Индексатор не умеет объединять условия «отправитель ИЛИ
-       получатель», поэтому выборок ровно две. */
+    /* The indexer cannot combine "sender OR recipient", so there
+       are exactly two queries. */
     expect(node.requests).toHaveLength(2)
   })
 
-  it('запрашивает все пять категорий', async () => {
+  it('requests all five categories', async () => {
     await source.fetch(query, node)
 
     const [params] = (node.requests[0]?.params ?? []) as readonly Record<string, unknown>[]
@@ -143,15 +143,15 @@ describe('AlchemyHistoryProvider: запрос', () => {
     expect(params?.['category']).toEqual(['external', 'internal', 'erc20', 'erc721', 'erc1155'])
   })
 
-  it('обслуживает встроенные сети и отвергает неизвестные', () => {
+  it('serves built-in networks and rejects unknown ones', () => {
     expect(source.supports(CHAIN_ID)).toBe(true)
     expect(source.supports(BUILT_IN_CHAIN_ID.Polygon)).toBe(true)
     expect(source.supports(toChainId(999_999n))).toBe(false)
   })
 })
 
-describe('AlchemyHistoryProvider: точность сумм', () => {
-  it('берёт сумму из необработанного поля, а не из числа JSON', async () => {
+describe('AlchemyHistoryProvider: amount precision', () => {
+  it('takes the amount from the raw field, not the JSON number', async () => {
     node.response = {
       sent: [
         {
@@ -161,8 +161,8 @@ describe('AlchemyHistoryProvider: точность сумм', () => {
           from: OWNER,
           to: PEER,
           blockNum: '0x10',
-          /* Поле `value` — двоичная плавающая точка: суммы свыше 2^53
-             теряют младшие разряды. Реализация обязана его игнорировать. */
+          /* The `value` field is binary floating point: amounts above
+             2^53 lose low digits. The implementation must ignore it. */
           value: 1.0000000000000002,
           rawContract: { value: '0xffffffffffffffffffffffff', address: TOKEN, decimal: '0x6' },
         },
@@ -174,7 +174,7 @@ describe('AlchemyHistoryProvider: точность сумм', () => {
     expect(transfer?.value).toBe(79_228_162_514_264_337_593_543_950_335n)
   })
 
-  it('читает число знаков из ответа', async () => {
+  it('reads decimals from the reply', async () => {
     node.response = {
       sent: [
         {
@@ -192,7 +192,7 @@ describe('AlchemyHistoryProvider: точность сумм', () => {
     expect((await source.fetch(query, node)).transfers[0]?.asset.decimals).toBe(6)
   })
 
-  it('оставляет число знаков неизвестным, если его нет в ответе', async () => {
+  it('leaves decimals unknown when they are missing from the reply', async () => {
     node.response = {
       sent: [
         {
@@ -207,14 +207,14 @@ describe('AlchemyHistoryProvider: точность сумм', () => {
       ],
     }
 
-    /* Подстановка привычных восемнадцати знаков занизила бы сумму
-       токена с шестью в триллион раз. */
+    /* Filling in the familiar eighteen decimals would understate a
+       six-decimal token by a trillion. */
     expect((await source.fetch(query, node)).transfers[0]?.asset.decimals).toBeNull()
   })
 })
 
-describe('AlchemyHistoryProvider: категории', () => {
-  it('относит внешние и внутренние переводы к нативной валюте', async () => {
+describe('AlchemyHistoryProvider: categories', () => {
+  it('classifies external and internal transfers as native currency', async () => {
     node.response = {
       sent: [
         {
@@ -240,12 +240,12 @@ describe('AlchemyHistoryProvider: категории', () => {
 
     const kinds = (await source.fetch(query, node)).transfers.map((item) => item.kind)
 
-    /* Именно эти две категории недостижимы разбором журналов:
-       переводы нативной валюты событий не порождают. */
+    /* These two categories are unreachable by log parsing: native
+       transfers do not emit events. */
     expect(kinds).toEqual([TRANSFER_KIND.Native, TRANSFER_KIND.Native])
   })
 
-  it('распознаёт ERC-721 и не выдумывает количество', async () => {
+  it('recognises ERC-721 and does not invent an amount', async () => {
     node.response = {
       sent: [
         {
@@ -268,7 +268,7 @@ describe('AlchemyHistoryProvider: категории', () => {
     expect(transfer?.value).toBe(1n)
   })
 
-  it('разворачивает набор предметов ERC-1155 в отдельные записи', async () => {
+  it('expands an ERC-1155 set into separate records', async () => {
     node.response = {
       sent: [
         {
@@ -294,7 +294,7 @@ describe('AlchemyHistoryProvider: категории', () => {
     expect(new Set(transfers.map((item) => item.id)).size).toBe(2)
   })
 
-  it('отбрасывает неизвестные категории', async () => {
+  it('drops unknown categories', async () => {
     node.response = {
       sent: [
         {
@@ -312,17 +312,17 @@ describe('AlchemyHistoryProvider: категории', () => {
   })
 })
 
-describe('AlchemyHistoryProvider: недоверенный ответ', () => {
-  it('переживает ответ неожиданной формы', async () => {
-    node.response = { sent: ['строка', 42, null, {}] }
+describe('AlchemyHistoryProvider: untrusted reply', () => {
+  it('survives a reply of unexpected shape', async () => {
+    node.response = { sent: ['string', 42, null, {}] }
 
-    /* Формат внешнего сервиса может измениться без предупреждения.
-       Одна испорченная запись не должна лишать пользователя истории. */
+    /* An external service's format can change without notice. One
+       corrupt record must not take the user's history away. */
     await expect(source.fetch(query, node)).resolves.toBeDefined()
     expect((await source.fetch(query, node)).transfers).toHaveLength(0)
   })
 
-  it('пропускает записи без обязательных полей', async () => {
+  it('skips records that lack required fields', async () => {
     node.response = {
       sent: [
         { uniqueId: 'a', category: 'erc20', from: OWNER },
@@ -341,15 +341,15 @@ describe('AlchemyHistoryProvider: недоверенный ответ', () => {
     expect((await source.fetch(query, node)).transfers).toHaveLength(1)
   })
 
-  it('доводит отказ узла до вызывающего кода', async () => {
+  it('forwards a node refusal to the caller', async () => {
     node.failRequest = true
 
-    /* Отказ обязан быть виден: молчаливый пустой результат скрыл бы
-       неработающий ключ индексатора. */
+    /* The refusal must be visible: a silent empty result would hide
+       a broken indexer key. */
     await expect(source.fetch(query, node)).rejects.toThrow()
   })
 
-  it('определяет направление относительно владельца', async () => {
+  it('sets the direction relative to the owner', async () => {
     node.response = {
       received: [
         {
@@ -369,7 +369,7 @@ describe('AlchemyHistoryProvider: недоверенный ответ', () => {
     )
   })
 
-  it('сообщает, что ограничений на историю нет', async () => {
+  it('reports that history is not limited', async () => {
     const page = await source.fetch(query, node)
 
     expect(page.limits.nativeTransfersUnavailable).toBe(false)
@@ -377,14 +377,14 @@ describe('AlchemyHistoryProvider: недоверенный ответ', () => {
   })
 })
 
-describe('AlchemyHistoryProvider: продолжение выдачи', () => {
-  it('без ключей страниц продолжения нет', async () => {
-    /* Конец выдачи объявляет индексатор, а не мы по числу записей:
-       последняя страница вполне может оказаться полной. */
+describe('AlchemyHistoryProvider: continuation', () => {
+  it('without page keys there is no continuation', async () => {
+    /* The indexer declares the end of the listing, not us by record
+       count: the last page may well be full. */
     expect((await source.fetch(query, node)).cursor).toBeNull()
   })
 
-  it('ключ страницы уходит обратно в запрос', async () => {
+  it('the page key goes back into the request', async () => {
     node.response = { sentPageKey: 'sent-2', receivedPageKey: 'received-2' }
 
     const first = await source.fetch(query, node)
@@ -401,10 +401,10 @@ describe('AlchemyHistoryProvider: продолжение выдачи', () => {
     expect(keys).toContain('received-2')
   })
 
-  it('исчерпанная выборка на продолжении не повторяется', async () => {
-    /* Отправленного и полученного у адреса разное количество. Без
-       этого условия более короткая сторона выдавала бы свою первую
-       страницу заново при каждом «показать более ранние». */
+  it('an exhausted query is not repeated on continuation', async () => {
+    /* Sent and received counts differ for an address. Without this
+       the shorter side would replay its first page on every "show
+       earlier". */
     node.response = { receivedPageKey: 'received-2' }
 
     const first = await source.fetch(query, node)
@@ -417,7 +417,7 @@ describe('AlchemyHistoryProvider: продолжение выдачи', () => {
     expect((node.requests[0]?.params?.[0] as Record<string, unknown>)['toAddress']).toBe(OWNER)
   })
 
-  it('исчерпание обеих выборок закрывает продолжение', async () => {
+  it('exhausting both queries closes continuation', async () => {
     node.response = { sentPageKey: 'sent-2' }
 
     const first = await source.fetch(query, node)
@@ -427,10 +427,10 @@ describe('AlchemyHistoryProvider: продолжение выдачи', () => {
     expect((await source.fetch({ ...query, cursor: first.cursor }, node)).cursor).toBeNull()
   })
 
-  it('чужая метка читается как первая страница', async () => {
-    /* Метка разбора журналов — номер блока; истолковать её как ключ
-       страницы индексатора нельзя. Показать начало заново — худшее,
-       что при этом допустимо. */
+  it('a foreign cursor is read as the first page', async () => {
+    /* A log-scan cursor is a block number; it must not be read as an
+       indexer page key. Showing the start again is the worst that is
+       allowed. */
     await source.fetch({ ...query, cursor: { providerId: 'logs', value: '19000:10000' } }, node)
 
     const withKey = node.requests.filter(

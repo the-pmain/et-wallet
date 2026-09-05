@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import { ResponseAssembler, splitIntoPackets } from './WebHidTransport'
 
-/** Размер пакета обмена: задан устройством. */
 const PACKET_SIZE = 64
 
-/** Собирает пакет ответа так, как это делает устройство. */
+/** Build a reply packet the way the device does. */
 function responsePacket(index: number, body: Uint8Array, totalLength?: number): Uint8Array {
   const packet = new Uint8Array(PACKET_SIZE)
   const view = new DataView(packet.buffer)
@@ -24,28 +23,29 @@ function responsePacket(index: number, body: Uint8Array, totalLength?: number): 
   return packet
 }
 
-describe('Разделение команды на пакеты', () => {
-  it('короткая команда умещается в один пакет', () => {
+describe('Splitting a command into packets', () => {
+  it('a short command fits in one packet', () => {
     expect(splitIntoPackets(new Uint8Array(10))).toHaveLength(1)
   })
 
-  it('пустая команда всё равно отправляется', () => {
-    /* Команда без данных законна: у чтения состояния приложения
-       нет параметров. Ноль пакетов означал бы, что устройству
-       не отправлено ничего, и ответа не пришло бы никогда. */
+  it('an empty command is still sent', () => {
+    /* A command with no data is legal: reading app state has no
+       parameters. Zero packets would mean nothing was sent to the
+       device, and a reply would never arrive. */
     expect(splitIntoPackets(new Uint8Array(0))).toHaveLength(1)
   })
 
-  it('первый пакет объявляет длину всей команды', () => {
-    /* Устройство узнаёт длину только отсюда: последний пакет
-       дополнен нулями, и отличить дополнение от данных иначе нечем. */
+  it('the first packet declares the full command length', () => {
+    /* The device learns the length only from here: the last
+       packet is padded with zeros, and there is no other way to
+       tell padding from data. */
     const [first] = splitIntoPackets(new Uint8Array(200))
     const view = new DataView((first as Uint8Array).buffer)
 
     expect(view.getUint16(5, false)).toBe(200)
   })
 
-  it('длинная команда делится, и номера идут подряд', () => {
+  it('a long command is split and sequence numbers are consecutive', () => {
     const packets = splitIntoPackets(new Uint8Array(300))
 
     expect(packets.length).toBeGreaterThan(1)
@@ -58,9 +58,9 @@ describe('Разделение команды на пакеты', () => {
     })
   })
 
-  it('данные не теряются и не повторяются при делении', () => {
-    /* Потерянный байт означал бы подпись под другой транзакцией,
-       чем показана человеку. */
+  it('data is neither lost nor repeated when splitting', () => {
+    /* A lost byte would mean a signature under a different
+       transaction than the one shown to the person. */
     const command = Uint8Array.from({ length: 300 }, (_, index) => index % 251)
     const packets = splitIntoPackets(command)
 
@@ -70,29 +70,29 @@ describe('Разделение команды на пакеты', () => {
   })
 })
 
-describe('Сборка ответа из пакетов', () => {
-  it('короткий ответ собирается из одного пакета', () => {
+describe('Assembling a reply from packets', () => {
+  it('a short reply is assembled from one packet', () => {
     const assembler = new ResponseAssembler()
     const body = Uint8Array.from([1, 2, 0x90, 0x00])
 
     expect([...(assembler.push(responsePacket(0, body)) ?? [])]).toEqual([1, 2, 0x90, 0x00])
   })
 
-  it('дополнение нулями в ответ не попадает', () => {
-    /* Пакет всегда шестидесятичетырёхбайтовый; лишние нули, принятые
-       за данные, испортили бы разбор подписи. */
+  it('zero padding does not enter the reply', () => {
+    /* A packet is always sixty-four bytes; extra zeros taken as
+       data would corrupt signature parsing. */
     const assembler = new ResponseAssembler()
 
     expect(assembler.push(responsePacket(0, Uint8Array.from([0x90, 0x00])))).toHaveLength(2)
   })
 
-  it('неполный ответ не выдаётся за готовый', () => {
+  it('an incomplete reply is not treated as ready', () => {
     const assembler = new ResponseAssembler()
 
     expect(assembler.push(responsePacket(0, new Uint8Array(57), 100))).toBeNull()
   })
 
-  it('длинный ответ собирается из нескольких пакетов', () => {
+  it('a long reply is assembled from several packets', () => {
     const assembler = new ResponseAssembler()
     const first = Uint8Array.from({ length: 57 }, () => 0xaa)
     const second = Uint8Array.from({ length: 10 }, () => 0xbb)
@@ -106,9 +106,10 @@ describe('Сборка ответа из пакетов', () => {
     expect(complete?.[66]).toBe(0xbb)
   })
 
-  it('пакеты не по порядку прерывают обмен', () => {
-    /* Пропущенный пакет означает дыру в середине ответа. Собрать его
-       как ни в чём не бывало значило бы разобрать подпись из мусора. */
+  it('out-of-order packets abort the exchange', () => {
+    /* A skipped packet means a hole in the middle of the reply.
+       Assembling it as if nothing happened would parse a
+       signature from garbage. */
     const assembler = new ResponseAssembler()
 
     assembler.push(responsePacket(0, new Uint8Array(57), 100))
@@ -116,7 +117,7 @@ describe('Сборка ответа из пакетов', () => {
     expect(() => assembler.push(responsePacket(2, new Uint8Array(10)))).toThrow(/out of order/i)
   })
 
-  it('чужой пакет пропускается, а не ломает обмен', () => {
+  it('a foreign packet is skipped instead of breaking the exchange', () => {
     const assembler = new ResponseAssembler()
     const foreign = new Uint8Array(PACKET_SIZE)
 

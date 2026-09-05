@@ -4,16 +4,17 @@ import type { IPriceProvider } from './contracts'
 import type { FiatCurrency, IPriceRef, PriceMap } from './types'
 
 /**
- * Источник, который курсов не знает.
+ * A source that does not know rates.
  *
- * ЭТО НЕ ЗАГЛУШКА ДЛЯ ТЕСТОВ, А БОЕВОЕ ПОВЕДЕНИЕ ПО УМОЛЧАНИЮ.
- * Пока пользователь не согласился на обращение к стороннему сервису,
- * кошелёк курсов не запрашивает — и это состояние обязано быть
- * выражено объектом, а не отсутствием объекта: `null` вместо источника
- * заставил бы каждое место вызова помнить о проверке.
+ * THIS IS NOT A TEST STUB, IT IS LIVE DEFAULT BEHAVIOUR. Until the
+ * user consents to calling a third-party service, the wallet does
+ * not request rates — and that state must be expressed as an
+ * object, not as the absence of an object: `null` instead of a
+ * source would force every call site to remember the check.
  *
- * Пустой словарь означает «курсы неизвестны», и интерфейс показывает
- * портфель без стоимости. Он не означает «активы ничего не стоят».
+ * An empty map means "rates are unknown", and the UI shows the
+ * portfolio without a value. It does not mean "the assets are
+ * worth nothing".
  */
 export class NullPriceProvider implements IPriceProvider {
   readonly id = 'none'

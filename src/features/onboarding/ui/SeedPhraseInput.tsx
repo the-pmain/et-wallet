@@ -9,7 +9,7 @@ import {
 } from '@/core'
 import { Label, Textarea } from '@/shared/ui'
 
-/** Пояснения к причинам отказа. Коды приходят из ядра, тексты — отсюда. */
+/** Rejection reasons. Codes come from the core; the copy lives here. */
 const REASON_TEXT: Readonly<Record<MnemonicInvalidReason, string>> = {
   [MNEMONIC_INVALID_REASON.Empty]: 'Enter the phrase',
   [MNEMONIC_INVALID_REASON.WordCount]: `Allowed word counts: ${VALID_WORD_COUNTS.join(', ')}`,
@@ -27,19 +27,19 @@ interface SeedPhraseInputProps {
 }
 
 /**
- * Ввод существующей мнемонической фразы.
+ * Input for an existing mnemonic phrase.
  *
- * Ошибка показывается только когда пользователь ввёл достаточно слов:
- * подсветка «фраза некорректна» после первого же символа приучает
- * не читать сообщения об ошибках.
+ * An error is shown only after enough words are entered: highlighting
+ * "phrase is invalid" after the first character trains people not to
+ * read error messages.
  *
- * Позиции неизвестных слов выводятся отдельно. Это единственная подсказка,
- * которая реально помогает: в 24 словах найти опечатку глазами тяжело,
- * а ошибка в одном слове означает потерю доступа к средствам.
+ * Unknown-word positions are listed separately. That is the only hint
+ * that actually helps: finding a typo among 24 words by eye is hard,
+ * and a single wrong word means losing access to funds.
  *
- * Атрибуты автозаполнения и автокоррекции выключены: подстановка сохранённого
- * значения в поле seed-фразы и исправление слова мобильной клавиатурой
- * одинаково приводят к неверной фразе.
+ * Autofill and autocorrect are off: inserting a saved value into a
+ * seed-phrase field and a mobile keyboard "fixing" a word both produce
+ * the wrong phrase.
  */
 export function SeedPhraseInput({
   value,
@@ -52,14 +52,14 @@ export function SeedPhraseInput({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* СЧЁТЧИК СЛОВ — У ПОДПИСИ, А НЕ ПОД ПОЛЕМ. Он отвечает на
-          единственный вопрос, который человек задаёт себе, набирая
-          фразу: «сколько уже». Стоя под полем, он оказывался ниже
-          взгляда, занятого набором, и его находили не сразу.
+      {/* WORD COUNT SITS ON THE LABEL, NOT UNDER THE FIELD. It answers
+          the only question someone asks while typing the phrase:
+          "how many so far". Under the field it sat below the gaze
+          busy with typing and was found late.
 
-          Двенадцать и двадцать четыре — единственные допустимые
-          значения, поэтому счётчик показывает не «сколько введено»,
-          а «сколько из скольких»: цель названа вместе с достигнутым. */}
+          Twelve and twenty-four are the only allowed counts, so the
+          counter shows "how many of how many": the target is named
+          with the progress. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <Label htmlFor={inputId}>Seed phrase</Label>
 

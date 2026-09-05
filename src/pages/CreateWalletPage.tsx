@@ -39,7 +39,6 @@ import {
   Label,
 } from '@/shared/ui'
 
-/** Шаги создания кошелька. */
 const STEP = {
   Password: 'password',
   Phrase: 'phrase',
@@ -48,8 +47,8 @@ const STEP = {
 
 type Step = (typeof STEP)[keyof typeof STEP]
 
-/* Ключи словаря, а не готовые строки: язык меняется на лету, и текст,
-   вычисленный один раз при загрузке модуля, остался бы прежним. */
+/* Dictionary keys, not ready-made strings: the language can change
+   live, and text computed once at module load would stay stale. */
 const STEP_TITLE: Readonly<Record<Step, TranslationKey>> = {
   [STEP.Password]: 'create.title',
   [STEP.Phrase]: 'create.phraseTitle',
@@ -63,18 +62,17 @@ const STEP_DESCRIPTION: Readonly<Record<Step, TranslationKey>> = {
 }
 
 /**
- * Создание кошелька.
+ * Wallet creation.
  *
- * ПОРЯДОК ШАГОВ ВЫБРАН СОЗНАТЕЛЬНО: сначала пароль, затем фраза.
- * Обратный порядок означал бы, что фраза уже создана и лежит в памяти,
- * пока пользователь придумывает пароль, — окно, в течение которого
- * секрет существует без всякой защиты и без причины.
+ * STEP ORDER IS DELIBERATE: password first, then the phrase. The reverse
+ * would create the phrase and leave it in memory while the user invents
+ * a password — a window in which the secret exists unprotected and
+ * without reason.
  *
- * ЖИЗНЕННЫЙ ЦИКЛ ФРАЗЫ. Буфер создаётся при переходе к шагу показа
- * и затирается при уходе со страницы в любом случае — успешном
- * завершении, возврате назад или закрытии вкладки. Строковое
- * представление, попадающее в дерево React, затереть невозможно;
- * оно живёт до сборки мусора.
+ * PHRASE LIFECYCLE. The buffer is created when the display step opens
+ * and is wiped on any leave — success, going back, or closing the tab.
+ * The string that enters the React tree cannot be wiped; it lives until
+ * garbage collection.
  */
 export function CreateWalletPage() {
   const onboarding = useOnboarding()
@@ -94,9 +92,8 @@ export function CreateWalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
 
-  /* Буфер хранится в ref, а не в состоянии: он не участвует в отрисовке,
-     а помещение секрета в состояние сделало бы его видимым в инструментах
-     разработчика при каждом обновлении компонента. */
+  /* The buffer lives in a ref, not in state: it is not rendered, and
+     putting a secret in state would show it in DevTools on every update. */
   const mnemonicRef = useRef<ISecretBuffer | null>(null)
 
   useEffect(() => {
@@ -214,7 +211,7 @@ export function CreateWalletPage() {
                     setError(null)
                   }}
                 />
-                {/* Почта — идентификатор входа, не отображаемое имя. */}
+                {/* Email is the sign-in identifier, not a display name. */}
                 <p className="text-xs text-muted-foreground">{t('create.usernameNotice')}</p>
                 {isEmailInvalid ? (
                   <p className="text-xs text-risk-high">{t('unlock.emailInvalid')}</p>
@@ -262,10 +259,11 @@ export function CreateWalletPage() {
                 <span className="text-sm leading-snug font-normal">{t('create.acknowledge')}</span>
               </Label>
 
-              {/* Отдельного предупреждения о выключенной проверке нет:
-                  она выключена постоянно, а не временно, и сообщать
-                  об этом при каждом создании кошелька — шум. Цену
-                  решения несёт отметка выше: без неё кнопка недоступна. */}
+              {/* There is no separate warning that confirmation is off:
+                  it is off permanently, not temporarily, and announcing
+                  that on every creation is noise. The cost of the
+                  decision is the checkbox above: without it the button
+                  stays disabled. */}
 
               {error !== null && (
                 <Alert variant="danger">

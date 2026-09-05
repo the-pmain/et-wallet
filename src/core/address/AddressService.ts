@@ -17,18 +17,20 @@ import { isValidPrivateKey, privateKeyToAddress, privateKeyToPublicKey } from '.
 import type { PublicKeyFormat } from './types'
 
 /**
- * Реализация работы с адресами EVM.
+ * EVM address work.
  *
- * Класс делегирует чистым функциям того же модуля и НЕ содержит
- * собственной логики вычисления адреса. Дублирование здесь было бы
- * прямой угрозой: две независимые реализации со временем разойдутся,
- * и кошелёк начнёт показывать разные адреса в разных местах.
+ * The class delegates to pure functions of the same module and
+ * contains NO address-computation logic of its own. Duplication
+ * here would be a direct threat: two independent implementations
+ * will diverge over time, and the wallet will start showing
+ * different addresses in different places.
  *
- * Зачем класс, если функции уже есть. Он даёт потребителям возможность
- * зависеть от интерфейса `IAddressService`, а не от конкретных импортов,
- * и подменять реализацию в тестах. Состояния и внедряемых зависимостей
- * у него нет — там, где хватает прямого вызова функции, вызывать её
- * напрямую допустимо и дешевле по размеру бандла.
+ * Why a class if the functions already exist. It lets consumers
+ * depend on the `IAddressService` interface, not on concrete
+ * imports, and swap the implementation in tests. It has no state
+ * and no injected dependencies — where a direct function call is
+ * enough, calling it directly is allowed and cheaper for the
+ * bundle.
  */
 export class AddressService implements IAddressService {
   parse(value: string): Address {

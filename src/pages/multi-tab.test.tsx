@@ -27,18 +27,18 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Стирание кошелька в соседней вкладке', () => {
-  it('открытый кошелёк закрывается', async () => {
-    /* САМЫЙ ОПАСНЫЙ СЛУЧАЙ ДВУХ ВКЛАДОК. Хранилище общее, а память —
-       нет: вкладка держит ключ шифрования у себя и о стирании
-       не узнаёт. Она продолжала показывать балансы и позволяла
-       подписать перевод — то есть человек, стерший кошелёк перед
-       передачей устройства, оставлял открытую дверь. */
+describe('Wallet erase in a neighboring tab', () => {
+  it('closes an open wallet', async () => {
+    /* THE MOST DANGEROUS TWO-TAB CASE. Storage is shared; memory is
+       not: the tab holds the encryption key and never learns about the
+       erase. It kept showing balances and allowed a signed transfer —
+       so someone who erased the wallet before handing the device over
+       left a door open. */
     renderApp()
 
     await screen.findByText('Account 1')
 
-    /* Сообщение приходит из другой вкладки: свои назад не возвращаются. */
+    /* The message comes from another tab: a tab does not echo its own. */
     const other = new WalletBroadcast(services.broadcastName)
 
     other.post(WALLET_BROADCAST.Erased)
@@ -50,7 +50,7 @@ describe('Стирание кошелька в соседней вкладке',
     other.close()
   })
 
-  it('вкладка возвращается к приветствию', async () => {
+  it('the tab returns to the welcome screen', async () => {
     renderApp()
     await screen.findByText('Account 1')
 
@@ -63,10 +63,10 @@ describe('Стирание кошелька в соседней вкладке',
     other.close()
   })
 
-  it('чужое сообщение кошелёк не закрывает', async () => {
-    /* В канал того же источника писать может любой код. Закрывать
-       кошелёк по неизвестному сообщению значило бы дать способ мешать
-       владельцу работать. */
+  it('an unknown message does not close the wallet', async () => {
+    /* Any code can write to a channel of the same origin. Closing the
+       wallet on an unknown message would give a way to disrupt the
+       owner. */
     renderApp()
     await screen.findByText('Account 1')
 

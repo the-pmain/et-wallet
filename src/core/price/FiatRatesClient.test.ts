@@ -32,14 +32,14 @@ beforeEach(() => {
 })
 
 describe('FiatRatesClient', () => {
-  it('читает евро и фунты к доллару', async () => {
+  it('reads euros and pounds against the dollar', async () => {
     const rates = await createClient().getRates()
 
     expect(requested[0]).toBe(PRIMARY)
     expect(rates).toEqual({ EUR: 0.9, GBP: 0.8 })
   })
 
-  it('переходит к запасному источнику после отказа', async () => {
+  it('moves to a fallback source after a refusal', async () => {
     responder = (url) =>
       url === PRIMARY
         ? { status: 502, body: {} }
@@ -49,7 +49,7 @@ describe('FiatRatesClient', () => {
     expect(requested).toEqual([PRIMARY, FALLBACK])
   })
 
-  it('не принимает отказ всех источников за курс 1:1', async () => {
+  it('does not treat a refusal of every source as a 1:1 rate', async () => {
     responder = () => ({ status: 502, body: {} })
 
     await expect(createClient().getRates()).rejects.toThrow(
@@ -57,7 +57,7 @@ describe('FiatRatesClient', () => {
     )
   })
 
-  it('не подставляет ноль, когда поле курса отсутствует', async () => {
+  it('does not insert zero when the rate field is missing', async () => {
     responder = () => ({ status: 200, body: { rates: { EUR: 0.9 } } })
 
     await expect(createClient().getRates()).rejects.toThrow(

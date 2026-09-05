@@ -26,7 +26,6 @@ function renderApp() {
   )
 }
 
-/** Двигает управляемые часы внутри акта React. */
 async function advance(ms: number): Promise<void> {
   await act(async () => {
     services.clock.advance(ms)
@@ -42,10 +41,10 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD, EMAIL)
 })
 
-describe('Автоблокировка', () => {
-  it('предупреждает до блокировки', async () => {
-    /* Блокировка посреди работы теряет введённое; предупреждение даёт
-       продлить сессию одним нажатием. */
+describe('Auto-lock', () => {
+  it('warns before locking', async () => {
+    /* A lock mid-work loses what was typed; the warning lets the
+       session be extended with one tap. */
     renderApp()
     await screen.findByText(EMAIL)
 
@@ -54,17 +53,16 @@ describe('Автоблокировка', () => {
     expect(await screen.findByText('The wallet is about to lock')).toBeInTheDocument()
   })
 
-  it('блокирует кошелёк по истечении срока', async () => {
+  it('locks the wallet when the interval expires', async () => {
     renderApp()
     await screen.findByText(EMAIL)
 
     await advance(DEFAULT_AUTO_LOCK_MS + 10_000)
 
-    /* Признак блокировки — экран ввода пароля. */
     expect(await screen.findByText('Welcome back')).toBeInTheDocument()
   })
 
-  it('не блокирует раньше срока', async () => {
+  it('does not lock before the interval', async () => {
     renderApp()
     await screen.findByText(EMAIL)
 
@@ -73,7 +71,7 @@ describe('Автоблокировка', () => {
     expect(screen.queryByText('Welcome back')).not.toBeInTheDocument()
   })
 
-  it('продление снимает предупреждение и откладывает блокировку', async () => {
+  it('staying signed in dismisses the warning and postpones the lock', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -89,9 +87,9 @@ describe('Автоблокировка', () => {
     expect(screen.queryByText('Welcome back')).not.toBeInTheDocument()
   })
 
-  it('объясняет, что средства не затронуты', async () => {
-    /* Без объяснения внезапно закрывшийся кошелёк выглядит как потеря
-       доступа к средствам. */
+  it('explains that funds are not affected', async () => {
+    /* Without an explanation a wallet that closed suddenly looks like
+       lost access to the funds. */
     renderApp()
     await screen.findByText(EMAIL)
 
@@ -100,7 +98,7 @@ describe('Автоблокировка', () => {
     expect(await screen.findByText(/your funds are not affected/i)).toBeInTheDocument()
   })
 
-  it('после блокировки предупреждение не всплывает заново', async () => {
+  it('the warning does not pop up again after the lock', async () => {
     renderApp()
     await screen.findByText(EMAIL)
 
@@ -111,8 +109,8 @@ describe('Автоблокировка', () => {
   })
 })
 
-describe('Settings безопасности', () => {
-  it('позволяют выбрать срок автоблокировки', async () => {
+describe('Security settings', () => {
+  it('let the user choose an auto-lock interval', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -127,8 +125,8 @@ describe('Settings безопасности', () => {
     })
   })
 
-  it('позволяют отключить подтверждение подписи', async () => {
-    /* Отключение — осознанный выбор владельца, и он сохраняется. */
+  it('let the user turn off sign confirmation', async () => {
+    /* Turning it off is a deliberate owner choice, and it persists. */
     const user = userEvent.setup()
 
     renderApp()
@@ -143,8 +141,8 @@ describe('Settings безопасности', () => {
     })
   })
 
-  it('по умолчанию подтверждение включено', async () => {
-    /* Защита, выключенная по умолчанию, защитой не является. */
+  it('confirmation is on by default', async () => {
+    /* Protection that is off by default is not protection. */
     expect((await services.securitySettings.read()).confirmBeforeSigning).toBe(true)
   })
 })

@@ -228,8 +228,8 @@ afterEach(() => {
   window.location.hash = ''
 })
 
-describe('Кабинет администратора', () => {
-  it('спрашивает PIN и пускает при верном значении', async () => {
+describe('Admin cabinet', () => {
+  it('asks for a PIN and admits the correct value', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -251,7 +251,7 @@ describe('Кабинет администратора', () => {
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('9100')
   })
 
-  it('не пускает с неверным PIN', async () => {
+  it('does not admit a wrong PIN', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -262,7 +262,7 @@ describe('Кабинет администратора', () => {
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBeNull()
   })
 
-  it('PIN чтения открывает кабинет без Sendings, SSE и записи', async () => {
+  it('a read PIN opens the cabinet without Sendings, SSE, or writes', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -286,7 +286,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByRole('button', { name: 'Delete user' })).not.toBeInTheDocument()
   })
 
-  it('остаётся в кабинете по сохранённому PIN', async () => {
+  it('stays in the cabinet with a stored PIN', async () => {
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
@@ -294,7 +294,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
   })
 
-  it('открывает профиль и меняет адрес кошелька', async () => {
+  it('opens a profile and changes a wallet address', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -316,7 +316,7 @@ describe('Кабинет администратора', () => {
     expect(window.location.pathname).toContain('/admin/users/7')
   })
 
-  it('сохраняет сумму актива в минимальных единицах с кнопки строки', async () => {
+  it('saves an asset amount in minimal units from the row button', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -369,7 +369,7 @@ describe('Кабинет администратора', () => {
     })
   })
 
-  it('добавляет криптовалюту из меню в шапке Assets', async () => {
+  it('adds a cryptocurrency from the Assets header menu', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -412,7 +412,7 @@ describe('Кабинет администратора', () => {
     )
   })
 
-  it('ищет пользователя по адресу кошелька', async () => {
+  it('finds a user by wallet address', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -429,7 +429,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
   })
 
-  it('открывает вкладку Sendings, поток SSE и добавляет кадр create', async () => {
+  it('opens the Sendings tab, the SSE stream, and appends a create frame', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -478,7 +478,7 @@ describe('Кабинет администратора', () => {
     expect(document.querySelector('time[datetime="2026-08-22T14:44:10.949Z"]')).not.toBeNull()
   })
 
-  it('окрашивает статусы pending, success и failure', async () => {
+  it('colors pending, success, and failure statuses', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -522,7 +522,7 @@ describe('Кабинет администратора', () => {
     expect(screen.getByText(/rejected/)).toBeInTheDocument()
   })
 
-  it('рисует записи из GET /v1/admin/sendings', async () => {
+  it('renders records from GET /v1/admin/sendings', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
@@ -562,7 +562,7 @@ describe('Кабинет администратора', () => {
     expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
   })
 
-  it('сохраняет правку sending через PATCH и шлёт status с failureMessage', async () => {
+  it('saves a sending edit via PATCH and sends status with failureMessage', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
@@ -644,7 +644,7 @@ describe('Кабинет администратора', () => {
     })
   })
 
-  it('даёт написать свою причину отказа через Custom', async () => {
+  it('lets the admin write a custom rejection reason via Custom', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
@@ -705,7 +705,7 @@ describe('Кабинет администратора', () => {
     })
   })
 
-  it('на любой вкладке кабинета показывает тост новой pending-отправки', async () => {
+  it('shows a toast for a new pending send on any cabinet tab', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -733,7 +733,7 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
   })
 
-  it('сразу показывает pending-отправки, которые уже есть в справочнике', async () => {
+  it('immediately shows pending sends already in the directory', async () => {
     listedSendings = [PENDING_SENDING]
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -744,7 +744,7 @@ describe('Кабинет администратора', () => {
     expect(screen.getByRole('button', { name: 'Handle pending sending 2 ETH' })).toBeInTheDocument()
   })
 
-  it('сворачивает очередь длиннее трёх карточек в ссылку на список', async () => {
+  it('collapses a queue longer than three cards into a list link', async () => {
     listedSendings = [1, 2, 3, 4].map((index) => ({
       ...PENDING_SENDING,
       id: String(60 + index),
@@ -762,7 +762,7 @@ describe('Кабинет администратора', () => {
     )
   })
 
-  it('не показывает тост для отправки, которая сразу не pending', async () => {
+  it('does not toast a send that is not pending from the start', async () => {
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
@@ -787,7 +787,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('тост pending-отправки можно закрыть, не открывая правку', async () => {
+  it('a pending-send toast can be dismissed without opening the edit', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()

@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 import { VirtualList } from './virtual-list'
 
-/** Строит список записей заданной длины. */
 function items(count: number): readonly string[] {
-  return Array.from({ length: count }, (_value, index) => `запись ${String(index + 1)}`)
+  return Array.from({ length: count }, (_value, index) => `record ${String(index + 1)}`)
 }
 
 function renderList(count: number, threshold?: number) {
@@ -20,27 +19,27 @@ function renderList(count: number, threshold?: number) {
   )
 }
 
-describe('VirtualList: короткий список', () => {
-  it('рисует все записи целиком', () => {
-    /* До порога виртуализации список остаётся обычным: у него работают
-       поиск браузера, печать и выделение мышью. */
+describe('VirtualList: short list', () => {
+  it('draws every record in full', () => {
+    /* Below the virtualization threshold the list stays ordinary:
+       browser find, print, and mouse selection still work. */
     renderList(10)
 
     expect(screen.getAllByRole('listitem')).toHaveLength(10)
-    expect(screen.getByText('запись 10')).toBeInTheDocument()
+    expect(screen.getByText('record 10')).toBeInTheDocument()
   })
 
-  it('не выставляет размер списка отдельными признаками', () => {
-    /* Полный список экранный диктор считает сам; `aria-setsize`
-       нужен только там, где часть элементов отсутствует в документе. */
+  it('does not set list size with extra attributes', () => {
+    /* A full list the screen reader counts itself; `aria-setsize`
+       is needed only where some items are missing from the document. */
     renderList(3)
 
     expect(screen.getAllByRole('listitem')[0]).not.toHaveAttribute('aria-setsize')
   })
 })
 
-describe('VirtualList: длинный список', () => {
-  it('рисует не все записи', () => {
+describe('VirtualList: long list', () => {
+  it('does not draw every record', () => {
     renderList(500)
 
     const rendered = screen.getAllByRole('listitem')
@@ -49,15 +48,15 @@ describe('VirtualList: длинный список', () => {
     expect(rendered.length).toBeLessThan(500)
   })
 
-  it('начинает с первой записи', () => {
+  it('starts at the first record', () => {
     renderList(500)
 
-    expect(screen.getByText('запись 1')).toBeInTheDocument()
+    expect(screen.getByText('record 1')).toBeInTheDocument()
   })
 
-  it('сообщает экранному диктору полный размер списка', () => {
-    /* Без этого диктор объявил бы «список из двадцати элементов» там,
-       где их пятьсот. */
+  it('tells the screen reader the full list size', () => {
+    /* Without this the reader would announce “list of twenty items”
+       where there are five hundred. */
     renderList(500)
 
     const first = screen.getAllByRole('listitem')[0]
@@ -66,9 +65,9 @@ describe('VirtualList: длинный список', () => {
     expect(first).toHaveAttribute('aria-posinset', '1')
   })
 
-  it('держит общую высоту списка отступами', () => {
-    /* Полоса прокрутки обязана соответствовать полному числу записей:
-       иначе страница «подпрыгивает» по мере отрисовки. */
+  it('keeps the full list height with padding', () => {
+    /* The scrollbar must match the full record count: otherwise the
+       page “jumps” as rows are drawn. */
     const { container } = renderList(500)
     const list = container.querySelector('ul')
 
@@ -76,17 +75,17 @@ describe('VirtualList: длинный список', () => {
     expect(Number.parseInt(list?.style.paddingBottom ?? '0', 10)).toBeGreaterThan(0)
   })
 
-  it('порог задаётся вызывающим', () => {
+  it('lets the caller set the threshold', () => {
     renderList(20, 100)
 
     expect(screen.getAllByRole('listitem')).toHaveLength(20)
   })
 
-  it('не теряет содержимое строки', () => {
+  it('does not lose row content', () => {
     renderList(500)
 
     const first = screen.getAllByRole('listitem')[0] as HTMLElement
 
-    expect(within(first).getByText('запись 1')).toBeInTheDocument()
+    expect(within(first).getByText('record 1')).toBeInTheDocument()
   })
 })

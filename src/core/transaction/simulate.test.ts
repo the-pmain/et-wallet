@@ -15,11 +15,12 @@ const PEER = toAddress('0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359')
 const TOKEN = toAddress('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
 /**
- * Псевдоадрес нативной валюты.
+ * Pseudo-address of the native currency.
  *
- * Значение снято с живого узла: именно его подставляет `eth_simulateV1`
- * в синтетический журнал при `traceTransfers`. Захардкожено в тесте
- * намеренно — если модуль поменяет константу, тест обязан упасть.
+ * Taken from a live node: this is what `eth_simulateV1` puts into
+ * the synthetic log when `traceTransfers` is on. Hard-coded in the
+ * test on purpose — if the module changes the constant, the test
+ * must fail.
  */
 const NATIVE = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 
@@ -30,16 +31,14 @@ const REQUEST = {
   value: toWei(1_000n),
 }
 
-/** Узел, отвечающий на `eth_simulateV1` заданным образом. */
+/** A node that replies to `eth_simulateV1` in a prescribed way. */
 class SimulatingNode implements IProvider {
   readonly chainId = 1n as ChainId
   readonly rpcUrl = 'https://stub.example'
   readonly isActive = true
 
-  /** Что вернуть на запрос. */
   response: unknown = null
 
-  /** Чем отказать вместо ответа. */
   failure: Error | null = null
 
   readonly #events = new EventBus<ProviderEventMap>()
@@ -104,7 +103,7 @@ class SimulatingNode implements IProvider {
   }
 
   destroy(): void {
-    /* Дублёру нечего освобождать. */
+    /* The stand-in has nothing to release. */
   }
 
   on = this.#events.on.bind(this.#events)
@@ -112,13 +111,13 @@ class SimulatingNode implements IProvider {
   off = this.#events.off.bind(this.#events)
 }
 
-/** Собирает ответ узла с одним вызовом и заданными журналами. */
+/** Builds a node reply with one call and the given logs. */
 function answer(status: string, logs: readonly unknown[], returnData = '0x'): unknown {
   return [{ calls: [{ status, gasUsed: '0x5246', returnData, logs }] }]
 }
 
-describe('simulateTransaction: исход', () => {
-  it('сообщает об успехе и израсходованном газе', async () => {
+describe('simulateTransaction: outcome', () => {
+  it('reports success and the gas used', async () => {
     const node = new SimulatingNode()
     node.response = answer('0x1', [])
 
@@ -128,9 +127,9 @@ describe('simulateTransaction: исход', () => {
     expect(result.gasUsed).toBe(0x5246n)
   })
 
-  it('отличает откат от успеха и достаёт причину', async () => {
+  it('distinguishes a revert from success and extracts the reason', async () => {
     const node = new SimulatingNode()
-    /* `Error("no")`: признак функции, смещение, длина, тело. */
+    /* `Error("no")`: function selector, offset, length, body. */
     const revert = `0x08c379a0${encodeUintWord(32n)}${encodeUintWord(2n)}${Buffer.from('no').toString('hex').padEnd(64, '0')}`
     node.response = answer('0x0', [], revert)
 
@@ -140,11 +139,12 @@ describe('simulateTransaction: исход', () => {
     expect(result.reason).toBe('no')
   })
 
-  it('отличает «узел не умеет» от «узел не ответил»', async () => {
+  it('distinguishes "the node cannot" from "the node did not answer"', async () => {
     const node = new SimulatingNode()
 
-    /* Разница не косметическая: в первом случае повторять бессмысленно,
-       во втором — осмысленно, и владельцу говорят разное. */
+    /* The difference is not cosmetic: retrying is pointless in the
+       first case and useful in the second, and the owner is told
+       different things. */
     node.failure = new RpcError(-32601, 'the method does not exist')
     expect((await simulateTransaction(node, REQUEST)).outcome).toBe(SIMULATION_OUTCOME.Unsupported)
 
@@ -152,11 +152,11 @@ describe('simulateTransaction: исход', () => {
     expect((await simulateTransaction(node, REQUEST)).outcome).toBe(SIMULATION_OUTCOME.Unavailable)
   })
 
-  it('не выдаёт неожиданный ответ за отсутствие перемещений', async () => {
+  it('does not treat an unexpected reply as no movements', async () => {
     const node = new SimulatingNode()
 
-    /* Пустой перечень при исходе «не удалось» означает «неизвестно»,
-       а не «ничего не двинется»: именно эту подмену и нельзя допустить. */
+    /* An empty list on a "failed" outcome means "unknown", not
+       "nothing will move": that substitution must not be allowed. */
     for (const response of [null, {}, [], [{}], [{ calls: [] }]]) {
       node.response = response
 
@@ -168,8 +168,8 @@ describe('simulateTransaction: исход', () => {
   })
 })
 
-describe('simulateTransaction: перемещения', () => {
-  it('разбирает перевод нативной валюты', async () => {
+describe('simulateTransaction: movements', () => {
+  it('parses a native-currency transfer', async () => {
     const node = new SimulatingNode()
     node.response = answer('0x1', [
       {
@@ -181,14 +181,15 @@ describe('simulateTransaction: перемещения', () => {
 
     const [movement] = (await simulateTransaction(node, REQUEST)).movements
 
-    /* Нативная валюта отличается ОТСУТСТВИЕМ контракта, а не особым
-       адресом: псевдоадрес — деталь протокола, наружу она не идёт. */
+    /* Native currency is marked by the ABSENCE of a contract, not a
+       special address: the pseudo-address is a protocol detail and
+       does not go outside. */
     expect(movement?.kind).toBe(MOVEMENT_KIND.Native)
     expect(movement?.contract).toBeNull()
     expect(movement?.amount).toBe(1_000n)
   })
 
-  it('разбирает перевод ERC-20', async () => {
+  it('parses an ERC-20 transfer', async () => {
     const node = new SimulatingNode()
     node.response = answer('0x1', [
       {
@@ -207,7 +208,7 @@ describe('simulateTransaction: перемещения', () => {
     expect(movement?.amount).toBe(5n)
   })
 
-  it('отличает ERC-721 от ERC-20 по числу тем', async () => {
+  it('distinguishes ERC-721 from ERC-20 by the topic count', async () => {
     const node = new SimulatingNode()
     node.response = answer('0x1', [
       {
@@ -224,14 +225,14 @@ describe('simulateTransaction: перемещения', () => {
 
     const [movement] = (await simulateTransaction(node, REQUEST)).movements
 
-    /* У ERC-721 номер предмета лежит в теме, а не в данных: та же
-       подпись события означает другое. */
+    /* For ERC-721 the item id sits in a topic, not in the data: the
+       same event signature means something else. */
     expect(movement?.kind).toBe(MOVEMENT_KIND.Erc721)
     expect(movement?.tokenId).toBe(7n)
     expect(movement?.amount).toBe(1n)
   })
 
-  it('разбирает одиночную передачу ERC-1155', async () => {
+  it('parses a single ERC-1155 transfer', async () => {
     const node = new SimulatingNode()
     node.response = answer('0x1', [
       {
@@ -254,7 +255,7 @@ describe('simulateTransaction: перемещения', () => {
     expect(movement?.to).toBe(PEER)
   })
 
-  it('пропускает журналы, не означающие перемещения', async () => {
+  it('skips logs that are not movements', async () => {
     const node = new SimulatingNode()
     node.response = answer('0x1', [
       { address: TOKEN, topics: ['0xdeadbeef'], data: '0x' },

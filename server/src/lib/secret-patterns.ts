@@ -1,35 +1,33 @@
 /**
- * Признаки данных, которых у сервиса быть не может.
+ * Signs of data the service must never hold.
  *
- * ЗАЧЕМ ЭТО НУЖНО, ЕСЛИ НИ ОДИН МАРШРУТ ТАКОГО НЕ ПРИНИМАЕТ. Затем,
- * что «ни один маршрут» — это утверждение о сегодняшнем коде. Маршрут,
- * добавленный через полгода, может принять поле, о котором никто
- * не подумал; клиент с ошибкой может отправить не то, что собирался.
- * Проверка на входе превращает обещание «сервис не получает секретов»
- * из намерения в поведение: такой запрос отвергается до разбора,
- * не попадает ни в журнал, ни в хранилище.
+ * WHY THIS EXISTS IF NO ROUTE ACCEPTS THAT. Because "no route" is a
+ * claim about today's code. A route added in six months may accept a
+ * field nobody thought of; a buggy client may send the wrong thing.
+ * An inbound check turns "the service does not receive secrets" from
+ * intent into behavior: such a request is rejected before parse and
+ * never reaches the log or storage.
  *
- * ЭТО НЕ ЗАЩИТА ПОЛЬЗОВАТЕЛЯ ОТ СЕБЯ. Секрет, ушедший в сеть, уже
- * скомпрометирован — его видел прокси, его видел TLS-терминатор.
- * Проверка сокращает ущерб и, главное, делает ошибку заметной сразу,
- * а не через год в журналах.
+ * THIS IS NOT PROTECTING THE USER FROM THEMSELVES. A secret that went
+ * on the wire is already compromised — a proxy saw it, the TLS
+ * terminator saw it. The check limits the damage and, more important,
+ * makes the mistake visible immediately, not a year later in logs.
  */
 
-/** Приватный ключ EVM: 32 байта в шестнадцатеричной записи. */
+/** EVM private key: 32 bytes, hex. */
 const PRIVATE_KEY_PATTERN = /\b(0x)?[0-9a-fA-F]{64}\b/u
 
 /**
- * Последовательность из двенадцати и более слов латиницей в нижнем
- * регистре, разделённых пробелами.
+ * Twelve or more lowercase Latin words separated by spaces.
  *
- * Словарь BIP-39 сюда не тянется намеренно: он весит сотни килобайт,
- * а признак «двенадцать коротких слов подряд» ловит мнемоническую фразу
- * ничуть не хуже. Ложное срабатывание на осмысленном тексте возможно,
- * но ни одно поле этого сервиса длинных текстов не принимает.
+ * The BIP-39 wordlist is not pulled in on purpose: it weighs hundreds
+ * of kilobytes, and "twelve short words in a row" catches a mnemonic
+ * just as well. A false hit on prose is possible, but no field in this
+ * service accepts long text.
  */
 const MNEMONIC_PATTERN = /\b([a-z]{3,8}\s+){11,}[a-z]{3,8}\b/u
 
-/** Что именно распознано во входящих данных. */
+/** What was recognized in the inbound data. */
 export const SECRET_KIND = {
   PrivateKey: 'private-key',
   Mnemonic: 'mnemonic',
@@ -38,9 +36,9 @@ export const SECRET_KIND = {
 export type SecretKind = (typeof SECRET_KIND)[keyof typeof SECRET_KIND]
 
 /**
- * Ищет во входящем тексте признаки секрета.
+ * Looks for secret-like data in inbound text.
  *
- * @returns Что распознано, либо `null`, если ничего похожего нет.
+ * @returns What was recognized, or `null` if nothing matched.
  */
 export function findSecretKind(payload: string): SecretKind | null {
   if (PRIVATE_KEY_PATTERN.test(payload)) {

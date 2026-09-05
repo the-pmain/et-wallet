@@ -7,10 +7,10 @@ import {
   type JsonRpcResult,
 } from 'ethers'
 
-/** Ответ узла: либо результат, либо ошибка JSON-RPC. */
+/** Node reply: either a result or a JSON-RPC error. */
 export type NodeHandler = (params: readonly unknown[]) => unknown
 
-/** Ошибка, которую узел вернёт в поле `error` ответа. */
+/** Error the node will return in the `error` field of the reply. */
 export class NodeRpcError extends Error {
   readonly rpcCode: number
 
@@ -21,25 +21,25 @@ export class NodeRpcError extends Error {
 }
 
 /**
- * Узел JSON-RPC для тестов.
+ * JSON-RPC node for tests.
  *
- * Наследует `JsonRpcApiProvider` и реализует единственный абстрактный
- * метод `_send` — документированную точку расширения ethers. Это позволяет
- * проверять `RpcClient` целиком, включая разбор ответов и отображение
- * ошибок, без сети и без подмены внутренностей библиотеки.
+ * Extends `JsonRpcApiProvider` and implements the one abstract
+ * method `_send` — the documented ethers extension point. That
+ * lets `RpcClient` be checked as a whole, including reply parsing
+ * and error mapping, without a network and without replacing the
+ * library's internals.
  *
- * Подмена на уровне HTTP была бы ещё честнее, но потребовала бы поднимать
- * сервер: для проверки адаптера это лишняя сложность без выигрыша
- * в достоверности.
+ * Stubbing at the HTTP level would be even more honest, but would
+ * require standing up a server: for an adapter check that is extra
+ * complexity with no gain in fidelity.
  */
 export class FakeJsonRpcNode extends JsonRpcApiProvider {
-  /** Обработчики методов. Метод без обработчика приводит к ошибке. */
+  /** Method handlers. A method without a handler becomes an error. */
   readonly handlers = new Map<string, NodeHandler>()
 
-  /** Журнал вызовов: имя метода и параметры. Для проверки тегов блока. */
+  /** Call log: method name and params. For checking block tags. */
   readonly calls: { method: string; params: readonly unknown[] }[] = []
 
-  /** Имитировать полную недоступность узла. */
   offline = false
 
   constructor(chainId: number) {
@@ -48,14 +48,12 @@ export class FakeJsonRpcNode extends JsonRpcApiProvider {
     this.handlers.set('eth_chainId', () => `0x${chainId.toString(16)}`)
   }
 
-  /** Регистрирует обработчик метода. */
   on_(method: string, handler: NodeHandler): this {
     this.handlers.set(method, handler)
 
     return this
   }
 
-  /** Параметры последнего вызова метода. */
   lastCall(method: string): readonly unknown[] | null {
     for (let index = this.calls.length - 1; index >= 0; index -= 1) {
       const call = this.calls[index]
@@ -73,10 +71,10 @@ export class FakeJsonRpcNode extends JsonRpcApiProvider {
     payload: JsonRpcPayload | JsonRpcPayload[],
   ): Promise<(JsonRpcResult | JsonRpcError)[]> {
     if (this.offline) {
-      /* Ошибка формируется средствами ethers: настоящий транспорт
-         выбрасывает именно NETWORK_ERROR, и подмена обычным Error
-         проверяла бы не тот путь отображения ошибок. */
-      throw makeError('узел недоступен', 'NETWORK_ERROR', { event: 'offline' })
+      /* The error is built with ethers helpers: a real transport
+         throws NETWORK_ERROR, and substituting a plain Error would
+         check the wrong error-mapping path. */
+      throw makeError('the node is unavailable', 'NETWORK_ERROR', { event: 'offline' })
     }
 
     const requests = Array.isArray(payload) ? payload : [payload]
@@ -90,7 +88,7 @@ export class FakeJsonRpcNode extends JsonRpcApiProvider {
       if (handler === undefined) {
         return {
           id: request.id,
-          error: { code: -32601, message: `метод "${request.method}" не поддержан` },
+          error: { code: -32601, message: `method "${request.method}" is not supported` },
         }
       }
 

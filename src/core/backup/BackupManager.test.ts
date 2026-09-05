@@ -30,20 +30,20 @@ import {
 
 import { BackupManager } from './BackupManager'
 
-const PASSWORD = 'правильный-пароль-1234'
-const WRONG_PASSWORD = 'неправильный-пароль-9999'
+const PASSWORD = 'correct-password-1234'
+const WRONG_PASSWORD = 'wrong-password-9999'
 
 /**
- * Тестовая фраза нулевой энтропии.
+ * Zero-entropy test phrase.
  *
- * Совпадает с общеотраслевым вектором. Записана здесь не по памяти:
- * тест ниже сверяет её с фразой, построенной из шестнадцати нулевых
- * байтов, — расхождение означало бы, что константа испорчена.
+ * Matches the industry-wide vector. Written here not from memory:
+ * a test below checks it against a phrase built from sixteen zero
+ * bytes — a mismatch would mean the constant is corrupted.
  */
 const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
-/** Приватный ключ, равный единице. Его адрес общеизвестен. */
+/** Private key equal to one. Its address is well known. */
 const IMPORTED_KEY = new Uint8Array(32)
 IMPORTED_KEY[31] = 1
 
@@ -58,7 +58,7 @@ let backup: BackupManager
 
 const mnemonicService = new MnemonicService()
 
-/** Читает выданный секрет строкой и затирает буфер. */
+/** Reads the issued secret as a string and wipes the buffer. */
 function readAndWipe(secret: { bytes: Uint8Array; wipe: () => void }): string {
   const text = new TextDecoder().decode(secret.bytes)
 
@@ -103,24 +103,25 @@ beforeEach(async () => {
   })
 })
 
-describe('BackupManager: оценка риска', () => {
-  it('выдачу seed-фразы оценивает как критическую', async () => {
+describe('BackupManager: risk assessment', () => {
+  it('rates seed-phrase reveal as critical', async () => {
     const assessment = await backup.assessMnemonicExport()
 
     expect(assessment.risk).toBe(EXPORT_RISK.Critical)
   })
 
-  it('область seed-фразы не совпадает с областью аккаунта', async () => {
-    /* Фраза выводит все аккаунты, включая ещё не созданные. Записав её
-       выдачу под путём подписывающего аккаунта, журнал утверждал бы,
-       что риск ограничен этим аккаунтом. */
+  it('the seed-phrase scope does not match an account scope', async () => {
+    /* The phrase derives every account, including ones not yet
+       created. Recording its reveal under the signing account's
+       path, the log would claim the risk is limited to that
+       account. */
     const assessment = await backup.assessMnemonicExport()
 
     expect(assessment.request.scope).toBe(WALLET_SCOPE)
     expect(assessment.request.scope).not.toBe(hdAccountScope(hdWallet.accountPath))
   })
 
-  it('выдачу приватного ключа без истории оценивает как повышенный риск', async () => {
+  it('rates a private-key reveal with no history as elevated risk', async () => {
     const id = firstAccountId()
 
     await expect(backup.assessPrivateKeyExport(id)).resolves.toMatchObject({
@@ -128,7 +129,7 @@ describe('BackupManager: оценка риска', () => {
     })
   })
 
-  it('после выдачи xpub оценивает выдачу ключа как компрометацию аккаунта', async () => {
+  it('after an xpub reveal, rates a key reveal as account compromise', async () => {
     await guard.confirm(
       accountExportRequest(EXPORT_KIND.Xpub, hdAccountScope(hdWallet.accountPath)),
       EXPORT_RISK.Elevated,
@@ -140,29 +141,29 @@ describe('BackupManager: оценка риска', () => {
     expect(assessment.closesCompromisePair).toBe(true)
   })
 
-  it('отказывает в оценке для несуществующего аккаунта', async () => {
-    await expect(backup.assessPrivateKeyExport('нет-такого' as AccountId)).rejects.toThrow(
+  it('refuses assessment for a missing account', async () => {
+    await expect(backup.assessPrivateKeyExport('does-not-exist' as AccountId)).rejects.toThrow(
       AccountNotFoundError,
     )
   })
 })
 
-describe('BackupManager: выдача seed-фразы', () => {
-  it('возвращает сохранённую фразу', async () => {
+describe('BackupManager: seed-phrase reveal', () => {
+  it('returns the stored phrase', async () => {
     const secret = await backup.exportMnemonic(PASSWORD, EXPORT_RISK.Critical)
 
     expect(readAndWipe(secret)).toBe(TEST_MNEMONIC)
   })
 
-  it('отвергает неверный пароль', async () => {
+  it('rejects a wrong password', async () => {
     await expect(backup.exportMnemonic(WRONG_PASSWORD, EXPORT_RISK.Critical)).rejects.toThrow(
       InvalidPasswordError,
     )
   })
 
-  it('неверный пароль не оставляет записи в журнале экспортов', async () => {
-    /* Журнал, полный несостоявшихся выгрузок, завышал бы оценку риска
-       последующих операций — то есть учил бы не читать предупреждения. */
+  it('a wrong password leaves no export-log entry', async () => {
+    /* A log full of failed exports would inflate the risk of later
+       operations — that is, teach people not to read the warnings. */
     await expect(backup.exportMnemonic(WRONG_PASSWORD, EXPORT_RISK.Critical)).rejects.toThrow(
       InvalidPasswordError,
     )
@@ -170,19 +171,19 @@ describe('BackupManager: выдача seed-фразы', () => {
     await expect(auditLog.hasExported(WALLET_SCOPE, EXPORT_KIND.Mnemonic)).resolves.toBe(false)
   })
 
-  it('отказывает, если показанный уровень риска ниже фактического', async () => {
+  it('refuses if the shown risk level is below the actual one', async () => {
     await expect(backup.exportMnemonic(PASSWORD, EXPORT_RISK.Elevated)).rejects.toThrow(
       ExportNotPermittedError,
     )
   })
 
-  it('записывает состоявшуюся выдачу в журнал', async () => {
+  it('records a completed reveal in the log', async () => {
     ;(await backup.exportMnemonic(PASSWORD, EXPORT_RISK.Critical)).wipe()
 
     await expect(auditLog.hasExported(WALLET_SCOPE, EXPORT_KIND.Mnemonic)).resolves.toBe(true)
   })
 
-  it('фраза не появляется в сыром хранилище открытым текстом', async () => {
+  it('the phrase does not appear in raw storage in the clear', async () => {
     ;(await backup.exportMnemonic(PASSWORD, EXPORT_RISK.Critical)).wipe()
 
     const raw = await storage.get<Record<string, unknown>>(
@@ -194,8 +195,8 @@ describe('BackupManager: выдача seed-фразы', () => {
   })
 })
 
-describe('BackupManager: выдача приватного ключа', () => {
-  it('выдаёт ключ HD-аккаунта', async () => {
+describe('BackupManager: private-key reveal', () => {
+  it('reveals an HD-account key', async () => {
     const secret = await backup.exportPrivateKey(
       firstAccountId(),
       PASSWORD,
@@ -206,7 +207,7 @@ describe('BackupManager: выдача приватного ключа', () => {
     secret.wipe()
   })
 
-  it('отвергает неверный пароль и не пишет в журнал', async () => {
+  it('rejects a wrong password and does not write the log', async () => {
     const id = firstAccountId()
 
     await expect(
@@ -218,13 +219,13 @@ describe('BackupManager: выдача приватного ключа', () => {
     ).resolves.toBe(false)
   })
 
-  it('отказывает при заниженном уровне риска', async () => {
+  it('refuses when the risk level is understated', async () => {
     await expect(
       backup.exportPrivateKey(firstAccountId(), PASSWORD, EXPORT_RISK.Low),
     ).rejects.toThrow(ExportNotPermittedError)
   })
 
-  it('выдаёт импортированный ключ и не задевает область HD-аккаунта', async () => {
+  it('reveals an imported key and does not touch the HD-account scope', async () => {
     const key = SecretBuffer.copyOf(IMPORTED_KEY)
     const imported = await accounts.importPrivateKey({ privateKey: key })
 
@@ -239,20 +240,21 @@ describe('BackupManager: выдача приватного ключа', () => {
     expect(secret.bytes).toHaveLength(32)
     secret.wipe()
 
-    /* Импортированный ключ не принадлежит HD-дереву: пометив им аккаунт,
-       кошелёк выдавал бы ложное предупреждение о компрометации. */
+    /* An imported key does not belong to the HD tree: marking the
+       account with it, the wallet would issue a false compromise
+       warning. */
     await expect(
       auditLog.hasExported(hdAccountScope(hdWallet.accountPath), EXPORT_KIND.PrivateKey),
     ).resolves.toBe(false)
   })
 
-  it('разрешение одноразово: повторная выдача требует нового подтверждения', async () => {
+  it('the permit is one-shot: a second reveal needs a new confirmation', async () => {
     const id = firstAccountId()
 
     ;(await backup.exportPrivateKey(id, PASSWORD, EXPORT_RISK.AccountCompromise)).wipe()
 
-    /* Второй вызов проходит заново через оценку и подтверждение —
-       разрешение от первого использовать нельзя. */
+    /* The second call goes through assessment and confirmation
+       again — the permit from the first cannot be reused. */
     const secret = await backup.exportPrivateKey(id, PASSWORD, EXPORT_RISK.AccountCompromise)
 
     expect(secret.bytes).toHaveLength(32)
@@ -260,40 +262,40 @@ describe('BackupManager: выдача приватного ключа', () => {
   })
 })
 
-describe('BackupManager: проверка фразы перед импортом', () => {
-  it('принимает действительную фразу', () => {
+describe('BackupManager: phrase check before import', () => {
+  it('accepts a valid phrase', () => {
     const check = backup.checkMnemonic(TEST_MNEMONIC)
 
     expect(check.isValid).toBe(true)
     expect(check.wordCount).toBe(12)
   })
 
-  it('называет причину при неверной контрольной сумме', () => {
+  it('names the reason on a wrong checksum', () => {
     const swapped = TEST_MNEMONIC.replace('about', 'abandon')
 
     expect(backup.checkMnemonic(swapped).reason).toBe(MNEMONIC_INVALID_REASON.Checksum)
   })
 
-  it('указывает позиции слов вне словаря', () => {
-    const broken = TEST_MNEMONIC.replace('abandon abandon abandon a', 'abandon abandon зомби a')
+  it('points at word positions outside the wordlist', () => {
+    const broken = TEST_MNEMONIC.replace('abandon abandon abandon a', 'abandon abandon zombie a')
 
     expect(backup.checkMnemonic(broken).unknownWordIndexes).toEqual([2])
   })
 
-  it('предупреждает о тривиальной энтропии', () => {
+  it('warns about trivial entropy', () => {
     expect(backup.checkMnemonic(TEST_MNEMONIC).isGuessable).toBe(true)
   })
 
-  it('тестовая фраза действительно соответствует нулевой энтропии', () => {
-    /* Проверка самой константы: она выписана строкой, а строку нельзя
-       проверить чтением. Фраза, построенная из шестнадцати нулевых байт,
-       обязана совпасть с ней слово в слово. */
+  it('the test phrase really matches zero entropy', () => {
+    /* Check of the constant itself: it is written as a string, and
+       a string cannot be checked by reading. A phrase built from
+       sixteen zero bytes must match it word for word. */
     const built = mnemonicService.fromEntropy(new Uint8Array(16))
 
     expect(readAndWipe(built)).toBe(TEST_MNEMONIC)
   })
 
-  it('фразу со случайной энтропией тривиальной не считает', () => {
+  it('does not treat a phrase with random entropy as trivial', () => {
     const generated = mnemonicService.generate()
     const phrase = mnemonicService.revealPhrase(generated)
 
@@ -302,78 +304,80 @@ describe('BackupManager: проверка фразы перед импортом
     expect(backup.checkMnemonic(phrase).isGuessable).toBe(false)
   })
 
-  it('не бросает исключений на незаконченном вводе', () => {
+  it('does not throw on unfinished input', () => {
     expect(() => backup.checkMnemonic('abandon aban')).not.toThrow()
     expect(backup.checkMnemonic('abandon aban').isValid).toBe(false)
   })
 
-  it('пустой ввод тривиальным не считает', () => {
-    /* «Энтропия неизвестна» и «энтропия слабая» — разные утверждения.
-       Второе, показанное вместо первого, — ложная тревога. */
+  it('does not treat empty input as trivial', () => {
+    /* "Entropy unknown" and "entropy weak" are different claims.
+       The second, shown in place of the first, is a false alarm. */
     expect(backup.checkMnemonic('').isGuessable).toBe(false)
   })
 })
 
-/** Идентификатор единственного созданного аккаунта. */
+/** Identifier of the only created account. */
 function firstAccountId(): AccountId {
   const account = accounts.list()[0]
 
   if (account === undefined) {
-    throw new Error('Аккаунт не создан.')
+    throw new Error('Account was not created.')
   }
 
   return account.id
 }
 
-describe('BackupManager: проверка записанной копии', () => {
-  it('верно переписанная фраза признаётся совпадающей', async () => {
+describe('BackupManager: written-copy check', () => {
+  it('a correctly rewritten phrase is recognised as matching', async () => {
     await expect(backup.verifyMnemonicBackup(TEST_MNEMONIC, PASSWORD)).resolves.toBe(true)
   })
 
-  it('фраза с одним изменённым словом не совпадает', async () => {
-    /* Ровно эта ошибка и приводит к потере: одно слово мимо — другой
-       кошелёк, и узнаётся это при восстановлении. */
+  it('a phrase with one changed word does not match', async () => {
+    /* Exactly this error leads to loss: one word off — another
+       wallet, and that is learned at restore. */
     const wrong = TEST_MNEMONIC.replace('about', 'above')
 
     await expect(backup.verifyMnemonicBackup(wrong, PASSWORD)).resolves.toBe(false)
   })
 
-  it('пропущенное слово не совпадает', async () => {
+  it('a missing word does not match', async () => {
     const short = TEST_MNEMONIC.split(' ').slice(0, 11).join(' ')
 
     await expect(backup.verifyMnemonicBackup(short, PASSWORD)).resolves.toBe(false)
   })
 
-  it('лишние пробелы и регистр совпадению не мешают', async () => {
-    /* Переписывают с бумаги столбцом и набирают с мобильной клавиатуры,
-       которая ставит заглавную букву. Отказ по этой причине выглядел бы
-       как «фраза записана неверно» — то есть ложной тревогой
-       о невосполнимой потере. */
+  it('extra spaces and casing do not prevent a match', async () => {
+    /* People rewrite from paper in a column and type on a mobile
+       keyboard that capitalises. A refusal for that reason would
+       look like "the phrase was written wrong" — a false alarm
+       about an irrecoverable loss. */
     const messy = `  ${TEST_MNEMONIC.toUpperCase().split(' ').join('\n')}  `
 
     await expect(backup.verifyMnemonicBackup(messy, PASSWORD)).resolves.toBe(true)
   })
 
-  it('без верного пароля не отвечает вовсе', async () => {
-    /* Иначе экран превращается в оракул: нашедший бумагу с несколькими
-       смазанными словами перебирал бы остаток, получая «да/нет»
-       на каждую догадку. */
-    await expect(backup.verifyMnemonicBackup(TEST_MNEMONIC, 'не тот пароль')).rejects.toThrow(
+  it('does not answer at all without the right password', async () => {
+    /* Otherwise the screen becomes an oracle: someone who found a
+       paper with a few smeared words would guess the rest, getting
+       yes/no on every attempt. */
+    await expect(backup.verifyMnemonicBackup(TEST_MNEMONIC, 'wrong password')).rejects.toThrow(
       InvalidPasswordError,
     )
   })
 
-  it('неверный пароль не отличается по ответу от неверной фразы', async () => {
-    /* Оба случая обязаны кончаться отказом, а не «фраза не совпала»:
-       второе сообщало бы, что пароль угадан. */
-    await expect(backup.verifyMnemonicBackup('abandon abandon', 'не тот пароль')).rejects.toThrow(
+  it('a wrong password does not differ in reply from a wrong phrase', async () => {
+    /* Both cases must end in a refusal, not "the phrase did not
+       match": the latter would report that the password was
+       guessed. */
+    await expect(backup.verifyMnemonicBackup('abandon abandon', 'wrong password')).rejects.toThrow(
       InvalidPasswordError,
     )
   })
 
-  it('фраза наружу не выдаётся ни при совпадении, ни при расхождении', async () => {
-    /* Метод возвращает признак, а не текст: второй путь выдачи фразы
-       обошёл бы и подтверждение риска, и журнал экспортов. */
+  it('the phrase is not issued on a match or a mismatch', async () => {
+    /* The method returns a flag, not the text: a second phrase-
+       reveal path would bypass both risk confirmation and the
+       export log. */
     const matched = await backup.verifyMnemonicBackup(TEST_MNEMONIC, PASSWORD)
     const missed = await backup.verifyMnemonicBackup('abandon abandon abandon', PASSWORD)
 
@@ -381,10 +385,10 @@ describe('BackupManager: проверка записанной копии', () =
     expect(typeof missed).toBe('boolean')
   })
 
-  it('проверка не пишется в журнал экспортов', async () => {
-    /* Записи «фраза выгружена» здесь нет, потому что выгрузки не было.
-       Запись завышала бы оценку риска последующих настоящих выгрузок,
-       то есть учила бы не читать предупреждения. */
+  it('the check is not written to the export log', async () => {
+    /* There is no "phrase exported" entry here, because there was
+       no export. An entry would inflate the risk of later real
+       exports, that is, teach people not to read the warnings. */
     const before = await backup.assessMnemonicExport()
 
     await backup.verifyMnemonicBackup(TEST_MNEMONIC, PASSWORD)

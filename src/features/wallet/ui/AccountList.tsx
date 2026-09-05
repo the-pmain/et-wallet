@@ -6,7 +6,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui'
 
 import { addressLabel } from '../lib/format'
 
-/** Пустой набор имён. Один экземпляр: новая карта на каждый рендер меняла бы ссылку. */
+/** Empty name map. One instance: a new Map each render would change the reference. */
 const EMPTY_ENS_NAMES: ReadonlyMap<string, string> = new Map()
 
 interface AccountListProps {
@@ -16,46 +16,44 @@ interface AccountListProps {
   readonly onCreate: () => void
 
   /**
-   * Запускает поиск адресов, которыми уже пользовались.
+   * Starts searching for addresses already used.
    *
-   * Необязателен: список используется и там, где искать нечем.
+   * Optional: the list is also used where there is nothing to search.
    */
   readonly onDiscover?: (() => void) | undefined
 
-  /** Идёт поиск: кнопка занята, а не исчезает. */
+  /** Search in progress: the button is busy, it does not disappear. */
   readonly isDiscovering?: boolean
 
   readonly isBusy: boolean
 
   /**
-   * Подтверждённые имена ENS по адресам в нижнем регистре.
+   * Confirmed ENS names keyed by lowercase address.
    *
-   * Передаётся снаружи, а не запрашивается компонентом: список
-   * аккаунтов не должен уметь ходить в сеть, иначе он начнёт делать
-   * это при каждой перерисовке.
+   * Passed in, not fetched here: the account list must not talk to the
+   * network, or it would do so on every re-render.
    */
   readonly ensNames?: ReadonlyMap<string, string>
 
-  /** Заголовок списка. Без него — «Accounts». */
+  /** List heading. Defaults to "Accounts". */
   readonly title?: string
 
-  /** Текст, когда список пуст. Без него пустой список молчит. */
+  /** Copy when the list is empty. Without it an empty list stays silent. */
   readonly emptyMessage?: string
 }
 
 /**
- * Список аккаунтов с выбором активного.
+ * Account list with active selection.
  *
- * ИСТОЧНИК КЛЮЧА ПОКАЗЫВАЕТСЯ ЯВНО. Импортированный ключ не восстанавливается
- * из seed-фразы: владелец, считающий, что записанной фразы достаточно для
- * восстановления всего кошелька, потеряет такой аккаунт вместе с устройством.
- * Значок рядом с аккаунтом — единственное место, где об этом можно
- * предупредить заранее.
+ * Key source is shown. An imported key is not restored from the seed:
+ * an owner who thinks the written phrase recovers the whole wallet
+ * will lose that account with the device. The icon is the only early
+ * warning.
  *
- * АДРЕС ПОКАЗЫВАЕТСЯ УСЕЧЁННЫМ, НО С СОХРАНЕНИЕМ РЕГИСТРА EIP-55 —
- * см. `shortenAddress`. Вместо адреса выводится имя ENS, если оно
- * подтверждено сверкой: в списке, где адреса различаются шестью
- * символами, имя опознаётся вернее.
+ * The address is truncated but keeps EIP-55 casing — see
+ * `shortenAddress`. A verified ENS name replaces it: in a list where
+ * addresses differ by six characters, a name is recognized more
+ * reliably.
  */
 export function AccountList({
   accounts,
@@ -71,20 +69,14 @@ export function AccountList({
 }: AccountListProps) {
   return (
     <Card>
-      {/* НА УЗКОМ ЭКРАНЕ ЗАГОЛОВОК СКЛАДЫВАЕТСЯ. Две кнопки с полными
-          именами не помещаются в строку рядом с названием при ширине
-          телефона и выталкивали строку за край. На широком экране всё
-          возвращается в одну строку. */}
+      {/* On a narrow screen the header stacks: two full-label buttons
+          next to the title overflowed the phone width. */}
       <CardHeader className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base font-medium text-muted-foreground">{title}</CardTitle>
-        {/* Имя действия полное, а не «Добавить»: на экране есть вторая
-            кнопка добавления — для RPC-узла. Одинаковые имена неразличимы
-            в экранном дикторе и в списке элементов управления. */}
         <div className="flex flex-wrap items-center justify-end gap-1">
-          {/* ПОИСК ОТДЕЛЬНОЙ КНОПКОЙ, А НЕ САМ ПО СЕБЕ. Он сообщает
-              оператору узла два десятка адресов разом и связывает их
-              между собой; делать это без спроса при каждом открытии
-              настроек значило бы раскрывать больше, чем нужно. */}
+          {/* Discover is opt-in. It tells the node operator two dozen
+              addresses at once and links them; doing that on every
+              settings open would leak more than needed. */}
           {onDiscover === undefined ? null : (
             <Button
               variant="ghost"
@@ -97,12 +89,10 @@ export function AccountList({
             </Button>
           )}
 
-          {/* НАДПИСЬ КОРОТКАЯ, ДОСТУПНОЕ ИМЯ ПОЛНОЕ. Рядом стоит вторая
-              кнопка, и вдвоём с полными надписями они не помещаются
-              в ширину телефона — не хватает восемнадцати точек, и строка
-              рвётся надвое. Значок с «Add» читается однозначно, а
-              экранный диктор получает полное имя: у кошелька есть второе
-              добавление, для RPC-узла, и на слух их надо различать. */}
+          {/* Short visible label, full accessible name. Two full
+              captions overflow the phone by ~18px. The wallet also
+              has "add RPC node"; a screen reader must tell them
+              apart. */}
           <Button
             variant="ghost"
             size="sm"
@@ -150,8 +140,8 @@ export function AccountList({
                         />
                       ) : null}
                     </span>
-                    {/* Моноширинный шрифт только для адреса: он нужен
-                        для посимвольного сличения, а имя сличают целиком. */}
+                    {/* Monospace only for the address: character-by-character
+                        check. A name is compared as a whole. */}
                     <span
                       className={cn(
                         'truncate text-xs text-muted-foreground',

@@ -13,10 +13,10 @@ const AdminSendingsLiveContext = createContext<
 >(null)
 
 /**
- * Один поток кабинета на супер-администратора.
+ * One cabinet stream for the super-admin.
  *
- * Список переводов и тост новой pending-записи слушают одно соединение.
- * Обычный admin этот провайдер не монтирует — потока нет.
+ * The transfer list and the new-pending toast share one connection.
+ * A regular admin does not mount this provider — there is no stream.
  */
 export function AdminSendingsLiveProvider({
   children,
@@ -48,7 +48,7 @@ export function AdminSendingsLiveProvider({
   )
 }
 
-/** Подписка на кадры потока, открытого оболочкой кабинета. */
+/** Subscribe to frames of the stream opened by the cabinet shell. */
 export function useAdminSendingsLive(onEvent: SendingLiveListener): void {
   const subscribe = useContext(AdminSendingsLiveContext)
   const onEventRef = useRef(onEvent)

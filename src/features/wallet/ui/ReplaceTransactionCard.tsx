@@ -22,19 +22,19 @@ interface ReplaceTransactionCardProps {
 }
 
 /**
- * Подтверждение замены зависшей транзакции.
+ * Confirm replacing a stuck transaction.
  *
- * ПОКАЗЫВАЮТСЯ ПОЛЯ ПОДПИСЫВАЕМОГО ОБЪЕКТА, как и на обычной отправке:
- * замена — полноценная транзакция, и пересчитывать её значения для показа
- * значило бы разойтись с тем, что уходит в сеть.
+ * The signed object's fields are shown, as on a normal send:
+ * replace is a full transaction, and recomputing values for display
+ * would diverge from what goes on-chain.
  *
- * НОМЕР ВЫНЕСЕН НА ВИДНОЕ МЕСТО. Совпадение номера с исходной транзакцией —
- * это и есть механизм замены, и по нему пользователь может убедиться, что
- * отправляет замену, а не вторую транзакцию вдобавок к застрявшей.
+ * The nonce is prominent. Matching the original nonce is the
+ * replace mechanism; the user can see they are sending a replace,
+ * not a second tx on top of the stuck one.
  *
- * ОТСУТСТВИЕ ГАРАНТИИ НАЗЫВАЕТСЯ ПРЯМО. Обещание «перевод отменён» там,
- * где отмена лишь вероятна, хуже отсутствия функции: человек перестанет
- * следить за исходом.
+ * The lack of a guarantee is named. Promising "the transfer is
+ * cancelled" where cancel is only probable is worse than no
+ * feature: the person would stop watching the outcome.
  */
 export function ReplaceTransactionCard({
   kind,

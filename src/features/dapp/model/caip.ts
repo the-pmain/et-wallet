@@ -1,33 +1,30 @@
 import { toChainId, type Address, type ChainId } from '@/core'
 
 /**
- * Идентификаторы сетей и счетов по CAIP-2 и CAIP-10.
+ * Network and account identifiers per CAIP-2 and CAIP-10.
  *
- * WalletConnect адресует сети строкой вида `eip155:1`, а счета —
- * `eip155:1:0x…`. Кошелёк внутри работает с `ChainId`, поэтому перевод
- * выполняется на границе транспорта и в одном месте: две копии этого
- * разбора разошлись бы при первой же правке.
+ * WalletConnect addresses networks as `eip155:1` and accounts as
+ * `eip155:1:0x…`. Internally the wallet uses `ChainId`, so the
+ * conversion happens at the transport boundary in one place: two
+ * copies of this parse would drift on the first edit.
  */
 
-/** Пространство имён сетей EVM. */
 const EVM_NAMESPACE = 'eip155'
 
-/** Строит идентификатор сети: `eip155:1`. */
 export function toCaip2(chainId: ChainId): string {
   return `${EVM_NAMESPACE}:${chainId.toString()}`
 }
 
-/** Строит идентификатор счёта: `eip155:1:0x…`. */
 export function toCaip10(chainId: ChainId, address: Address): string {
   return `${toCaip2(chainId)}:${address}`
 }
 
 /**
- * Читает идентификатор сети.
+ * Parse a network identifier.
  *
- * `null` для чужого пространства имён либо неразбираемой строки.
- * Подставить сюда значение по умолчанию значило бы выполнить запрос
- * не в той сети, о которой просило приложение.
+ * `null` for a foreign namespace or an unparseable string.
+ * Substituting a default here would run a request on a network
+ * the app did not ask for.
  */
 export function parseCaip2(value: string): ChainId | null {
   const [namespace, reference] = value.split(':')

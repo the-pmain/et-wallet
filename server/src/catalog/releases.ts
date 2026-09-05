@@ -1,18 +1,18 @@
 import type { IReleaseCatalog } from './types.ts'
 
 /**
- * Сведения о выпусках приложения.
+ * App release info.
  *
- * АДРЕСА ЗАГРУЗКИ ЗДЕСЬ НЕТ. Сервис, сообщающий «ваша версия устарела,
- * скачайте отсюда», — готовый способ увести пользователя на поддельный
- * установщик: достаточно однажды подменить одну строку в ответе.
- * Адрес магазина расширений зашит в клиенте и меняется только выпуском
- * новой версии, то есть проходит через подпись и проверку магазина.
+ * NO DOWNLOAD URL HERE. A service that says "your version is outdated,
+ * download from here" is a ready way to send the user to a fake
+ * installer: one swapped string in the response is enough. The store
+ * URL is baked into the client and changes only with a new release,
+ * so it goes through store signing and review.
  *
- * `minSupported` — ЭТО ЗАЯВЛЕНИЕ О ПОДДЕРЖКЕ, А НЕ ВЫКЛЮЧАТЕЛЬ.
- * Сервис не вправе остановить кошелёк: некастодиальное приложение
- * обязано оставаться работоспособным, даже когда его сервис недоступен
- * или враждебен. Клиент показывает предупреждение и продолжает работать.
+ * `minSupported` IS A SUPPORT STATEMENT, NOT A KILL SWITCH.
+ * The service may not stop the wallet: a non-custodial app must stay
+ * usable even when its service is down or hostile. The client shows
+ * a warning and keeps working.
  */
 export const RELEASES: IReleaseCatalog = {
   latest: '0.1.0',

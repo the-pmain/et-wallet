@@ -12,7 +12,7 @@ import {
   type IToken,
 } from '@/core'
 
-/** Как часто перечитывать свечи, пока панель открыта. */
+/** How often to re-read candles while the panel is open. */
 const LIVE_POLL_MS = 30_000
 
 export type PriceSeriesStatus = 'idle' | 'loading' | 'ready' | 'empty'
@@ -24,15 +24,16 @@ export interface ITokenPriceSeries {
 }
 
 /**
- * Ряд цен раскрытого актива.
+ * Price series of the expanded asset.
  *
- * ЗАПРОС ИДЁТ ТОЛЬКО ПОКА ПАНЕЛЬ ОТКРЫТА. Закрытая строка не дергает
- * Coinbase: лимит чужой, и график всё равно не виден.
+ * The request runs only while the panel is open. A closed row does
+ * not hit Coinbase: the quota is theirs, and the chart is not visible.
  *
- * СНАЧАЛА КАТАЛОГ. Sparkline уже лежит в снимке рынка — линия
- * появляется сразу. Свечи, если пара известна, заменяют ряд, когда
- * придут. Нет монеты в каталоге — запроса нет: угадывать пару
- * по тикеру опасно, USDC и USD₮ визуально не отличить.
+ * Catalog first. The sparkline already lives in the market snapshot,
+ * so the line appears immediately. Candles, if the pair is known,
+ * replace the series when they arrive. No catalog coin means no
+ * request: guessing a pair from a ticker is unsafe — USDC and USD₮
+ * look the same.
  */
 export function useTokenPriceSeries(
   token: IToken,

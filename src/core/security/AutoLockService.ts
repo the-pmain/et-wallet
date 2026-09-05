@@ -3,77 +3,70 @@ import type { IClock } from '@/core/platform'
 import type { Unsubscribe } from '@/core/types'
 
 /**
- * Значение по умолчанию: пятнадцать минут бездействия.
+ * Default: fifteen minutes of inactivity.
  *
- * Компромисс между двумя видами вреда. Слишком короткий срок заставляет
- * вводить пароль посреди работы, и пользователь ставит самый длинный
- * из доступных либо отключает защиту вовсе. Слишком длинный оставляет
- * ключи в памяти разблокированного кошелька на брошенном устройстве.
+ * A compromise between two harms. Too short forces a password mid-work,
+ * and the user picks the longest available timeout or turns the
+ * protection off. Too long leaves keys in memory of an unlocked wallet
+ * on an abandoned device.
  */
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000
 
 /**
- * За сколько до блокировки показывается предупреждение.
+ * How far before lock a warning is shown.
  *
- * Блокировка посреди заполнения формы отправки теряет введённое.
- * Предупреждение даёт возможность продлить сессию одним движением —
- * и оно же объясняет, почему кошелёк вдруг закрылся, если человек
- * отвлёкся.
+ * Locking mid-send-form loses what was typed. A warning lets the
+ * session be extended in one motion — and explains why the wallet
+ * suddenly closed if the person looked away.
  */
 const DEFAULT_WARNING_MS = 60 * 1000
 
-/** Как часто проверяется истечение срока. */
 const TICK_INTERVAL_MS = 5 * 1000
 
-/** События автоблокировки. */
 export interface AutoLockEventMap {
-  /** До блокировки осталось меньше порога предупреждения. */
+  /** Less than the warning threshold remains until lock. */
   'autolock:warning': { readonly remainingMs: number }
 
-  /** Предупреждение снято: пользователь проявил активность. */
+  /** Warning cleared: the user was active. */
   'autolock:resumed': Record<string, never>
 
-  /** Срок истёк, кошелёк подлежит блокировке. */
+  /** The timeout expired; the wallet should lock. */
   'autolock:expired': Record<string, never>
 }
 
-/** Настройки сервиса. */
 export interface IAutoLockOptions {
-  /** Срок бездействия до блокировки. */
   readonly timeoutMs?: number
 
-  /** За сколько до блокировки предупреждать. */
   readonly warningMs?: number
 }
 
-/** Зависимости сервиса. */
 export interface IAutoLockDependencies {
   readonly clock: IClock
 }
 
 /**
- * Автоблокировка по бездействию.
+ * Idle auto-lock.
  *
- * ЗАЧЕМ ОНА НУЖНА. Разблокированный кошелёк держит в памяти корневой
- * ключ, выведенный из seed-фразы. Пока сессия открыта, любой, кто
- * получил доступ к устройству, распоряжается средствами без пароля.
- * Автоблокировка ограничивает это окно временем, а не доверием
- * к обстановке вокруг.
+ * WHY IT EXISTS. An unlocked wallet holds the root key derived from
+ * the seed phrase in memory. While the session is open, anyone who
+ * gets the device can move funds without the password. Auto-lock
+ * bounds that window by time, not by trust in the surroundings.
  *
- * ЯДРО НЕ ЗНАЕТ О СОБЫТИЯХ БРАУЗЕРА. Сервис считает время и ничего
- * не слушает: нажатия клавиш и движения указателя отслеживает слой
- * приложения и сообщает о них через `notifyActivity`. Иначе ядро
- * перестало бы работать в service worker, где DOM отсутствует.
+ * THE CORE DOES NOT KNOW ABOUT BROWSER EVENTS. The service counts
+ * time and listens to nothing: keypresses and pointer moves are
+ * tracked by the app layer, which reports them via `notifyActivity`.
+ * Otherwise the core would stop working in a service worker, where
+ * there is no DOM.
  *
- * СЕРВИС НЕ БЛОКИРУЕТ КОШЕЛЁК САМ. Он сообщает, что срок истёк;
- * блокировку выполняет тот, кто владеет сессией. Разделение нужно,
- * чтобы порядок закрытия — остановка опроса, разрыв соединений,
- * затирание ключа — оставался в одном месте.
+ * THE SERVICE DOES NOT LOCK THE WALLET ITSELF. It reports that the
+ * timeout expired; the session owner performs the lock. The split
+ * keeps the shutdown order — stop polling, drop connections, wipe
+ * the key — in one place.
  *
- * ИСКЛЮЧЕНИЙ ДЛЯ «ВАЖНЫХ ЭКРАНОВ» НЕТ. Оговорка «не блокировать, пока
- * открыта форма отправки» превратила бы защиту в необязательную:
- * достаточно оставить эту форму открытой. Вместо исключения —
- * предупреждение заранее.
+ * THERE ARE NO EXCEPTIONS FOR "IMPORTANT SCREENS". A carve-out
+ * "do not lock while the send form is open" would make the
+ * protection optional: leave that form open. Instead of an
+ * exception — a warning in advance.
  */
 export class AutoLockService {
   readonly #clock: IClock
@@ -92,21 +85,19 @@ export class AutoLockService {
     this.#warningMs = options.warningMs ?? DEFAULT_WARNING_MS
   }
 
-  /** Действует ли отсчёт. */
   get isRunning(): boolean {
     return this.#stopTicking !== null
   }
 
-  /** Текущий срок бездействия. */
   get timeoutMs(): number {
     return this.#timeoutMs
   }
 
   /**
-   * Сколько осталось до блокировки.
+   * Time left until lock.
    *
-   * `null`, когда отсчёт не идёт: «не запущено» и «осталось ноль» —
-   * разные состояния, и второе означает немедленную блокировку.
+   * `null` when the countdown is not running: "not started" and
+   * "zero left" are different states, and the latter means lock now.
    */
   get remainingMs(): number | null {
     if (this.#stopTicking === null) {
@@ -116,7 +107,7 @@ export class AutoLockService {
     return Math.max(0, this.#lastActivityAt + this.#timeoutMs - this.#clock.now())
   }
 
-  /** Запускает отсчёт заново. Повторный вызов не создаёт второй таймер. */
+  /** Restarts the countdown. A second call does not create a second timer. */
   start(): void {
     this.stop()
 
@@ -128,7 +119,7 @@ export class AutoLockService {
     }, TICK_INTERVAL_MS)
   }
 
-  /** Останавливает отсчёт. Вызывается при блокировке кошелька. */
+  /** Stops the countdown. Called when the wallet locks. */
   stop(): void {
     this.#stopTicking?.()
     this.#stopTicking = null
@@ -136,11 +127,11 @@ export class AutoLockService {
   }
 
   /**
-   * Отмечает активность пользователя.
+   * Records user activity.
    *
-   * Вызывается слоем приложения по событиям ввода. Если предупреждение
-   * уже показано, оно снимается — иначе оно висело бы до самой
-   * блокировки, которой уже не будет.
+   * Called by the app layer on input events. If a warning is already
+   * showing, it is cleared — otherwise it would hang until a lock
+   * that will no longer happen.
    */
   notifyActivity(): void {
     if (this.#stopTicking === null) {
@@ -156,18 +147,18 @@ export class AutoLockService {
   }
 
   /**
-   * Меняет срок бездействия.
+   * Changes the idle timeout.
    *
-   * Отсчёт начинается заново: применить новый срок к уже прошедшему
-   * времени значило бы заблокировать кошелёк немедленно при выборе
-   * более короткого значения.
+   * The countdown restarts: applying a new timeout to time already
+   * elapsed would lock the wallet immediately when a shorter value
+   * is chosen.
    */
   setTimeout(timeoutMs: number): void {
     this.#timeoutMs = timeoutMs
 
-    /* Предупреждение не может быть длиннее самого срока: иначе оно
-       показывалось бы с первой же секунды и перестало бы означать
-       «скоро заблокируется». */
+    /* The warning cannot be longer than the timeout itself: otherwise
+       it would show from the first second and stop meaning
+       "about to lock". */
     this.#warningMs = Math.min(DEFAULT_WARNING_MS, Math.floor(timeoutMs / 2))
 
     if (this.#stopTicking !== null) {
@@ -182,7 +173,7 @@ export class AutoLockService {
     return this.#events.on(event, listener)
   }
 
-  /** Проверяет срок и сообщает о наступивших событиях. */
+  /** Checks the timeout and reports events that have occurred. */
   #tick(): void {
     const remaining = this.remainingMs
 
@@ -191,9 +182,9 @@ export class AutoLockService {
     }
 
     if (remaining <= 0) {
-      /* Отсчёт останавливается до сообщения о событии: обработчик
-         блокирует кошелёк, и таймер, переживший блокировку, продолжил
-         бы обращаться к уничтоженным сервисам. */
+      /* Stop before emitting: the handler locks the wallet, and a
+         timer that outlived the lock would keep calling destroyed
+         services. */
       this.stop()
       this.#events.emit('autolock:expired', {})
 

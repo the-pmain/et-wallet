@@ -1,22 +1,24 @@
 import { EncryptionService, type IKdfParams } from '@/core'
 
 /**
- * Число итераций PBKDF2 в тестах.
+ * PBKDF2 iteration count in tests.
  *
- * Боевое значение — 600 000, и один вывод ключа занимает сотни
- * миллисекунд. Набор из полусотни тестов работал бы минуты.
+ * The production value is 600 000, and one key derivation takes
+ * hundreds of milliseconds. A suite of fifty tests would run for
+ * minutes.
  */
 export const TEST_KDF_ITERATIONS = 1_000
 
 /**
- * Шифрование с уменьшенным числом итераций. ТОЛЬКО ДЛЯ ТЕСТОВ.
+ * Encryption with a reduced iteration count. TESTS ONLY.
  *
- * Реализовано наследованием, а не параметром конструктора, сознательно:
- * production-код не получает никакой возможности ослабить KDF.
- * Единственный способ снизить стойкость — написать подкласс, что
- * невозможно сделать случайно или по невнимательности.
+ * Implemented by inheritance, not a constructor parameter, on
+ * purpose: production code gets no way to weaken the KDF. The
+ * only way to lower strength is to write a subclass, which cannot
+ * happen by accident or inattention.
  *
- * Отдельные тесты проверяют, что базовый класс сохранил боевые параметры.
+ * Separate tests check that the base class kept production
+ * parameters.
  */
 export class FastEncryptionService extends EncryptionService {
   override createKdfParams(): IKdfParams {

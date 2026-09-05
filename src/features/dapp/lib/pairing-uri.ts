@@ -1,32 +1,32 @@
 /**
- * Схема ссылки подключения WalletConnect.
+ * WalletConnect pairing URI scheme.
  *
- * Проверяется точно, а не поиском подстроки: строка `https://evil/wc:…`
- * содержит `wc:` и прошла бы поиск, не будучи ссылкой подключения.
+ * Checked exactly, not by substring: `https://evil/wc:…` contains
+ * `wc:` and would pass a search without being a pairing URI.
  */
 const PAIRING_SCHEME = 'wc:'
 
 /**
- * Верхняя граница длины.
+ * Upper length bound.
  *
- * Ссылка подключения состоит из темы, версии и ключа — около полутора
- * сотен символов. Штрих-код вмещает несколько тысяч, и принимать их все
- * значит позволить постороннему занять поле ввода полотном текста.
+ * A pairing URI is topic, version, and key — about a hundred and
+ * fifty characters. A barcode holds several thousand, and accepting
+ * them all lets a stranger fill the input with a wall of text.
  */
 const MAX_PAIRING_URI_LENGTH = 512
 
 /**
- * Похоже ли прочитанное на ссылку подключения.
+ * Whether the scanned text looks like a pairing URI.
  *
- * ПРОЧИТАННОЕ С ЭКРАНА ИЛИ НАКЛЕЙКИ — НЕДОВЕРЕННЫЕ ДАННЫЕ. Штрих-код
- * может содержать что угодно: адрес сайта, платёжное требование
- * другого кошелька, произвольный текст. Отдать это подключению
- * не глядя значило бы выполнить чужую команду; отбросить молча —
- * оставить человека перед камерой, которая «не работает».
+ * TEXT FROM A SCREEN OR A STICKER IS UNTRUSTED. A barcode can hold
+ * anything: a site URL, another wallet's payment request, arbitrary
+ * text. Handing that to pairing unread would run a stranger's
+ * command; dropping it silently would leave the person in front of
+ * a camera that "does not work".
  *
- * Проверка НАМЕРЕННО ПОВЕРХНОСТНАЯ: разбирать содержимое ссылки здесь
- * нельзя. Это работа библиотеки WalletConnect, и второе место разбора
- * означало бы два разных представления о том, что считать ссылкой.
+ * The check is SHALLOW ON PURPOSE: the URI must not be parsed here.
+ * That is WalletConnect's job, and a second parser would mean two
+ * ideas of what counts as a URI.
  */
 export function isPairingUri(text: string): boolean {
   const value = text.trim()

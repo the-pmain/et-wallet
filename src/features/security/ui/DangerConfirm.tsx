@@ -6,13 +6,13 @@ import { Alert, AlertDescription, AlertTitle, Button, Checkbox, Label } from '@/
 interface DangerConfirmProps {
   readonly title: string
 
-  /** Что произойдёт и почему это необратимо. */
+  /** What will happen and why it is irreversible. */
   readonly description: ReactNode
 
-  /** Текст отметки, которую пользователь обязан поставить. */
+  /** Text of the checkbox the user must tick. */
   readonly acknowledgement: string
 
-  /** Подпись кнопки, выполняющей действие. */
+  /** Label of the button that performs the action. */
   readonly confirmLabel: string
 
   readonly isBusy?: boolean
@@ -21,21 +21,21 @@ interface DangerConfirmProps {
 }
 
 /**
- * Подтверждение необратимого действия.
+ * Confirm an irreversible action.
  *
- * ЕДИНЫЙ МЕХАНИЗМ ВМЕСТО РАЗРОЗНЕННЫХ ПРЕДУПРЕЖДЕНИЙ. Опасные действия
- * разбросаны по экранам — удаление сети, отзыв согласия, сброс
- * кошелька, — и каждое было оформлено по-своему. Разное оформление
- * одинаковых по последствиям действий учит не читать: пользователь
- * запоминает вид, а не смысл.
+ * ONE MECHANISM INSTEAD OF SCATTERED WARNINGS. Dangerous actions
+ * are spread across screens — delete a network, revoke a grant,
+ * reset the wallet — and each used to look different. Different
+ * dressing for the same consequences trains people not to read:
+ * they remember the look, not the meaning.
  *
- * ОТМЕТКА, А НЕ ПРОСТО КНОПКА. Одна кнопка отсекает промах пальцем,
- * но не отсекает механическое нажатие не читая. Отметка требует
- * второго, осознанного движения.
+ * A CHECKBOX, NOT JUST A BUTTON. One button stops a finger miss,
+ * but not a mechanical click without reading. The checkbox needs
+ * a second, deliberate movement.
  *
- * ДЕЙСТВИЕ НЕ ВЫДЕЛЕНО ВИЗУАЛЬНО КАК ОСНОВНОЕ. Основной остаётся
- * отмена: оформление, приглашающее нажать опасное, — это подталкивание
- * к потере средств.
+ * THE ACTION IS NOT STYLED AS PRIMARY. Cancel stays primary: a
+ * look that invites the dangerous click is a nudge toward losing
+ * funds.
  */
 export function DangerConfirm({
   title,

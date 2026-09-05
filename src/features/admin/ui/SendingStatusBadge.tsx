@@ -5,9 +5,6 @@ interface SendingStatusBadgeProps {
   readonly status: RemoteSendingStatus | null
 }
 
-/**
- * Цвет статуса перевода: pending — жёлтый, success — зелёный, failure — красный.
- */
 export function SendingStatusBadge({ status }: SendingStatusBadgeProps) {
   if (status === 'success') {
     return (

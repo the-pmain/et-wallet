@@ -3,15 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppErrorBoundary } from './AppErrorBoundary'
 
-/** Компонент, ломающийся при отрисовке. */
 function Broken(): never {
-  throw new Error('Сломался список активов')
+  throw new Error('The asset list broke')
 }
 
 beforeEach(() => {
-  /* React печатает сбой сам, и вывод перехватчика добавляется сверху.
-     Заглушка убирает шум, не скрывая самой проверки: факт вызова
-     проверяется отдельным тестом. */
+  /* React prints the crash itself, and the catcher's output is added
+     on top. The stub removes the noise without hiding the check: the
+     call itself is asserted in a separate test. */
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
 
@@ -19,8 +18,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('Перехват сбоя отрисовки', () => {
-  it('исправное дерево показывается без изменений', () => {
+describe('render failure catch', () => {
+  it('renders a healthy tree unchanged', () => {
     render(
       <AppErrorBoundary>
         <p>Balance</p>
@@ -30,8 +29,9 @@ describe('Перехват сбоя отрисовки', () => {
     expect(screen.getByText('Balance')).toBeInTheDocument()
   })
 
-  it('сбой не оставляет пустой экран', () => {
-    /* Белый экран для владельца средств неотличим от пропажи денег. */
+  it('does not leave a blank screen on failure', () => {
+    /* A white screen is indistinguishable from money gone for the
+       owner of funds. */
     render(
       <AppErrorBoundary>
         <Broken />
@@ -41,9 +41,9 @@ describe('Перехват сбоя отрисовки', () => {
     expect(screen.getByRole('heading', { name: 'The application stopped' })).toBeInTheDocument()
   })
 
-  it('прямо говорит, что средства целы', () => {
-    /* Это единственный вопрос, который возникает у человека, увидевшего
-       отказ кошелька. «Что-то пошло не так» на него не отвечает. */
+  it('says outright that funds are intact', () => {
+    /* The only question that arises for someone who saw a wallet
+       failure. "Something went wrong" does not answer it. */
     render(
       <AppErrorBoundary>
         <Broken />
@@ -54,19 +54,19 @@ describe('Перехват сбоя отрисовки', () => {
     expect(screen.getByText(/neither the/i)).toBeInTheDocument()
   })
 
-  it('называет причину дословно', () => {
-    /* Без причины владелец не поймёт, повторяется ли сбой, и не сможет
-       о нём рассказать. */
+  it('shows the cause verbatim', () => {
+    /* Without the cause the owner cannot tell whether the crash
+       repeats, or report it. */
     render(
       <AppErrorBoundary>
         <Broken />
       </AppErrorBoundary>,
     )
 
-    expect(screen.getByText('Сломался список активов')).toBeInTheDocument()
+    expect(screen.getByText('The asset list broke')).toBeInTheDocument()
   })
 
-  it('предлагает перезагрузку и объясняет, что фраза не понадобится', () => {
+  it('offers a reload and explains the phrase is not needed', () => {
     render(
       <AppErrorBoundary>
         <Broken />
@@ -77,9 +77,9 @@ describe('Перехват сбоя отрисовки', () => {
     expect(screen.getByText(/The seed phrase is not needed to reload/i)).toBeInTheDocument()
   })
 
-  it('сведения о сбое попадают в консоль', () => {
-    /* Иначе они исчезают вместе с деревом компонентов, и разобраться
-       в повторяющемся отказе нечем. */
+  it('writes failure details to the console', () => {
+    /* Otherwise they vanish with the component tree, and there is
+       nothing to diagnose a repeating failure with. */
     render(
       <AppErrorBoundary>
         <Broken />

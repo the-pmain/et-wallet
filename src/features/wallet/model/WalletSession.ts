@@ -97,22 +97,22 @@ import {
 const SESSION_NAME = 'WalletSession'
 
 /**
- * Пустой набор имён ENS.
+ * Empty ENS name map.
  *
- * Один экземпляр на всё приложение: `useSyncExternalStore` сравнивает
- * снимок по ссылке, и новая пустая карта на каждую публикацию давала бы
- * перерисовку без изменения данных.
+ * One instance for the whole app: `useSyncExternalStore` compares the
+ * snapshot by reference, and a new empty map on every publish would
+ * re-render with no data change.
  */
 const EMPTY_ENS_NAMES: ReadonlyMap<string, string> = new Map()
 
-/** Итог непроведённого прогона. Отдельная константа ради стабильности ссылки. */
+/** Result of a trial that was not run. A constant so the reference stays stable. */
 const UNCHECKED_PREFLIGHT: IPreflightResult = {
   outcome: PREFLIGHT_OUTCOME.Unavailable,
   reason: null,
   revertData: null,
 }
 
-/** Снимок закрытой сессии. Один экземпляр: пересоздание вызывало бы перерисовку. */
+/** Closed-session snapshot. One instance: recreating it would re-render. */
 const CLOSED_SNAPSHOT: IWalletSnapshot = {
   state: SESSION_STATE.Closed,
   error: null,
@@ -150,93 +150,92 @@ const CLOSED_SNAPSHOT: IWalletSnapshot = {
   activeRpcEndpoint: null,
 }
 
-/** Зависимости сессии. */
+/** Session dependencies. */
 export interface IWalletSessionDependencies {
-  /** Та же сессия дешифрования, что у онбординга. */
+  /** The same decryption session as onboarding. */
   readonly secureStorage: ISecureStorage
 
-  /** Незашифрованное хранилище — для конфигураций сетей. */
+  /** Unencrypted storage — for network configs. */
   readonly storage: IStorageService
 
   readonly clock: IClock
   readonly logger: ILogger
 
   /**
-   * Фабрика соединений с узлами.
+   * Node-connection factory.
    *
-   * Точка подмены для тестов. Без неё проверка сессии обращалась бы
-   * к настоящим публичным RPC: тест становится медленным, зависящим
-   * от сети и от чужой доступности.
+   * Test seam. Without it a session test would hit real public RPCs:
+   * the test becomes slow and depends on the network and someone
+   * else's uptime.
    */
   readonly providerFactory?: IProviderFactory
 
   /**
-   * Источники RPC endpointов в порядке предпочтения.
+   * RPC endpoint sources in preference order.
    *
-   * Задаются снаружи: набор источников и их приоритет — политика
-   * приложения, а не свойство сессии. Источник пользовательских адресов
-   * добавляется сюда автоматически, если его нет в списке, — без него
-   * не работали бы добавление и удаление собственного узла.
+   * Set from outside: the set of sources and their priority is app
+   * policy, not a session property. The custom-URL source is added
+   * here automatically if missing — without it add/remove of an own
+   * node would not work.
    *
-   * По умолчанию используется публичный источник. Alchemy сюда не входит:
-   * он требует ключа, а ключ читается из окружения слоем приложения
-   * и в ядро не передаётся.
+   * Default is the public source. Alchemy is not included: it needs
+   * a key, and the key is read from the environment by the app layer
+   * and is not passed into the core.
    */
   readonly rpcProviders?: readonly IRpcProvider[]
 
   /**
-   * Источники истории переводов в порядке предпочтения.
+   * Transfer-history sources in preference order.
    *
-   * По умолчанию — только разбор журналов узла: он работает везде,
-   * не требует ключа и, главное, не передаёт адрес пользователя
-   * стороннему сервису. Индексатор добавляется слоем приложения,
-   * потому что решение «полнота в обмен на приватность» принимает
-   * владелец кошелька, а не ядро.
+   * Default is log-scan only: it works everywhere, needs no key, and
+   * does not send the user's address to a third party. An indexer is
+   * added by the app layer because "completeness for privacy" is the
+   * owner's decision, not the core's.
    */
   readonly historyProviders?: readonly IHistoryProvider[]
 
-  /** Подключение аппаратного кошелька по требованию. */
+  /** Connect a hardware wallet on demand. */
   readonly connectHardware?: () => Promise<IHardwareDevice>
 
   /**
-   * Источник курсов.
+   * Price source.
    *
-   * По умолчанию — источник, который курсов не знает. Это не заглушка:
-   * пока пользователь не согласился на обращение к стороннему сервису,
-   * кошелёк курсов не запрашивает. Боевой источник подставляет слой
-   * приложения, потому что решение «оценка портфеля в обмен
-   * на раскрытие его состава» принимает владелец средств, а не ядро.
+   * Default is a source that knows no prices. That is not a stub:
+   * until the user consents to a third-party call, the wallet does
+   * not fetch rates. The live source is injected by the app layer
+   * because "a valuation in exchange for revealing the portfolio" is
+   * the owner's decision, not the core's.
    */
   readonly priceProvider?: IPriceProvider
 
   /**
-   * Учётные данные Tenderly из окружения сборки.
+   * Tenderly credentials from the build environment.
    *
-   * ЧИТАЮТСЯ СЛОЕМ ПРИЛОЖЕНИЯ, А НЕ ЯДРОМ. `import.meta.env` —
-   * особенность сборщика, и ядро о ней знать не должно: оно обязано
-   * собираться и в расширении, и в тестах, где никакого `import.meta`
-   * нет.
+   * Read by the app layer, not the core. `import.meta.env` is a
+   * bundler feature; the core must not know about it — it has to
+   * build in the extension and in tests, where there is no
+   * `import.meta`.
    *
-   * Это путь для проверки на своей машине. Значение из `.env` попадает
-   * в текст выложенной программы и достаётся каждому, кто её открыл, —
-   * поэтому введённые владельцем данные его перекрывают.
+   * This is the local-check path. A `.env` value lands in the shipped
+   * program text and is available to anyone who opens it, so
+   * owner-entered credentials override it.
    */
   readonly tenderlyCredentials?: ITenderlyCredentials | null
 }
 
 /**
- * Набор сервисов разблокированного кошелька.
+ * Services of an unlocked wallet.
  *
- * ЗАЧЕМ ОТДЕЛЬНЫЙ ОБЪЕКТ, А НЕ СБОРКА В КОМПОНЕНТЕ. Сервисы связаны общим
- * временем жизни: `HDWalletService` держит корневой ключ, `RpcManager` —
- * открытые соединения, `BalanceService` — таймеры опроса. Разложенные по
- * компонентам React, они пережили бы блокировку кошелька: размонтирование
- * дерева не гарантировано, а `useEffect` с очисткой выполняется не всегда
- * в том порядке, в каком нужно затирать ключи.
+ * Why a separate object, not assembly in a component. The services
+ * share a lifetime: `HDWalletService` holds the root key,
+ * `RpcManager` open connections, `BalanceService` poll timers.
+ * Spread across React components they would outlive a lock: tree
+ * unmount is not guaranteed, and `useEffect` cleanup does not always
+ * run in the order keys must be wiped.
  *
- * ПОРЯДОК ЗАКРЫТИЯ ЗНАЧИМ. Сначала останавливается опрос, затем рвутся
- * соединения, и только потом затирается корневой ключ. Обратный порядок
- * оставил бы запущенный таймер, обращающийся к уничтоженным сервисам.
+ * Close order matters. Stop polling first, then drop connections,
+ * then wipe the root key. The reverse would leave a running timer
+ * calling destroyed services.
  */
 export class WalletSession implements IWalletSession {
   readonly #secureStorage: ISecureStorage
@@ -249,26 +248,26 @@ export class WalletSession implements IWalletSession {
   readonly #historyProviders: readonly IHistoryProvider[]
 
   /**
-   * Соединение с аппаратным кошельком.
+   * Hardware-wallet connection.
    *
-   * Внедряется снаружи: WebHID существует только в браузере, и сессия
-   * о нём знать не обязана. Отсутствие означает сборку без поддержки
-   * устройств.
+   * Injected from outside: WebHID exists only in the browser, and the
+   * session need not know about it. Missing means a build without
+   * device support.
    */
   readonly #connectHardware: (() => Promise<IHardwareDevice>) | null
   readonly #priceProvider: IPriceProvider
 
-  /** Учётные данные Tenderly из окружения сборки. `null` — их нет. */
+  /** Tenderly credentials from the build environment. `null` means none. */
   readonly #buildCredentials: ITenderlyCredentials | null
 
-  /* Служба симуляции пересобирается при смене учётных данных либо
-     согласия: набор источников задаётся в конструкторе. */
+  /* Simulation service is rebuilt when credentials or consent
+     change: the source set is fixed in the constructor. */
   #simulation: SimulationService | null = null
   readonly #listeners = new Set<() => void>()
 
-  /* Один экземпляр на сессию: сервис не хранит состояния, а создание
-     его заново в каждом методе, которому он нужен, — размножение
-     одинаковых объектов без причины. */
+  /* One instance per session: the service holds no state, and
+     creating it in every method that needs it would multiply
+     identical objects for no reason. */
   readonly #mnemonicService = new MnemonicService()
 
   #snapshot: IWalletSnapshot = CLOSED_SNAPSHOT
@@ -292,13 +291,14 @@ export class WalletSession implements IWalletSession {
   #unsubscribeBalanceEvents: Unsubscribe | null = null
   #unsubscribeTransactionEvents: Unsubscribe | null = null
 
-  /* Фоновый опрос включён, пока вкладка на виду. Управляет им слой
-     интерфейса: `document.visibilityState` — часть DOM, а сессия
-     обязана работать и в service worker расширения, где документа нет. */
+  /* Background polling is on while the tab is visible. The UI layer
+     drives it: `document.visibilityState` is DOM, and the session
+     must run in the extension service worker, where there is no
+     document. */
   #isBackgroundRefreshEnabled = true
 
-  /* Защита от повторного входа: экран может вызвать open() дважды —
-     например, при быстрой смене состояния разблокировки. */
+  /* Re-entry guard: the screen may call open() twice — for example
+     on a fast unlock-state change. */
   #opening: Promise<void> | null = null
 
   constructor(dependencies: IWalletSessionDependencies) {
@@ -309,10 +309,10 @@ export class WalletSession implements IWalletSession {
     this.#providerFactory =
       dependencies.providerFactory ?? new LazyRpcClientFactory({ logger: dependencies.logger })
 
-    /* Набор по умолчанию содержит публичный источник. Без него сессия,
-       собранная без явного списка, не получила бы ни одного адреса
-       и не подключилась бы никуда: Alchemy требует ключа, а ключ живёт
-       в слое приложения и в ядро не попадает. */
+    /* The default set includes the public source. Without it a
+       session built with no explicit list would get no URL and
+       connect nowhere: Alchemy needs a key, and the key lives in
+       the app layer and never reaches the core. */
     const configured = dependencies.rpcProviders ?? [new PublicRpcProvider()]
     const existingCustom = configured.find(
       (provider): provider is CustomRpcProvider => provider instanceof CustomRpcProvider,
@@ -320,9 +320,8 @@ export class WalletSession implements IWalletSession {
 
     this.#customRpc = existingCustom ?? new CustomRpcProvider(dependencies.secureStorage)
 
-    /* Собственный узел пользователя идёт первым: он выбран сознательно,
-       и подставлять вместо него значение по умолчанию значило бы отменять
-       решение владельца средств. */
+    /* The user's own node goes first: it was chosen on purpose, and
+       substituting the default would undo the owner's decision. */
     this.#rpcProviders =
       existingCustom === undefined ? [this.#customRpc, ...configured] : configured
 
@@ -368,23 +367,24 @@ export class WalletSession implements IWalletSession {
     this.#unsubscribeTransactionEvents?.()
     this.#unsubscribeTransactionEvents = null
 
-    /* Слежение останавливается вместе с сессией: таймер, переживший
-       блокировку, продолжал бы опрашивать узел и раскрывать
-       оператору, что кошелёк с этими адресами существует. */
+    /* Watching stops with the session: a timer that outlived lock
+       would keep polling the node and tell the operator that a
+       wallet with these addresses exists. */
     this.#transactionService?.stopTracking()
 
     this.#balances?.stop()
     await this.#providers?.destroy()
 
-    /* Кэши очищаются ДО обнуления ссылок: после него звать их не у кого.
-       Названия коллекций и метаданные токенов не секрет, но связь
-       «этот кошелёк интересовался этими контрактами» переживать
-       блокировку не должна — по тем же причинам, что и кэш имён. */
+    /* Caches are cleared BEFORE the references are nulled: after
+       that there is nobody to call. Collection names and token
+       metadata are not secret, but the link "this wallet looked at
+       these contracts" must not outlive lock — same reason as the
+       name cache. */
     this.#nfts?.clear()
     this.#approvals?.clear()
 
-    /* Затирание корневого ключа — последнее действие и единственное,
-       ради которого существует весь этот порядок. */
+    /* Wiping the root key is the last action and the one this
+       whole order exists for. */
     this.#hdWallet?.wipe()
 
     this.#hdWallet = null
@@ -401,8 +401,8 @@ export class WalletSession implements IWalletSession {
     this.#prices = null
     this.#backup = null
 
-    /* Кэш имён сбрасывается вместе с сессией: он связывает адреса
-       кошелька с именами, и переживать блокировку эта связь не должна. */
+    /* The name cache is dropped with the session: it links wallet
+       addresses to names, and that link must not outlive lock. */
     this.#ens?.clearCache()
     this.#ens = null
 
@@ -410,15 +410,15 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Возвращает менеджер резервного копирования.
+   * Returns the backup manager.
    *
-   * ПОЧЕМУ ПОДСЕРВИС, А НЕ ПЯТЬ МЕТОДОВ-ОБЁРТОК. Сессия и без того велика,
-   * а пять делегирующих методов не добавили бы ни одной проверки — только
-   * пять мест, где сигнатуры могут разойтись с оригиналом. Экспорт секретов
-   * при этом остаётся связанным с временем жизни сессии: заблокированный
-   * кошелёк менеджера не отдаёт вовсе.
+   * Why a sub-service, not five wrapper methods. The session is
+   * already large, and five delegating methods would add no check —
+   * only five places for signatures to drift. Secret export stays
+   * bound to the session lifetime: a locked wallet does not hand
+   * the manager out at all.
    *
-   * @throws NotInitializedError при закрытой сессии.
+   * @throws NotInitializedError when the session is closed.
    */
   getBackup(): IBackupManager {
     if (this.#backup === null) {
@@ -429,18 +429,18 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Включает и выключает фоновый опрос баланса.
+   * Enable or disable background balance polling.
    *
-   * ЗАЧЕМ ВЫКЛЮЧАТЬ. Опрос на скрытой вкладке тратит лимиты узла
-   * и — что важнее — продолжает сообщать его оператору, что кошелёк
-   * с этим адресом открыт, пока пользователь занимается чем-то другим.
-   * Обновлять невидимый экран незачем.
+   * Why disable. Polling a hidden tab spends node quota and — more
+   * important — keeps telling the operator that a wallet with this
+   * address is open while the user is busy elsewhere. There is
+   * nothing to refresh on an unseen screen.
    *
-   * ВОЗВРАТ НА ВКЛАДКУ ОБНОВЛЯЕТ ЗНАЧЕНИЕ СРАЗУ, а не через период
-   * опроса: показанный баланс к этому моменту заведомо устарел.
+   * Returning to the tab refreshes immediately, not after the poll
+   * period: the shown balance is already stale by then.
    *
-   * Вызывается слоем интерфейса: `document.visibilityState` — часть DOM,
-   * а ядро и сессия обязаны работать там, где документа нет.
+   * Called by the UI layer: `document.visibilityState` is DOM, and
+   * the core and session must run where there is no document.
    */
   setBackgroundRefreshEnabled(enabled: boolean): void {
     if (this.#isBackgroundRefreshEnabled === enabled) {
@@ -476,9 +476,9 @@ export class WalletSession implements IWalletSession {
 
     await networks.switchTo(chainId)
 
-    /* Кэш балансов привязан к паре «адрес + сеть», но показанное значение
-       относится к прежней сети. Оставить его на экране означало бы показать
-       баланс одной сети под именем другой. */
+    /* The balance cache is keyed by (address, chain), but the shown
+       value belongs to the previous chain. Leaving it on screen
+       would show one chain's balance under another chain's name. */
     this.#balances?.invalidate()
 
     this.#publish({
@@ -519,9 +519,9 @@ export class WalletSession implements IWalletSession {
   async addNetwork(params: IAddNetworkParams): Promise<void> {
     await this.#requireNetworks().add(params)
 
-    /* Список сетей публикуется сразу, без перезагрузки данных аккаунта:
-       добавление сети не делает её активной, и трогать баланс с историей
-       незачем. */
+    /* The network list is published at once, without reloading
+       account data: adding a network does not make it active, so
+       there is no need to touch balance or history. */
     this.#publish({ ...this.#snapshot, networks: this.#requireNetworks().list() })
   }
 
@@ -531,8 +531,8 @@ export class WalletSession implements IWalletSession {
 
     await networks.remove(chainId)
 
-    /* Соединение с удалённой сетью закрывается: оставленное открытым,
-       оно продолжало бы опрашивать узел, которого в списке уже нет. */
+    /* The connection to the removed network is closed: left open it
+       would keep polling a node that is no longer in the list. */
     await this.#requireProviders().release(chainId)
 
     this.#publish({
@@ -541,9 +541,9 @@ export class WalletSession implements IWalletSession {
       activeNetwork: networks.getActive(),
     })
 
-    /* Удаление активной сети переводит кошелёк на сеть по умолчанию,
-       и все привязанные к сети данные — баланс, история, список узлов —
-       обязаны быть перечитаны. */
+    /* Removing the active network moves the wallet to the default
+       chain, and all chain-bound data — balance, history, node list —
+       must be re-read. */
     if (wasActive) {
       this.#balances?.invalidate()
       await this.#reloadAccountScopedData()
@@ -557,12 +557,12 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Дозагружает более ранний участок истории.
+   * Loads an earlier slice of history.
    *
-   * ЗАПРОС ИДЁТ РОВНО ОДИН. Второе нажатие при незавершённом первом
-   * ушло бы с той же меткой и вернуло бы тот же участок; записи
-   * отсеялись бы по ключу, но узел был бы опрошен дважды, а оператор
-   * увидел бы адрес лишний раз.
+   * Exactly one request. A second click while the first is unfinished
+   * would leave with the same cursor and return the same slice;
+   * records would be de-duped by key, but the node would be polled
+   * twice and the operator would see the address again.
    */
   async loadMoreHistory(): Promise<void> {
     const cursor = this.#snapshot.historyCursor
@@ -584,9 +584,9 @@ export class WalletSession implements IWalletSession {
     try {
       const page = await this.#history.getHistory(account.address, network.chainId, { cursor })
 
-      /* Активный аккаунт либо сеть могли смениться, пока узел отвечал.
-         Дописать полученное к чужой истории значило бы показать
-         операции другого адреса как свои. */
+      /* The active account or network may have changed while the
+         node answered. Appending the result to someone else's
+         history would show another address's operations as ours. */
       if (
         this.#snapshot.activeAccount?.id !== account.id ||
         this.#snapshot.activeNetwork?.chainId !== network.chainId
@@ -609,8 +609,8 @@ export class WalletSession implements IWalletSession {
         reason: error instanceof Error ? error.message : String(error),
       })
 
-      /* Метка сохраняется: отказ узла — не конец истории, и повторная
-         попытка обязана начинаться с того же места. */
+      /* The cursor is kept: a node refusal is not the end of
+         history, and a retry must start from the same place. */
       this.#publish({ ...this.#snapshot, isHistoryLoadingMore: false })
     }
   }
@@ -653,16 +653,15 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Разбирает введённого получателя.
+   * Parse the typed recipient.
    *
-   * ПОРЯДОК ПРОВЕРОК ОТ ДЕШЁВЫХ К ДОРОГИМ: пустое, адрес, непохожее
-   * на имя — всё это решается без обращения к сети. Узел спрашивается
-   * только там, где иначе нельзя.
+   * Checks run cheap-to-expensive: empty, address, not-a-name — all
+   * without a network call. The node is asked only where there is no
+   * other way.
    *
-   * ИСКЛЮЧЕНИЙ НЕ БРОСАЕТ. Разбор идёт по мере ввода, и отказ узла
-   * обязан стать состоянием на экране: «проверить не удалось» —
-   * это то, что пользователь должен прочитать, а не то, что должно
-   * попасть в консоль.
+   * Does not throw. Parsing runs as the user types, and a node
+   * refusal must become on-screen state: "could not check" is what
+   * the user should read, not what should hit the console.
    */
   async resolveRecipient(input: string): Promise<IRecipientResolution> {
     const value = input.trim()
@@ -732,10 +731,10 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Обратное разрешение адреса, не мешающее вводу.
+   * Reverse-resolve an address without blocking input.
    *
-   * Отказ узла оставляет подпись пустой: адрес уже известен и годен
-   * к отправке, а имя — только украшение.
+   * A node refusal leaves the label empty: the address is already
+   * known and sendable; the name is only decoration.
    */
   async #lookupNameQuietly(address: Address): Promise<IEnsResolution | null> {
     try {
@@ -756,9 +755,9 @@ export class WalletSession implements IWalletSession {
   async disablePrices(): Promise<void> {
     await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.PricesEnabled, false)
 
-    /* Кэш очищается вместе с отзывом согласия: оставить в памяти курсы,
-       полученные по прежнему разрешению, значило бы продолжать
-       показывать оценку после отказа от неё. */
+    /* The cache is cleared with consent withdrawal: leaving rates
+       fetched under the previous permission would keep showing an
+       estimate after it was refused. */
     this.#prices?.invalidate()
 
     this.#publish({
@@ -771,12 +770,13 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Сохраняет учётные данные Tenderly.
+   * Save Tenderly credentials.
    *
-   * СОГЛАСИЯ НЕ ДАЁТ. Введённый ключ означает «я готов», а не «начинай»:
-   * включение остаётся отдельным действием с перечнем того, что уходит
-   * наружу. Ввод данных и разрешение на их применение — разные решения,
-   * и объединять их значило бы получать второе под видом первого.
+   * Does not grant consent. A typed key means "I am ready", not
+   * "start": enabling stays a separate action with a list of what
+   * leaves. Entering data and allowing its use are different
+   * decisions; merging them would take the second under the guise of
+   * the first.
    */
   async setTenderlyCredentials(credentials: ITenderlyCredentials): Promise<void> {
     await this.#storage.set(
@@ -798,14 +798,14 @@ export class WalletSession implements IWalletSession {
     await this.#refreshSimulation()
   }
 
-  /** Забывает учётные данные и выключает источник вместе с ними. */
+  /** Forget credentials and switch the source off with them. */
   async clearTenderlyCredentials(): Promise<void> {
     await this.#storage.remove(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyAccount)
     await this.#storage.remove(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyProject)
     await this.#storage.remove(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.TenderlyAccessKey)
 
-    /* Согласие снимается вместе с данными: оставить его значило бы, что
-       следующий введённый ключ заработает молча, без нового решения. */
+    /* Consent is lifted with the data: leaving it would let the next
+       typed key start silently, without a new decision. */
     await this.#storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.SimulationSourceEnabled, false)
 
     await this.#refreshSimulation()
@@ -830,31 +830,32 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Готовит перевод к подписи.
+   * Prepare a transfer for signing.
    *
-   * ЗАМЕЧАНИЯ К ПОЛУЧАТЕЛЮ ЗДЕСЬ НЕ СЧИТАЮТСЯ. Часть из них — прежде
-   * всего отсутствие контрольной суммы — видна только по тому, как
-   * пользователь ввёл адрес, а `prepare` работает с нормализованным
-   * значением. Считать их по нормализованному значит не находить
-   * их никогда, поэтому проверка выполняется там, где есть исходный
-   * ввод, — на экране отправки.
+   * Recipient remarks are not computed here. Some of them —
+   * especially a missing checksum — are visible only from how the
+   * user typed the address, and `prepare` works with a normalized
+   * value. Computing them from the normalized form would never find
+   * them, so the check lives where the raw input is — the send
+   * screen.
    */
   async prepareTransfer(request: ITransactionRequest): Promise<IPreparedTransfer> {
     return await this.#describePrepared(await this.#requireTransactions().prepare(request))
   }
 
   /**
-   * Подписывает и публикует перевод.
+   * Sign and publish a transfer.
    *
-   * ПОДПИСЫВАЕТСЯ ИМЕННО ПЕРЕДАННЫЙ ОБЪЕКТ. Пересчёт полей между показом
-   * пользователю и подписью создал бы расхождение между тем, что человек
-   * подтвердил, и тем, что ушло в сеть.
+   * The object passed in is what is signed. Recalculating fields
+   * between display and sign would diverge what the person confirmed
+   * from what went on-chain.
    *
-   * АККАУНТ ОПРЕДЕЛЯЕТСЯ ПО ПОЛЮ `from`, а не берётся активным: между
-   * подготовкой и подтверждением пользователь мог переключить аккаунт,
-   * и подпись чужим ключом отправила бы средства не с того адреса.
-   * `SigningService` эту подмену тоже отвергнет, но полагаться
-   * на последний рубеж вместо явного выбора неправильно.
+   * The account is taken from `from`, not from the active account:
+   * between prepare and confirm the user may have switched, and
+   * signing with another key would send funds from the wrong
+   * address. `SigningService` would reject that swap too, but
+   * relying on the last line instead of an explicit choice is
+   * wrong.
    */
   async sendTransfer(transaction: ISignableTransaction): Promise<TxHash> {
     const accounts = this.#requireAccounts()
@@ -867,9 +868,8 @@ export class WalletSession implements IWalletSession {
     const signed = await accounts.signTransaction(sender.id, transaction)
     const hash = await this.#requireTransactions().send(signed)
 
-    /* История и баланс перечитываются: отправленная транзакция обязана
-       появиться в списке сразу, иначе пользователь решит, что отправка
-       не состоялась. */
+    /* History and balance are re-read: the sent tx must appear in
+       the list at once, or the user will think the send failed. */
     this.#balances?.invalidate()
     await this.#reloadAccountScopedData()
 
@@ -877,23 +877,23 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Ищет адреса, которыми уже пользовались, и добавляет недостающие.
+   * Find addresses already used and add the missing ones.
    *
-   * ЗАПУСКАЕТСЯ ВЛАДЕЛЬЦЕМ. Поиск сообщает оператору узла два десятка
-   * адресов разом и связывает их между собой; делать это без спроса
-   * при каждом запуске значило бы раскрывать больше, чем нужно.
-   * Исключение — первое открытие восстановленного кошелька: там цена
-   * молчания выше, и поиск выполняется сам, один раз.
+   * Started by the owner. Discovery tells the node operator two
+   * dozen addresses at once and links them; doing that unasked on
+   * every launch would leak more than needed. Exception: first open
+   * of a restored wallet — the cost of silence is higher, and
+   * discovery runs itself, once.
    *
-   * @returns Сколько аккаунтов добавлено.
+   * @returns How many accounts were added.
    */
   async discoverAccounts(): Promise<IAccountDiscoverySummary> {
     const accounts = this.#requireAccounts()
     const hdWallet = this.#hdWallet
 
-    /* Сеть берётся у сервиса, а не из снимка: при первом открытии
-       поиск выполняется раньше, чем снимок заполнен, и по снимку
-       он молча не находил бы ничего. */
+    /* The network comes from the service, not the snapshot: on
+       first open discovery runs before the snapshot is filled, and
+       from the snapshot it would silently find nothing. */
     const network = this.#networks?.getActive() ?? null
 
     if (network === null || hdWallet === null || this.#providers === null) {
@@ -908,12 +908,11 @@ export class WalletSession implements IWalletSession {
       this.#logger,
     )
 
-    /* УПЁРЛИСЬ В ПРЕДЕЛ — ЗНАЧИТ, УЗЕЛ ОТВЕЧАЕТ НЕДОСТОВЕРНО.
-       Занятыми оказались все проверенные адреса подряд, чего у живого
-       кошелька не бывает: так выглядит либо узел-обманка, либо
-       неисправность. Создать по такому ответу две сотни аккаунтов
-       значило бы засорить кошелёк мусором, который нельзя удалить —
-       HD-аккаунты только скрываются. */
+    /* Hitting the cap means the node is answering unreliably.
+       Every checked address came back used in a row, which a live
+       wallet does not do: that looks like a lying node or a fault.
+       Creating two hundred accounts from that reply would junk the
+       wallet with undeletable HD accounts (they can only be hidden). */
     if (result.stoppedByLimit) {
       this.#logger.warn(
         'Account discovery stopped at the limit: the node answers for every address',
@@ -922,8 +921,8 @@ export class WalletSession implements IWalletSession {
       return { added: 0, scanned: result.scanned, stoppedByLimit: true }
     }
 
-    /* Уже существующие адреса пропускаются: поиск повторяем,
-       а создание аккаунта — нет. */
+    /* Addresses that already exist are skipped: discovery is
+       repeated, account creation is not. */
     const known = new Set(accounts.list().map((account) => account.address.toLowerCase()))
 
     let added = 0
@@ -945,10 +944,10 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Выполняет поиск один раз за жизнь кошелька.
+   * Run discovery once in the wallet's life.
    *
-   * Отказ не мешает открытию сессии: кошелёк с одним аккаунтом
-   * работоспособен, а поиск повторяется по кнопке в настройках.
+   * Failure does not block session open: a one-account wallet is
+   * usable, and discovery can be retried from the settings button.
    */
   async #discoverAccountsOnce(): Promise<void> {
     const done = await this.#storage.get<boolean>(
@@ -974,10 +973,10 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Ищет разрешения, выданные активным аккаунтом.
+   * Find approvals granted by the active account.
    *
-   * ЗАПРОС ИДЁТ ТОЛЬКО ПО ТРЕБОВАНИЮ — как и поиск предметов: это
-   * выборка журналов и обращение к каждому найденному контракту.
+   * On demand only — same as item discovery: this is a log scan and
+   * a call to every found contract.
    */
   async loadApprovals(): Promise<void> {
     const account = this.#snapshot.activeAccount
@@ -991,9 +990,9 @@ export class WalletSession implements IWalletSession {
 
     const page = await this.#approvals.list(account.address, network.chainId)
 
-    /* Ответ применяется, только если аккаунт и сеть не сменились:
-       чужой список разрешений под новым адресом успокоил бы владельца
-       без оснований. */
+    /* The reply is applied only if account and network did not
+       change: someone else's approval list under a new address
+       would reassure the owner without grounds. */
     if (
       this.#snapshot.activeAccount?.id !== account.id ||
       this.#snapshot.activeNetwork?.chainId !== network.chainId
@@ -1009,7 +1008,7 @@ export class WalletSession implements IWalletSession {
     })
   }
 
-  /** Готовит отзыв выданного разрешения. */
+  /** Prepare a revoke of a granted approval. */
   async prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<IPreparedTransfer> {
     return await this.#describePrepared(
       await this.#requireTransactions().prepareRevokeApproval(request),
@@ -1017,12 +1016,12 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Ищет коллекционные предметы активного аккаунта.
+   * Find collectibles of the active account.
    *
-   * ЗАПРОС ИДЁТ ТОЛЬКО ПО ТРЕБОВАНИЮ. Поиск — это выборка журналов
-   * и обращение к каждому найденному контракту: десятки запросов
-   * и подробный след у оператора узла. Делать это при каждом входе
-   * в кошелёк значило бы платить за то, чего владелец не просил.
+   * On demand only. Discovery is a log scan and a call to every
+   * found contract: dozens of requests and a detailed trail at the
+   * node operator. Doing it on every wallet entry would pay for
+   * something the owner did not ask for.
    */
   async loadNfts(): Promise<void> {
     const account = this.#snapshot.activeAccount
@@ -1036,9 +1035,9 @@ export class WalletSession implements IWalletSession {
 
     const page = await this.#nfts.list(account.address, network.chainId)
 
-    /* Ответ применяется, только если аккаунт и сеть не сменились, пока
-       шёл поиск: чужой список под новым адресом читается как чужое
-       имущество. */
+    /* The reply is applied only if account and network did not
+       change during the search: someone else's list under a new
+       address reads as someone else's property. */
     if (
       this.#snapshot.activeAccount?.id !== account.id ||
       this.#snapshot.activeNetwork?.chainId !== network.chainId
@@ -1055,13 +1054,12 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Готовит перевод токена ERC-20 к подписи.
+   * Prepare an ERC-20 transfer for signing.
    *
-   * ОТДЕЛЬНЫЙ МЕТОД, А НЕ ПРИЗНАК В `prepareTransfer`. У перевода токена
-   * поле `to` подписываемой транзакции указывает на контракт, а получатель
-   * и сумма лежат в данных вызова. Общая форма для двух разных операций
-   * рано или поздно приводит к тому, что адрес контракта принимают
-   * за адрес человека.
+   * A separate method, not a flag on `prepareTransfer`. On a token
+   * transfer the signed `to` is the contract, and the recipient and
+   * amount live in the call data. One shape for two operations
+   * eventually makes people take the contract address for a person's.
    */
   async prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer> {
     return await this.#describePrepared(
@@ -1070,10 +1068,11 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Готовит передачу коллекционного предмета к подписи.
+   * Prepare a collectible transfer for signing.
    *
-   * Как и у токена, транзакция адресована контракту, а получатель
-   * лежит в данных вызова. Экран подтверждения показывает оба адреса.
+   * As with a token, the transaction is addressed to the contract
+   * and the recipient lives in the call data. Confirm shows both
+   * addresses.
    */
   async prepareNftTransfer(request: INftTransferRequest): Promise<IPreparedTransfer> {
     return await this.#describePrepared(
@@ -1082,28 +1081,26 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Готовит ускорение зависшей транзакции.
+   * Prepare a speed-up of a stuck transaction.
    *
-   * ОТПРАВЛЯЕТСЯ ОБЫЧНЫМ `sendTransfer`. Замена — такая же транзакция
-   * с подписью и комиссией; отдельный путь отправки означал бы второе
-   * место, где решается, что подписывать, и подтверждение пользователя
-   * можно было бы обойти.
+   * Sent via ordinary `sendTransfer`. A replace is the same signed,
+   * fee-paying transaction; a separate send path would be a second
+   * place deciding what to sign, and user confirm could be skipped.
    */
   async prepareSpeedUp(hash: TxHash): Promise<IPreparedTransfer> {
     return await this.#describePrepared(await this.#requireTransactions().prepareSpeedUp(hash))
   }
 
-  /** Готовит отмену зависшей транзакции. */
+  /** Prepare a cancel of a stuck transaction. */
   async prepareCancel(hash: TxHash): Promise<IPreparedTransfer> {
     return await this.#describePrepared(await this.#requireTransactions().prepareCancel(hash))
   }
 
   /**
-   * Определяет, является ли адрес контрактом.
+   * Decide whether an address is a contract.
    *
-   * ЗАПРОС ВЫПОЛНЯЕТСЯ ОДИН РАЗ, НА ШАГЕ ПОДТВЕРЖДЕНИЯ, а не при вводе
-   * адреса: проверка на каждое нажатие клавиши означала бы запрос
-   * к узлу на каждый набранный символ.
+   * The request runs once, at confirm, not while typing: a check on
+   * every keystroke would mean a node request per character.
    */
   async isContractRecipient(address: Address): Promise<boolean | null> {
     const network = this.#snapshot.activeNetwork
@@ -1115,24 +1112,25 @@ export class WalletSession implements IWalletSession {
     try {
       return await isContractAddress(address, await this.#providers.get(network))
     } catch {
-      /* Недоступность узла — это «проверить не удалось», а не «адрес
-         обычный». Второе успокаивало бы без оснований. */
+      /* An unavailable node is "could not check", not "ordinary
+         address". The second would reassure without grounds. */
       return null
     }
   }
 
   /**
-   * Выполняет запрос, одобренный пользователем.
+   * Execute a request the user approved.
    *
-   * ВЫЗЫВАЕТСЯ ТОЛЬКО ПОСЛЕ ПОДТВЕРЖДЕНИЯ. Метод не показывает экранов
-   * и не оценивает риски: это сделано выше, и повторять здесь значило бы
-   * иметь два места, где решается, что считать согласием.
+   * Called only after confirm. The method shows no screens and
+   * assesses no risk: that was done above, and repeating it here
+   * would make two places decide what counts as consent.
    *
-   * ОТПРАВИТЕЛЬ СВЕРЯЕТСЯ ЗАНОВО. Проверка была при приёме запроса,
-   * но между приёмом и подтверждением пользователь мог сменить аккаунт;
-   * подписать чужим адресом нечем, и узнать об этом надо до подписи.
+   * The sender is re-checked. The check ran at accept, but between
+   * accept and confirm the user may have switched accounts; there
+   * is nothing to sign with a foreign address, and that must be
+   * known before sign.
    *
-   * @returns Подпись либо хэш транзакции — то, что ожидает приложение.
+   * @returns A signature or a transaction hash — what the dapp expects.
    */
   async executeDappRequest(request: IDappRequest): Promise<string> {
     const accounts = this.#requireAccounts()
@@ -1159,19 +1157,18 @@ export class WalletSession implements IWalletSession {
       throw new Error('The request targets an account that does not exist in this wallet.')
     }
 
-    /* Транзакция проходит через ту же подготовку, что и отправка
-       из кошелька: оценка газа, проверка средств, выбор типа. Второй
-       путь к подписи означал бы вторую точку, где эти проверки можно
-       забыть. */
+    /* The transaction goes through the same prepare as a wallet
+       send: gas estimate, funds check, type choice. A second path
+       to sign would be a second place those checks can be forgotten. */
     const prepared = await this.#requireTransactions().prepare({
       chainId: request.chainId,
       from: payload.transaction.from,
-      /* ПОЛУЧАТЕЛЬ ПЕРЕДАЁТСЯ КАК ПРИСЛАН, ВКЛЮЧАЯ ЕГО ОТСУТСТВИЕ.
-         Пустое поле означает развёртывание контракта, и экран
-         подтверждения говорит об этом прямо. Прежде сюда подставлялся
-         адрес отправителя: пользователь одобрял создание контракта,
-         а подписывал перевод самому себе с байт-кодом в данных вызова —
-         газ списывался, одобренная операция не выполнялась. */
+      /* The recipient is passed as sent, including its absence.
+         An empty field means a contract deploy, and confirm says so
+         plainly. The sender address used to be substituted here: the
+         user approved creating a contract and signed a self-transfer
+         with bytecode in the call data — gas was spent, the approved
+         operation did not run. */
       to: payload.transaction.to,
       value: toWei(payload.transaction.value),
       ...(payload.transaction.data === null ? {} : { data: payload.transaction.data }),
@@ -1180,8 +1177,8 @@ export class WalletSession implements IWalletSession {
     const signed = await accounts.signTransaction(sender.id, prepared)
 
     if (payload.kind === DAPP_REQUEST_KIND.SignTransaction) {
-      /* Приложение просило подписать, но не отправлять: публикация
-         здесь была бы действием, о котором пользователя не спрашивали. */
+      /* The dapp asked to sign, not to send: publishing here would
+         be an action the user was not asked about. */
       return signed.raw
     }
 
@@ -1231,8 +1228,9 @@ export class WalletSession implements IWalletSession {
     try {
       await this.#buildServices()
 
-      /* Согласие читается до загрузки данных: иначе первая загрузка
-         прошла бы без курсов, и оценка появилась бы только со второй. */
+      /* Consent is read before data load: otherwise the first load
+         would run without rates, and the estimate would appear only
+         on the second. */
       await this.#buildSimulation()
 
       this.#publish({
@@ -1250,21 +1248,22 @@ export class WalletSession implements IWalletSession {
 
       this.#logger.error('The wallet session could not be opened', { reason: message })
 
-      /* Частично построенные сервисы обязаны быть разобраны: иначе
-         в памяти остался бы выведенный корневой ключ при неоткрытой сессии. */
+      /* Partially built services must be torn down: otherwise a
+         derived root key would stay in memory with the session
+         unopened. */
       await this.close()
       this.#publish({ ...CLOSED_SNAPSHOT, state: SESSION_STATE.Failed, error: message })
     }
   }
 
-  /** Выводит ключи и поднимает сервисы. */
+  /** Derive keys and stand the services up. */
   async #buildServices(): Promise<void> {
-    /* Модули подписи и HD-дерева подгружаются здесь, а не статически.
-       Они тянут за собой ethers — самую тяжёлую зависимость приложения,
-       которой нет дела до экранов приветствия, создания кошелька
-       и разблокировки. Момент загрузки совпадает с моментом, когда
-       сервисы действительно нужны: сессия открывается после ввода
-       пароля. Порядок сборки и время жизни ключей не меняются. */
+    /* Signing and HD-tree modules are loaded here, not statically.
+       They pull ethers — the heaviest app dependency, which welcome,
+       create-wallet, and unlock screens do not need. Load time
+       matches when the services are actually needed: the session
+       opens after the password. Assembly order and key lifetime do
+       not change. */
     const { AccountManager } = await import('@/core/account')
 
     this.#hdWallet = await this.#deriveHdWallet()
@@ -1277,10 +1276,10 @@ export class WalletSession implements IWalletSession {
     })
 
     this.#networks = new NetworkService({
-      /* Сети хранятся зашифрованными: у пользовательской сети
-         в `rpcUrls` лежит адрес её узла, обычно с ключом учётной записи
-         в строке. Открытое хранилище передаётся вторым: из него
-         переносятся записи, сделанные прежними версиями. */
+      /* Networks are stored encrypted: a custom network's `rpcUrls`
+         hold its node URL, usually with an account key in the
+         string. Open storage is passed second: records from older
+         versions are migrated from it. */
       repository: new NetworkRepository(this.#secureStorage, this.#storage),
       providerFactory: this.#providerFactory,
       logger: this.#logger,
@@ -1290,8 +1289,9 @@ export class WalletSession implements IWalletSession {
 
     await this.#networks.init()
 
-    /* Пользовательские адреса читаются после списка сетей: они хранятся
-       по chainId, и перечень сетей нужен, чтобы знать, что читать. */
+    /* Custom URLs are read after the network list: they are stored
+       by chainId, and the network list is needed to know what to
+       read. */
     await this.#customRpc.init(this.#networks.list())
 
     this.#accounts = AccountManager.create({
@@ -1304,30 +1304,30 @@ export class WalletSession implements IWalletSession {
 
     await this.#accounts.init()
 
-    /* Кошелёк, только что созданный из seed-фразы, аккаунтов не содержит:
-       онбординг сохраняет фразу, но не выводит из неё адреса. Без первого
-       аккаунта экран показал бы пустой список и никакого способа его
-       заполнить. */
+    /* A wallet just created from a seed has no accounts: onboarding
+       saves the phrase but does not derive addresses. Without the
+       first account the screen would show an empty list and no way
+       to fill it. */
     if (this.#accounts.list().length === 0) {
-      /* Первый аккаунт получает имя из адреса электронной почты, если
-         владелец его указал: подпись «Аккаунт 1» ничего не говорит
-         человеку, у которого кошельков несколько. Последующие аккаунты
-         нумеруются как раньше — они принадлежат тому же владельцу
-         и одинаковой подписью не различались бы. */
+      /* The first account is named from the email if the owner
+         provided one: "Account 1" says nothing to someone with
+         several wallets. Later accounts are numbered as before —
+         they belong to the same owner and an identical label would
+         not distinguish them. */
       const username = await this.#readUserName()
 
       await this.#accounts.create(username === null ? {} : { name: username })
     }
 
-    /* ВОССТАНОВЛЕННЫЙ КОШЕЛЁК ОБЯЗАН НАЙТИ СВОИ АККАУНТЫ. Адреса
-       выводятся из фразы, но кошелёк о них не знает, пока не выведет:
-       у человека, у которого их было пять, четыре просто не появятся,
-       и он увидит вместо своих средств пустой кошелёк.
+    /* A restored wallet must find its accounts. Addresses are
+       derived from the phrase, but the wallet does not know them
+       until it derives: someone who had five would see four missing
+       and an empty wallet instead of their funds.
 
-       ПОИСК НЕ ЗАДЕРЖИВАЕТ ОТКРЫТИЕ. Это два десятка пар запросов
-       к узлу; ожидание их в критическом пути означало бы, что кошелёк
-       открывается минуту на медленной сети. Найденное добавляется
-       к списку по мере готовности. */
+       Discovery does not block open. That is two dozen request
+       pairs to the node; waiting on the critical path would make
+       the wallet take a minute on a slow network. Finds are added
+       to the list as they arrive. */
     void this.#discoverAccountsOnce()
 
     this.#transactions = new TransactionRepository(this.#secureStorage)
@@ -1356,8 +1356,9 @@ export class WalletSession implements IWalletSession {
       logger: this.#logger,
     })
 
-    /* Список токенов читается после инициализации сетей: он хранится
-       по chainId, и перечень сетей нужен, чтобы знать, что читать. */
+    /* The token list is read after networks are initialized: it is
+       stored by chainId, and the network list is needed to know
+       what to read. */
     await this.#tokens.init()
 
     this.#nfts = new NftService({
@@ -1393,9 +1394,9 @@ export class WalletSession implements IWalletSession {
       logger: this.#logger,
     })
 
-    /* Журнал экспортов лежит в зашифрованном хранилище. Секретов он
-       не содержит, но сообщает наблюдателю с доступом к диску, что
-       владелец выгружал seed-фразу и когда. */
+    /* The export log lives in encrypted storage. It holds no
+       secrets, but it tells an observer with disk access that the
+       owner exported the seed and when. */
     this.#backup = new BackupManager({
       secureStorage: this.#secureStorage,
       mnemonicService: this.#mnemonicService,
@@ -1410,13 +1411,13 @@ export class WalletSession implements IWalletSession {
     })
 
     /*
-      Смена состояния отправленной транзакции перерисовывает историю
-      и перезапрашивает баланс.
+      A sent-transaction status change redraws history and re-fetches
+      the balance.
 
-      Баланс — потому что подтверждение перевода меняет его, а кэш
-      об этом не знает: он обновляется по времени, и до следующего
-      опроса пользователь видел бы прежнюю сумму рядом с уже
-      подтверждённой операцией.
+      Balance because a confirmed transfer changes it, and the cache
+      does not know: it updates on a timer, and until the next poll
+      the user would see the old amount next to an already-confirmed
+      operation.
     */
     this.#unsubscribeTransactionEvents = this.#transactionService.on(
       'transaction:statusChanged',
@@ -1425,13 +1426,13 @@ export class WalletSession implements IWalletSession {
       },
     )
 
-    /* Слежение начинается сразу после сборки сервисов: транзакция,
-       отправленная в прошлой сессии, могла подтвердиться, пока
-       кошелёк был закрыт. */
+    /* Tracking starts right after the services are built: a tx sent
+       in the previous session may have confirmed while the wallet
+       was closed. */
     this.#transactionService.startTracking()
   }
 
-  /** Перечитывает историю и баланс после смены состояния транзакции. */
+  /** Re-read history and balance after a transaction status change. */
   async #onTransactionStatusChanged(): Promise<void> {
     const account = this.#snapshot.activeAccount
     const network = this.#snapshot.activeNetwork
@@ -1447,25 +1448,14 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Читает сохранённое согласие на обращение к источнику курсов.
+   * Username for the first account's label.
    *
-   * Отсутствие записи означает «не спрашивали» и равносильно отказу:
-   * умолчание не вправе разрешать то, что раскрывает состав портфеля
-   * стороннему сервису.
-   */
-  /**
-   * Читает адрес электронной почты владельца.
-   *
-   * Лежит в защищённом хранилище, поэтому доступен только открытой
-   * сессии. `null` означает, что кошелёк создан без адреса, — обычное
-   * состояние, а не ошибка.
-   */
-  /**
-   * Имя пользователя для подписи первого аккаунта.
-   *
-   * Читается и прежний ключ с почтой: кошельки, созданные до замены,
-   * хранят подпись там, и без запаса их владельцы увидели бы безликое
-   * «Аккаунт 1» вместо того, что вводили сами.
+   * Also reads the older email key: wallets created before the
+   * rename store the label there, and without the fallback their
+   * owners would see a faceless "Account 1" instead of what they
+   * typed. Lives in secure storage, so only an open session can
+   * read it. `null` means the wallet was created without an
+   * address — a normal state, not an error.
    */
   async #readUserName(): Promise<string | null> {
     const username = await this.#secureStorage.get<string>(
@@ -1480,6 +1470,13 @@ export class WalletSession implements IWalletSession {
     return await this.#secureStorage.get<string>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UserEmail)
   }
 
+  /**
+   * Read stored consent to a price source.
+   *
+   * A missing record means "never asked" and equals a refusal:
+   * a default must not permit what reveals the portfolio to a
+   * third party.
+   */
   async #readPricesConsent(): Promise<boolean> {
     return (
       (await this.#storage.get<boolean>(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.PricesEnabled)) ===
@@ -1497,15 +1494,15 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Читает учётные данные Tenderly.
+   * Read Tenderly credentials.
    *
-   * ДВА ИСТОЧНИКА, И НАСТРОЙКИ ВАЖНЕЕ ПЕРЕМЕННЫХ СБОРКИ. Значения
-   * из `.env` попадают в текст программы и достаются каждому, кто открыл
-   * кошелёк, — они годятся для проверки на своей машине, но не для
-   * выложенной сборки. Введённые владельцем лежат в зашифрованном
-   * хранилище и принадлежат ему одному, поэтому перекрывают сборочные.
+   * Two sources, and settings beat build variables. `.env` values
+   * land in the program text and are available to anyone who opened
+   * the wallet — fine for a local check, not for a shipped build.
+   * Owner-entered values live in encrypted storage and belong to
+   * them alone, so they override the build ones.
    *
-   * `null` — данных нет ни там, ни там.
+   * `null` means neither source has data.
    */
   async #readTenderlyCredentials(): Promise<ITenderlyCredentials | null> {
     const stored = await Promise.all([
@@ -1518,9 +1515,9 @@ export class WalletSession implements IWalletSession {
     const project = nonEmpty(stored[1])
     const accessKey = nonEmpty(stored[2])
 
-    /* Все три либо ничего: два значения из трёх — это не «настроено
-       наполовину», а неработающая связка, о которой лучше сказать
-       «не настроено», чем отправлять заведомо отказной запрос. */
+    /* All three or nothing: two of three is not "half configured"
+       but a broken trio better called "not set" than sent as a
+       request that will fail. */
     if (account !== null && project !== null && accessKey !== null) {
       return { account, project, accessKey }
     }
@@ -1529,14 +1526,13 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Собирает службу симуляции.
+   * Build the simulation service.
    *
-   * СТОРОННИЙ ИСТОЧНИК ДОБАВЛЯЕТСЯ ТОЛЬКО ПРИ ДВУХ УСЛОВИЯХ СРАЗУ:
-   * учётные данные введены И согласие дано. Проверка стоит здесь,
-   * а не в интерфейсе: путь к симуляции появится и из других мест —
-   * подтверждение перевода, запрос приложения, разбор вызова, — и
-   * правило, соблюдение которого зависит от каждого вызывающего,
-   * нарушается при первом же добавлении такого места.
+   * A third-party source is added only when both are true:
+   * credentials entered AND consent given. The check lives here,
+   * not in the UI: a path to simulation will appear from confirm,
+   * a dapp request, call decode — and a rule that depends on every
+   * caller breaks at the first extra call site.
    */
   async #buildSimulation(): Promise<void> {
     const credentials = await this.#readTenderlyCredentials()
@@ -1550,7 +1546,7 @@ export class WalletSession implements IWalletSession {
     this.#simulation = new SimulationService({ logger: this.#logger, sources })
   }
 
-  /** Пересобирает службу и сообщает экрану новое состояние источника. */
+  /** Rebuild the service and tell the screen the new source state. */
   async #refreshSimulation(): Promise<void> {
     await this.#buildSimulation()
 
@@ -1563,13 +1559,14 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Выводит HD-кошелёк из сохранённой мнемонической фразы.
+   * Derive the HD wallet from the stored mnemonic.
    *
-   * ГРАНИЦА ЗАЩИТЫ. Фраза возвращается из хранилища строкой: `SecureStorage`
-   * сериализует значения через JSON, где `Uint8Array` молча портится.
-   * Строку в JavaScript затереть невозможно — она остаётся в куче до сборки
-   * мусора. Всё, что здесь достижимо, — не удерживать на неё ссылку дольше
-   * необходимого и затереть производные буферы явно.
+   * Protection boundary. The phrase comes back from storage as a
+   * string: `SecureStorage` serializes via JSON, where `Uint8Array`
+   * silently corrupts. A JavaScript string cannot be wiped — it
+   * stays on the heap until GC. All that is reachable here is not
+   * holding a reference longer than needed and wiping derived
+   * buffers explicitly.
    */
   async #deriveHdWallet(): Promise<HDWalletService> {
     const { HDWalletService } = await import('@/core/hdwallet')
@@ -1598,7 +1595,7 @@ export class WalletSession implements IWalletSession {
     }
   }
 
-  /** Перечитывает данные, зависящие от активного аккаунта и сети. */
+  /** Reload data that depends on the active account and network. */
   async #reloadAccountScopedData(): Promise<void> {
     const accounts = this.#requireAccounts()
     const networks = this.#requireNetworks()
@@ -1620,27 +1617,29 @@ export class WalletSession implements IWalletSession {
       isHistoryLoadingMore: false,
       tokenBalances: [],
       isTokensLoading: activeAccount !== null,
-      /* Предметы сбрасываются вместе с сетью и аккаунтом: показать
-         коллекцию одного адреса под другим — то же, что показать чужое
-         имущество как своё. Новый поиск начнётся, когда владелец
-         откроет раздел. */
+      /* NFTs reset with the network and account: showing one
+         address's collection under another is showing someone
+         else's property as yours. A new search starts when the
+         owner opens the section. */
       nfts: null,
       nftLimits: null,
       isNftLoading: false,
-      /* Разрешения выдаются от имени адреса и живут в контрактах
-         конкретной сети: показать список одного адреса под другим
-         значило бы успокоить владельца чужими данными. */
+      /* Approvals are issued in an address's name and live in
+         that network's contracts: showing one address's list
+         under another would reassure the owner with someone
+         else's data. */
       approvals: null,
       approvalLimits: null,
       isApprovalsLoading: false,
-      /* Имена сбрасываются вместе с сетью: имя, действительное
-         в Ethereum, показанное рядом с балансом Polygon, утверждало бы
-         больше, чем известно. */
+      /* Names reset with the network: an Ethereum-valid name
+         next to a Polygon balance would claim more than is
+         known. */
       ensNames: EMPTY_ENS_NAMES,
       isEnsSupported:
         activeNetwork !== null && this.#ens?.isSupported(activeNetwork.chainId) === true,
-      /* Оценка сбрасывается вместе с балансами: портфель прошлой сети,
-         показанный рядом с новой, — это чужая сумма под чужим именем. */
+      /* The estimate resets with balances: the previous network's
+         portfolio next to the new one is someone else's sum
+         under someone else's name. */
       portfolio: null,
       priceError: null,
       rpcEndpoints:
@@ -1656,28 +1655,30 @@ export class WalletSession implements IWalletSession {
     await this.#publishActiveEndpoint(activeNetwork)
     await this.#loadTokens(activeAccount, activeNetwork)
 
-    /* Оценка считается после балансов: без них считать нечего. */
+    /* The estimate is computed after balances: without them
+       there is nothing to value. */
     await this.#loadPortfolio()
 
-    /* История загружается последней и без ожидания: она требует обхода
-       журналов либо обращения к индексатору и занимает секунды. Держать
-       из-за неё пустым весь экран, включая уже полученный баланс,
-       незачем. */
+    /* History loads last and is not waited on for the rest of
+       the screen: it needs a log walk or an indexer and takes
+       seconds. Leaving the whole screen empty — including an
+       already-fetched balance — for that is unnecessary. */
     await this.#loadHistory(activeAccount, activeNetwork)
 
     await this.#loadEnsNames()
   }
 
   /**
-   * Находит имена ENS аккаунтов кошелька.
+   * Resolve ENS names for the wallet's own accounts.
    *
-   * ЗАПРАШИВАЮТСЯ ТОЛЬКО СВОИ АДРЕСА. Обратное разрешение каждого
-   * встреченного адреса — например, всех контрагентов в истории —
-   * означало бы по два обращения к узлу на строку списка и подробный
-   * рассказ оператору узла о том, с кем пользователь имеет дело.
+   * Only own addresses are queried. Reverse-resolving every
+   * address seen — for example every counterparty in history —
+   * would mean two node calls per list row and a detailed
+   * report to the node operator about whom the user deals with.
    *
-   * Отказ узла имя не показывает и ошибкой не считается: подпись под
-   * адресом — украшение, и ронять из-за неё экран нельзя.
+   * A node refusal hides the name and is not an error: a label
+   * under the address is decoration, and the screen must not
+   * fall because of it.
    */
   async #loadEnsNames(): Promise<void> {
     const ens = this.#ens
@@ -1694,9 +1695,9 @@ export class WalletSession implements IWalletSession {
         const resolution = await ens.lookupAddress(account.address)
 
         if (resolution !== null) {
-          /* В карту кладётся форма для показа, а не каноническая:
-             каноническая существует ради единственности узла и эмодзи
-             в ней выглядят чёрно-белыми. */
+          /* Store the display form, not the canonical one:
+             canonical exists for node uniqueness, and emoji
+             in it render black-and-white. */
           found.set(account.address.toLowerCase(), resolution.displayName)
         }
       } catch (error) {
@@ -1714,12 +1715,12 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Дописывает в снимок адрес узла, с которым установлено соединение.
+   * Write the connected node address into the snapshot.
    *
-   * Выполняется после запроса баланса, а не до: до первого обращения
-   * соединения не существует, и показывать предполагаемый адрес вместо
-   * действующего значило бы вводить пользователя в заблуждение —
-   * перебор мог увести на другой узел.
+   * Runs after the balance request, not before: until the first
+   * call there is no connection, and showing a presumed address
+   * instead of the live one would mislead — failover may have
+   * moved to another node.
    */
   async #publishActiveEndpoint(network: INetworkConfig | null): Promise<void> {
     if (network === null || this.#providers === null) {
@@ -1734,18 +1735,18 @@ export class WalletSession implements IWalletSession {
         activeRpcEndpoint: provider instanceof FailoverProvider ? provider.activeEndpoint : null,
       })
     } catch {
-      /* Недоступность сети уже отражена в `balanceError`. Второе
-         сообщение об одном и том же событии ничего не добавляет. */
+      /* Network unavailability is already in `balanceError`. A
+         second message about the same event adds nothing. */
     }
   }
 
   /**
-   * Загружает список токенов с балансами.
+   * Load the token list with balances.
    *
-   * Балансы читаются по одному: публичные узлы ограничивают частоту
-   * обращений, и десяток одновременных вызовов получает отказ вместо
-   * ответа. Отказ по одному токену не отменяет остальных — строка
-   * показывается без величины, а не исчезает.
+   * Balances are read one at a time: public nodes rate-limit,
+   * and a dozen concurrent calls get a refusal instead of a
+   * reply. Failure for one token does not cancel the rest —
+   * the row is shown without an amount, not dropped.
    */
   async #loadTokens(account: IAccount | null, network: INetworkConfig | null): Promise<void> {
     if (account === null || network === null || this.#tokens === null) {
@@ -1759,8 +1760,9 @@ export class WalletSession implements IWalletSession {
 
     for (const token of service.list(network.chainId)) {
       if (token.address === null) {
-        /* Нативная валюта уже получена отдельным запросом: повторять
-           его ради единообразия списка значило бы удвоить обращения. */
+        /* Native currency was already fetched in a separate
+           request: repeating it for list uniformity would
+           double the calls. */
         balances.push({ token, balance: this.#snapshot.balance?.raw ?? null })
         continue
       }
@@ -1779,17 +1781,17 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Считает оценку портфеля.
+   * Compute the portfolio estimate.
    *
-   * КУРСЫ НЕ ЗАПРАШИВАЮТСЯ БЕЗ СОГЛАСИЯ. Проверка стоит здесь, а не
-   * в интерфейсе: путь к оценке появится и из других мест, и правило,
-   * соблюдение которого зависит от каждого вызывающего, нарушается
-   * при первом же добавлении такого места.
+   * Rates are not requested without consent. The check lives
+   * here, not in the UI: a path to the estimate will appear
+   * from other places, and a rule that depends on every caller
+   * breaks at the first extra call site.
    *
-   * ОТКАЗ ИСТОЧНИКА НЕ ОБНУЛЯЕТ ПОРТФЕЛЬ. `PriceService` возвращает
-   * то, что смог получить, а причина отказа уходит в снимок отдельным
-   * полем: экран обязан сказать «стоимость получить не удалось»,
-   * а не показать ноль.
+   * A source failure does not zero the portfolio. `PriceService`
+   * returns what it could get, and the failure reason goes into
+   * the snapshot as a separate field: the screen must say
+   * "could not get the value", not show zero.
    */
   async #loadPortfolio(): Promise<void> {
     if (!this.#snapshot.arePricesEnabled || this.#prices === null) {
@@ -1828,12 +1830,13 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Загружает историю переводов.
+   * Load transfer history.
    *
-   * Отказ источника не оставляет экран без данных: `HistoryService`
-   * возвращает хотя бы локальные отправки. Исключение сюда доходит
-   * только при недоступной сети, и тогда история остаётся пустой,
-   * а признак загрузки снимается — иначе экран крутил бы ожидание вечно.
+   * A source failure does not leave the screen empty:
+   * `HistoryService` at least returns local sends. An exception
+   * reaches here only when the network is down; then history
+   * stays empty and the loading flag is cleared — otherwise
+   * the screen would spin forever.
    */
   async #loadHistory(account: IAccount | null, network: INetworkConfig | null): Promise<void> {
     if (account === null || network === null || this.#history === null) {
@@ -1849,8 +1852,9 @@ export class WalletSession implements IWalletSession {
         ...this.#snapshot,
         transfers: this.#withKnownAssets(page.transfers, network.chainId),
         historyLimits: page.limits,
-        /* Метка заменяется, а не дополняется: это чтение с начала,
-           и продолжать надо от него, а не от прежнего участка. */
+        /* The cursor is replaced, not appended: this is a
+           read from the start, and paging must continue from
+           it, not from the previous stretch. */
         historyCursor: page.cursor,
         isHistoryLoading: false,
         isHistoryLoadingMore: false,
@@ -1865,24 +1869,25 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Подставляет символ и число знаков известных токенов.
+   * Fill in the symbol and decimals of known tokens.
    *
-   * ЗАЧЕМ. Источники истории возвращают адрес контракта, но не его
-   * метаданные: разбор журналов их не читает, а собственные отправки
-   * ядро истории описывает по подписанным данным, где их тоже нет.
-   * Без подстановки только что отправленные десять USDC выглядят
-   * в списке как «10000000 единиц контракта».
+   * Why. History sources return a contract address, not its
+   * metadata: log parsing does not read them, and the history
+   * core describes own sends from signed data, which also
+   * lacks them. Without this fill-in, ten USDC just sent look
+   * like "10000000 units of a contract".
    *
-   * ПОДСТАВЛЯЮТСЯ ТОЛЬКО ОТСЛЕЖИВАЕМЫЕ ТОКЕНЫ. Их пользователь добавил
-   * сам либо они пришли из встроенного списка; число знаков для них
-   * прочитано из контракта. Для незнакомого адреса значения остаются
-   * пустыми, и запись честно помечается как показанная в необработанных
-   * единицах — выдумывать привычные восемнадцать знаков нельзя,
-   * это исказило бы сумму на порядки.
+   * Only tracked tokens are filled. The user added them or
+   * they came from the built-in list; their decimals were
+   * read from the contract. For an unknown address the fields
+   * stay empty and the record is honestly marked as raw units
+   * — inventing the usual eighteen decimals is forbidden,
+   * that would distort the amount by orders of magnitude.
    *
-   * СИМВОЛ ОСТАЁТСЯ НЕДОВЕРЕННЫМ: его задаёт автор контракта. Здесь он
-   * лишь переносится из списка токенов, где отличие добавленного вручную
-   * от встроенного уже отмечено.
+   * The symbol stays untrusted: the contract author set it.
+   * Here it is only copied from the token list, where a
+   * hand-added token is already distinguished from a built-in
+   * one.
    */
   #withKnownAssets(
     transfers: readonly ITransferRecord[],
@@ -1930,7 +1935,7 @@ export class WalletSession implements IWalletSession {
     }
   }
 
-  /** Кладёт в снимок значение, обновлённое фоновым опросом. */
+  /** Put a background-poll update into the snapshot. */
   async #applyCachedBalance(): Promise<void> {
     const account = this.#snapshot.activeAccount
     const network = this.#snapshot.activeNetwork
@@ -1944,8 +1949,9 @@ export class WalletSession implements IWalletSession {
 
       this.#publish({ ...this.#snapshot, balance, balanceError: null })
     } catch {
-      /* Отказ фонового обновления не должен стирать показанное значение:
-         прежний баланс с пометкой устаревания полезнее пустого места. */
+      /* A background-refresh failure must not erase the shown
+         value: the previous balance marked stale is more useful
+         than a blank. */
     }
   }
 
@@ -1970,8 +1976,9 @@ export class WalletSession implements IWalletSession {
 
     this.#logger.warn('The balance is unavailable', { reason: message })
 
-    /* Прежнее значение сохраняется: отказ узла не означает, что средств нет.
-       Замена баланса нулём при недоступной сети — прямая дезинформация. */
+    /* The previous value is kept: a node failure does not mean
+       there are no funds. Replacing the balance with zero when
+       the network is down is outright misinformation. */
     this.#publish({
       ...this.#snapshot,
       isBalanceLoading: false,
@@ -2014,15 +2021,15 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Достраивает подготовленную транзакцию до того, что видит человек.
+   * Finish a prepared transaction into what a person sees.
    *
-   * ЕДИНАЯ ТОЧКА ДЛЯ ВСЕХ ПУТЕЙ ПОДПИСИ. Перевод, токен, предмет,
-   * отзыв разрешения, ускорение и отмена приходят сюда одинаково:
-   * иначе проверка, добавленная к одному пути, обошла бы остальные.
+   * One path for every sign flow. Transfer, token, NFT, revoke,
+   * speed-up and cancel all arrive here the same way: otherwise
+   * a check added to one path would skip the rest.
    *
-   * ПРОГОН НЕ ПРЕРЫВАЕТ ПОДГОТОВКУ. Недоступный узел означает
-   * «проверить не удалось», и это состояние показывается отдельно
-   * от «проверено и всё хорошо».
+   * A preflight failure does not abort prepare. An unreachable
+   * node means "could not check", and that state is shown
+   * separately from "checked and fine".
    */
   async #describePrepared(transaction: ISignableTransaction): Promise<IPreparedTransfer> {
     const transactions = this.#requireTransactions()
@@ -2031,20 +2038,19 @@ export class WalletSession implements IWalletSession {
       transaction,
       fees: await transactions.estimateFees(transaction),
       preflight: await this.#preflight(transaction),
-      /* Ожидание, а не одновременный запуск с прогоном: библиотека
-         склеивает одновременные вызовы в одну пачку JSON-RPC, а на
-         пачку публичные узлы отвечают отказом по частоте обращений.
-         Проверено на журналах истории — там та же ошибка стоила
-         истории целиком. */
+      /* Await, do not start together with preflight: the library
+         batches concurrent calls into one JSON-RPC pack, and
+         public nodes refuse the pack for rate limits. Seen on
+         history logs — the same error cost the whole history. */
       simulation: await this.#simulate(transaction),
     }
   }
 
   /**
-   * Добавляет аккаунт аппаратного кошелька.
+   * Add a hardware-wallet account.
    *
-   * Секрета здесь нет: сохраняются адрес и путь, ключ остаётся
-   * в устройстве.
+   * There is no secret here: address and path are stored, the
+   * key stays on the device.
    */
   async addHardwareAccount(params: IAddHardwareAccountParams): Promise<IAccount> {
     const accounts = this.#requireAccounts()
@@ -2056,15 +2062,16 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Прогоняет вызов приложения на узле до показа подтверждения.
+   * Run a dapp call on the node before showing confirmation.
    *
-   * ЗДЕСЬ ПРОВЕРКА НУЖНЕЕ ВСЕГО. Собственная отправка составлена самим
-   * владельцем и понятна ему; вызов приложения — набор байтов, о котором
-   * известно только имя приложения, а имя это ничем не подтверждено.
+   * This is where the check matters most. An own send was
+   * composed by the owner and is clear to them; a dapp call is
+   * a byte string of which only the app name is known, and
+   * that name is unproven.
    *
-   * Проверяются только запросы на отправку: подпись сообщения и
-   * структурированных данных ничего в цепи не выполняет, и прогонять
-   * там нечего.
+   * Only send requests are checked: signing a message or
+   * typed data does nothing on-chain, so there is nothing to
+   * run.
    */
   async checkDappRequest(request: IDappRequest): Promise<IPreflightResult> {
     const payload = request.payload
@@ -2087,11 +2094,11 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Прогоняет транзакцию на узле до подписи.
+   * Run the transaction on the node before signing.
    *
-   * Отказ самого прогона не выбрасывается наружу: он ничего не говорит
-   * о транзакции и не должен мешать её подписать. Итог «проверить
-   * не удалось» честнее отказа в подготовке.
+   * A preflight failure is not thrown outward: it says nothing
+   * about the transaction and must not block signing. "Could
+   * not check" is more honest than failing prepare.
    */
   async #preflight(transaction: ISignableTransaction): Promise<IPreflightResult> {
     return await this.#preflightCall({
@@ -2103,11 +2110,12 @@ export class WalletSession implements IWalletSession {
   }
 
   /**
-   * Показывает следствия транзакции до подписи.
+   * Show the transaction's effects before signing.
    *
-   * ОТКАЗ НЕ ПРЕРЫВАЕТ ПОДГОТОВКУ. Узел, не знающий метода, — обычное
-   * дело; подготовка транзакции не может от этого срываться, и
-   * состояние «не проверено» доходит до экрана отдельным исходом.
+   * Failure does not abort prepare. A node that does not know
+   * the method is common; prepare must not fail because of
+   * that, and the "unchecked" state reaches the screen as a
+   * separate outcome.
    */
   async #simulate(transaction: ISignableTransaction): Promise<ISimulationResult> {
     const network = this.#snapshot.activeNetwork
@@ -2125,8 +2133,9 @@ export class WalletSession implements IWalletSession {
       }
       const provider = await this.#providers.get(network)
 
-      /* Служба может отсутствовать только у неоткрытой сессии; для этого
-         случая остаётся прямой путь к узлу, а не отказ от проверки. */
+      /* The service can be missing only on a closed session; for
+         that case a direct path to the node remains, not a
+         refusal to check. */
       return this.#simulation === null
         ? await simulateTransaction(provider, request)
         : await this.#simulation.simulate(provider, request, network.chainId)
@@ -2139,7 +2148,7 @@ export class WalletSession implements IWalletSession {
     }
   }
 
-  /** Общий прогон: сеть и узел берутся из текущего состояния сессии. */
+  /** Shared preflight: network and node come from the current session. */
   async #preflightCall(request: IPreflightRequest): Promise<IPreflightResult> {
     const network = this.#snapshot.activeNetwork
 
@@ -2168,16 +2177,17 @@ export class WalletSession implements IWalletSession {
 }
 
 /**
- * Дописывает более ранний участок истории к показанному.
+ * Append an earlier history stretch to what is shown.
  *
- * ПОВТОРЫ ОТБРАСЫВАЮТСЯ ПО КЛЮЧУ, а не по хэшу: одна транзакция
- * порождает десятки переводов, и хэш у них общий. Повторы возникают
- * законно — окна источников перекрываются на границе, — и молча
- * удвоенный перевод читается как две отправки вместо одной.
+ * Duplicates are dropped by record id, not by hash: one
+ * transaction yields dozens of transfers that share a hash.
+ * Overlaps are legitimate — source windows meet at the
+ * boundary — and a silently doubled transfer reads as two
+ * sends instead of one.
  *
- * ПОРЯДОК СОХРАНЯЕТСЯ: показанное остаётся на месте, новое идёт следом.
- * Пересортировка сдвинула бы строки под пальцем у того, кто в этот
- * момент читает список.
+ * Order is kept: what is shown stays put, new rows follow.
+ * Re-sorting would move rows under the finger of whoever is
+ * reading the list.
  */
 function appendTransfers(
   shown: readonly ITransferRecord[],
@@ -2189,11 +2199,11 @@ function appendTransfers(
 }
 
 /**
- * Строка без пробелов по краям либо `null`.
+ * A string without edge whitespace, or `null`.
  *
- * Пустое значение и отсутствующее равнозначны: и то и другое означает
- * «не задано». Пробелы срезаются, потому что ключ доступа обычно
- * приходит вставкой из буфера обмена вместе с переводом строки.
+ * Empty and missing are the same: both mean "not set".
+ * Whitespace is trimmed because an access key usually arrives
+ * pasted from the clipboard with a trailing newline.
  */
 function nonEmpty(value: string | null | undefined): string | null {
   if (typeof value !== 'string') {

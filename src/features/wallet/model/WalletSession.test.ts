@@ -9,10 +9,10 @@ import { SESSION_STATE } from './contracts'
 const PASSWORD = 'Korova-7-Luna!'
 
 /**
- * Ожидаемый адрес берётся из общего набора векторов, а не выписывается
- * заново: константа, скопированная из вывода собственного кода, проверяла бы
- * реализацию ею же самой. Набор сверен с MetaMask, Rabby и Trust Wallet
- * на этапе HD-кошелька.
+ * Expected address comes from the shared vector set, not rewritten
+ * here: a constant copied from this code's own output would test the
+ * implementation against itself. The set was checked against MetaMask,
+ * Rabby, and Trust Wallet at the HD-wallet stage.
  */
 const FIRST_ADDRESS = TEST_MNEMONIC_ADDRESSES[0]
 
@@ -26,7 +26,7 @@ beforeEach(async () => {
 })
 
 describe('WalletSession.open', () => {
-  it('создаёт первый аккаунт из seed-фразы', async () => {
+  it('creates the first account from the seed phrase', async () => {
     await services.session.open()
 
     const snapshot = services.session.getSnapshot()
@@ -36,7 +36,7 @@ describe('WalletSession.open', () => {
     expect(snapshot.activeAccount?.address).toBe(FIRST_ADDRESS)
   })
 
-  it('поднимает список сетей и выбирает активную', async () => {
+  it('loads the network list and selects the active one', async () => {
     await services.session.open()
 
     const snapshot = services.session.getSnapshot()
@@ -45,29 +45,29 @@ describe('WalletSession.open', () => {
     expect(snapshot.activeNetwork?.chainId).toBe(BUILT_IN_CHAIN_ID.Ethereum)
   })
 
-  it('получает баланс активного аккаунта', async () => {
+  it('fetches the active-account balance', async () => {
     await services.session.open()
 
     expect(services.session.getSnapshot().balance?.raw).toBe(1_500_000_000_000_000_000n)
   })
 
-  it('не выбрасывает исключение при отказе узла', async () => {
+  it('does not throw when the node refuses', async () => {
     services.providerFactory.configure({ unavailable: true })
 
     await services.session.open()
 
     const snapshot = services.session.getSnapshot()
 
-    /* Недоступный узел не мешает работе с ключами: аккаунты выведены
-       локально, и экран обязан открыться. Отсутствие баланса помечается
-       ошибкой, а не подменяется нулём. */
+    /* An unavailable node does not block key work: accounts are
+       derived locally and the screen must open. A missing balance is
+       marked as an error, not replaced with zero. */
     expect(snapshot.state).toBe(SESSION_STATE.Open)
     expect(snapshot.activeAccount).not.toBeNull()
     expect(snapshot.balance).toBeNull()
     expect(snapshot.balanceError).not.toBeNull()
   })
 
-  it('сообщает об отказе, если фразы в хранилище нет', async () => {
+  it('reports failure when the phrase is not in storage', async () => {
     const empty = createTestAppServices()
 
     await empty.session.open()
@@ -76,7 +76,7 @@ describe('WalletSession.open', () => {
     expect(empty.session.getSnapshot().error).not.toBeNull()
   })
 
-  it('повторный вызов не создаёт второй аккаунт', async () => {
+  it('a second call does not create a second account', async () => {
     await services.session.open()
     await services.session.open()
 
@@ -85,7 +85,7 @@ describe('WalletSession.open', () => {
 })
 
 describe('WalletSession.close', () => {
-  it('сбрасывает снимок и закрывает соединения', async () => {
+  it('resets the snapshot and closes connections', async () => {
     await services.session.open()
     await services.session.close()
 
@@ -97,19 +97,19 @@ describe('WalletSession.close', () => {
     expect(services.providerFactory.lastProvider?.isActive).toBe(false)
   })
 
-  it('позволяет открыть сессию заново', async () => {
+  it('allows the session to be opened again', async () => {
     await services.session.open()
     await services.session.close()
     await services.session.open()
 
     expect(services.session.getSnapshot().state).toBe(SESSION_STATE.Open)
-    /* Аккаунт читается из хранилища, а не создаётся повторно. */
+    /* The account is read from storage, not created again. */
     expect(services.session.getSnapshot().accounts).toHaveLength(1)
   })
 })
 
-describe('WalletSession: аккаунты', () => {
-  it('добавляет аккаунт со следующим адресом', async () => {
+describe('WalletSession: accounts', () => {
+  it('adds an account with the next address', async () => {
     await services.session.open()
     await services.session.createAccount()
 
@@ -119,7 +119,7 @@ describe('WalletSession: аккаунты', () => {
     expect(snapshot.accounts[1]?.address).not.toBe(FIRST_ADDRESS)
   })
 
-  it('переключает активный аккаунт', async () => {
+  it('switches the active account', async () => {
     await services.session.open()
     await services.session.createAccount()
 
@@ -131,28 +131,28 @@ describe('WalletSession: аккаунты', () => {
   })
 })
 
-describe('WalletSession: сети', () => {
-  it('переключает активную сеть', async () => {
+describe('WalletSession: networks', () => {
+  it('switches the active network', async () => {
     await services.session.open()
     await services.session.switchNetwork(BUILT_IN_CHAIN_ID.Polygon)
 
     expect(services.session.getSnapshot().activeNetwork?.chainId).toBe(BUILT_IN_CHAIN_ID.Polygon)
   })
 
-  it('не показывает баланс прежней сети после переключения', async () => {
+  it('does not show the previous chain\'s balance after switching', async () => {
     await services.session.open()
 
     services.providerFactory.configure({ balance: 7n as Wei })
     await services.session.switchNetwork(BUILT_IN_CHAIN_ID.Polygon)
 
-    /* Значение обязано быть перезапрошено: баланс одной сети под именем
-       другой — прямая дезинформация о доступных средствах. */
+    /* The value must be re-fetched: a balance from one chain under
+       another chain's name is direct misinformation about funds. */
     expect(services.session.getSnapshot().balance?.raw).toBe(7n)
   })
 })
 
-describe('WalletSession: подписка', () => {
-  it('уведомляет подписчиков о смене снимка', async () => {
+describe('WalletSession: subscription', () => {
+  it('notifies subscribers when the snapshot changes', async () => {
     let notifications = 0
     const unsubscribe = services.session.subscribe(() => {
       notifications += 1
@@ -164,7 +164,7 @@ describe('WalletSession: подписка', () => {
     expect(notifications).toBeGreaterThan(0)
   })
 
-  it('перестаёт уведомлять после отписки', async () => {
+  it('stops notifying after unsubscribe', async () => {
     let notifications = 0
     const unsubscribe = services.session.subscribe(() => {
       notifications += 1

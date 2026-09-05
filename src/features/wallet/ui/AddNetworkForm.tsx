@@ -8,7 +8,7 @@ interface AddNetworkFormProps {
   readonly onAdd: (params: IAddNetworkParams) => Promise<void>
 }
 
-/** Поля формы. Хранятся строками: пользователь вводит текст. */
+/** Form fields. Stored as strings: the user types text. */
 interface IFormState {
   readonly name: string
   readonly chainId: string
@@ -30,19 +30,18 @@ const EMPTY_FORM: IFormState = {
 }
 
 /**
- * Добавление пользовательской сети.
+ * Adding a custom network.
  *
- * ДОБАВЛЕНИЕ СЕТИ — ОСНОВНОЙ ВЕКТОР ПОДМЕНЫ. Сеть определяет, куда уходят
- * средства и какой узел сообщает кошельку баланс и цену газа. Поэтому
- * форма не просто собирает поля, а последовательно предъявляет риски:
- * узел проверяется обращением, совпадение имени со встроенной сетью
- * требует отдельного согласия, а обозреватель помечается как ссылка,
- * заданная тем, кто добавил сеть.
+ * Adding a network is the main impersonation vector. The network
+ * decides where funds go and which node reports balance and gas
+ * price. So the form does not merely collect fields: it presents
+ * risks in sequence — the node is probed, a name colliding with a
+ * built-in network needs separate consent, and the explorer is
+ * marked as a link set by whoever added the network.
  *
- * ОТКАЗ ПОКАЗЫВАЕТСЯ ДОСЛОВНО. «Узел обслуживает другую сеть»,
- * «адрес недоступен» и «имя совпадает со встроенной» требуют разных
- * действий пользователя, и обобщение лишило бы его возможности понять,
- * что исправлять.
+ * Refusal is shown verbatim. "The node serves another chain",
+ * "the URL is unreachable", and "the name matches a built-in"
+ * need different actions; a summary would hide what to fix.
  */
 export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
   const fieldId = useId()
@@ -55,8 +54,8 @@ export function AddNetworkForm({ onAdd }: AddNetworkFormProps) {
   function update<TKey extends keyof IFormState>(key: TKey, value: IFormState[TKey]): void {
     setForm((current) => ({ ...current, [key]: value }))
     setError(null)
-    /* Согласие сбрасывается при любой правке: оно давалось на конкретную
-       пару «имя — идентификатор», а не на форму вообще. */
+    /* Consent is reset on any edit: it was given for a specific
+       (name, id) pair, not for the form in general. */
     setImpersonation(null)
   }
 
@@ -241,11 +240,11 @@ function Field({ id, label, value, placeholder, inputMode, onChange }: FieldProp
 }
 
 /**
- * Превращает поля формы в параметры добавления.
+ * Turn form fields into add-network parameters.
  *
- * Число знаков по умолчанию восемнадцать — так устроено большинство
- * сетей EVM. Но значение остаётся редактируемым: сеть с иным числом
- * знаков показывала бы баланс, отличающийся на порядки.
+ * Decimals default to eighteen — that is how most EVM chains work.
+ * The value stays editable: a chain with a different count would
+ * show a balance off by orders of magnitude.
  */
 function buildParams(form: IFormState, allowImpersonation: boolean): IAddNetworkParams {
   const decimals = Number.parseInt(form.decimals, 10)

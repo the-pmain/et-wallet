@@ -24,36 +24,36 @@ import {
   type MnemonicStrength,
 } from './types'
 
-/** Допустимые размеры энтропии в байтах: 128, 160, 192, 224 и 256 бит. */
+/** Allowed entropy sizes in bytes: 128, 160, 192, 224, and 256 bits. */
 const VALID_ENTROPY_LENGTHS: readonly number[] = [16, 20, 24, 28, 32]
 
-/** Ограничение числа подсказок автодополнения по умолчанию. */
 const DEFAULT_SUGGESTION_LIMIT = 8
 
 /**
- * Множество слов словаря.
+ * Wordlist as a set.
  *
- * Set вместо `Array.includes`: проверка каждого из 24 слов линейным поиском
- * по 2048 элементам выполняется на каждое нажатие клавиши при вводе фразы.
- * Построение множества один раз при загрузке модуля дешевле.
+ * A Set instead of `Array.includes`: checking each of 24 words by
+ * a linear search over 2048 entries runs on every keystroke while
+ * the phrase is typed. Building the set once at module load is
+ * cheaper.
  */
 const WORDLIST_SET = new Set(wordlist)
 
 /**
- * Реализация работы с мнемоническими фразами BIP-39.
+ * BIP-39 mnemonic work.
  *
- * ОГРАНИЧЕНИЕ ПО ЯЗЫКУ. Поддерживается только английский словарь.
- * Он жёстко зашит и НЕ внедряется через зависимости: возможность подменить
- * словарь означала бы возможность подсунуть набор слов, для которого
- * злоумышленник знает соответствие индексов, и получить предсказуемую
- * энтропию из «правильной» на вид фразы.
+ * LANGUAGE LIMIT. Only the English wordlist is supported. It is
+ * hard-wired and is NOT injected: the ability to swap the wordlist
+ * would be the ability to slip in a set of words whose index
+ * mapping an attacker knows, and to get predictable entropy from a
+ * phrase that looks "correct".
  *
- * Фраза на другом языке будет отвергнута как некорректная. Это ограничение,
- * а не ошибка; оно зафиксировано в README.
+ * A phrase in another language is rejected as invalid. That is a
+ * limit, not a bug; it is recorded in the README.
  *
- * ОГРАНИЧЕНИЕ ПО ПАМЯТИ. Каждый вызов, обращающийся к `@scure/bip39`,
- * создаёт неочищаемую строку с фразой. Ниже она везде живёт ровно одно
- * выражение, но полностью устранить её нельзя.
+ * MEMORY LIMIT. Every call into `@scure/bip39` creates an
+ * unwipeable string with the phrase. Below it lives for exactly one
+ * expression everywhere, but it cannot be eliminated entirely.
  */
 export class MnemonicService implements IMnemonicService {
   generate(strength: MnemonicStrength = MNEMONIC_STRENGTH.Words12): ISecretBuffer {
@@ -61,10 +61,10 @@ export class MnemonicService implements IMnemonicService {
       throw new InvalidArgumentError('strength', 'only the values 128 and 256 are allowed')
     }
 
-    /* Энтропия берётся собственной функцией, а не встроенным
-       `generateMnemonic`, ради проверки на неисправный генератор:
-       нулевой буфер от сломанного полифила должен остановить создание
-       кошелька, а не привести к предсказуемому ключу. */
+    /* Entropy is taken with our own function, not the built-in
+       `generateMnemonic`, so a broken generator can be detected: a
+       zero buffer from a broken polyfill must stop wallet creation,
+       not yield a predictable key. */
     const entropy = getRandomBytes(strength / 8)
 
     try {
@@ -86,9 +86,9 @@ export class MnemonicService implements IMnemonicService {
       return MnemonicService.#invalid(words.length, MNEMONIC_INVALID_REASON.WordCount)
     }
 
-    /* Неизвестные слова выявляются до проверки контрольной суммы: опечатка
-       встречается несравнимо чаще перепутанного порядка, и подсказка про
-       конкретное слово полезнее сообщения про контрольную сумму. */
+    /* Unknown words are found before the checksum check: a typo is
+       incomparably more common than a swapped order, and a hint
+       about a specific word is more useful than a checksum message. */
     const unknownWordIndexes: number[] = []
 
     words.forEach((word, index) => {
@@ -122,8 +122,8 @@ export class MnemonicService implements IMnemonicService {
     const result = this.validate(phrase)
 
     if (!result.isValid) {
-      /* Причина всегда заполнена при isValid === false. Проверка нужна
-         компилятору, а не логике. */
+      /* The reason is always filled when isValid === false. The
+         check is for the compiler, not the logic. */
       throw new InvalidMnemonicError(result.reason ?? MNEMONIC_INVALID_REASON.Checksum)
     }
 
@@ -141,14 +141,14 @@ export class MnemonicService implements IMnemonicService {
   async toSeed(mnemonic: ISecretBuffer, passphrase = ''): Promise<ISecretBuffer> {
     const phrase = this.revealPhrase(mnemonic)
 
-    /* Предпочтителен нативный PBKDF2 из Web Crypto: он выполняется вне
-       кучи JavaScript, не оставляя промежуточных состояний HMAC в объектах,
-       которые потом невозможно затереть.
+    /* Native Web Crypto PBKDF2 is preferred: it runs outside the
+       JavaScript heap, leaving no intermediate HMAC states in
+       objects that then cannot be wiped.
 
-       Запасной путь — реализация из @noble/hashes. Это не понижение
-       стойкости: алгоритм и параметры те же, отличается лишь место
-       выполнения. Нужен для сред без crypto.subtle, в частности для
-       jsdom в тестах. */
+       The fallback is the @noble/hashes implementation. That is not
+       a drop in strength: the algorithm and parameters are the same,
+       only the place of execution differs. Needed for environments
+       without crypto.subtle, in particular jsdom in tests. */
     const seed = MnemonicService.#hasWebCryptoSubtle()
       ? await mnemonicToSeedWebcrypto(phrase, passphrase)
       : await mnemonicToSeed(phrase, passphrase)
@@ -162,9 +162,9 @@ export class MnemonicService implements IMnemonicService {
     try {
       return SecretBuffer.own(mnemonicToEntropy(phrase, wordlist))
     } catch {
-      /* Библиотека сообщает об ошибке текстом, разбирать который нельзя:
-         формулировка не является частью её публичного контракта. Причина
-         восстанавливается собственной валидацией. */
+      /* The library reports the error as text that must not be
+         parsed: the wording is not part of its public contract. The
+         reason is recovered by our own validation. */
       const result = this.validate(phrase)
 
       throw new InvalidMnemonicError(result.reason ?? MNEMONIC_INVALID_REASON.Checksum)

@@ -27,37 +27,37 @@ const PROVIDER_ID = 'logs'
 const PROVIDER_NAME = 'Node logs'
 
 /**
- * Глубина выборки в блоках.
+ * Query depth in blocks.
  *
- * Публичные узлы ограничивают диапазон `eth_getLogs`; десять тысяч блоков —
- * значение, которое принимают почти все. В Ethereum это около полутора
- * суток, в быстрых сетях — несколько часов.
+ * Public nodes limit the `eth_getLogs` range; ten thousand blocks is
+ * a value almost all of them accept. On Ethereum that is about a day
+ * and a half, on fast networks — a few hours.
  *
- * Увеличивать бессмысленно: узел ответит отказом, и история окажется
- * пустой вместо короткой.
+ * Raising it is pointless: the node will refuse, and history will be
+ * empty instead of short.
  */
 const DEFAULT_SCAN_BLOCKS = 10_000
 
-/** Итог одной выборки журналов: либо записи, либо причина отказа. */
+/** Result of one log query: either records or a refusal reason. */
 interface IScanBatch {
   readonly logs: readonly ILogEntry[]
   readonly error: string | null
 }
 
-/** Число тем у события ERC-721: идентификатор события плюс три параметра. */
+/** Topic count of an ERC-721 event: the event id plus three parameters. */
 const ERC721_TOPIC_COUNT = 4
 
-/** Настройки источника. */
+/** Source settings. */
 export interface ILogScanOptions {
   readonly scanBlocks?: number
 }
 
-/** Где остановился предыдущий просмотр. */
+/** Where the previous scan stopped. */
 interface IScanPosition {
-  /** Верхний блок следующего окна, включительно. */
+  /** Upper block of the next window, inclusive. */
   readonly ceiling: bigint
 
-  /** Сколько блоков просмотрено за все предыдущие страницы. */
+  /** How many blocks were scanned across all previous pages. */
   readonly scanned: number
 }
 
@@ -66,21 +66,21 @@ function encodeCursor(ceiling: bigint, scanned: number): IHistoryCursor {
 }
 
 /**
- * История по журналам узла.
+ * History from node logs.
  *
- * ЧТО ЭТОТ ИСТОЧНИК ВИДЕТЬ НЕ МОЖЕТ. Перевод нативной валюты не порождает
- * события и в журналах отсутствует физически. Никакая настройка этого
- * не изменит: чтобы найти такие переводы, пришлось бы перебирать каждый
- * блок целиком либо пользоваться трассировкой, которой публичные узлы
- * не предоставляют.
+ * WHAT THIS SOURCE CANNOT SEE. A native-currency transfer emits no
+ * event and is physically absent from the logs. No setting will
+ * change that: finding those transfers would mean walking every
+ * block whole or using tracing, which public nodes do not provide.
  *
- * Ограничение сообщается вызывающему коду полем `nativeTransfersUnavailable`,
- * а не замалчивается: пустой список без объяснения читается как
- * «переводов не было».
+ * The limit is reported to the caller via `nativeTransfersUnavailable`,
+ * not silenced: an empty list without explanation reads as "there
+ * were no transfers".
  *
- * ЗАЧЕМ ОН ТОГДА НУЖЕН. Работает на любом узле и без ключа, то есть
- * не требует передавать адрес пользователя стороннему сервису. Для того,
- * кто ценит приватность выше полноты, это единственный приемлемый вариант.
+ * WHY IT IS NEEDED THEN. It works on any node and without a key,
+ * i.e. it does not require sending the user's address to a
+ * third-party service. For someone who values privacy above
+ * completeness, that is the only acceptable option.
  */
 export class LogScanHistoryProvider implements IHistoryProvider {
   readonly id = PROVIDER_ID
@@ -93,31 +93,33 @@ export class LogScanHistoryProvider implements IHistoryProvider {
   }
 
   supports(_chainId: ChainId): boolean {
-    /* Журналы есть в любой сети EVM: источник не зависит от оператора. */
+    /* Logs exist on every EVM network: the source does not depend on
+       the operator. */
     return true
   }
 
   async fetch(query: IHistoryQuery, provider: IProvider): Promise<IHistoryPage> {
     const position = this.#resolvePosition(query.cursor)
-    /* Номер последнего блока нужен только на первой странице:
-       на последующих потолок окна задан меткой. Лишний запрос к узлу
-       здесь ничего не уточнил бы — сеть за это время ушла вперёд,
-       и повторное чтение сдвинуло бы окно, оставив пропуск. */
+    /* The latest block number is needed only on the first page:
+       later pages have the window ceiling set by the cursor. An extra
+       node request here would clarify nothing — the network has
+       moved on, and a re-read would shift the window and leave a
+       gap. */
     const ceiling = position?.ceiling ?? (await provider.getBlockNumber())
-    /* ОКНО СОДЕРЖИТ РОВНО `scanBlocks` БЛОКОВ, ВКЛЮЧАЯ ПОСЛЕДНИЙ.
-       Вычитание всей глубины давало окно на блок шире объявленного,
-       и узлы с пределом ровно в десять тысяч отвечали отказом
-       «диапазон слишком широк». Проверено живьём: узел Polygon
-       отвергал именно наш запрос, хотя предел совпадал с нашей
-       глубиной. */
+    /* THE WINDOW CONTAINS EXACTLY `scanBlocks` BLOCKS, INCLUDING THE
+       LAST. Subtracting the full depth made a window one block wider
+       than declared, and nodes with a limit of exactly ten thousand
+       answered "range too wide". Checked live: a Polygon node
+       refused exactly our request, even though the limit matched
+       our depth. */
     const span = BigInt(this.#scanBlocks) - 1n
     const fromBlock = ceiling > span ? ceiling - span : 0n
     const latest = ceiling
     const ownerTopic = addressToTopic(query.owner)
 
-    /* Шесть выборок: отправленное и полученное, отдельно для трёх
-       семейств событий. Объединить их в одну нельзя — позиция адреса
-       в темах у ERC-20 и ERC-1155 разная. */
+    /* Six queries: sent and received, separately for three event
+       families. They cannot be merged into one — the address
+       position in topics differs between ERC-20 and ERC-1155. */
     const requests: readonly (readonly (HexString | null)[])[] = [
       [TRANSFER_TOPIC, ownerTopic],
       [TRANSFER_TOPIC, null, ownerTopic],
@@ -128,22 +130,23 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     ]
 
     /*
-      ВЫБОРКИ ИДУТ ПО ОЧЕРЕДИ, А НЕ ОДНОВРЕМЕННО.
+      QUERIES RUN IN SEQUENCE, NOT IN PARALLEL.
 
-      Прежде здесь стоял `Promise.all`, и это выглядело безобидной
-      оптимизацией: шесть запросов вместо шести ожиданий. Но библиотека
-      склеивает одновременные вызовы в одну пачку JSON-RPC, и снаружи
-      получался запрос с шестью тяжёлыми выборками журналов разом.
+      There used to be a `Promise.all` here, and it looked like a
+      harmless optimization: six requests instead of six waits. But
+      the library batches concurrent calls into one JSON-RPC packet,
+      and from the outside that became a request with six heavy log
+      queries at once.
 
-      Измерено живьём на шлюзе, который эти выборки обслуживает: пачка
-      из шести — «429, rate limit exceeded»; те же шесть запросов
-      по очереди — все шесть по 180 миллисекунд. То есть узел не
-      отказывал в самой выборке, он отказывал в шести сразу, а история
-      выглядела недоступной.
+      Measured live on the gateway that serves those queries: a
+      packet of six — "429, rate limit exceeded"; the same six
+      requests in sequence — all six at 180 milliseconds. So the
+      node was not refusing the query itself, it was refusing six at
+      once, and history looked unavailable.
 
-      Цена очереди — около секунды вместо трети. Для экрана, который
-      открывают, чтобы посмотреть переводы, это несопоставимо с тем,
-      что история не показывалась вовсе.
+      The cost of the queue is about a second instead of a third. For
+      a screen opened to look at transfers, that is incomparable to
+      history not showing at all.
     */
     const batches: IScanBatch[] = []
 
@@ -152,16 +155,16 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     }
 
     /*
-      ОТКАЗ ВСЕХ ВЫБОРОК — ЭТО ОТКАЗ ИСТОЧНИКА, А НЕ ПУСТАЯ ИСТОРИЯ.
+      REFUSAL OF EVERY QUERY IS A SOURCE FAILURE, NOT EMPTY HISTORY.
 
-      Публичные узлы отвечают отказом на выборку журналов без указания
-      контракта, а именно такая выборка нужна, чтобы найти переводы всех
-      токенов сразу. Проглотив этот отказ, кошелёк сообщил бы владельцу
-      «операций не было» — то есть утверждение о его средствах, которое
-      он не проверял.
+      Public nodes refuse a log query without a contract, and that
+      is exactly the query needed to find transfers of every token
+      at once. Swallowing that refusal would tell the owner "there
+      were no operations" — i.e. a claim about their funds that was
+      not checked.
 
-      Ошибка выбрасывается, чтобы вызывающий код перешёл к следующему
-      источнику, а при его отсутствии показал настоящую причину.
+      The error is thrown so the caller can move to the next source,
+      and if there is none, show the real reason.
     */
     const failure = batches.find((batch) => batch.error !== null)
 
@@ -171,14 +174,14 @@ export class LogScanHistoryProvider implements IHistoryProvider {
 
     const transfers = batches
       .flatMap((batch) => batch.logs)
-      /* Лог, отменённый реорганизацией цепи, обязан исчезнуть, а не
-         остаться в истории как состоявшийся перевод. */
+      /* A log cancelled by a chain reorganization must disappear,
+         not stay in history as a completed transfer. */
       .filter((log) => !log.removed)
       .flatMap((log) => this.#toRecords(log, query))
 
-    /* Просмотрено с самого начала просмотра, а не за одну страницу:
-       после третьего нажатия «показать более ранние» надпись
-       «просмотрено десять тысяч блоков» была бы неверна втрое. */
+    /* Scanned from the start of the scan, not for one page: after
+       the third "show earlier" click a "scanned ten thousand
+       blocks" label would be wrong by a factor of three. */
     const scannedBlocks = Number(latest - fromBlock + 1n) + (position?.scanned ?? 0)
 
     return {
@@ -187,22 +190,22 @@ export class LogScanHistoryProvider implements IHistoryProvider {
         nativeTransfersUnavailable: true,
         scannedBlocks,
         sourceUnavailable: false,
-        /* Часть выборок могла отказать: история неполна, и об этом
-           сообщается, а не умалчивается. */
+        /* Some queries may have failed: history is incomplete, and
+           that is reported, not silenced. */
         reason: failure?.error ?? null,
       },
-      /* Нулевой блок — начало цепи: продолжать некуда. */
+      /* Block zero is the start of the chain: there is nowhere to continue. */
       cursor: fromBlock === 0n ? null : encodeCursor(fromBlock - 1n, scannedBlocks),
     }
   }
 
   /**
-   * Разбирает метку продолжения.
+   * Parses a continuation cursor.
    *
-   * ЧУЖАЯ ЛИБО ИСПОРЧЕННАЯ МЕТКА НАЧИНАЕТ ПРОСМОТР ЗАНОВО, а не
-   * приводит к отказу. Повторно показанные свежие записи будут
-   * отброшены по ключу выше по стеку, тогда как исключение оставило бы
-   * пользователя с сообщением об ошибке вместо истории.
+   * A FOREIGN OR CORRUPT CURSOR STARTS THE SCAN OVER, rather than
+   * causing a failure. Freshly shown records will be dropped by key
+   * further up the stack, whereas an exception would leave the user
+   * with an error message instead of history.
    */
   #resolvePosition(cursor: IHistoryQuery['cursor']): IScanPosition | null {
     if (cursor === null || cursor === undefined || cursor.providerId !== PROVIDER_ID) {
@@ -222,12 +225,12 @@ export class LogScanHistoryProvider implements IHistoryProvider {
   }
 
   /**
-   * Запрашивает журналы, сохраняя причину отказа вместо её потери.
+   * Requests logs, keeping the refusal reason instead of losing it.
    *
-   * Отказ одной выборки не губит остальные: узел может принять запрос
-   * по одному семейству событий и отвергнуть по другому. Но причина
-   * запоминается — молчаливый пустой результат неотличим от отсутствия
-   * операций.
+   * Refusal of one query does not kill the rest: a node may accept
+   * a request for one event family and refuse another. But the
+   * reason is remembered — a silent empty result is indistinguishable
+   * from no operations.
    */
   async #getLogs(
     provider: IProvider,
@@ -242,7 +245,7 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     }
   }
 
-  /** Превращает журнальную запись в записи истории. */
+  /** Turns a log entry into history records. */
   #toRecords(log: ILogEntry, query: IHistoryQuery): readonly ITransferRecord[] {
     const [topic] = log.topics
 
@@ -262,12 +265,12 @@ export class LogScanHistoryProvider implements IHistoryProvider {
   }
 
   /**
-   * `Transfer` — ERC-20 либо ERC-721.
+   * `Transfer` — ERC-20 or ERC-721.
    *
-   * РАЗЛИЧАЮТСЯ ЧИСЛОМ ТЕМ, а не содержимым. У ERC-721 идентификатор
-   * предмета индексирован и занимает четвёртую тему; у ERC-20 сумма
-   * лежит в данных, и тем всего три. Признак единственный: тип
-   * в событии не указан.
+   * THEY ARE DISTINGUISHED BY TOPIC COUNT, not by contents. On
+   * ERC-721 the item id is indexed and occupies the fourth topic;
+   * on ERC-20 the amount lives in data, and there are only three
+   * topics. That is the only sign: the type is not in the event.
    */
   #fromTransfer(log: ILogEntry, query: IHistoryQuery): readonly ITransferRecord[] {
     const [, fromTopic, toTopic, tokenIdTopic] = log.topics
@@ -294,7 +297,7 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     ]
   }
 
-  /** `TransferSingle` — один предмет ERC-1155. */
+  /** `TransferSingle` — one ERC-1155 item. */
   #fromTransferSingle(log: ILogEntry, query: IHistoryQuery): readonly ITransferRecord[] {
     const [, , fromTopic, toTopic] = log.topics
 
@@ -319,13 +322,13 @@ export class LogScanHistoryProvider implements IHistoryProvider {
   }
 
   /**
-   * `TransferBatch` — набор предметов ERC-1155 в одном событии.
+   * `TransferBatch` — a set of ERC-1155 items in one event.
    *
-   * Данные содержат два массива переменной длины в кодировке ABI:
-   * сначала смещения, затем длины и сами значения. Разбор упрощён
-   * до чтения длин и последовательных элементов — этого достаточно
-   * для событий, где оба массива идут подряд, как их формирует
-   * эталонная реализация.
+   * Data contains two variable-length arrays in ABI encoding: first
+   * the offsets, then the lengths and the values. Parsing is
+   * simplified to reading lengths and consecutive elements — enough
+   * for events where both arrays sit next to each other, as the
+   * reference implementation forms them.
    */
   #fromTransferBatch(log: ILogEntry, query: IHistoryQuery): readonly ITransferRecord[] {
     const [, , fromTopic, toTopic] = log.topics
@@ -347,7 +350,7 @@ export class LogScanHistoryProvider implements IHistoryProvider {
 
     for (let item = 0; item < idsLength; item += 1) {
       const tokenId = words[3 + item]
-      /* Второй массив следует за первым: его длина, затем значения. */
+      /* The second array follows the first: its length, then values. */
       const value = words[3 + idsLength + 1 + item]
 
       if (tokenId === undefined || value === undefined) {
@@ -386,8 +389,9 @@ export class LogScanHistoryProvider implements IHistoryProvider {
     const isIncoming = areAddressesEqual(to, query.owner)
 
     return {
-      /* Ключ включает номер лога и порядковый номер внутри события:
-         одна транзакция порождает десятки переводов, и хэша мало. */
+      /* The key includes the log index and the ordinal inside the
+         event: one transaction produces dozens of transfers, and the
+         hash is not enough. */
       id: `${log.transactionHash}:${String(log.logIndex)}:${String(index)}`,
       hash: log.transactionHash,
       chainId: query.chainId,
@@ -404,22 +408,22 @@ export class LogScanHistoryProvider implements IHistoryProvider {
       tokenId,
       asset: {
         contract: log.address,
-        /* Символ и число знаков журнал не содержит. Запрашивать их
-           у контракта на каждую запись — сотни вызовов на один экран;
-           `null` честно означает «неизвестно». */
+        /* The log contains neither the symbol nor the decimals.
+           Asking the contract for them on every record is hundreds
+           of calls per screen; `null` honestly means "unknown". */
         symbol: null,
         decimals: null,
       },
       blockNumber: log.blockNumber,
       timestamp: null,
       source: TRANSFER_SOURCE.Logs,
-      /* Запись существует только потому, что уже попала в блок. */
+      /* The record exists only because it is already in a block. */
       status: TRANSACTION_STATUS.Confirmed,
     }
   }
 }
 
-/** Убирает повторы: один перевод попадает и в выборку «отправлено», и в «получено». */
+/** Drops duplicates: one transfer lands in both the "sent" and "received" queries. */
 function dedupeById(records: readonly ITransferRecord[]): readonly ITransferRecord[] {
   const seen = new Map<string, ITransferRecord>()
 

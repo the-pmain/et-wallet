@@ -1,10 +1,11 @@
 /**
- * Ряд цен для графика актива.
+ * Price series for an asset chart.
  *
- * КАТАЛОЖНЫЙ SPARKLINE — ОСНОВА. Он приходит вместе с `/coins/markets`
- * и не стоит отдельного запроса. Свечи Coinbase — уточнение, пока
- * панель открыта: другой источник, свой лимит, состав портфеля
- * в запрос не входит — только общедоступная пара вроде ETH-USD.
+ * THE CATALOG SPARKLINE IS THE BASE. It arrives with `/coins/markets`
+ * and costs no extra request. Coinbase candles are a refinement while
+ * the panel is open: a different source, its own limit, and the
+ * portfolio is not in the request — only a public pair such as
+ * ETH-USD.
  */
 
 export const CHART_RANGE = {
@@ -14,7 +15,7 @@ export const CHART_RANGE = {
 
 export type ChartRange = (typeof CHART_RANGE)[keyof typeof CHART_RANGE]
 
-/** Одна точка ряда. Время — миллисекунды Unix. */
+/** One point of the series. Time is Unix milliseconds. */
 export interface IPricePoint {
   readonly at: number
   readonly price: number
@@ -32,10 +33,10 @@ const HOUR_MS = 3_600_000
 const DAY_MS = 24 * HOUR_MS
 
 /**
- * Пара Coinbase по идентификатору монеты каталога.
+ * Coinbase pair by catalog coin id.
  *
- * Нет пары — нет свечей. Подставить похожую значило бы нарисовать
- * чужой график: WBTC это не ETH, даже если оба «крипта».
+ * No pair — no candles. Substituting a similar one would draw someone
+ * else's chart: WBTC is not ETH, even if both are "crypto".
  */
 const PRODUCT_BY_COIN_ID: ReadonlyMap<string, string> = new Map([
   ['ethereum', 'ETH-USD'],
@@ -55,10 +56,11 @@ export function coinbaseProductForCoinId(coinId: string): string | null {
 }
 
 /**
- * Ставит часовые метки на ряд CoinGecko.
+ * Puts hourly timestamps on a CoinGecko series.
  *
- * Источник отдаёт только цены. Семь дней по часу — договорённость
- * их `sparkline_in_7d`, не наша догадка о произвольном шаге.
+ * The source returns prices only. Seven days by the hour is the
+ * contract of their `sparkline_in_7d`, not our guess at an arbitrary
+ * step.
  */
 export function pointsFromSparkline(
   prices: readonly number[],
@@ -76,7 +78,7 @@ export function pointsFromSparkline(
   }))
 }
 
-/** Оставляет точки выбранного окна. Пустой ряд не дополняется. */
+/** Keeps points of the chosen window. An empty series is not padded. */
 export function slicePointsForRange(
   points: readonly IPricePoint[],
   range: ChartRange,
@@ -93,11 +95,11 @@ export function slicePointsForRange(
 }
 
 /**
- * Дописывает текущую цену в хвост.
+ * Appends the current price to the tail.
  *
- * Без этого график из каталога стоит, пока Coinbase не ответил:
- * последняя точка sparkline может быть часовой давности, а курс
- * на строке — только что полученный.
+ * Without this the catalog chart stands still until Coinbase answers:
+ * the last sparkline point may be an hour old, and the rate on the
+ * row is one just received.
  */
 export function mergeLivePrice(
   points: readonly IPricePoint[],
@@ -122,10 +124,11 @@ export function mergeLivePrice(
 }
 
 /**
- * Свечи Coinbase за окно графика.
+ * Coinbase candles for the chart window.
  *
- * `[]` — пара неизвестна источнику, ответ битый или сеть не ответила.
- * Пустой ряд не ошибка экрана: тогда остаётся sparkline каталога.
+ * `[]` — the pair is unknown to the source, the response is broken,
+ * or the network did not answer. An empty series is not a screen
+ * error: the catalog sparkline remains.
  */
 export async function fetchCoinbaseCandlePoints(
   product: string,
@@ -165,11 +168,12 @@ export async function fetchCoinbaseCandlePoints(
 }
 
 /**
- * Разбирает массив `[time, low, high, open, close, volume]`.
+ * Parses an array `[time, low, high, open, close, volume]`.
  *
- * Источник отдаёт свечи от новых к старым. График читает слева
- * направо, поэтому ряд переворачивается. Берётся close: high/low
- * на узкой линии неразличимы и создавали бы ложный размах.
+ * The source returns candles from newest to oldest. The chart reads
+ * left to right, so the series is reversed. Close is taken: high/low
+ * are indistinguishable on a narrow line and would create a false
+ * range.
  */
 export function parseCoinbaseCandles(payload: unknown): readonly IPricePoint[] {
   if (!Array.isArray(payload)) {

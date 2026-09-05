@@ -1,16 +1,16 @@
 /**
- * Переводит введённую пользователем сумму в минимальные единицы.
+ * Convert a user-entered amount into smallest units.
  *
- * РАЗБОР ВЫПОЛНЯЕТСЯ НА СТРОКАХ, БЕЗ ЧИСЕЛ С ПЛАВАЮЩЕЙ ТОЧКОЙ.
- * `Number('0.1') * 1e18` даёт 100000000000000001 — на единицу больше
- * запрошенного. Для денег такая погрешность недопустима: пользователь
- * подтвердил бы одну сумму, а подписал другую.
+ * Parsing is string-based, no floating point. `Number('0.1') * 1e18`
+ * is 100000000000000001 — one unit more than asked. For money that
+ * error is unacceptable: the user would confirm one amount and sign
+ * another.
  *
- * Дробная часть длиннее числа знаков токена отвергается, а не
- * округляется: молчаливое отбрасывание разрядов означало бы отправку
- * суммы, отличной от введённой.
+ * A fraction longer than the token decimals is rejected, not rounded:
+ * silently dropping digits would send an amount different from what
+ * was typed.
  *
- * @throws Error с понятной причиной при недопустимой записи.
+ * @throws Error with a clear reason on an invalid record.
  */
 export function parseAmount(
   input: string,

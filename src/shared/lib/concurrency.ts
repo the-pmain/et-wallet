@@ -1,38 +1,37 @@
 /**
- * Выполняет задачи с ограниченной параллельностью.
+ * Runs tasks with a concurrency limit.
  *
- * ЗАЧЕМ ОГРАНИЧЕНИЕ, А НЕ `Promise.all`. Публичные RPC-узлы ограничивают
- * частоту обращений: десяток одновременных вызовов получает отказ вместо
- * ответа, и вместо ускорения выходит пустой экран. Обратная крайность —
- * строго последовательный обход — тратит на десять токенов десять
- * задержек сети подряд.
+ * WHY A LIMIT, NOT `Promise.all`. Public RPC nodes rate-limit:
+ * a dozen simultaneous calls get a refusal instead of an answer, and
+ * instead of a speedup the screen is empty. The other extreme —
+ * strictly sequential work — spends ten network delays on ten tokens
+ * in a row.
  *
- * ЗАЧЕМ ОГРАНИЧЕНИЕ, А НЕ `Promise.all`, — ВТОРАЯ ПРИЧИНА. Одновременные
- * запросы к одному узлу выдают наблюдателю весь состав портфеля одним
- * пакетом. Поток в несколько задач размывает эту картину, не устраняя
- * её полностью.
+ * WHY A LIMIT, NOT `Promise.all` — SECOND REASON. Simultaneous
+ * requests to one node hand an observer the whole portfolio in one
+ * packet. A stream of a few tasks blurs that picture without
+ * removing it.
  *
- * ПОРЯДОК РЕЗУЛЬТАТОВ СОВПАДАЕТ С ПОРЯДКОМ ЗАДАЧ. Список токенов
- * показывается в заданном порядке, и перестановка строк при каждом
- * обновлении читалась бы как изменение состава.
+ * RESULT ORDER MATCHES TASK ORDER. The token list is shown in a
+ * given order, and reshuffling rows on every refresh would read as
+ * a change in composition.
  *
- * ОТКАЗ ОДНОЙ ЗАДАЧИ НЕ ОТМЕНЯЕТ ОСТАЛЬНЫЕ, в отличие от `Promise.all`:
- * недоступный контракт не имеет права стереть с экрана балансы всех
- * прочих токенов. Причина отказа возвращается вызывающему, а не
- * проглатывается.
+ * ONE TASK FAILING DOES NOT CANCEL THE REST, unlike `Promise.all`:
+ * an unreachable contract must not wipe every other token balance
+ * off the screen. The failure reason is returned to the caller, not
+ * swallowed.
  */
 
-/** Результат одной задачи. */
 export type SettledResult<TValue> =
   | { readonly status: 'fulfilled'; readonly value: TValue }
   | { readonly status: 'rejected'; readonly reason: unknown }
 
 /**
- * @param tasks Задачи. Функции, а не обещания: обещание начинает
- *        выполняться в момент создания, и ограничить его было бы уже
- *        нечем.
- * @param limit Сколько задач выполняется одновременно. Значение меньше
- *        единицы приводится к единице.
+ * @param tasks Tasks. Functions, not promises: a promise starts
+ *        running when it is created, and there would already be
+ *        nothing to limit.
+ * @param limit How many tasks run at once. Values below one are
+ *        raised to one.
  */
 export async function mapWithLimit<TValue>(
   tasks: readonly (() => Promise<TValue>)[],
@@ -41,11 +40,11 @@ export async function mapWithLimit<TValue>(
   const results = new Array<SettledResult<TValue>>(tasks.length)
   const width = Math.max(1, Math.min(Math.floor(limit), tasks.length))
 
-  /* Один итератор на всех исполнителей. Выборка очередной задачи
-     синхронна, а поток исполнения в JavaScript один, поэтому две задачи
-     одному исполнителю не достанутся. Счётчик с ручной проверкой границы
-     дал бы то же самое ценой обращения по индексу, который система типов
-     считает возможным пустым. */
+  /* One iterator for every worker. Taking the next task is
+     synchronous, and JavaScript has one execution thread, so two
+     tasks will not go to one worker. A counter with a manual bound
+     check would do the same at the cost of an index the type system
+     treats as possibly empty. */
   const queue = tasks.entries()
 
   async function worker(): Promise<void> {

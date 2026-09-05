@@ -5,68 +5,65 @@ import type { Address, HexString } from '@/core/types'
 /**
  * `Transfer(address,address,uint256)`.
  *
- * Общее событие ERC-20 и ERC-721. Различаются они числом индексированных
- * параметров: у ERC-20 индексированы отправитель и получатель (три темы
- * вместе с идентификатором события), у ERC-721 индексирован ещё
- * и `tokenId` (четыре темы). Это единственный надёжный признак —
- * в самом событии тип не указан.
+ * Shared event of ERC-20 and ERC-721. They differ in the number of
+ * indexed parameters: ERC-20 indexes sender and recipient (three
+ * topics together with the event id), ERC-721 also indexes
+ * `tokenId` (four topics). That is the only reliable mark —
+ * the event itself does not name the type.
  */
 export const TRANSFER_TOPIC = eventTopic('Transfer(address,address,uint256)')
 
-/** `TransferSingle(address,address,address,uint256,uint256)` — ERC-1155. */
 export const TRANSFER_SINGLE_TOPIC = eventTopic(
   'TransferSingle(address,address,address,uint256,uint256)',
 )
 
-/** `TransferBatch(address,address,address,uint256[],uint256[])` — ERC-1155. */
 export const TRANSFER_BATCH_TOPIC = eventTopic(
   'TransferBatch(address,address,address,uint256[],uint256[])',
 )
 
-/** Длина темы: 32 байта в шестнадцатеричной записи плюс префикс. */
+/** Topic length: 32 bytes in hex plus the prefix. */
 const TOPIC_LENGTH = 66
 
 /**
- * Кодирует адрес как тему журнала.
+ * Encodes an address as a log topic.
  *
- * Адрес занимает 20 байт, тема — 32, поэтому значение дополняется нулями
- * слева. Регистр приводится к нижнему: узел сравнивает темы побайтово,
- * и запись в контрольной сумме EIP-55 не совпала бы ни с чем.
+ * An address is 20 bytes, a topic is 32, so the value is left-padded
+ * with zeros. Case is lowercased: the node compares topics byte for
+ * byte, and an EIP-55 checksum writing would match nothing.
  */
 export function addressToTopic(address: Address): HexString {
   return `0x${address.slice(2).toLowerCase().padStart(64, '0')}` as HexString
 }
 
 /**
- * Извлекает адрес из темы журнала.
+ * Extracts an address from a log topic.
  *
- * @throws InvalidAddressError если тема не содержит корректного адреса.
+ * @throws InvalidAddressError if the topic does not hold a valid address.
  */
 export function topicToAddress(topic: HexString): Address {
   if (topic.length !== TOPIC_LENGTH) {
     throw new Error(`The log topic has a wrong length: ${String(topic.length)}`)
   }
 
-  /* Адрес — последние 20 байт темы, то есть 40 последних символов. */
+  /* The address is the last 20 bytes of the topic, i.e. the last 40 characters. */
   return toAddress(`0x${topic.slice(-40)}`)
 }
 
 /**
- * Читает беззнаковое целое из шестнадцатеричной строки.
+ * Reads an unsigned integer from a hex string.
  *
- * Пустая строка и одиночный префикс означают ноль: узлы возвращают
- * `0x` для пустых данных, и `BigInt('0x')` на этом выбрасывает
- * исключение.
+ * An empty string and a lone prefix mean zero: nodes return `0x`
+ * for empty data, and `BigInt('0x')` throws on that.
  */
 export function hexToBigInt(value: string): bigint {
   return value === '' || value === '0x' ? 0n : BigInt(value)
 }
 
 /**
- * Разбирает поле `data` журнала на 32-байтовые слова.
+ * Splits a log `data` field into 32-byte words.
  *
- * Все значения в журнале выровнены по 32 байта независимо от объявленного
- * типа — так устроена кодировка ABI.
+ * Every value in a log is aligned to 32 bytes regardless of the
+ * declared type — that is how ABI encoding works.
  */
 export function splitDataWords(data: HexString): readonly bigint[] {
   const body = data.startsWith('0x') ? data.slice(2) : data

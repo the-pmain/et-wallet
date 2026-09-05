@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { WALLET_BROADCAST, WalletBroadcast } from './WalletBroadcast'
 
-/** Открытые каналы закрываются, иначе они переживают проверку. */
+/** Opened channels are closed so they do not outlive the test. */
 const opened: WalletBroadcast[] = []
 
 function channel(name: string): WalletBroadcast {
@@ -21,13 +21,13 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-/** Ждёт доставки: сообщения канала приходят следующим тактом. */
+/** Wait for delivery: channel messages arrive on the next tick. */
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 10))
 }
 
-describe('Оповещение между вкладками', () => {
-  it('сообщение доходит до другой вкладки', async () => {
+describe('Inter-tab notification', () => {
+  it('delivers a message to another tab', async () => {
     const sender = channel('test-delivery')
     const receiver = channel('test-delivery')
 
@@ -43,9 +43,9 @@ describe('Оповещение между вкладками', () => {
     expect(received).toEqual([WALLET_BROADCAST.Erased])
   })
 
-  it('собственное сообщение обратно не возвращается', async () => {
-    /* Иначе вкладка, стирающая кошелёк, приняла бы собственное
-       оповещение и обработала стирание дважды. */
+  it('does not echo its own message back', async () => {
+    /* Otherwise the tab that erases the wallet would accept its own
+       notification and handle the erase twice. */
     const sender = channel('test-self')
     const received: string[] = []
 
@@ -59,7 +59,7 @@ describe('Оповещение между вкладками', () => {
     expect(received).toEqual([])
   })
 
-  it('чужой канал не слышен', async () => {
+  it('does not hear a foreign channel', async () => {
     const sender = channel('test-one')
     const receiver = channel('test-two')
 
@@ -75,10 +75,9 @@ describe('Оповещение между вкладками', () => {
     expect(received).toEqual([])
   })
 
-  it('незнакомое сообщение игнорируется', async () => {
-    /* В канал того же источника писать может любой код, включая
-       внедрённый через XSS. Обрабатывается значение, а не факт
-       сообщения. */
+  it('ignores an unknown message', async () => {
+    /* Any same-origin code can write to the channel, including XSS.
+       The value is handled, not the mere fact of a message. */
     const receiver = channel('test-foreign')
     const received: string[] = []
 
@@ -92,7 +91,7 @@ describe('Оповещение между вкладками', () => {
     expect(received).toEqual([])
   })
 
-  it('отписка прекращает доставку', async () => {
+  it('unsubscribe stops delivery', async () => {
     const sender = channel('test-unsubscribe')
     const receiver = channel('test-unsubscribe')
 
@@ -108,10 +107,10 @@ describe('Оповещение между вкладками', () => {
     expect(received).toEqual([])
   })
 
-  it('среда без канала не роняет приложение', () => {
-    /* Оповещение — удобство, а не условие работы. Там, где
-       `BroadcastChannel` недоступен, кошелёк остаётся таким же, каким
-       был до его появления. */
+  it('does not crash when the channel is missing', () => {
+    /* Notification is a convenience, not a condition of work. Where
+       `BroadcastChannel` is unavailable, the wallet stays as it was
+       before the feature existed. */
     vi.stubGlobal('BroadcastChannel', undefined)
 
     const created = new WalletBroadcast('test-missing')

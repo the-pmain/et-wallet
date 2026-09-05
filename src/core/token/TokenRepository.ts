@@ -6,7 +6,6 @@ import { toChainId, type ChainId, type Timestamp } from '@/core/types'
 import type { ITokenRepository } from './contracts'
 import type { IToken, ITokenRef, TokenStandard } from './types'
 
-/** Запись в виде, пригодном для JSON. */
 interface IStoredToken {
   readonly chainId: string
   readonly address: string
@@ -20,18 +19,18 @@ interface IStoredToken {
 }
 
 /**
- * Список отслеживаемых токенов в защищённом хранилище.
+ * Tracked-token list in secure storage.
  *
- * ПОЧЕМУ ШИФРУЕТСЯ. Адреса контрактов публичны, но перечень токенов,
- * которые отслеживает пользователь, — это состав его портфеля.
- * Заблокированный кошелёк не должен сообщать, чем владеет владелец.
+ * WHY IT IS ENCRYPTED. Contract addresses are public, but the list
+ * of tokens the user tracks is the makeup of their portfolio.
+ * A locked wallet must not say what the owner holds.
  *
- * КЛЮЧ СОДЕРЖИТ И СЕТЬ, И АДРЕС. Один и тот же адрес контракта в разных
- * сетях — разные токены; индексация только по адресу привела бы к показу
- * баланса одной сети в интерфейсе другой.
+ * THE KEY HOLDS BOTH NETWORK AND ADDRESS. The same contract address
+ * on different networks is different tokens; indexing by address
+ * alone would show one network's balance in another's UI.
  *
- * `chainId` ХРАНИТСЯ СТРОКОЙ: это `bigint`, а `JSON.stringify` на нём
- * выбрасывает исключение, а не преобразует.
+ * `chainId` IS STORED AS A STRING: it is a `bigint`, and
+ * `JSON.stringify` throws on it instead of converting.
  */
 export class TokenRepository implements ITokenRepository {
   readonly #storage: ISecureStorage
@@ -70,8 +69,8 @@ export class TokenRepository implements ITokenRepository {
 
   async save(token: IToken): Promise<void> {
     if (token.address === null) {
-      /* Нативная валюта не хранится: она синтезируется из конфигурации
-         сети и не может быть добавлена или убрана пользователем. */
+      /* The native currency is not stored: it is synthesised from
+         the network config and cannot be added or removed by the user. */
       return
     }
 
@@ -119,9 +118,9 @@ function decode(stored: IStoredToken): IToken {
     decimals: stored.decimals,
     logoUri: stored.logoUri,
     isCustom: stored.isCustom,
-    /* Проверенность в хранилище не пишется: она свойство встроенного
-       списка, а не записи. Значение проставляет `TokenService`
-       при чтении. */
+    /* Verification is not written to storage: it is a property of
+       the built-in list, not of the record. `TokenService` fills
+       the value on read. */
     isVerified: false,
     addedAt: stored.addedAt as Timestamp,
   }

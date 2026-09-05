@@ -1,18 +1,17 @@
 import { DICTIONARIES, type Language, type TranslationKey } from './dictionary'
 
-/** Значения для подстановки в строку перевода. */
 export type TranslationValues = Readonly<Record<string, string | number>>
 
 /**
- * Подставляет значения в строку перевода.
+ * Substitutes values into a translation string.
  *
- * ПОДСТАНОВКА ТЕКСТОВАЯ И НЕ ИСПОЛНЯЕТ НИЧЕГО. Заполнитель вида
- * `{name}` заменяется значением как есть; результат попадает в React
- * текстовым узлом и разметкой не становится. Шаблонизатор, умеющий
- * больше, открыл бы путь к подстановке разметки из перевода.
+ * SUBSTITUTION IS TEXTUAL AND EXECUTES NOTHING. A `{name}`
+ * placeholder is replaced as-is; the result reaches React as a text
+ * node and never becomes markup. A richer templater would open a
+ * path to injecting markup from a translation.
  *
- * Незаданный заполнитель остаётся на месте, а не превращается в пустоту:
- * `{amount}` на экране виден и чинится, пустое место — нет.
+ * An unset placeholder stays in place instead of becoming empty:
+ * `{amount}` on screen is visible and can be fixed; a blank is not.
  */
 function interpolate(template: string, values: TranslationValues | undefined): string {
   if (values === undefined) {
@@ -27,16 +26,17 @@ function interpolate(template: string, values: TranslationValues | undefined): s
 }
 
 /**
- * Возвращает перевод по ключу.
+ * Returns a translation for a key.
  *
- * ОТСУТСТВУЮЩИЙ ПЕРЕВОД ВОЗВРАЩАЕТ РУССКИЙ ТЕКСТ, А НЕ КЛЮЧ И НЕ ПУСТУЮ
- * СТРОКУ. Пустое место на месте предупреждения о риске — это исчезнувшее
- * предупреждение; строка `unlock.failed` на экране пугает пользователя
- * и ничего ему не сообщает. Текст на другом языке хотя бы читается.
+ * A MISSING TRANSLATION RETURNS THE DEFAULT-LANGUAGE TEXT, NOT THE
+ * KEY AND NOT AN EMPTY STRING. A blank where a risk warning belongs
+ * is a vanished warning; the string `unlock.failed` on screen scares
+ * the user and tells them nothing. Text in another language is at
+ * least readable.
  *
- * Типы делают такой случай почти невозможным: английский словарь обязан
- * содержать те же ключи. Запасной вариант остаётся на случай, когда
- * словарь собран не типами — например, придёт из данных.
+ * Types make this case almost impossible: the English dictionary
+ * must contain the same keys. The fallback stays for when the
+ * dictionary is assembled without types — for example from data.
  */
 export function translate(
   language: Language,

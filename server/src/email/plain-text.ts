@@ -1,9 +1,8 @@
 /**
- * Грубый текст письма из HTML, если кабинет не прислал `text`.
+ * Rough mail text from HTML when the cabinet did not send `text`.
  *
- * Cloudflare принимает html без text, но почтовые клиенты без HTML
- * тогда показывают пустое тело. Снимаем теги, а не пытаемся
- * воссоздать вёрстку.
+ * Cloudflare accepts html without text, but non-HTML clients then
+ * show an empty body. Tags are stripped; layout is not rebuilt.
  */
 
 export function htmlToPlainText(html: string): string {

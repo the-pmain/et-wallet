@@ -22,11 +22,12 @@ function renderApp() {
 }
 
 /**
- * Открывает экран настроек, где живёт управление RPC-узлами.
+ * Opens settings, where RPC node controls live.
  *
- * Узлы перенесены с главного экрана намеренно: он отвечает на вопрос
- * «сколько у меня и что происходит», а выбор узла меняет устройство
- * кошелька и требует осознанного захода в настройки.
+ * Nodes were moved off the home screen on purpose: home answers
+ * "how much do I have and what is happening", and choosing a node
+ * changes how the wallet is built and needs a deliberate trip into
+ * settings.
  */
 async function openSettings(): Promise<void> {
   const user = userEvent.setup()
@@ -44,8 +45,8 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Панель RPC', () => {
-  it('скрыта из настроек', async () => {
+describe('RPC panel', () => {
+  it('is hidden from settings', async () => {
     renderApp()
     await openSettings()
 
@@ -54,8 +55,8 @@ describe('Панель RPC', () => {
   })
 })
 
-describe.skip('Панель RPC: список узлов', () => {
-  it('показывает узлы активной сети с указанием источника', async () => {
+describe.skip('RPC panel: node list', () => {
+  it('shows the active network's nodes and names their source', async () => {
     renderApp()
     await openSettings()
 
@@ -63,29 +64,29 @@ describe.skip('Панель RPC: список узлов', () => {
     expect(screen.getAllByText(/Public node/).length).toBeGreaterThan(0)
   })
 
-  it('отмечает действующий узел', async () => {
+  it('marks the node in use', async () => {
     renderApp()
     await openSettings()
 
-    /* Пользователь обязан видеть, к чьему узлу обращается кошелёк:
-       оператор узла видит его IP и все запрашиваемые адреса. */
+    /* The user must see whose node the wallet talks to: the operator
+       sees their IP and every address that is queried. */
     await waitFor(() => {
       expect(screen.getByText(/in use now/)).toBeInTheDocument()
     })
   })
 
-  it('показывает только имя узла, без пути с ключом', async () => {
+  it('shows only the node name, not a path with a key', async () => {
     renderApp()
     await openSettings()
 
-    /* Путь адреса содержит ключ доступа. Показанный на экране ключ
-       утекает при демонстрации экрана и на скриншотах. */
+    /* The URL path holds an access key. A key shown on screen leaks
+       in screen shares and screenshots. */
     expect(screen.queryByText(/https:\/\//)).not.toBeInTheDocument()
   })
 })
 
-describe.skip('Панель RPC: проверка доступности', () => {
-  it('показывает время ответа исправного узла', async () => {
+describe.skip('RPC panel: availability check', () => {
+  it('shows the response time of a working node', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -98,7 +99,7 @@ describe.skip('Панель RPC: проверка доступности', () =>
     })
   })
 
-  it('помечает недоступные узлы', async () => {
+  it('marks unavailable nodes', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -112,7 +113,7 @@ describe.skip('Панель RPC: проверка доступности', () =>
     })
   })
 
-  it('отдельно сообщает о чужой сети', async () => {
+  it('reports a foreign network separately', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -130,8 +131,8 @@ describe.skip('Панель RPC: проверка доступности', () =>
   })
 })
 
-describe.skip('Панель RPC: свой адрес', () => {
-  it('добавляет узел и ставит его первым', async () => {
+describe.skip('RPC panel: a custom URL', () => {
+  it('adds a node and puts it first', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -146,7 +147,7 @@ describe.skip('Панель RPC: свой адрес', () => {
     expect(screen.getByText(/Your own node/)).toBeInTheDocument()
   })
 
-  it('показывает причину отказа узла чужой сети', async () => {
+  it('shows the refusal reason from a node on a different network', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -160,24 +161,25 @@ describe.skip('Панель RPC: свой адрес', () => {
     await user.type(screen.getByLabelText('Your own RPC endpoint'), 'https://wrong-chain.example')
     await user.click(screen.getByRole('button', { name: /Add the node/i }))
 
-    /* «The node serves a different network» и «узел не отвечает» требуют
-       разных действий: подменять первое вторым — вводить в заблуждение. */
-    /* Шаблон включает глагол: «chainId 137» встречается и в списке сетей
-       строкой Polygon, и такой запрос нашёл бы оба совпадения. */
+    /* "The node serves a different network" and "the node does not
+       answer" need different actions: swapping the first for the
+       second would mislead. */
+    /* The pattern includes a verb: "chainId 137" also appears in the
+       network list as the Polygon row, and that query would match both. */
     await waitFor(() => {
       expect(screen.getByText(/returned chainId 137/)).toBeInTheDocument()
     })
     expect(screen.queryByText('wrong-chain.example')).not.toBeInTheDocument()
   })
 
-  it('предупреждает, что добавление узла — вопрос доверия', async () => {
+  it('warns that adding a node is a trust decision', async () => {
     renderApp()
     await openSettings()
 
     expect(screen.getByText(/a dishonest node will show something other/i)).toBeInTheDocument()
   })
 
-  it('удаляет добавленный узел', async () => {
+  it('removes an added node', async () => {
     const user = userEvent.setup()
 
     renderApp()

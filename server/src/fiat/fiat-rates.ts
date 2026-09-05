@@ -13,7 +13,7 @@ export interface IFiatRatesPayload {
 
 let cached: { readonly rates: IFiatRatesPayload; readonly expiresAt: number } | null = null
 
-/** Курсы EUR и GBP к одному USD. Кэш на час — ЕЦБ обновляет реже. */
+/** EUR and GBP rates per one USD. Cached for an hour — ECB updates less often. */
 export async function fetchFiatRates(fetchImpl: typeof fetch = fetch): Promise<IFiatRatesPayload> {
   if (cached !== null && Date.now() < cached.expiresAt) {
     return cached.rates
@@ -86,7 +86,7 @@ function readRates(payload: unknown): IFiatRatesPayload {
   return { EUR: eur, GBP: gbp }
 }
 
-/** Сброс кэша — только для тестов. */
+/** Cache reset — tests only. */
 export function resetFiatRatesCacheForTests(): void {
   cached = null
 }

@@ -1,15 +1,17 @@
 /**
- * Снимок публичного рынка.
+ * Public-market snapshot.
  *
- * ЭТО НЕ КУРС ПОРТФЕЛЯ. Список не содержит адресов владельца и адресов
- * его контрактов: сервис узнаёт только IP и то, что кто-то смотрел
- * общедоступную таблицу. Поэтому запрос не требует согласия, которое
- * берётся на экране портфеля — там в запросе уходят адреса активов.
+ * THIS IS NOT A PORTFOLIO RATE. The list contains neither the owner's
+ * addresses nor their contract addresses: the service learns only the
+ * IP and that someone looked at a public table. So the request does
+ * not need the consent taken on the portfolio screen — there, asset
+ * addresses go in the request.
  *
- * КАРТИНКА ИЗ ОТВЕТА СЮДА НЕ ПОПАДАЕТ. Боевой CSP разрешает изображения
- * только из собственной сборки; чужой URL в `src` был бы заблокирован,
- * а набор запрошенных картинок выдал бы оператору хранилища, какие
- * монеты смотрели. Знаки, если нужны, берутся из вложенных файлов.
+ * AN IMAGE FROM THE RESPONSE DOES NOT LAND HERE. The production CSP
+ * allows images only from the own build; a foreign URL in `src`
+ * would be blocked, and the set of requested pictures would tell the
+ * storage operator which coins were viewed. Marks, if needed, come
+ * from bundled files.
  */
 export interface IMarketCoin {
   readonly id: string
@@ -24,23 +26,23 @@ export interface IMarketCoin {
   readonly marketCapUsd: number | null
 
   /**
-   * Ряд цен за семь дней из того же `/coins/markets`.
+   * Seven-day price series from the same `/coins/markets`.
    *
-   * Отдельный `market_chart` не запрашивается: бесплатный лимит
-   * CoinGecko кончается на нескольких обращениях, а этот ряд уже
-   * приходит вместе с таблицей. `null` — источника не было или точек
-   * слишком мало, чтобы провести линию.
+   * A separate `market_chart` is not requested: the free CoinGecko
+   * limit runs out on a few calls, and this series already arrives
+   * with the table. `null` — there was no source, or too few points
+   * to draw a line.
    */
   readonly sparkline7d: readonly number[] | null
 }
 
 /**
- * Разбирает ответ `/coins/markets`.
+ * Parses a `/coins/markets` response.
  *
- * ЗАПИСЬ БЕЗ ИМЕНИ ОТБРАСЫВАЕТСЯ, А НЕ ЧИНИТСЯ. Подставить прочерк
- * вместо имени значило бы показать строку, которую нельзя опознать.
- * Битая запись среди пятидесяти не отменяет остальные: одна дыра
- * в ответе — не повод прятать весь рынок.
+ * A RECORD WITHOUT A NAME IS DROPPED, NOT REPAIRED. Substituting a
+ * dash for a name would show a row that cannot be identified. A
+ * broken record among fifty does not cancel the rest: one hole in
+ * the response is not a reason to hide the whole market.
  */
 export function parseMarketList(payload: unknown): readonly IMarketCoin[] {
   if (!Array.isArray(payload)) {
@@ -60,7 +62,7 @@ export function parseMarketList(payload: unknown): readonly IMarketCoin[] {
   return coins
 }
 
-/** Собирает одну строку рынка. `null` — запись нельзя показать. */
+/** Builds one market row. `null` — the record cannot be shown. */
 function readMarketCoin(entry: unknown, index: number): IMarketCoin | null {
   if (typeof entry !== 'object' || entry === null) {
     return null
@@ -93,8 +95,9 @@ function readMarketCoin(entry: unknown, index: number): IMarketCoin | null {
 }
 
 /**
- * Ряд из `sparkline_in_7d.price`. Меньше двух точек — не ряд:
- * одну точку график не нарисует, и врать пустой линией нельзя.
+ * Series from `sparkline_in_7d.price`. Fewer than two points is not
+ * a series: a chart will not draw one point, and a fake empty line
+ * is not allowed.
  */
 function readSparkline(value: unknown): readonly number[] | null {
   if (typeof value !== 'object' || value === null) {
@@ -118,7 +121,7 @@ function readSparkline(value: unknown): readonly number[] | null {
   return points.length >= 2 ? points : null
 }
 
-/** Положительный ранг из ответа, иначе порядковый номер в выдаче. */
+/** Positive rank from the response, otherwise the ordinal in the list. */
 function readRank(value: unknown, index: number): number {
   const rank = readNumber(value)
 
@@ -140,10 +143,10 @@ function readRequiredString(value: unknown): string | null {
 }
 
 /**
- * Конечное число либо `null`.
+ * A finite number or `null`.
  *
- * Ноль оставляется нулём: у стейблкоина изменение 0.0 % — настоящее
- * значение, а не дыра. Нечисло и бесконечность — дыра.
+ * Zero is left as zero: a 0.0 % change on a stablecoin is a real
+ * value, not a hole. A non-number and infinity are a hole.
  */
 function readNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null

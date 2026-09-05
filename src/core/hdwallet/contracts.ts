@@ -9,188 +9,192 @@ import type { IDerivationPathOptions } from './path'
 import type { IHdAccount } from './types'
 
 /**
- * Иерархически детерминированный кошелёк по BIP-32 и BIP-44.
+ * Hierarchical deterministic wallet per BIP-32 and BIP-44.
  *
- * ВЛАДЕНИЕ СЕКРЕТОМ. Экземпляр держит в памяти корневой ключ, выведенный
- * из seed. Это не singleton: на каждый набор ключей (`IKeyring`) создаётся
- * свой экземпляр, и каждый обязан быть затёрт вызовом `wipe()` при
- * блокировке кошелька.
+ * SECRET OWNERSHIP. The instance holds in memory the root key derived
+ * from the seed. This is not a singleton: each keyring (`IKeyring`)
+ * gets its own instance, and each must be wiped with `wipe()` when
+ * the wallet is locked.
  *
- * ПУТЬ ПО УМОЛЧАНИЮ: `m/44'/60'/0'/0/n`, где наращивается индекс адреса.
- * Соответствует MetaMask, Rabby и Trust Wallet. Ledger Live использует
- * другое соглашение — см. комментарий к `accountIndex` в `IDerivationPathOptions`.
+ * DEFAULT PATH: `m/44'/60'/0'/0/n`, where the address index is
+ * incremented. Matches MetaMask, Rabby, and Trust Wallet. Ledger Live
+ * uses another convention — see the comment on `accountIndex` in
+ * `IDerivationPathOptions`.
  */
 export interface IHDWalletService {
-  /** Может ли экземпляр выдавать приватные ключи и подписывать. */
+  /** Whether the instance can issue private keys and sign. */
   readonly canDerivePrivateKeys: boolean
 
-  /** Затёрт ли корневой ключ. После `wipe()` любые операции недоступны. */
+  /** Whether the root key has been wiped. After `wipe()` no operations are available. */
   readonly isWiped: boolean
 
-  /** Путь уровня аккаунта, из которого выводятся адреса. */
+  /** Account-level path from which addresses are derived. */
   readonly accountPath: DerivationPath
 
   /**
-   * Выводит аккаунт по индексу адреса.
+   * Derives an account by address index.
    *
-   * Приватного ключа в результате нет — он выдаётся отдельным методом.
+   * The result has no private key — that is issued by a separate method.
    */
   deriveAccount(addressIndex: number): IHdAccount
 
   /**
-   * Выводит подряд идущие аккаунты.
+   * Derives consecutive accounts.
    *
-   * @param startIndex Индекс первого аккаунта.
-   * @param count Количество, не более `MAX_ACCOUNTS_PER_CALL`.
+   * @param startIndex Index of the first account.
+   * @param count Count, at most `MAX_ACCOUNTS_PER_CALL`.
    */
   deriveAccounts(startIndex: number, count: number): readonly IHdAccount[]
 
-  /** Адрес по индексу без построения полной структуры аккаунта. */
   getAddress(addressIndex: number): Address
 
   /**
-   * Публичный ключ по индексу.
+   * Public key by index.
    *
-   * Секретом не является: из публичного ключа приватный не восстанавливается.
-   * Тем не менее раскрывать его без нужды не следует — он связывает адрес
-   * с ветвью дерева.
+   * Not a secret: a private key cannot be recovered from a public
+   * key. Still it should not be disclosed without need — it ties
+   * the address to a branch of the tree.
    */
   getPublicKey(addressIndex: number, format?: PublicKeyFormat): Uint8Array
 
   /**
-   * Подписывает транзакцию ключом указанного адреса.
+   * Signs a transaction with the key of the given address.
    *
-   * Приватный ключ выводится, используется и затирается внутри вызова.
-   * Наружу он не попадает: раньше существовал метод, отдававший ключ
-   * для подписи вызывающему коду, и это было лишним расширением
-   * периметра секретов — подпись единственное, ради чего ключ нужен.
+   * The private key is derived, used, and wiped inside the call.
+   * It never leaves: there used to be a method that handed the key
+   * out for the caller to sign, and that was an unnecessary expansion
+   * of the secret perimeter — signing is the only reason the key is needed.
    *
-   * Проверки, выполняемые до подписи, описаны в `ISigningService`.
+   * Checks performed before signing are described on `ISigningService`.
    *
-   * @throws KeyringCannotSignError для экземпляра, созданного из xpub.
-   * @throws InvalidArgumentError если `from` не соответствует адресу
-   *         по указанному индексу либо не указан chainId.
+   * @throws KeyringCannotSignError for an instance created from an xpub.
+   * @throws InvalidArgumentError if `from` does not match the address
+   *         at the given index, or chainId is missing.
    */
   signTransaction(addressIndex: number, transaction: ISignableTransaction): ISignedTransaction
 
   /**
-   * Подписывает произвольное сообщение по EIP-191 (`personal_sign`).
+   * Signs an arbitrary message per EIP-191 (`personal_sign`).
    *
-   * Префикс применяется всегда: без него подписываемые байты могут
-   * оказаться корректной транзакцией.
+   * The prefix is always applied: without it the signed bytes may
+   * be a valid transaction.
    *
    * @throws KeyringCannotSignError
    */
   signMessage(addressIndex: number, message: SignableMessage): HexString
 
   /**
-   * Подписывает структурированные данные (`eth_signTypedData_v4`).
+   * Signs structured data (`eth_signTypedData_v4`).
    *
-   * `domain.chainId` сверяется с переданной активной сетью.
+   * `domain.chainId` is checked against the passed active network.
    *
    * @throws KeyringCannotSignError, InvalidArgumentError
    */
   signTypedData(addressIndex: number, data: ITypedData, expectedChainId: ChainId): HexString
 
   /**
-   * Выдаёт приватный ключ адреса ПОЛЬЗОВАТЕЛЮ.
+   * Issues the address private key TO THE USER.
    *
-   * ВЫСШИЙ УРОВЕНЬ ОПАСНОСТИ. Владение значением равносильно владению
-   * средствами на адресе.
+   * HIGHEST DANGER LEVEL. Owning the value is owning the funds
+   * on the address.
    *
-   * ОТДЕЛЬНОЕ ПРЕДУПРЕЖДЕНИЕ. Приватный ключ ЛЮБОГО дочернего адреса
-   * вместе с ранее выданным xpub позволяет вычислить родительский
-   * приватный ключ, а значит все адреса аккаунта. Оценку этого условия
-   * выполняет `ExportGuard`; получить разрешение на такую операцию можно
-   * только подтвердив уровень риска `AccountCompromise`.
+   * A SEPARATE WARNING. The private key of ANY child address
+   * together with a previously issued xpub lets the parent private
+   * key be computed, and therefore every address of the account.
+   * `ExportGuard` evaluates that condition; a permit for such an
+   * operation can only be obtained after confirming the
+   * `AccountCompromise` risk level.
    *
-   * @param permit Одноразовое разрешение, выданное `ExportGuard`.
-   * @throws ExportNotPermittedError если разрешение не соответствует
-   *         операции либо уже использовано.
-   * @throws KeyringCannotSignError для экземпляра, созданного из xpub.
+   * @param permit One-shot permit issued by `ExportGuard`.
+   * @throws ExportNotPermittedError if the permit does not match
+   *         the operation or has already been used.
+   * @throws KeyringCannotSignError for an instance created from an xpub.
    */
   exportPrivateKey(addressIndex: number, permit: ExportPermit): ISecretBuffer
 
   /**
-   * Выводит аккаунт по произвольному пути.
+   * Derives an account by an arbitrary path.
    *
-   * Нужен при импорте адреса, выведенного другим кошельком по нестандартной
-   * ветви. Путь задаётся полностью и не обязан соответствовать BIP-44.
+   * Needed when importing an address derived by another wallet on
+   * a non-standard branch. The path is given in full and need not
+   * follow BIP-44.
    */
   deriveByPath(path: DerivationPath): IHdAccount
 
   /**
-   * Расширенный ПУБЛИЧНЫЙ ключ уровня аккаунта (`m/44'/60'/0'`).
+   * Extended PUBLIC key at the account level (`m/44'/60'/0'`).
    *
-   * Позволяет стороннему приложению вычислить все адреса аккаунта,
-   * не имея доступа к средствам. Применение — режим наблюдения и учёт.
+   * Lets a third-party app compute every address of the account
+   * without access to the funds. Used for watch-only and accounting.
    *
-   * РИСК ПРИВАТНОСТИ: получатель xpub видит всю историю операций
-   * по всем адресам аккаунта, связанным между собой. Это раскрывает
-   * размер портфеля и контрагентов.
+   * PRIVACY RISK: the xpub recipient sees the whole operation
+   * history of every address of the account, tied together. That
+   * reveals portfolio size and counterparties.
    */
   exportAccountXpub(permit: ExportPermit): string
 
   /**
-   * Расширенный публичный ключ уровня цепочки (`m/44'/60'/0'/0`).
+   * Extended public key at the chain level (`m/44'/60'/0'/0`).
    *
-   * КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ, справедливое для любого xpub
-   * несмягчённого уровня.
+   * A CRITICAL WARNING that applies to any xpub of a non-hardened
+   * level.
    *
-   * Уровни `change` и `addressIndex` по требованию BIP-44 не закалены —
-   * иначе xpub был бы бесполезен. Обратная сторона: из расширенного
-   * ПУБЛИЧНОГО ключа родителя и приватного ключа ЛЮБОГО его потомка
-   * арифметически восстанавливается ПРИВАТНЫЙ ключ родителя, а из него —
-   * приватные ключи всех остальных потомков.
+   * The `change` and `addressIndex` levels are not hardened by
+   * BIP-44 — otherwise the xpub would be useless. The other side:
+   * from a parent's extended PUBLIC key and the private key of ANY
+   * of its children, the parent's PRIVATE key is recovered
+   * arithmetically, and from it — the private keys of every other
+   * child.
    *
-   * Практический вывод: выдача xpub для режима наблюдения безопасна сама
-   * по себе, но становится полной компрометацией аккаунта, если тому же
-   * получателю когда-либо достанется приватный ключ хотя бы одного адреса.
-   * Интерфейс обязан предупреждать об этом при экспорте.
+   * Practical conclusion: issuing an xpub for watch-only is safe
+   * by itself, but becomes a full account compromise if the same
+   * recipient ever gets the private key of even one address.
+   * The UI must warn about this on export.
    */
   exportChangeXpub(permit: ExportPermit): string
 
   /**
-   * Расширенный ПРИВАТНЫЙ ключ уровня аккаунта.
+   * Extended PRIVATE key at the account level.
    *
-   * НАИБОЛЕЕ ОПАСНАЯ ОПЕРАЦИЯ МОДУЛЯ. Это не ключ от одного адреса, а ключ
-   * от всей ветви: владелец получает контроль над всеми адресами аккаунта,
-   * включая ещё не созданные. По последствиям сопоставимо с выдачей
-   * seed-фразы.
+   * THE MOST DANGEROUS OPERATION IN THE MODULE. This is not the
+   * key of one address, it is the key of the whole branch: the
+   * owner gains control of every address of the account, including
+   * those not yet created. In consequences it is comparable to
+   * issuing the seed phrase.
    *
-   * Требует подтверждения паролем на уровне выше. Возвращённый буфер
-   * подлежит немедленному затиранию.
+   * Requires a password confirmation one layer up. The returned
+   * buffer must be wiped immediately.
    *
-   * @throws KeyringCannotSignError для экземпляра, созданного из xpub.
+   * @throws KeyringCannotSignError for an instance created from an xpub.
    */
   exportAccountXprv(permit: ExportPermit): ISecretBuffer
 
   /**
-   * Расширенный публичный ключ уровня аккаунта БЕЗ выдачи наружу.
+   * Account-level extended public key WITHOUT issuing it outward.
    *
-   * Нужен внутренним потребителям ядра — например, для восстановления
-   * узла наблюдения при перезапуске. Разрешения не требует именно потому,
-   * что значение не покидает ядро.
+   * Needed by internal core consumers — e.g. to restore a watch
+   * node on restart. Needs no permit precisely because the value
+   * does not leave the core.
    *
    * @internal
    */
   peekAccountXpub(): string
 
   /**
-   * Затирает корневой и производные ключи.
+   * Wipes the root and derived keys.
    *
-   * Вызывается при блокировке кошелька. Метод синхронный: блокировка обязана
-   * завершиться до возврата управления в цикл событий.
+   * Called when the wallet is locked. The method is synchronous:
+   * the lock must finish before control returns to the event loop.
    */
   wipe(): void
 }
 
 /**
- * Параметры создания экземпляра.
+ * Instance creation parameters.
  *
- * Псевдоним, а не наследование интерфейса: пустой интерфейс-наследник
- * не добавляет ничего к супертипу и лишь создаёт видимость самостоятельной
- * сущности. Отдельное имя нужно как точка расширения на случай появления
- * параметров, не относящихся к пути деривации.
+ * An alias, not an interface that extends: an empty child interface
+ * adds nothing to the supertype and only creates the appearance of
+ * a separate entity. A separate name is needed as an extension
+ * point if parameters unrelated to the derivation path appear.
  */
 export type IHDWalletOptions = IDerivationPathOptions

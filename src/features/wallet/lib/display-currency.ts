@@ -1,8 +1,8 @@
 /**
- * Валюта показа суммы.
+ * Currency used to display an amount.
  *
- * Каноническая величина на сервере — доллары. Переключение только
- * меняет, в каких единицах число рисуется.
+ * The canonical server value is dollars. Switching only changes the
+ * units the figure is drawn in.
  */
 export const DISPLAY_CURRENCY = {
   Usd: 'USD',
@@ -18,7 +18,7 @@ export const DISPLAY_CURRENCIES: readonly DisplayCurrency[] = [
   DISPLAY_CURRENCY.Gbp,
 ]
 
-/** Курсы к доллару: сколько единиц валюты за один USD. */
+/** Rates against the dollar: how many units of the currency per one USD. */
 export interface IFiatRates {
   readonly USD: 1
   readonly EUR: number
@@ -27,7 +27,7 @@ export interface IFiatRates {
 
 export const USD_ONLY_RATES: IFiatRates = { USD: 1, EUR: 1, GBP: 1 }
 
-/** Разбирает денежную строку справочника. Пустое и нечисло — `null`. */
+/** Parse a directory money string. Empty or non-numeric is `null`. */
 export function parseDisplayAmount(value: string | null | undefined): number | null {
   if (value === undefined || value === null) {
     return null
@@ -44,7 +44,7 @@ export function parseDisplayAmount(value: string | null | undefined): number | n
   return Number.isFinite(amount) ? amount : null
 }
 
-/** Переводит доллары в выбранную валюту. */
+/** Convert dollars into the selected currency. */
 export function convertFromUsd(
   amountUsd: number,
   currency: DisplayCurrency,
@@ -53,7 +53,7 @@ export function convertFromUsd(
   return amountUsd * rates[currency]
 }
 
-/** Денежная величина в выбранной валюте. `null` — прочерк. */
+/** Money figure in the selected currency. `null` is an em dash. */
 export function formatDisplayFiat(
   amountUsd: number | null,
   currency: DisplayCurrency,

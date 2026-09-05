@@ -9,7 +9,6 @@ const OWNER = toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
 const ETHEREUM = toChainId(1n)
 const POLYGON = toChainId(137n)
 
-/** Сессия, одобрившая перечисленные сети. */
 function session(topic: string, chains: readonly string[]) {
   return {
     topic,
@@ -19,49 +18,49 @@ function session(topic: string, chains: readonly string[]) {
   }
 }
 
-describe('Сборка событий смены состояния', () => {
-  it('на каждое подходящее подключение уходит два события', () => {
-    /* Приложению важно и то, и другое: сеть — чтобы готовить операцию
-       для верной цепи, аккаунт — чтобы показать верный адрес. */
+describe('Building state-change events', () => {
+  it('sends two events for every matching connection', () => {
+    /* The app needs both: the network to prepare an operation for
+       the right chain, the account to show the right address. */
     const emissions = buildStateChangeEmissions([session('a', ['eip155:1'])], ETHEREUM, [OWNER])
 
     expect(emissions.map((entry) => entry.event.name)).toEqual(['chainChanged', 'accountsChanged'])
   })
 
-  it('сеть передаётся шестнадцатеричной строкой', () => {
-    /* Формат EIP-1193: приложения ждут `0x89`, а не число 137. */
+  it('sends the network as a hex string', () => {
+    /* EIP-1193 format: apps expect `0x89`, not the number 137. */
     const emissions = buildStateChangeEmissions([session('a', ['eip155:137'])], POLYGON, [OWNER])
 
     expect(emissions[0]?.event.data).toBe('0x89')
   })
 
-  it('адреса передаются в формате CAIP-10', () => {
-    /* Тот же формат, в каком они выданы при подключении: голый адрес
-       часть приложений не принимает. */
+  it('sends addresses in CAIP-10 form', () => {
+    /* Same form issued at connect: some apps reject a bare address. */
     const emissions = buildStateChangeEmissions([session('a', ['eip155:1'])], ETHEREUM, [OWNER])
 
     expect(emissions[1]?.event.data).toEqual([`eip155:1:${OWNER}`])
   })
 
-  it('событие уходит только одобрившим эту сеть', () => {
-    /* Приложению, не запрашивавшему сеть, relay всё равно откажет,
-       а перебор несогласованных сетей засоряет журнал. */
+  it('sends the event only to sessions that approved this network', () => {
+    /* Relay would reject an app that did not request the network,
+       and iterating mismatched networks fills the log. */
     const emissions = buildStateChangeEmissions(
-      [session('одобрил', ['eip155:1']), session('не одобрял', ['eip155:137'])],
+      [session('approved', ['eip155:1']), session('did not approve', ['eip155:137'])],
       ETHEREUM,
       [OWNER],
     )
 
-    expect(new Set(emissions.map((entry) => entry.topic))).toEqual(new Set(['одобрил']))
+    expect(new Set(emissions.map((entry) => entry.topic))).toEqual(new Set(['approved']))
   })
 
-  it('без подключений событий нет', () => {
+  it('emits nothing without connections', () => {
     expect(buildStateChangeEmissions([], ETHEREUM, [OWNER])).toEqual([])
   })
 
-  it('конверт события несёт ту же сеть, что и сам переход', () => {
-    /* relay сверяет поле chainId конверта с одобренными сетями сессии;
-       расхождение с самим событием было бы отвергнуто. */
+  it('the event envelope carries the same network as the change', () => {
+    /* Relay checks the envelope chainId against the session's
+       approved networks; a mismatch with the event itself would
+       be rejected. */
     const emissions = buildStateChangeEmissions([session('a', ['eip155:1'])], ETHEREUM, [OWNER])
 
     expect(emissions.every((entry) => entry.chainId === 'eip155:1')).toBe(true)

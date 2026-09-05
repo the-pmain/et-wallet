@@ -16,7 +16,7 @@ import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
 
-/** Витрина записи справочника, которую экран активов показывает как есть. */
+/** Directory-record showcase that the assets screen shows as-is. */
 const STORED_ASSETS: IRemoteAssets = {
   quoteCurrency: 'USD',
   updatedAt: '2026-08-20T12:00:00.000Z',
@@ -145,8 +145,8 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe('Активы записи справочника', () => {
-  it('показывает все токены из users.assets, а не один ETH с нулём', async () => {
+describe('Directory-record assets', () => {
+  it('shows every token from users.assets, not a single ETH at zero', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -188,7 +188,7 @@ describe('Активы записи справочника', () => {
     ).toBe(true)
   })
 
-  it('по нажатию строки показывает сведения об активе', async () => {
+  it('shows asset details after a row is tapped', async () => {
     const user = userEvent.setup()
 
     renderApp()

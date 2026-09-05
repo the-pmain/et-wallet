@@ -3,19 +3,15 @@ import { createContext, use, useSyncExternalStore } from 'react'
 import type { IOnboardingService, OnboardingState } from './contracts'
 
 /**
- * Контекст операций онбординга.
+ * Onboarding operations context.
  *
- * Значение по умолчанию отсутствует намеренно: обращение к операциям вне
- * провайдера — ошибка композиции, и она должна проявляться сразу,
- * а не деградировать до неработающих кнопок.
+ * No default value, on purpose: calling operations outside the
+ * provider is a composition error and must fail immediately, not
+ * degrade into dead buttons.
  */
 export const OnboardingContext = createContext<IOnboardingService | null>(null)
 
-/**
- * Доступ к операциям онбординга.
- *
- * @throws Если вызван вне провайдера.
- */
+/** @throws If called outside the provider. */
 export function useOnboarding(): IOnboardingService {
   const service = use(OnboardingContext)
 
@@ -27,11 +23,11 @@ export function useOnboarding(): IOnboardingService {
 }
 
 /**
- * Текущее состояние кошелька с подпиской на изменения.
+ * Current wallet state, subscribed to changes.
  *
- * `useSyncExternalStore` вместо собственного `useEffect` с подпиской:
- * он корректно работает при параллельном рендеринге и не даёт показать
- * устаревшее состояние между подпиской и первым событием.
+ * `useSyncExternalStore` instead of a homemade `useEffect` subscription:
+ * it works under concurrent rendering and does not show stale state
+ * between subscribe and the first event.
  */
 export function useOnboardingState(): OnboardingState {
   const service = useOnboarding()

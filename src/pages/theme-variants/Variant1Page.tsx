@@ -17,10 +17,10 @@ import { InertButton, ThemeVariantStudio, TokenGlyph } from './ThemeVariantStudi
 import { VARIANT_ACCOUNT, VARIANT_BALANCE, VARIANT_TOKENS } from './mock-data'
 
 /**
- * Этюд 1: хром расширения MetaMask.
+ * Study 1: MetaMask extension chrome.
  *
- * Тёмная колонка ширины всплывающего окна, эфир первым, оранжевый акцент.
- * Знак лисы — собственный геометрический рисунок, не товарный знак.
+ * Dark column at popup width, ether first, orange accent.
+ * The fox mark is an original geometric drawing, not a trademark.
  */
 export function Variant1Page() {
   return (

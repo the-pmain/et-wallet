@@ -11,7 +11,7 @@ import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
 
 const PASSWORD = 'Korova-7-Luna!'
-/** Почта владельца: идентификатор входа, лежит в колонке `email`. */
+/** Owner email: the sign-in identifier, stored in the `email` column. */
 const USERNAME = 'owner@example.com'
 const WRONG_PASSWORD = 'Sobaka-9-Solnce!'
 
@@ -27,7 +27,6 @@ function renderApp() {
   )
 }
 
-/** Открывает экран резервной копии. */
 async function openBackup(): Promise<void> {
   await screen.findByText(USERNAME)
   openPath('/wallet/backup')
@@ -35,7 +34,6 @@ async function openBackup(): Promise<void> {
   await screen.findByRole('heading', { name: 'Backup' })
 }
 
-/** Проходит путь до ввода пароля для указанного секрета. */
 async function reachPasswordStep(button: string, acknowledge: string): Promise<void> {
   const user = userEvent.setup()
 
@@ -52,15 +50,15 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD, USERNAME)
 })
 
-describe('Резервная копия: экран', () => {
-  it('объясняет, что означает потеря фразы', async () => {
+describe('Backup: screen', () => {
+  it('explains what losing the phrase means', async () => {
     renderApp()
     await openBackup()
 
     expect(screen.getByText(/obtains the wallet/i)).toBeInTheDocument()
   })
 
-  it('не показывает секретов до запроса', async () => {
+  it('does not show secrets before they are requested', async () => {
     renderApp()
     await openBackup()
 
@@ -68,8 +66,8 @@ describe('Резервная копия: экран', () => {
   })
 })
 
-describe('Резервная копия: seed-фраза', () => {
-  it('требует отметки о понимании последствий до ввода пароля', async () => {
+describe('Backup: seed phrase', () => {
+  it('requires a consequence acknowledgement before the password', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -81,7 +79,7 @@ describe('Резервная копия: seed-фраза', () => {
     expect(screen.getByRole('button', { name: 'Show the phrase' })).toBeDisabled()
   })
 
-  it('называет, что пароль устройства фразу не защищает', async () => {
+  it('names that the device password does not protect the phrase', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -92,7 +90,7 @@ describe('Резервная копия: seed-фраза', () => {
     expect(screen.getByText(/The password of this device does not protect it/i)).toBeInTheDocument()
   })
 
-  it('спрашивает пароль даже при разблокированном кошельке', async () => {
+  it('asks for the password even when the wallet is unlocked', async () => {
     renderApp()
     await openBackup()
     await reachPasswordStep('Show the seed phrase', 'Show the phrase')
@@ -101,7 +99,7 @@ describe('Резервная копия: seed-фраза', () => {
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
   })
 
-  it('показывает фразу после верного пароля', async () => {
+  it('shows the phrase after the correct password', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -115,7 +113,7 @@ describe('Резервная копия: seed-фраза', () => {
     expect(screen.getAllByText('abandon')).toHaveLength(11)
   })
 
-  it('неверный пароль фразу не выдаёт', async () => {
+  it('a wrong password does not reveal the phrase', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -129,10 +127,10 @@ describe('Резервная копия: seed-фраза', () => {
     expect(screen.queryByText('about')).not.toBeInTheDocument()
   })
 
-  it('копирование фразы в буфер обмена не предлагается', async () => {
-    /* Буфер обмена читают другие приложения, а фраза — это весь
-       кошелёк. Кнопка копирования здесь была бы удобством ценой
-       единственного секрета, который нельзя сменить. */
+  it('copying the phrase to the clipboard is not offered', async () => {
+    /* Other apps can read the clipboard, and the phrase is the whole
+       wallet. A copy button here would be convenience at the price of
+       the one secret that cannot be changed. */
     const user = userEvent.setup()
 
     renderApp()
@@ -147,7 +145,7 @@ describe('Резервная копия: seed-фраза', () => {
     expect(screen.queryByRole('button', { name: /Copy/i })).not.toBeInTheDocument()
   })
 
-  it('убирает фразу с экрана по закрытию', async () => {
+  it('removes the phrase from the screen on close', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -164,8 +162,8 @@ describe('Резервная копия: seed-фраза', () => {
   })
 })
 
-describe('Резервная копия: приватный ключ', () => {
-  it('оговаривает невозможность отзыва', async () => {
+describe('Backup: private key', () => {
+  it('notes that a key cannot be revoked', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -176,7 +174,7 @@ describe('Резервная копия: приватный ключ', () => {
     expect(screen.getByText('The key hands over the address for good')).toBeInTheDocument()
   })
 
-  it('выдаёт ключ после подтверждения и пароля', async () => {
+  it('reveals the key after acknowledgement and password', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -189,7 +187,7 @@ describe('Резервная копия: приватный ключ', () => {
     expect(await screen.findByText(/^0x[0-9a-f]{64}$/i)).toBeInTheDocument()
   })
 
-  it('ключ скрыт до явного показа', async () => {
+  it('the key is hidden until it is shown explicitly', async () => {
     const user = userEvent.setup()
 
     renderApp()
@@ -199,15 +197,14 @@ describe('Резервная копия: приватный ключ', () => {
     await user.type(screen.getByLabelText('Password'), PASSWORD)
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    /* Значение присутствует в разметке, но скрыто от чтения с экрана
-       и размыто: случайный взгляд и демонстрация экрана его не раскроют. */
+    /* The value is in the markup but hidden from on-screen reading
+       and blurred: a glance or a screen share will not reveal it. */
     expect(await screen.findByText(/^0x[0-9a-f]{64}$/i)).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByRole('button', { name: 'Show' })).toBeInTheDocument()
   })
 })
 
-describe('Проверка записанной копии', () => {
-  /** Заполняет форму проверки и нажимает «Check». */
+describe('Written-copy check', () => {
   async function check(phrase: string, password: string): Promise<void> {
     const user = userEvent.setup()
 
@@ -216,7 +213,7 @@ describe('Проверка записанной копии', () => {
     await user.click(screen.getByRole('button', { name: 'Check' }))
   }
 
-  it('верная копия подтверждается', async () => {
+  it('a matching copy is confirmed', async () => {
     renderApp()
     await openBackup()
     await check(TEST_MNEMONIC, PASSWORD)
@@ -224,7 +221,7 @@ describe('Проверка записанной копии', () => {
     expect(await screen.findByText('The copy matches')).toBeInTheDocument()
   })
 
-  it('ошибка в одном слове названа расхождением', async () => {
+  it('a one-word error is named as a mismatch', async () => {
     renderApp()
     await openBackup()
     await check(TEST_MNEMONIC.replace('about', 'above'), PASSWORD)
@@ -232,10 +229,10 @@ describe('Проверка записанной копии', () => {
     expect(await screen.findByText('The copy does not match')).toBeInTheDocument()
   })
 
-  it('при расхождении фраза не показывается', async () => {
-    /* Показ «правильного варианта» после неудачи свёл бы всю пользу
-       экрана к нулю: он и затевался ради того, чтобы не раскрывать
-       фразу ради проверки. */
+  it('the phrase is not shown after a mismatch', async () => {
+    /* Showing the "correct" phrase after a failure would erase the
+       point of the screen: it exists so the phrase is not revealed
+       just to be checked. */
     renderApp()
     await openBackup()
     await check('abandon abandon abandon', PASSWORD)
@@ -245,9 +242,9 @@ describe('Проверка записанной копии', () => {
     expect(document.body.textContent).not.toContain(TEST_MNEMONIC)
   })
 
-  it('какое слово отличается, не сообщается', async () => {
-    /* Подсказка помогла бы не только владельцу: нашедший бумагу
-       с несколькими смазанными словами подбирал бы остаток по одному. */
+  it('does not say which word differs', async () => {
+    /* A hint would help more than the owner: someone who found a
+       paper with a few smudged words would guess the rest one by one. */
     renderApp()
     await openBackup()
     await check(TEST_MNEMONIC.replace('about', 'above'), PASSWORD)
@@ -257,8 +254,8 @@ describe('Проверка записанной копии', () => {
     expect(screen.getByText(/not shown on purpose/i)).toBeInTheDocument()
   })
 
-  it('неверный пароль отвечает отказом, а не «не совпало»', async () => {
-    /* Иначе ответ сообщал бы, что пароль угадан. */
+  it('a wrong password is a refusal, not a mismatch', async () => {
+    /* Otherwise the reply would say the password was guessed. */
     renderApp()
     await openBackup()
     await check(TEST_MNEMONIC, WRONG_PASSWORD)
@@ -267,9 +264,9 @@ describe('Проверка записанной копии', () => {
     expect(screen.queryByText('The copy does not match')).not.toBeInTheDocument()
   })
 
-  it('введённое стирается после ответа', async () => {
-    /* Оставленная в поле фраза видна каждому, кто подойдёт
-       к устройству. */
+  it('what was typed is cleared after the reply', async () => {
+    /* A phrase left in the field is visible to anyone who walks
+       up to the device. */
     renderApp()
     await openBackup()
     await check(TEST_MNEMONIC, PASSWORD)
@@ -280,9 +277,9 @@ describe('Проверка записанной копии', () => {
     expect(screen.getByLabelText(/Wallet password/i)).toHaveValue('')
   })
 
-  it('объясняет, зачем спрашивается пароль', async () => {
-    /* На разблокированном кошельке требование выглядит придиркой,
-       если не сказать, что оно закрывает перебор чужих догадок. */
+  it('explains why the password is asked', async () => {
+    /* On an unlocked wallet the demand looks like nitpicking unless
+       it is said that it blocks someone else's guesses. */
     renderApp()
     await openBackup()
 

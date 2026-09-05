@@ -3,98 +3,99 @@ import type { Brand } from '@/shared/types'
 import type { DerivationPath, KeyringId, Timestamp } from '@/core/types'
 
 /**
- * Область, к которой относится экспорт секрета.
+ * Scope a secret export belongs to.
  *
- * ПОЧЕМУ НЕ ПРОСТО ПУТЬ ДЕРИВАЦИИ. Опасное сочетание «xpub плюс приватный
- * ключ потомка» существует только внутри одного HD-аккаунта. Импортированный
- * ключ не принадлежит никакому дереву: его выдача не раскрывает HD-аккаунт,
- * а выдача xpub HD-аккаунта не раскрывает импортированный ключ.
+ * WHY NOT JUST A DERIVATION PATH. The dangerous pair "xpub plus a
+ * child private key" exists only inside one HD account. An imported
+ * key belongs to no tree: exporting it does not leak the HD account,
+ * and exporting the HD account's xpub does not leak the imported key.
  *
- * Если бы обе операции учитывались под одним путём деривации, экспорт
- * импортированного ключа помечал бы HD-аккаунт скомпрометированным.
- * Ложное предупреждение здесь не безобидно: пользователь, приученный
- * к ложным тревогам, перестаёт читать настоящие.
+ * If both operations were counted under one derivation path, exporting
+ * an imported key would mark the HD account compromised. A false
+ * warning here is not harmless: a user trained on false alarms stops
+ * reading real ones.
  */
 export type ExportScope = Brand<string, 'ExportScope'>
 
-/** Область HD-аккаунта. Совпадает с путём деривации уровня аккаунта. */
+/** HD-account scope. Matches the account-level derivation path. */
 export function hdAccountScope(accountPath: DerivationPath): ExportScope {
   return accountPath as string as ExportScope
 }
 
 /**
- * Область импортированного ключа.
+ * Imported-key scope.
  *
- * Префикс исключает совпадение с путём деривации: тот всегда начинается
- * с `m/`.
+ * The prefix prevents a clash with a derivation path: those always
+ * start with `m/`.
  */
 export function importedKeyScope(keyringId: KeyringId): ExportScope {
   return `imported:${keyringId}` as ExportScope
 }
 
 /**
- * Область всего кошелька. Применима только к мнемонической фразе.
+ * Whole-wallet scope. Applies only to the mnemonic.
  *
- * ПОЧЕМУ НЕ ПУТЬ ПОДПИСЫВАЮЩЕГО АККАУНТА. Фраза не принадлежит ни одному
- * аккаунту: из неё выводятся все, включая ещё не созданные. Записав её
- * выдачу под путём `m/44'/60'/0'`, мы утверждали бы, что риск ограничен
- * этим аккаунтом, — прямо противоположное действительности.
+ * WHY NOT THE SIGNING ACCOUNT'S PATH. The phrase belongs to no single
+ * account: it derives all of them, including ones not created yet.
+ * Recording its export under `m/44'/60'/0'` would claim the risk is
+ * limited to that account — the opposite of the truth.
  *
- * Значение не начинается ни с `m/`, ни с `imported:`, поэтому совпасть
- * с областью аккаунта либо импортированного ключа не может.
+ * The value starts with neither `m/` nor `imported:`, so it cannot
+ * collide with an account or imported-key scope.
  */
 export const WALLET_SCOPE = 'wallet' as ExportScope
 
 /**
- * Вид экспортируемого секрета.
+ * Kind of secret being exported.
  *
- * Различение принципиально: последствия выдачи xpub и выдачи xprv
- * отличаются на порядки, и обобщённое «экспортировать» скрыло бы эту разницу.
+ * The distinction is essential: exporting an xpub and exporting an
+ * xprv differ by orders of magnitude, and a generic "export" would
+ * hide that.
  */
 export const EXPORT_KIND = {
-  /** Расширенный публичный ключ. Сам по себе средствами не распоряжается. */
+  /** Extended public key. By itself it cannot move funds. */
   Xpub: 'xpub',
-  /** Приватный ключ одного адреса. */
+  /** Private key of one address. */
   PrivateKey: 'private-key',
-  /** Расширенный приватный ключ — доступ ко всем адресам аккаунта. */
+  /** Extended private key — access to every address of the account. */
   Xprv: 'xprv',
-  /** Мнемоническая фраза — доступ ко всему кошельку. */
+  /** Mnemonic — access to the whole wallet. */
   Mnemonic: 'mnemonic',
 } as const
 
 export type ExportKind = (typeof EXPORT_KIND)[keyof typeof EXPORT_KIND]
 
 /**
- * Уровень риска операции экспорта.
+ * Risk level of an export.
  *
- * Порядок возрастания задан явно: он используется для сравнения
- * подтверждённого пользователем уровня с фактическим.
+ * Ascending order is explicit: it is used to compare the level the
+ * user acknowledged with the actual one.
  */
 export const EXPORT_RISK = {
-  /** Обычный экспорт без известных осложняющих обстоятельств. */
+  /** Ordinary export with no known aggravating circumstances. */
   Low: 'low',
-  /** Экспорт создаёт предпосылку для будущей компрометации. */
+  /** The export creates a precondition for a later compromise. */
   Elevated: 'elevated',
   /**
-   * Экспорт ЗАМЫКАЕТ пару «xpub + приватный ключ потомка».
+   * The export CLOSES the "xpub + child private key" pair.
    *
-   * После него получатель обоих артефактов способен арифметически вычислить
-   * приватный ключ всего аккаунта. Это не предположение, а прямое следствие
-   * устройства несмягчённой деривации BIP-32.
+   * After this the holder of both artefacts can arithmetically compute
+   * the account's private key. That is not a guess — it is a direct
+   * consequence of BIP-32 non-hardened derivation.
    */
   AccountCompromise: 'account-compromise',
-  /** Выдача секрета, дающего доступ ко всему аккаунту или кошельку. */
+  /** Release of a secret that opens the whole account or wallet. */
   Critical: 'critical',
 } as const
 
 export type ExportRisk = (typeof EXPORT_RISK)[keyof typeof EXPORT_RISK]
 
 /**
- * Порядок уровней риска по возрастанию.
+ * Risk levels in ascending order.
  *
- * Массив, а не числовые значения в самой константе: числа в перечислении
- * соблазняют сравнивать их напрямую, а строковые значения обязаны попадать
- * в хранилище и в интерфейс в читаемом виде.
+ * An array, not numeric values on the constant: numbers in an enum
+ * tempt direct comparison, and the string values must land in storage
+ * and the UI in a readable form.
  */
 export const EXPORT_RISK_ORDER: readonly ExportRisk[] = [
   EXPORT_RISK.Low,
@@ -103,73 +104,68 @@ export const EXPORT_RISK_ORDER: readonly ExportRisk[] = [
   EXPORT_RISK.Critical,
 ]
 
-/** Возвращает порядковый номер уровня риска. */
 export function riskLevel(risk: ExportRisk): number {
   return EXPORT_RISK_ORDER.indexOf(risk)
 }
 
 /**
- * Причина назначенного уровня риска.
+ * Why that risk level was assigned.
  *
- * Машиночитаемый код, а не готовый текст: интерфейс подбирает формулировку
- * на языке пользователя, а в журнал попадает стабильный идентификатор.
+ * A machine-readable code, not finished copy: the UI picks wording in
+ * the user's language, and the log gets a stable identifier.
  */
 export const EXPORT_RISK_REASON = {
-  /** Осложняющих обстоятельств нет. */
   None: 'none',
-  /** Из этого аккаунта уже выдавался xpub. */
+  /** An xpub has already been exported from this account. */
   XpubAlreadyExported: 'xpub-already-exported',
-  /** Из этого аккаунта уже выдавался приватный ключ. */
+  /** A private key has already been exported from this account. */
   PrivateKeyAlreadyExported: 'private-key-already-exported',
-  /** xpub запрашивается из аккаунта, которым подписываются транзакции. */
+  /** An xpub is requested from the account that signs transactions. */
   XpubFromSigningAccount: 'xpub-from-signing-account',
-  /** Экспортируемый секрет открывает доступ ко всему аккаунту. */
+  /** The exported secret opens the whole account. */
   GrantsWholeAccount: 'grants-whole-account',
-  /** Экспортируемый секрет открывает доступ ко всему кошельку. */
+  /** The exported secret opens the whole wallet. */
   GrantsWholeWallet: 'grants-whole-wallet',
 } as const
 
 export type ExportRiskReason = (typeof EXPORT_RISK_REASON)[keyof typeof EXPORT_RISK_REASON]
 
-/** Запрос на экспорт секрета. */
 export interface IExportRequest {
   readonly kind: ExportKind
 
-  /** Область, из которой выполняется экспорт. */
   readonly scope: ExportScope
 
   /**
-   * Индекс адреса. Заполняется только для {@link EXPORT_KIND.PrivateKey}.
-   * Для экспорта уровня аккаунта равен `null`.
+   * Address index. Set only for {@link EXPORT_KIND.PrivateKey}.
+   * `null` for an account-level export.
    */
   readonly addressIndex: number | null
 }
 
-/** Заключение о риске операции. */
 export interface IExportRiskAssessment {
   readonly request: IExportRequest
   readonly risk: ExportRisk
   readonly reason: ExportRiskReason
 
   /**
-   * Приведёт ли операция к тому, что аккаунт станет вычислимым целиком.
+   * Whether the operation makes the whole account computable.
    *
-   * Отдельный флаг, а не вывод из уровня риска: интерфейс обязан показать
-   * при этом условии не предупреждение, а объяснение необратимых последствий.
+   * A separate flag, not inferred from the risk level: the UI must
+   * then show an explanation of irreversible consequences, not a
+   * warning.
    */
   readonly closesCompromisePair: boolean
 
   /**
-   * Рекомендация вынести операцию в отдельный аккаунт.
+   * Recommendation to move the operation to a separate account.
    *
-   * Уровень аккаунта в BIP-44 закалён, поэтому компрометация одного аккаунта
-   * не затрагивает другие. Выдача xpub из аккаунта, зарезервированного
-   * под наблюдение, полностью снимает риск эскалации.
+   * The BIP-44 account level is hardened, so compromising one account
+   * does not touch the others. Exporting an xpub from an account
+   * reserved for watching removes the escalation risk entirely.
    */
   readonly suggestsSeparateAccount: boolean
 }
 
-/** Запись журнала экспортов. */
 export interface IExportRecord {
   readonly kind: ExportKind
   readonly scope: ExportScope

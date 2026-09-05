@@ -88,7 +88,7 @@ function fakeSession(accounts: readonly IAccount[]): Pick<
 }
 
 describe('syncCreatedWalletsToDirectory', () => {
-  it('пишет новый адрес в справочник', async () => {
+  it('writes a new address to the directory', async () => {
     writeLoginCredentials({
       id: '7',
       email: 'james@example.com',
@@ -114,7 +114,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     })
   })
 
-  it('не повторяет уже записанный адрес при следующем снимке', async () => {
+  it('does not rewrite an already posted address on the next snapshot', async () => {
     writeLoginCredentials({
       id: '7',
       email: 'james@example.com',
@@ -133,7 +133,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     })
   })
 
-  it('пишет второй аккаунт отдельно', async () => {
+  it('posts a second account separately', async () => {
     writeLoginCredentials({
       id: '7',
       email: 'james@example.com',
@@ -160,7 +160,7 @@ describe('syncCreatedWalletsToDirectory', () => {
     })
   })
 
-  it('молчит без сохранённого входа', () => {
+  it('does nothing without stored sign-in', () => {
     const addWallet = vi.fn()
     const session = fakeSession([])
 

@@ -5,7 +5,6 @@ import { SystemClock, type IClock, type StorageDurability } from '@/core'
 import type { IAutoLockState } from './useAutoLock'
 import { DEFAULT_SECURITY_SETTINGS, type ISecuritySettings } from './SecuritySettings'
 
-/** Значение контекста безопасности. */
 export interface ISecurityContextValue {
   readonly autoLock: IAutoLockState
   readonly settings: ISecuritySettings
@@ -13,38 +12,38 @@ export interface ISecurityContextValue {
   readonly setAutoLockTimeout: (timeoutMs: number) => Promise<void>
   readonly setConfirmBeforeSigning: (enabled: boolean) => Promise<void>
 
-  /** Проверяет пароль, не меняя состояния блокировки. */
+  /** Checks the password without changing the lock state. */
   readonly verifyPassword: (password: string) => Promise<boolean>
 
   /**
-   * Источник времени приложения.
+   * The application's clock.
    *
-   * ЗАЧЕМ ОН ЭКРАНАМ. Обратный отсчёт до конца задержки обязан идти
-   * по тем же часам, по которым ограничитель считает срок. Системный
-   * таймер рядом с внедрёнными часами — два источника времени, и они
-   * расходятся: в проверке отсчёт не двигался бы вовсе, а в боевом
-   * коде показанное значение разошлось бы с действительным сроком.
+   * WHY SCREENS NEED IT. The countdown to the end of a delay must
+   * run on the same clock the limiter uses. A system timer next to
+   * an injected clock is two time sources, and they drift: in a
+   * test the countdown would not move at all, and in production
+   * the shown value would disagree with the real deadline.
    */
   readonly clock: IClock
 
   /**
-   * Насколько надёжно хранилище удерживает данные.
+   * How reliably storage holds on to data.
    *
-   * `null`, пока состояние не прочитано. Отличается от «данные
-   * не защищены»: показывать предупреждение до того, как ответ получен,
-   * значит пугать владельца тем, чего может не быть.
+   * `null` until the state has been read. That is not "data is
+   * unprotected": showing a warning before the answer arrives
+   * would scare the owner with something that may not exist.
    */
   readonly storageDurability: StorageDurability | null
 }
 
 /**
- * Контекст модуля безопасности.
+ * Security-module context.
  *
- * ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ НЕ ОСЛАБЛЯЕТ ЗАЩИТУ. Компонент вне провайдера
- * получает настройки по умолчанию (подтверждение включено) и проверку
- * пароля, которая всегда отвечает отказом. Обратное — «вне провайдера
- * всё разрешено» — превратило бы забытый провайдер в тихое отключение
- * защиты.
+ * THE DEFAULT VALUE DOES NOT WEAKEN PROTECTION. A component
+ * outside the provider gets the default settings (confirm on)
+ * and a password check that always refuses. The opposite —
+ * "outside the provider everything is allowed" — would turn a
+ * forgotten provider into a silent kill-switch for protection.
  */
 export const SecurityContext = createContext<ISecurityContextValue>({
   autoLock: { isWarning: false, remainingMs: null, extend: () => undefined },
@@ -56,7 +55,6 @@ export const SecurityContext = createContext<ISecurityContextValue>({
   storageDurability: null,
 })
 
-/** Доступ к состоянию безопасности. */
 export function useSecurity(): ISecurityContextValue {
   return use(SecurityContext)
 }

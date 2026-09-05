@@ -1,10 +1,10 @@
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/core'
 
 /**
- * Готова ли пара полей «пароль» и «подтверждение» к отправке.
+ * Whether the password and confirmation pair is ready to submit.
  *
- * Сложности нет: достаточно непустого пароля в пределах длины
- * и совпадения с подтверждением.
+ * No complexity check: a non-empty password within the length bound
+ * that matches confirmation is enough.
  */
 export function isPasswordPairValid(password: string, confirmation: string): boolean {
   return (

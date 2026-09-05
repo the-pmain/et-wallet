@@ -8,28 +8,28 @@ import { RpcClient, type IRpcClientOptions } from './RpcClient'
 
 const FACTORY_NAME = 'RpcClientFactory'
 
-/** Зависимости фабрики. */
+/** Factory dependencies. */
 export interface IRpcClientFactoryDependencies {
   readonly logger: ILogger
   readonly options?: IRpcClientOptions
 }
 
 /**
- * Создание соединений с перебором резервных узлов.
+ * Creating connections with backup-node rotation.
  *
- * ПОРЯДОК ПЕРЕБОРА. Адреса из `rpcUrls` пробуются по очереди, первый
- * откликнувшийся и прошедший сверку chainId становится действующим.
- * Список задаётся в порядке приоритета, поэтому перемешивать его нельзя:
- * первым обычно стоит наиболее надёжный оператор.
+ * ROTATION ORDER. Addresses from `rpcUrls` are tried in order; the
+ * first that answers and passes chainId verification becomes active.
+ * The list is in priority order, so it must not be shuffled: the
+ * most reliable operator is usually first.
  *
- * ОТКАЗ ПРИ НЕСОВПАДЕНИИ chainId НЕ ПРОПУСКАЕТСЯ МОЛЧА. Узел, вернувший
- * чужой идентификатор сети, исключается из перебора, но факт записывается
- * в журнал предупреждением: это либо ошибка конфигурации, либо попытка
- * подмены, и оба случая заслуживают внимания.
+ * A chainId MISMATCH IS NOT SKIPPED IN SILENCE. A node that returned
+ * a foreign network id is dropped from rotation, but the fact is
+ * logged as a warning: it is either a config error or an
+ * impersonation attempt, and both deserve attention.
  *
- * Если ни один адрес не подошёл, выбрасывается ошибка последней попытки:
- * при единственном узле с чужим chainId пользователь увидит именно эту
- * причину, а не обобщённое «сеть недоступна».
+ * If no address fits, the last attempt's error is thrown: with a
+ * single node on a foreign chainId the user will see that reason,
+ * not a generic "network unavailable".
  */
 export class RpcClientFactory implements IProviderFactory {
   readonly #logger: ILogger
@@ -71,19 +71,21 @@ export class RpcClientFactory implements IProviderFactory {
       }
     }
 
-    /* Ошибка последней попытки сохраняется как причина: при единственном
-       узле с чужим chainId это важнее обобщённого «сеть недоступна». */
+    /* The last attempt's error is kept as the cause: with a single
+       node on a foreign chainId that matters more than a generic
+       "network unavailable". */
     throw new ProviderUnavailableError(network.chainId, { cause: lastError })
   }
 
   /**
-   * Устанавливает соединение с одним узлом.
+   * Establishes a connection to one node.
    *
-   * Вынесен отдельным защищённым методом как точка подмены: тесты правил
-   * перебора не должны зависеть от сети, а проверять их через реальные
-   * запросы значило бы получить недетерминированный и медленный набор.
+   * Extracted as a protected method so tests can substitute it:
+   * rotation-rule tests must not depend on the network, and checking
+   * them through real requests would make a non-deterministic, slow
+   * suite.
    *
-   * Production-код метод не переопределяет.
+   * Production code does not override this method.
    */
   protected async connect(rpcUrl: string, chainId: ChainId): Promise<IProvider> {
     return await RpcClient.connect(rpcUrl, chainId, this.#options)

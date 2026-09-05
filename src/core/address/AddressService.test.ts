@@ -14,8 +14,8 @@ import { AddressService } from './AddressService'
 import { PUBLIC_KEY_FORMAT } from './types'
 
 /**
- * Порядок группы secp256k1. Приватный ключ обязан лежать в 1..n-1.
- * Значение закреплено стандартом SEC 2 и приводится в спецификации кривой.
+ * secp256k1 group order. A private key must lie in 1..n-1.
+ * The value is fixed by SEC 2 and is given in the curve spec.
  */
 const CURVE_ORDER_HEX = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141'
 
@@ -34,12 +34,12 @@ function toHex(bytes: Uint8Array): string {
 }
 
 /**
- * Приватный ключ, равный единице.
+ * Private key equal to one.
  *
- * Соответствующий публичный ключ — точка-генератор кривой, а адрес
- * общеизвестен и постоянно приводится в документации. Это делает его
- * пригодным эталоном для проверки всей цепочки
- * «приватный ключ -> публичный ключ -> keccak256 -> EIP-55».
+ * The matching public key is the curve generator, and the address
+ * is well-known and constantly cited in the documentation. That
+ * makes it a usable reference for the whole chain
+ * "private key -> public key -> keccak256 -> EIP-55".
  */
 const PRIVATE_KEY_ONE = fromHex('0000000000000000000000000000000000000000000000000000000000000001')
 const ADDRESS_OF_KEY_ONE = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf'
@@ -54,33 +54,33 @@ beforeEach(() => {
   service = new AddressService()
 })
 
-describe('AddressService: разбор и контрольная сумма', () => {
-  it.each(EIP55_ADDRESSES)('приводит %s к каноническому виду', (address) => {
+describe('AddressService: parse and checksum', () => {
+  it.each(EIP55_ADDRESSES)('brings %s to canonical form', (address) => {
     expect(service.checksum(address.toLowerCase())).toBe(address)
   })
 
-  it('принимает адрес в нижнем регистре', () => {
+  it('accepts a lower-case address', () => {
     expect(service.parse('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')).toBe(
       '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
     )
   })
 
-  it('отвергает неверную контрольную сумму', () => {
+  it('rejects a wrong checksum', () => {
     expect(() => service.parse('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD')).toThrow(
       AddressChecksumMismatchError,
     )
   })
 
-  it('отвергает строку не в формате адреса', () => {
+  it('rejects a string that is not an address', () => {
     expect(() => service.parse('0x123')).toThrow(InvalidAddressError)
   })
 
-  it('подтверждает корректность без исключения', () => {
+  it('confirms validity without throwing', () => {
     expect(service.isValid('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')).toBe(true)
-    expect(service.isValid('мусор')).toBe(false)
+    expect(service.isValid('garbage')).toBe(false)
   })
 
-  it('сравнивает адреса без учёта регистра', () => {
+  it('compares addresses ignoring case', () => {
     expect(
       service.equals(
         '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
@@ -90,37 +90,37 @@ describe('AddressService: разбор и контрольная сумма', ()
   })
 })
 
-describe('AddressService: двоичное представление', () => {
-  it('преобразует адрес в 20 байт', () => {
+describe('AddressService: binary form', () => {
+  it('converts an address to 20 bytes', () => {
     const bytes = service.toBytes(toAddress('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed'))
 
     expect(bytes).toHaveLength(20)
     expect(toHex(bytes)).toBe('5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')
   })
 
-  it('восстанавливает адрес из байтов в контрольной сумме', () => {
+  it('restores an address from bytes in checksum form', () => {
     const bytes = fromHex('5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')
 
     expect(service.fromBytes(bytes)).toBe('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
   })
 
-  it('обратим для всех эталонных адресов EIP-55', () => {
+  it('is reversible for every official EIP-55 address', () => {
     for (const address of EIP55_ADDRESSES) {
       expect(service.fromBytes(service.toBytes(toAddress(address)))).toBe(address)
     }
   })
 
-  it('отвергает массив неверной длины', () => {
+  it('rejects an array of the wrong length', () => {
     expect(() => service.fromBytes(new Uint8Array(19))).toThrow(InvalidAddressError)
     expect(() => service.fromBytes(new Uint8Array(21))).toThrow(InvalidAddressError)
   })
 })
 
-describe('AddressService: вывод из приватного ключа', () => {
-  /* Полная цепочка secp256k1 -> Keccak-256 -> EIP-55 на эталоне,
-     значение которого известно независимо от нашей реализации. */
+describe('AddressService: derivation from a private key', () => {
+  /* Full chain secp256k1 -> Keccak-256 -> EIP-55 on a reference
+     whose value is known independently of our implementation. */
 
-  it('выводит публичный ключ в сжатой форме', () => {
+  it('derives a public key in compressed form', () => {
     const key = SecretBuffer.copyOf(PRIVATE_KEY_ONE)
 
     try {
@@ -130,7 +130,7 @@ describe('AddressService: вывод из приватного ключа', () =
     }
   })
 
-  it('выводит публичный ключ в несжатой форме', () => {
+  it('derives a public key in uncompressed form', () => {
     const key = SecretBuffer.copyOf(PRIVATE_KEY_ONE)
 
     try {
@@ -142,7 +142,7 @@ describe('AddressService: вывод из приватного ключа', () =
     }
   })
 
-  it('выводит адрес из приватного ключа', () => {
+  it('derives an address from a private key', () => {
     const key = SecretBuffer.copyOf(PRIVATE_KEY_ONE)
 
     try {
@@ -152,19 +152,19 @@ describe('AddressService: вывод из приватного ключа', () =
     }
   })
 
-  it('согласован с выводом адреса из публичного ключа', () => {
+  it('agrees with deriving an address from a public key', () => {
     const key = SecretBuffer.copyOf(PRIVATE_KEY_ONE)
 
     try {
-      /* Два независимых пути обязаны сойтись. Расхождение означало бы,
-         что кошелёк показывает адрес, которым не сможет подписать. */
+      /* Two independent paths must meet. A mismatch would mean the
+         wallet shows an address it cannot sign with. */
       expect(service.fromPrivateKey(key)).toBe(service.fromPublicKey(service.getPublicKey(key)))
     } finally {
       key.wipe()
     }
   })
 
-  it('не затирает переданный буфер: владение остаётся за вызывающим', () => {
+  it('does not wipe the passed buffer: ownership stays with the caller', () => {
     const key = SecretBuffer.copyOf(PRIVATE_KEY_ONE)
 
     try {
@@ -176,7 +176,7 @@ describe('AddressService: вывод из приватного ключа', () =
     }
   })
 
-  it('отказывается работать с затёртым буфером', () => {
+  it('refuses to work with a wiped buffer', () => {
     const key = SecretBuffer.copyOf(PRIVATE_KEY_ONE)
     key.wipe()
 
@@ -184,40 +184,41 @@ describe('AddressService: вывод из приватного ключа', () =
   })
 })
 
-describe('AddressService: проверка приватного ключа', () => {
-  /* Недостаточно проверить длину: допустимы только значения 1..n-1.
-     Ключ вне диапазона не задаёт точку на кривой, и его приём привёл бы
-     к адресу, отличному от показанного пользователю. */
+describe('AddressService: private-key check', () => {
+  /* Length is not enough: only values 1..n-1 are allowed. A key
+     outside the range does not define a point on the curve, and
+     accepting it would yield an address different from the one
+     shown to the user. */
 
-  it('принимает ключ из допустимого диапазона', () => {
+  it('accepts a key in the allowed range', () => {
     expect(service.isValidPrivateKey(PRIVATE_KEY_ONE)).toBe(true)
   })
 
-  it('отвергает нулевой ключ', () => {
+  it('rejects a zero key', () => {
     expect(service.isValidPrivateKey(new Uint8Array(32))).toBe(false)
   })
 
-  it('отвергает ключ, равный порядку группы', () => {
+  it('rejects a key equal to the group order', () => {
     expect(service.isValidPrivateKey(fromHex(CURVE_ORDER_HEX))).toBe(false)
   })
 
-  it('отвергает ключ больше порядка группы', () => {
+  it('rejects a key larger than the group order', () => {
     expect(service.isValidPrivateKey(new Uint8Array(32).fill(0xff))).toBe(false)
   })
 
-  it('принимает наибольший допустимый ключ n-1', () => {
+  it('accepts the largest allowed key n-1', () => {
     const maximum = fromHex(CURVE_ORDER_HEX)
     maximum.set([0x40], 31)
 
     expect(service.isValidPrivateKey(maximum)).toBe(true)
   })
 
-  it('отвергает ключ неверной длины', () => {
+  it('rejects a key of the wrong length', () => {
     expect(service.isValidPrivateKey(new Uint8Array(31))).toBe(false)
     expect(service.isValidPrivateKey(new Uint8Array(33))).toBe(false)
   })
 
-  it('бросает исключение при выводе адреса из непригодного ключа', () => {
+  it('throws when deriving an address from an unusable key', () => {
     const key = SecretBuffer.allocate(32)
 
     try {
@@ -228,27 +229,27 @@ describe('AddressService: проверка приватного ключа', () 
   })
 })
 
-describe('AddressService: невосстановимые адреса', () => {
-  it('распознаёт нулевой адрес', () => {
+describe('AddressService: unrecoverable addresses', () => {
+  it('recognises the zero address', () => {
     expect(service.isZero(ZERO_ADDRESS)).toBe(true)
     expect(service.isZero('0x0000000000000000000000000000000000000000')).toBe(true)
   })
 
-  it('не считает нулевым обычный адрес', () => {
+  it('does not treat an ordinary address as zero', () => {
     expect(service.isZero(ADDRESS_OF_KEY_ONE)).toBe(false)
   })
 
-  it('распознаёт общепринятый адрес сжигания', () => {
+  it('recognises the conventional burn address', () => {
     expect(service.isBurn(DEAD_ADDRESS)).toBe(true)
   })
 
-  it('считает нулевой адрес невосстановимым', () => {
+  it('treats the zero address as unrecoverable', () => {
     expect(service.isBurn(ZERO_ADDRESS)).toBe(true)
   })
 
-  it('не срабатывает на обычном адресе', () => {
-    /* Ложное срабатывание заставило бы пользователя отменить
-       законный перевод, поэтому эвристика намеренно узкая. */
+  it('does not fire on an ordinary address', () => {
+    /* A false hit would make the user cancel a legitimate transfer,
+       so the heuristic is deliberately narrow. */
     expect(service.isBurn(ADDRESS_OF_KEY_ONE)).toBe(false)
 
     for (const address of EIP55_ADDRESSES) {
@@ -256,27 +257,28 @@ describe('AddressService: невосстановимые адреса', () => {
     }
   })
 
-  it('распознаёт адреса сжигания независимо от регистра', () => {
+  it('recognises burn addresses regardless of case', () => {
     expect(service.isBurn(DEAD_ADDRESS.toLowerCase())).toBe(true)
   })
 
-  it('константы адресов проходят проверку контрольной суммы', () => {
+  it('address constants pass the checksum check', () => {
     expect(() => toAddress(ZERO_ADDRESS)).not.toThrow()
     expect(() => toAddress(DEAD_ADDRESS)).not.toThrow()
   })
 })
 
-describe('AddressService: согласованность с чистыми функциями', () => {
-  /* Класс обязан оставаться тонкой обёрткой. Появление собственной
-     логики вычисления адреса — прямая угроза: две реализации разойдутся. */
+describe('AddressService: agreement with the pure functions', () => {
+  /* The class must stay a thin wrapper. Growing its own
+     address-computation logic is a direct threat: the two
+     implementations will diverge. */
 
-  it('parse совпадает с toAddress', () => {
+  it('parse matches toAddress', () => {
     for (const address of EIP55_ADDRESSES) {
       expect(service.parse(address)).toBe(toAddress(address))
     }
   })
 
-  it('fromPublicKey совпадает с прямым вызовом', () => {
+  it('fromPublicKey matches a direct call', () => {
     const publicKey = fromHex(PUBLIC_KEY_OF_ONE_COMPRESSED)
 
     expect(service.fromPublicKey(publicKey)).toBe(ADDRESS_OF_KEY_ONE)

@@ -2,69 +2,72 @@ import { InvalidDerivationPathError } from '@/core/errors'
 import type { DerivationPath } from '@/core/types'
 
 /**
- * Смещение закалённой (hardened) деривации из BIP-32.
+ * Hardened derivation offset from BIP-32.
  *
- * Индексы от 0 до 2^31-1 — обычная деривация, от 2^31 до 2^32-1 — закалённая.
- * Поэтому пользовательский индекс обязан быть строго меньше 2^31.
+ * Indexes 0 to 2^31-1 are ordinary derivation; 2^31 to 2^32-1 are hardened.
+ * Therefore a user-facing index must be strictly less than 2^31.
  */
 export const HARDENED_OFFSET = 0x80000000
 
-/** Назначение по BIP-44. Значение 44 закреплено стандартом. */
+/** BIP-44 purpose. The value 44 is fixed by the standard. */
 export const BIP44_PURPOSE = 44
 
 /**
- * Тип монеты для Ethereum по SLIP-44.
+ * Coin type for Ethereum per SLIP-44.
  *
- * Все EVM-совместимые сети используют 60, а не собственные номера.
- * Это соглашение отрасли, а не требование стандарта: BNB Chain, Polygon,
- * Arbitrum и прочие деривируют ключи по тому же пути, что Ethereum,
- * поэтому один аккаунт имеет один адрес во всех сетях.
+ * All EVM-compatible networks use 60, not their own numbers.
+ * That is an industry convention, not a standard requirement:
+ * BNB Chain, Polygon, Arbitrum and the rest derive keys along
+ * the same path as Ethereum, so one account has one address
+ * on every network.
  *
- * Исключение — Ethereum Classic (61) и несколько форков, которые
- * зарегистрировали свои номера. Их поддержка потребует другого coinType.
+ * The exception is Ethereum Classic (61) and a few forks that
+ * registered their own numbers. Supporting them would need
+ * another coinType.
  */
 export const EVM_COIN_TYPE = 60
 
-/** Внешняя цепочка BIP-44: адреса, которые сообщаются другим. */
+/** BIP-44 external chain: addresses shown to others. */
 export const CHANGE_EXTERNAL = 0
 
 /**
- * Внутренняя цепочка BIP-44: адреса сдачи.
+ * BIP-44 internal chain: change addresses.
  *
- * В EVM-сетях не используется — модель UTXO с её сдачей там отсутствует.
- * Константа объявлена для полноты и для разбора путей, пришедших
- * из кошельков других экосистем.
+ * Unused on EVM networks — the UTXO model and its change do not
+ * exist there. The constant is declared for completeness and for
+ * parsing paths that arrived from wallets of other ecosystems.
  */
 export const CHANGE_INTERNAL = 1
 
-/** Общий формат пути BIP-32: `m` и далее индексы, возможно закалённые. */
+/** General BIP-32 path form: `m` then indexes, possibly hardened. */
 const PATH_PATTERN = /^m(\/\d+'?)*$/
 
-/** Параметры, задающие ветвь дерева выше индекса адреса. */
+/** Parameters that set the tree branch above the address index. */
 export interface IDerivationPathOptions {
   readonly purpose?: number
   readonly coinType?: number
 
   /**
-   * Индекс аккаунта BIP-44 — третий уровень пути, закалённый.
+   * BIP-44 account index — the third path level, hardened.
    *
-   * ВАЖНО ПРО СОВМЕСТИМОСТЬ. Существуют два несовместимых соглашения:
+   * COMPATIBILITY MATTERS. Two incompatible conventions exist:
    *
-   * - `m/44'/60'/0'/0/n` — наращивается индекс АДРЕСА. Так делают
-   *   MetaMask, Rabby, Trust Wallet. Это соглашение по умолчанию здесь.
-   * - `m/44'/60'/n'/0/0` — наращивается индекс АККАУНТА. Так делает
-   *   Ledger Live.
+   * - `m/44'/60'/0'/0/n` — the ADDRESS index is incremented. MetaMask,
+   *   Rabby, Trust Wallet do this. This is the default here.
+   * - `m/44'/60'/n'/0/0` — the ACCOUNT index is incremented. Ledger Live
+   *   does this.
    *
-   * Кошелёк, поддерживающий только первое, при импорте фразы из Ledger Live
-   * покажет пустой баланс: адреса будут выведены по другой ветви дерева.
-   * Поэтому индекс аккаунта вынесен в параметр, а не зашит константой.
+   * A wallet that supports only the first will show an empty balance
+   * when importing a phrase from Ledger Live: addresses will be derived
+   * on another branch of the tree. Therefore the account index is a
+   * parameter, not a hard-coded constant.
    */
   readonly accountIndex?: number
 
   readonly change?: number
 }
 
-/** Разобранный путь BIP-44. */
+/** A parsed BIP-44 path. */
 export interface IParsedBip44Path {
   readonly purpose: number
   readonly coinType: number
@@ -74,12 +77,12 @@ export interface IParsedBip44Path {
 }
 
 /**
- * Создаёт значение типа `DerivationPath` с проверкой формата.
+ * Builds a `DerivationPath` after checking the format.
  *
- * Единственный допустимый способ получить это значение. Приведение типом
- * обходит проверку: путь с индексом вне диапазона приведёт к выводу ключа
- * из другой ветви дерева, то есть к «потере» средств на адресе, который
- * кошелёк больше не покажет.
+ * The only allowed way to obtain this value. A type cast bypasses
+ * the check: a path with an out-of-range index would derive a key
+ * on another branch of the tree, i.e. "lose" funds on an address
+ * the wallet will no longer show.
  *
  * @throws InvalidDerivationPathError
  */
@@ -104,7 +107,7 @@ export function toDerivationPath(value: string): DerivationPath {
   return value as DerivationPath
 }
 
-/** Проверяет, что индекс пригоден для несмягчённой деривации. */
+/** Checks that the index is fit for non-hardened derivation. */
 export function assertValidIndex(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0 || value >= HARDENED_OFFSET) {
     throw new InvalidDerivationPathError(
@@ -115,11 +118,11 @@ export function assertValidIndex(value: number, name: string): void {
 }
 
 /**
- * Путь уровня аккаунта: `m/44'/60'/0'`.
+ * Account-level path: `m/44'/60'/0'`.
  *
- * Именно на этом уровне имеет смысл экспортировать расширенные ключи:
- * все три индекса выше закалённые, поэтому xpub этого уровня раскрывает
- * только один аккаунт, а не всё дерево.
+ * This is the level at which exporting extended keys makes sense:
+ * all three indexes above are hardened, so an xpub of this level
+ * reveals only one account, not the whole tree.
  */
 export function buildAccountPath(options: IDerivationPathOptions = {}): DerivationPath {
   const purpose = options.purpose ?? BIP44_PURPOSE
@@ -133,7 +136,7 @@ export function buildAccountPath(options: IDerivationPathOptions = {}): Derivati
   return `m/${String(purpose)}'/${String(coinType)}'/${String(accountIndex)}'` as DerivationPath
 }
 
-/** Путь уровня цепочки: `m/44'/60'/0'/0`. */
+/** Chain-level path: `m/44'/60'/0'/0`. */
 export function buildChangePath(options: IDerivationPathOptions = {}): DerivationPath {
   const change = options.change ?? CHANGE_EXTERNAL
 
@@ -142,7 +145,7 @@ export function buildChangePath(options: IDerivationPathOptions = {}): Derivatio
   return `${buildAccountPath(options)}/${String(change)}` as DerivationPath
 }
 
-/** Полный путь адреса: `m/44'/60'/0'/0/n`. */
+/** Full address path: `m/44'/60'/0'/0/n`. */
 export function buildAddressPath(
   addressIndex: number,
   options: IDerivationPathOptions = {},
@@ -153,13 +156,13 @@ export function buildAddressPath(
 }
 
 /**
- * Разбирает полный путь BIP-44 на составляющие.
+ * Splits a full BIP-44 path into parts.
  *
- * Нужен при импорте аккаунта, выведенного другим кошельком: по пути видно,
- * какое соглашение применялось и какой индекс наращивался.
+ * Needed when importing an account derived by another wallet: the
+ * path shows which convention was used and which index was incremented.
  *
- * @throws InvalidDerivationPathError если путь не пятиуровневый либо
- *         первые три уровня не закалённые.
+ * @throws InvalidDerivationPathError if the path is not five levels
+ *         or the first three levels are not hardened.
  */
 export function parseBip44Path(value: string): IParsedBip44Path {
   const path = toDerivationPath(value)

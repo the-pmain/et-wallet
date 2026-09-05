@@ -2,7 +2,7 @@ import type { Unsubscribe } from '@/core/types'
 
 import type { EventListener, IEventBus } from './types'
 
-/** Обработчик с неизвестной на уровне хранения полезной нагрузкой. */
+/** Handler whose payload type is unknown at the storage layer. */
 type AnyListener = (payload: never) => void
 
 interface IListenerEntry {
@@ -10,41 +10,41 @@ interface IListenerEntry {
   readonly once: boolean
 }
 
-/** Обработчик сбоя подписчика. */
 export type ListenerErrorHandler = (error: unknown, event: PropertyKey) => void
 
 export interface IEventBusOptions {
   /**
-   * Вызывается, когда подписчик выбросил исключение.
+   * Called when a subscriber throws.
    *
-   * Владелец шины обязан передать сюда обработчик, пишущий в журнал.
-   * Поведение по умолчанию — переброс исключения в отдельной микрозадаче,
-   * то есть попадание в глобальный обработчик необработанных исключений.
-   * Это шумно, но лучше молчаливого проглатывания: скрытый сбой подписчика
-   * в кошельке означает, что интерфейс не узнал о смене сети или блокировке
-   * и продолжает показывать устаревшее состояние.
+   * The bus owner must pass a handler that writes to the log.
+   * The default is to rethrow in a separate microtask, i.e. to
+   * hit the global unhandled-exception handler. That is noisy,
+   * but better than swallowing: a hidden subscriber failure in
+   * a wallet means the UI did not learn about a network change
+   * or a lock and keeps showing stale state.
    */
   readonly onListenerError?: ListenerErrorHandler
 }
 
 /**
- * Типизированная шина событий.
+ * Typed event bus.
  *
- * Реализация решает три проблемы, из-за которых наивный вариант на массиве
- * обработчиков непригоден:
+ * The implementation solves three problems that make a naive array
+ * of handlers unusable:
  *
- * 1. **Изоляция сбоев.** Исключение в одном обработчике не должно мешать
- *    остальным. Ошибка перебрасывается в отдельной микрозадаче: так она
- *    попадает в глобальный обработчик необработанных исключений и остаётся
- *    видимой, но не прерывает рассылку.
+ * 1. **Failure isolation.** An exception in one handler must not
+ *    stop the others. The error is rethrown in a separate
+ *    microtask: it reaches the global unhandled-exception handler
+ *    and stays visible, but does not interrupt delivery.
  *
- * 2. **Изменение подписок во время рассылки.** Обработчик вправе отписаться
- *    прямо в момент обработки. Перебор по копии набора исключает пропуск
- *    следующего обработчика и бесконечный цикл.
+ * 2. **Subscription changes during delivery.** A handler may
+ *    unsubscribe in the middle of handling. Iterating a copy of
+ *    the set avoids skipping the next handler and infinite loops.
  *
- * 3. **Отписка одноразовых обработчиков.** `once` хранится как признак
- *    записи, а не как обёртка над функцией. Иначе `off` с исходной функцией
- *    не нашёл бы подписку, созданную через `once`.
+ * 3. **Unsubscribing one-shot handlers.** `once` is stored as a
+ *    flag on the entry, not as a wrapper around the function.
+ *    Otherwise `off` with the original function would not find a
+ *    subscription created through `once`.
  */
 export class EventBus<TEventMap> implements IEventBus<TEventMap> {
   readonly #listeners = new Map<keyof TEventMap, Set<IListenerEntry>>()
@@ -64,8 +64,9 @@ export class EventBus<TEventMap> implements IEventBus<TEventMap> {
     event: TName,
     listener: EventListener<TEventMap[TName]>,
   ): Unsubscribe {
-    /* Приведение не требуется: функция, принимающая TEventMap[TName],
-       присваиваема функции, принимающей never (контравариантность параметра). */
+    /* No cast is needed: a function that accepts TEventMap[TName]
+       is assignable to a function that accepts never (parameter
+       contravariance). */
     return this.#add(event, listener, false)
   }
 
@@ -104,14 +105,14 @@ export class EventBus<TEventMap> implements IEventBus<TEventMap> {
       return
     }
 
-    /* Перебор по копии: обработчик вправе менять подписки во время рассылки,
-       а изменение набора прямо в цикле привело бы к пропуску записей. */
+    /* Iterate a copy: a handler may change subscriptions during
+       delivery, and mutating the set in the loop would skip entries. */
     for (const entry of [...entries]) {
-      /* Проверка на живость обязательна. Обработчик, отписанный другим
-         обработчиком в этой же рассылке, вызываться не должен: он снят
-         именно потому, что его реакция стала неуместной. Такое поведение
-         соответствует семантике EventTarget, а не EventEmitter из Node,
-         который вызывает уже снятые обработчики. */
+      /* Liveness check is required. A handler unsubscribed by
+         another handler in this same delivery must not run: it was
+         removed precisely because its reaction became inappropriate.
+         This matches EventTarget semantics, not Node's EventEmitter,
+         which still calls already-removed handlers. */
       if (!entries.has(entry)) {
         continue
       }
@@ -124,7 +125,7 @@ export class EventBus<TEventMap> implements IEventBus<TEventMap> {
         const listener = entry.listener as EventListener<TEventMap[TName]>
         listener(payload)
       } catch (error) {
-        /* Сбой одного подписчика не прерывает рассылку остальным. */
+        /* One subscriber's failure does not stop delivery to the rest. */
         this.#onListenerError(error, event)
       }
     }
@@ -138,7 +139,7 @@ export class EventBus<TEventMap> implements IEventBus<TEventMap> {
     this.#listeners.clear()
   }
 
-  /** Число активных подписок на событие. Используется в тестах на утечки. */
+  /** Active subscription count for an event. Used in leak tests. */
   listenerCount<TName extends keyof TEventMap>(event: TName): number {
     return this.#listeners.get(event)?.size ?? 0
   }

@@ -1,37 +1,33 @@
 import type { IPortfolioPosition } from '@/core'
 
 /**
- * Показ денежных величин и долей.
+ * Display of money figures and shares.
  *
- * ВСЕ ВЕЛИЧИНЫ ЗДЕСЬ — ОЦЕНОЧНЫЕ. Они получены умножением баланса
- * на курс стороннего сервиса и годятся только для представления
- * о порядке. Ни одна из них не участвует в формировании транзакции:
- * суммы, которые подписываются, считаются целыми числами
- * в минимальных единицах.
+ * Every figure here is an estimate. They come from balance × a
+ * third-party rate and are only for order of magnitude. None of them
+ * enter a transaction: signed amounts are integers in smallest units.
  */
 
-/** Разряды дробной части в денежной величине. */
+/** Fractional digits in a money figure. */
 const FIAT_FRACTION_DIGITS = 2
 
 /**
- * Порог, ниже которого сумма показывается как «меньше цента».
+ * Threshold below which an amount is shown as "less than a cent".
  *
- * Округление до нуля показало бы «0,00 $» у позиции, которая чего-то
- * стоит: пользователь прочитал бы это как «ничего не стоит».
+ * Rounding to zero would show "$0.00" on a position that is worth
+ * something: the user would read that as "worthless".
  */
 const MIN_DISPLAYED_FIAT = 0.01
 
 /*
-  ЯЗЫК ЧИСЛА СЛЕДУЕТ ЗА ЯЗЫКОМ ИНТЕРФЕЙСА. Здесь стояло `ru-RU`, и
-  оценка выводилась как «1 234,56 $» посреди полностью английского
-  экрана: запятая в роли десятичного разделителя, а знак валюты —
-  после числа. Для читающего по-английски это либо другое число,
-  либо опечатка.
+  Number locale follows the UI locale. This used to be `ru-RU`, so the
+  estimate rendered as "1 234,56 $" on an otherwise English screen:
+  comma as the decimal separator, currency after the number. An
+  English reader would take that as another figure or a typo.
 
-  Правка внесена вместе с показом оценки на главном экране: там
-  расхождение перестаёт быть частностью экрана портфеля и попадает
-  на первое, что видит владелец. Разряды и знак теперь размечает
-  тот же язык, что объявлен у документа, — `$1,234.56`.
+  Fixed together with showing the estimate on the home screen, where
+  the mismatch is the first thing the owner sees. Grouping and the
+  sign now follow the document language — `$1,234.56`.
 */
 const fiatFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -41,11 +37,11 @@ const fiatFormatter = new Intl.NumberFormat('en-US', {
 })
 
 /**
- * Денежная величина.
+ * Money figure.
  *
- * `null` показывается прочерком, а не нулём: «стоимость неизвестна»
- * и «стоит ноль» — разные утверждения, и второе, показанное вместо
- * первого, читается владельцем как пропажа.
+ * `null` is an em dash, not zero: "value unknown" and "worth zero"
+ * are different claims, and the second in place of the first reads
+ * as funds gone.
  */
 export function formatFiat(value: number | null): string {
   if (value === null) {
@@ -60,17 +56,16 @@ export function formatFiat(value: number | null): string {
 }
 
 /**
- * Часы и минуты котировки. `null` — момент неизвестен.
+ * Quote hours and minutes. `null` means the instant is unknown.
  *
- * ВОЗРАСТ КОТИРОВКИ ПОКАЗЫВАЕТСЯ, ПОТОМУ ЧТО «РЕАЛЬНОГО ВРЕМЕНИ» НЕТ.
- * Курс обновляется опросом раз в минуту, пока экран открыт, а при
- * отказе источника на экране остаётся прежний. Без времени рядом эти
- * два случая неотличимы: число выглядит одинаково живым и когда ему
- * двадцать секунд, и когда двадцать минут.
+ * Quote age is shown because there is no "real time". The rate polls
+ * once a minute while the screen is open; a source failure leaves the
+ * previous figure. Without a time next to it, twenty seconds and
+ * twenty minutes look equally live.
  *
- * Секунды не показываются намеренно: точность, которой нет, читалась
- * бы как обещание. Минуты — ровно тот разряд, в котором курс и
- * обновляется.
+ * Seconds are omitted on purpose: precision that does not exist would
+ * read as a promise. Minutes are the digit the rate actually updates
+ * in.
  */
 export function formatQuoteTime(at: number | null): string | null {
   return at === null ? null : timeFormatter.format(at)
@@ -81,12 +76,12 @@ const timeFormatter = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 })
 
-/** Доля в процентах. `null` — прочерк. */
+/** Share as a percent. `null` is an em dash. */
 export function formatShare(share: number | null): string {
   return share === null ? '—' : `${(share * 100).toFixed(1)} %`
 }
 
-/** Изменение в процентах со знаком. `null` — прочерк. */
+/** Signed percent change. `null` is an em dash. */
 export function formatChangePercent(percent: number | null): string {
   if (percent === null) {
     return '—'
@@ -98,14 +93,14 @@ export function formatChangePercent(percent: number | null): string {
 }
 
 /**
- * Цвета секторов диаграммы.
+ * Chart slice colors.
  *
- * Берутся из токенов оформления, а не задаются шестнадцатеричными
- * значениями: иначе диаграмма не следовала бы за сменой темы
- * и на тёмном фоне часть секторов стала бы неразличимой.
+ * Taken from design tokens, not hex literals: otherwise the chart
+ * would not follow a theme change and some slices would vanish on
+ * a dark background.
  *
- * Восемь оттенков: больше человек всё равно не различает на кольце,
- * а лишние позиции сводятся в «прочее».
+ * Eight shades: a person cannot tell more apart on a ring, and extra
+ * positions collapse into "other".
  */
 const SLICE_COLORS: readonly string[] = [
   'var(--chart-1)',
@@ -118,12 +113,12 @@ const SLICE_COLORS: readonly string[] = [
   'var(--chart-8)',
 ]
 
-/** Цвет сектора по его порядковому номеру. */
+/** Slice color by its index. */
 export function sliceColor(index: number): string {
   return SLICE_COLORS[index % SLICE_COLORS.length] ?? SLICE_COLORS[0] ?? 'var(--primary)'
 }
 
-/** Устойчивый ключ позиции: пара «сеть + адрес» однозначна. */
+/** Stable position key: the (chain, address) pair is unique. */
 export function positionKey(position: IPortfolioPosition): string {
   const { chainId, address } = position.token
 

@@ -9,16 +9,15 @@ import type { IAccountRepository } from './contracts'
 import { toAccountId } from './identity'
 import type { IAccount } from './types'
 
-/** Ключ, под которым хранится выбор активного аккаунта. */
 const ACTIVE_ID_KEY: StorageKey = toStorageKey('account.activeId')
 
 /**
- * Представление аккаунта в хранилище.
+ * Account representation in storage.
  *
- * Отличается от доменной модели типами брендированных полей: они
- * записываются обычными строками. Обратное преобразование выполняется
- * через валидирующие конструкторы — данные из хранилища недоверенные,
- * они могли быть записаны другой версией приложения либо повреждены.
+ * Differs from the domain model in the types of branded fields:
+ * they are written as ordinary strings. The reverse conversion goes
+ * through validating constructors — data from storage is untrusted;
+ * it may have been written by another app version or corrupted.
  */
 interface IAccountRecord {
   readonly id: string
@@ -34,13 +33,13 @@ interface IAccountRecord {
 }
 
 /**
- * Хранение метаданных аккаунтов поверх защищённого хранилища.
+ * Account-metadata storage on top of secure storage.
  *
- * ШИФРУЕТСЯ ЦЕЛИКОМ. Адрес сам по себе не секрет — он публичен
- * в блокчейне. Но список адресов связывает все аккаунты одного
- * пользователя между собой, а имена аккаунтов («Зарплата», «Биржа»)
- * раскрывают назначение средств. Заблокированный кошелёк не должен
- * сообщать наблюдателю с доступом к диску ни того, ни другого.
+ * ENCRYPTED IN FULL. An address itself is not a secret — it is
+ * public on the chain. But the address list ties every account of
+ * one user together, and account names ("Payroll", "Exchange")
+ * reveal what the funds are for. A locked wallet must tell an
+ * observer with disk access neither.
  */
 export class AccountRepository implements IAccountRepository {
   readonly #storage: ISecureStorage
@@ -65,8 +64,8 @@ export class AccountRepository implements IAccountRepository {
       }
     }
 
-    /* Порядок восстанавливается по полю `order`: перечисление ключей
-       хранилища его не сохраняет. */
+    /* Order is restored from the `order` field: enumerating storage
+       keys does not preserve it. */
     return accounts.sort((left, right) => left.order - right.order)
   }
 
@@ -95,9 +94,9 @@ export class AccountRepository implements IAccountRepository {
       return null
     }
 
-    /* Значение недоверенное: оно могло указывать на удалённый аккаунт
-       либо быть повреждено. Некорректное трактуется как отсутствие
-       выбора, а не как повод остановить запуск. */
+    /* The value is untrusted: it may point at a removed account or
+       be corrupted. An invalid one is treated as no choice, not as
+       a reason to stop startup. */
     try {
       return toAccountId(stored)
     } catch {

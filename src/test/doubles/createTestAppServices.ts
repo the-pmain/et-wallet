@@ -14,27 +14,27 @@ import { FakeProviderFactory } from './FakeProviderFactory'
 import { FastEncryptionService } from './FastEncryptionService'
 import { NullLogger } from './NullLogger'
 
-/** Сервисы приложения, собранные для теста. */
 export interface ITestAppServices {
   readonly onboarding: OnboardingService
 
   /**
-   * Канал оповещения между вкладками.
+   * Cross-tab notification channel.
    *
-   * В проверках он настоящий: `BroadcastChannel` есть и в jsdom,
-   * и в Node. Подменять его дублёром значило бы проверять дублёр.
+   * In checks it is the real one: `BroadcastChannel` exists in
+   * jsdom and in Node. Replacing it with a double would test the
+   * double.
    */
   readonly broadcast: WalletBroadcast
 
   /**
-   * Имя канала, своё у каждого набора сервисов.
+   * Channel name, unique per service set.
    *
-   * ИЗОЛЯЦИЯ ОБЯЗАТЕЛЬНА. `BroadcastChannel` в Node доставляет
-   * сообщения между рабочими потоками одного процесса, а проверки идут
-   * параллельно. С общим именем сообщение о стирании из одной проверки
-   * закрывало бы кошелёк во всех остальных — что и произошло при первом
-   * прогоне: упала проверка ограничителя попыток, к вкладкам отношения
-   * не имеющая.
+   * ISOLATION IS REQUIRED. `BroadcastChannel` in Node delivers
+   * messages between worker threads of one process, and checks run
+   * in parallel. A shared name meant a wipe message from one check
+   * would lock the wallet in every other — which happened on the
+   * first run: the unlock-throttle check failed, though it has
+   * nothing to do with tabs.
    */
   readonly broadcastName: string
   readonly session: WalletSession
@@ -47,29 +47,29 @@ export interface ITestAppServices {
   readonly logger: NullLogger
 
   /**
-   * Незашифрованное хранилище — то самое, поверх которого работает
-   * защищённое.
+   * Unencrypted store — the one the secure store sits on.
    *
-   * Отдаётся наружу ради проверок безопасности: убедиться, что секрет
-   * не лежит открытым текстом, можно только заглянув в сырые записи.
+   * Exposed for security checks: the only way to confirm a secret
+   * is not stored in plaintext is to look at the raw records.
    */
   readonly storage: MemoryStorageService
 
-  /** Защищённое хранилище. Одно на онбординг и сессию, как в бою. */
+  /** Secure store. One for onboarding and the session, as in production. */
   readonly secureStorage: SecureStorage
 }
 
 /**
- * Повторяет composition root приложения на дублёрах.
+ * Repeats the application composition root on doubles.
  *
- * ПОЧЕМУ НЕ ПАРАМЕТРИЗУЕТСЯ БОЕВАЯ СБОРКА. Возможность подставить в
- * `createAppServices` ускоренное шифрование или поддельный узел означала бы,
- * что такая подстановка достижима и в production-сборке. Дублёры остаются
- * в тестовом коде, а совпадение структуры проверяется тем, что оба варианта
- * собирают одни и те же классы.
+ * WHY THE PRODUCTION BUILD IS NOT PARAMETERIZED. Letting
+ * `createAppServices` take fast encryption or a fake node would
+ * mean that substitution is reachable in a production build.
+ * Doubles stay in test code, and structural match is checked by
+ * both variants assembling the same classes.
  *
- * ХРАНИЛИЩЕ ОДНО НА ОБА СЕРВИСА — как и в боевой сборке: онбординг пишет
- * мнемоническую фразу, сессия читает её той же сессией дешифрования.
+ * ONE STORE FOR BOTH SERVICES — as in production: onboarding
+ * writes the mnemonic, the session reads it with the same
+ * decryption session.
  */
 export function createTestAppServices(): ITestAppServices {
   const storage = new MemoryStorageService()
@@ -78,9 +78,9 @@ export function createTestAppServices(): ITestAppServices {
   const logger = new NullLogger()
   const providerFactory = new FakeProviderFactory()
 
-  /* Источник курсов подставляется всегда, но опрашивается только после
-     согласия пользователя: счётчик обращений позволяет проверить, что
-     до согласия к нему не обращались ни разу. */
+  /* The price source is always injected, but it is queried only
+     after the user consents: the call counter lets a test prove
+     it was never hit before consent. */
   const priceProvider = new FakePriceProvider()
 
   const session = new WalletSession({
@@ -92,12 +92,12 @@ export function createTestAppServices(): ITestAppServices {
     priceProvider,
   })
 
-  /* Транспорт подключений подменён дублёром: настоящий требует ключа
-     стороннего сервиса и живого relay, а проверять надо решения
-     кошелька, а не чужой сервер. */
+  /* Connection transport is a double: the real one needs a
+     third-party key and a live relay, and the checks are about
+     the wallet's decisions, not someone else's server. */
   const dappTransport = new FakeSessionTransport()
 
-  /* Имя уникально: см. пояснение к `broadcastName`. */
+  /* Unique name: see the note on `broadcastName`. */
   const broadcastName = `etwallet-test-${bytesToHex(getRandomBytes(8))}`
   const broadcast = new WalletBroadcast(broadcastName)
 

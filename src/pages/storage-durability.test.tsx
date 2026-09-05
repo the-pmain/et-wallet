@@ -21,7 +21,6 @@ function renderApp() {
   )
 }
 
-/** Открывает раздел настроек разблокированного кошелька. */
 async function openSettings(): Promise<void> {
   await screen.findByText('Account 1')
   openPath('/wallet/settings')
@@ -37,15 +36,15 @@ beforeEach(async () => {
   await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
 })
 
-describe('Предупреждение о стойкости хранилища', () => {
-  it('хранилище в памяти признаётся непереживающим перезагрузку', async () => {
-    /* Тестовая сборка работает на хранилище в памяти, и оно отвечает
-       честно. Молчание здесь означало бы, что кошелёк утверждает
-       сохранность, которой нет. */
+describe('Storage durability warning', () => {
+  it('in-memory storage is reported as not surviving a reload', async () => {
+    /* The test build uses in-memory storage, and it answers honestly.
+       Silence here would mean the wallet claims durability it does
+       not have. */
     await expect(services.storage.durability()).resolves.toBe(STORAGE_DURABILITY.Session)
   })
 
-  it('настройки больше не показывают предупреждение о стойкости хранилища', async () => {
+  it('settings no longer show a storage-durability warning', async () => {
     renderApp()
     await openSettings()
 
@@ -53,10 +52,9 @@ describe('Предупреждение о стойкости хранилища'
     expect(screen.queryByText(/from the\s+seed phrase you wrote down/i)).not.toBeInTheDocument()
   })
 
-  it('устаревшего утверждения про потерю доступа после перезагрузки больше нет', async () => {
-    /* Текст был верен, пока хранилище работало в памяти. После
-       появления IndexedDB он превратился бы в ложь на экране
-       настроек. */
+  it('the obsolete claim about losing access after a reload is gone', async () => {
+    /* The text was true while storage lived in memory. After IndexedDB
+       arrived it would have become a lie on the settings screen. */
     renderApp()
     await openSettings()
 

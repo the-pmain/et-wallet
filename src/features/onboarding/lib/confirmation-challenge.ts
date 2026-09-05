@@ -1,34 +1,29 @@
 import { getRandomBytes } from '@/core'
 
-/** Сколько слов проверяется. */
 const WORDS_TO_CONFIRM = 3
-
-/** Сколько вариантов предлагается на каждое слово. */
 const OPTIONS_PER_WORD = 4
 
 export interface IConfirmationChallenge {
-  /** Позиции проверяемых слов, начиная с нуля. */
   readonly positions: readonly number[]
-  /** Варианты ответа для каждой позиции, в перемешанном порядке. */
   readonly options: readonly (readonly string[])[]
 }
 
 /**
- * Составляет задание на проверку записанной фразы.
+ * Builds a challenge that the written phrase was recorded.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Пользователь, не записавший фразу, потеряет средства
- * при первой же потере устройства и обнаружит это слишком поздно.
- * Проверка не гарантирует, что фраза записана на бумаге, но отсекает
- * тех, кто нажал «Next» не глядя.
+ * WHY THIS EXISTS. A user who did not write the phrase down will lose
+ * funds at the first device loss and discover it too late. The check
+ * does not prove the phrase is on paper, but it filters people who
+ * hit "Next" without looking.
  *
- * Три слова, а не все двенадцать: полная перепечатка утомляет настолько,
- * что пользователь копирует фразу через буфер обмена, и проверка
- * превращается в формальность.
+ * Three words, not all twelve: a full retype is so tiring that the
+ * user copies the phrase through the clipboard, and the check becomes
+ * a formality.
  *
- * Позиции и отвлекающие варианты берутся из криптостойкого источника.
- * Предсказание позиций само по себе ничего не даёт, но отдельный weak
- * генератор «для несекретных нужд» неизбежно когда-нибудь применят
- * не по назначению.
+ * Positions and distractors come from a cryptographically strong
+ * source. Predicting positions is useless by itself, but a separate
+ * weak generator "for non-secret use" will eventually be applied
+ * to a secret.
  */
 export function createConfirmationChallenge(words: readonly string[]): IConfirmationChallenge {
   const positions = pickDistinct(words.length, Math.min(WORDS_TO_CONFIRM, words.length))
@@ -36,12 +31,12 @@ export function createConfirmationChallenge(words: readonly string[]): IConfirma
   const options = positions.map((position) => {
     const correct = words[position] as string
 
-    /* Отвлекающие варианты берутся из самой фразы, а не из словаря.
-       Словарная выборка по одному префиксу выдаёт себя: правильное слово
-       выделяется среди похожих друг на друга чужих, и пользователь
-       угадывает его не вспоминая. Слова из той же фразы неотличимы
-       от правильного, поэтому проверяется именно порядок — то, ради
-       чего проверка и существует. */
+    /* Distractors come from the phrase itself, not the dictionary.
+       A dictionary sample by one prefix gives itself away: the
+       correct word stands out among similar strangers, and the user
+       guesses it without remembering. Words from the same phrase
+       look like the correct one, so what is checked is order —
+       the reason this check exists. */
     const distractors = shuffle(words.filter((candidate) => candidate !== correct)).slice(
       0,
       OPTIONS_PER_WORD - 1,
@@ -53,7 +48,6 @@ export function createConfirmationChallenge(words: readonly string[]): IConfirma
   return { positions, options }
 }
 
-/** All ли ответы совпадают с фразой. */
 export function isConfirmationComplete(
   challenge: IConfirmationChallenge,
   answers: readonly (string | null)[],
@@ -62,7 +56,6 @@ export function isConfirmationComplete(
   return challenge.positions.every((position, index) => answers[index] === words[position])
 }
 
-/** Выбирает заданное число различных индексов из диапазона. */
 function pickDistinct(size: number, count: number): readonly number[] {
   const chosen = new Set<number>()
 
@@ -74,11 +67,10 @@ function pickDistinct(size: number, count: number): readonly number[] {
 }
 
 /**
- * Равномерно перемешивает массив.
+ * Shuffles an array uniformly.
  *
- * Алгоритм Фишера—Йетса. Сортировка со случайным компаратором,
- * которую часто пишут вместо него, даёт неравномерное распределение
- * и в некоторых движках вовсе неопределённое поведение.
+ * Fisher–Yates. A sort with a random comparator, often written in
+ * its place, is uneven and on some engines undefined.
  */
 function shuffle<TItem>(items: readonly TItem[]): TItem[] {
   const result = [...items]
@@ -95,11 +87,10 @@ function shuffle<TItem>(items: readonly TItem[]): TItem[] {
 }
 
 /**
- * Случайное целое в диапазоне `[0, bound)` без смещения.
+ * Random integer in `[0, bound)` without bias.
  *
- * Остаток от деления случайного байта на границу даёт перекос в пользу
- * младших значений. Отбрасывание значений из неполного диапазона
- * его устраняет.
+ * A random byte modulo the bound favours lower values. Discarding
+ * values from the incomplete range removes that bias.
  */
 function randomBelow(bound: number): number {
   const limit = Math.floor(256 / bound) * bound

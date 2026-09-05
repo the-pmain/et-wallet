@@ -4,31 +4,33 @@ import { toSafeText } from '@/core'
 import { cn } from '@/shared/lib/utils'
 
 interface UntrustedTextProps {
-  /** Строка из контракта, из конфигурации сети либо от стороннего сервиса. */
+  /** A string from a contract, a network config, or a third-party service. */
   readonly value: string
 
   readonly className?: string
 }
 
 /**
- * Показ строки, которую написали не мы.
+ * Display a string we did not write.
  *
- * ЧТО ЭТО ЗА СТРОКИ. Символ и имя токена задаёт автор контракта. Имя
- * сети — тот, кто её добавил. Текст уведомления приходит со справочного
- * сервиса. Все они показываются рядом с суммами и адресами, и все могут
- * содержать невидимые символы либо переопределение направления письма.
+ * WHAT THESE STRINGS ARE. A token symbol and name are set by the
+ * contract author. A network name is set by whoever added it.
+ * Notification text comes from a lookup service. All sit next to
+ * amounts and addresses, and all can hold invisible characters or
+ * a reversed writing direction.
  *
- * СКРЫТЫЕ СИМВОЛЫ ЗАМЕНЯЮТСЯ МАРКЕРОМ, А СТРОКА ПОМЕЧАЕТСЯ ЗНАЧКОМ.
- * Молчаливое удаление сделало бы подделку неотличимой от оригинала —
- * ровно то, чего добивался её автор. Значок рядом означает: эта строка
- * содержала то, чего вы не видите.
+ * HIDDEN CHARACTERS ARE REPLACED WITH A MARKER, AND THE STRING IS
+ * FLAGGED. Silent deletion would make a forgery indistinguishable
+ * from the original — exactly what its author wanted. The icon
+ * means: this string contained something you cannot see.
  *
- * СМЕШЕНИЕ ПИСЬМЕННОСТЕЙ ПОМЕЧАЕТСЯ ОТДЕЛЬНО. Скрытых символов в таком
- * имени нет — там обычные видимые буквы, просто из разных алфавитов:
- * `Аave` с кириллической `А` выглядит безупречно. Имя сети сверяется
- * со встроенными, символ токена — с проверенным списком, а имя
- * приложения сверять не с чем: его никто не заверял. Здесь смешение —
- * единственный признак, и он показывается как есть.
+ * MIXED SCRIPTS ARE FLAGGED SEPARATELY. There are no hidden
+ * characters in such a name — ordinary visible letters, just from
+ * different alphabets: `Aave` with a Cyrillic A (U+0410) looks perfect.
+ * A network name is checked against built-ins, a token symbol
+ * against the verified list, and an app name has nothing to check
+ * against: nobody attested it. Mix is the only signal, and it is
+ * shown as-is.
  */
 export function UntrustedText({ value, className }: UntrustedTextProps) {
   const safe = toSafeText(value)

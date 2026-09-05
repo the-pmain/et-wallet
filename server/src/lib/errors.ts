@@ -1,10 +1,10 @@
 /**
- * Отказ, который можно показать клиенту.
+ * A refusal that may be shown to the client.
  *
- * ПОЧЕМУ ОТДЕЛЬНЫЙ КЛАСС, А НЕ ПРОСТО `Error`. Наружу обязано уходить
- * ровно то, что мы решили сказать. Сообщение произвольной ошибки
- * содержит пути файлов, имена внутренних модулей, иногда — фрагменты
- * данных; всё это помогает нападающему и ничем не помогает пользователю.
+ * WHY A SEPARATE CLASS, NOT A PLAIN `Error`. Only what we chose to
+ * say must leave the process. An arbitrary error message contains
+ * file paths, internal module names, sometimes data fragments; all
+ * of that helps an attacker and does not help the user.
  */
 export class ApiError extends Error {
   readonly statusCode: number
@@ -18,7 +18,7 @@ export class ApiError extends Error {
   }
 }
 
-/** Запрошенного ресурса не существует. */
+/** The requested resource does not exist. */
 export class NotFoundError extends ApiError {
   constructor(message: string) {
     super(404, 'not_found', message)
@@ -26,7 +26,7 @@ export class NotFoundError extends ApiError {
   }
 }
 
-/** Запрос составлен неверно. */
+/** The request is malformed. */
 export class BadRequestError extends ApiError {
   constructor(code: string, message: string) {
     super(400, code, message)
@@ -35,10 +35,10 @@ export class BadRequestError extends ApiError {
 }
 
 /**
- * Предъявленное значение не подошло.
+ * The presented value did not match.
  *
- * Сообщение одно на все отказы входа: различать «нет записи» и
- * «неверное значение» — подсказка тому, кто подбирает `the_p`.
+ * One message for every login refusal: telling "no record" from
+ * "wrong value" is a hint to whoever is guessing `the_p`.
  */
 export class UnauthorizedError extends ApiError {
   constructor(message: string) {
@@ -47,7 +47,7 @@ export class UnauthorizedError extends ApiError {
   }
 }
 
-/** Учётные данные приняты, но операции для этой роли нет. */
+/** Credentials accepted, but this role has no such operation. */
 export class ForbiddenError extends ApiError {
   constructor(message: string) {
     super(403, 'forbidden', message)
@@ -55,7 +55,7 @@ export class ForbiddenError extends ApiError {
   }
 }
 
-/** Запись изменена другим устройством. */
+/** The record was changed by another device. */
 export class ConflictError extends ApiError {
   constructor(message: string) {
     super(409, 'revision_conflict', message)
@@ -64,8 +64,8 @@ export class ConflictError extends ApiError {
 }
 
 /**
- * Сервис не может выполнить запрос: нет подключения к базе
- * либо база отвергла запись.
+ * The service cannot fulfill the request: no database connection,
+ * or the database rejected the write.
  */
 export class ServiceUnavailableError extends ApiError {
   constructor(message: string) {
@@ -75,8 +75,7 @@ export class ServiceUnavailableError extends ApiError {
 }
 
 /**
- * Отправка писем не настроена: нет идентификатора аккаунта
- * либо токена Cloudflare.
+ * Mail sending is not configured: no account id or Cloudflare token.
  */
 export class EmailUnavailableError extends ApiError {
   constructor(message: string) {
@@ -86,7 +85,7 @@ export class EmailUnavailableError extends ApiError {
 }
 
 /**
- * Cloudflare принял запрос, но письмо не отправилось.
+ * Cloudflare accepted the request, but the mail was not sent.
  */
 export class EmailSendError extends ApiError {
   constructor(statusCode: number, message: string) {
@@ -96,15 +95,15 @@ export class EmailSendError extends ApiError {
 }
 
 /**
- * Каталог не прошёл проверку при загрузке.
+ * The catalog failed validation on load.
  *
- * Это ошибка развёртывания, а не выполнения: сервис с испорченным
- * каталогом обязан не запуститься. Запуск с адресом контракта, набранным
- * с опечаткой, означал бы раздачу этого адреса всем пользователям.
+ * This is a deploy error, not a runtime one: a service with a corrupt
+ * catalog must not start. Starting with a mistyped contract address
+ * would serve that address to every user.
  */
 export class CatalogValidationError extends Error {
   constructor(message: string) {
-    super(`Каталог не прошёл проверку: ${message}`)
+    super(`Catalog failed validation: ${message}`)
     this.name = 'CatalogValidationError'
   }
 }

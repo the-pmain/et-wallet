@@ -1,25 +1,25 @@
 /**
- * Сколько знаков после запятой показывается по умолчанию.
+ * Default fractional digits shown.
  *
- * Шесть, а не восемнадцать: полная точность нативной валюты нечитаема
- * и создаёт ложное ощущение, будто последние знаки чем-то важны.
+ * Six, not eighteen: full native-currency precision is unreadable and
+ * implies the last digits matter.
  */
 const DEFAULT_FRACTION_DIGITS = 6
 
 /**
- * Приводит сумму в минимальных единицах к строке для показа.
+ * Format a raw (smallest-unit) amount for display.
  *
- * ВСЕ ВЫЧИСЛЕНИЯ НА `bigint`. Перевод в `number` при восемнадцати знаках
- * теряет точность уже на десятых долях токена: `Number.MAX_SAFE_INTEGER`
- * меньше, чем 0.01 ETH в wei.
+ * All math is `bigint`. Casting to `number` at 18 decimals loses
+ * precision on tenths of a token: `Number.MAX_SAFE_INTEGER` is less
+ * than 0.01 ETH in wei.
  *
- * УСЕЧЕНИЕ, А НЕ ОКРУГЛЕНИЕ. Округление вверх показало бы больше средств,
- * чем есть, и пользователь попытался бы отправить недоступную сумму.
- * Показанное значение всегда не превышает настоящего.
+ * Truncate, do not round up. Rounding up would show more than the
+ * owner has and invite a send that cannot succeed. The shown value
+ * never exceeds the real one.
  *
- * НЕНУЛЕВОЙ ОСТАТОК НИКОГДА НЕ ПРЕВРАЩАЕТСЯ В НОЛЬ. Сумма меньше
- * отображаемой точности выводится как `<0.000001`. Показанный ноль при
- * ненулевом балансе — это утверждение «средств нет», и оно ложно.
+ * A non-zero remainder never becomes zero. Dust below display
+ * precision is `<0.000001`. A shown zero on a non-zero balance would
+ * claim "no funds".
  */
 export function formatTokenAmount(
   raw: bigint,
@@ -38,14 +38,13 @@ export function formatTokenAmount(
     return whole.toString()
   }
 
-  /* Дробная часть дополняется ведущими нулями до полной длины: остаток
-     0.05 при восемнадцати знаках — это 5·10¹⁶, и без дополнения он был бы
-     прочитан как 0.5. */
+  /* Pad the fraction to full length: 0.05 at 18 decimals is 5·10¹⁶,
+     and without padding the remainder "5" would be read as 0.5. */
   const fraction = remainder.toString().padStart(decimals, '0').slice(0, fractionDigits)
   const trimmed = fraction.replace(/0+$/u, '')
 
   if (trimmed === '') {
-    /* Остаток есть, но он не помещается в отображаемую точность. */
+    /* Remainder exists but does not fit the displayed precision. */
     return `<${formatSmallestVisible(whole, fractionDigits)}`
   }
 
@@ -53,11 +52,10 @@ export function formatTokenAmount(
 }
 
 /**
- * Полная запись суммы в единицах токена, без усечения.
+ * Full token-unit amount, no truncation.
  *
- * Для поля ввода: показать `2`, а не `2000000000000000000`, и не
- * подменять крошечный остаток на `<0.000001`. Обратная сторона
- * {@link parseAmount}.
+ * For the input field: show `2`, not `2000000000000000000`, and do
+ * not replace dust with `<0.000001`. Inverse of {@link parseAmount}.
  */
 export function formatExactTokenAmount(raw: bigint, decimals: number): string {
   if (raw < 0n) {
@@ -81,7 +79,7 @@ export function formatExactTokenAmount(raw: bigint, decimals: number): string {
   return `${whole.toString()}.${fraction}`
 }
 
-/** Наименьшее значение, различимое при заданной точности. */
+/** Smallest value distinguishable at the given precision. */
 function formatSmallestVisible(whole: bigint, fractionDigits: number): string {
   const fraction = '0'.repeat(Math.max(fractionDigits - 1, 0))
 
@@ -89,14 +87,13 @@ function formatSmallestVisible(whole: bigint, fractionDigits: number): string {
 }
 
 /**
- * Усекает адрес для показа в узком месте интерфейса.
+ * Truncate an address for a narrow UI slot.
  *
- * РЕГИСТР СИМВОЛОВ СОХРАНЯЕТСЯ: он несёт контрольную сумму EIP-55.
- * Приведение к нижнему регистру «для красоты» лишило бы пользователя
- * единственной возможности заметить подменённый адрес.
+ * Casing is kept: it carries the EIP-55 checksum. Lowercasing "for
+ * looks" would remove the only chance to notice a swapped address.
  *
- * Показываются начало и конец. Середина адреса не помогает опознанию,
- * а подмена крайних символов заметна.
+ * Start and end are shown. The middle does not help recognition;
+ * swapping the ends is what is visible.
  */
 export function shortenAddress(address: string, visibleChars = 6): string {
   if (address.length <= visibleChars * 2 + 1) {
@@ -107,32 +104,30 @@ export function shortenAddress(address: string, visibleChars = 6): string {
 }
 
 /**
- * Подпись адреса: имя ENS, если оно подтверждено, иначе усечённый адрес.
+ * Address label: a verified ENS name, otherwise the truncated address.
  *
- * ЗАМЕНА ДОПУСТИМА НЕ ВЕЗДЕ. Имя короче и узнаваемее адреса, и в списке
- * аккаунтов оно полезнее. Но на экране подтверждения перевода замена
- * запрещена: подписывается адрес, и показать вместо него имя значит
- * показать не то, что подписывается, — основной класс атак на интерфейс
- * кошелька. Там имя выводится ДОПОЛНИТЕЛЬНО к полному адресу.
+ * Replacement is not always allowed. A name is shorter and easier to
+ * recognize in an account list. On a send-confirm screen it is
+ * forbidden: the address is what is signed, and showing a name instead
+ * is the main wallet-UI attack class. There the name is shown in
+ * addition to the full address.
  *
- * В карту попадают только имена, прошедшие сверку прямым разрешением:
- * непроверенное имя из обратной записи задаёт кто угодно.
+ * The map holds only names checked by forward resolution: anyone can
+ * set an unchecked reverse-record name.
  */
 export function addressLabel(address: string, ensNames: ReadonlyMap<string, string>): string {
   return ensNames.get(address.toLowerCase()) ?? shortenAddress(address)
 }
 
 /**
- * Имя узла из адреса RPC.
+ * Host name from an RPC URL.
  *
- * ПОКАЗЫВАЕТСЯ ИМЕННО ХОСТ, А НЕ ПОЛНЫЙ АДРЕС. Путь адреса содержит ключ:
- * у Alchemy это ключ приложения, у собственного узла пользователя — ключ
- * его учётной записи. Выводить их на экран незачем: для опознания узла
- * достаточно имени, а ключ, показанный на экране, утекает при демонстрации
- * экрана и на скриншотах.
+ * Show the host, not the full URL. The path holds a key (Alchemy app
+ * key, or the user's own node credential). Showing it leaks on screen
+ * shares and screenshots; the host is enough to recognize the node.
  *
- * Неразбираемая строка возвращается как есть: скрыть непонятное значение
- * хуже, чем показать — пользователь должен видеть, что именно записано.
+ * An unparseable string is returned as-is: hiding a mystery value is
+ * worse than showing what is actually stored.
  */
 export function endpointHost(url: string): string {
   try {
@@ -142,7 +137,7 @@ export function endpointHost(url: string): string {
   }
 }
 
-/** Дата и время операции в местном формате. */
+/** Operation date and time in the local format. */
 export function formatTimestamp(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
 }

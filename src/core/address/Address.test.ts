@@ -15,90 +15,90 @@ import {
   toChecksumAddress,
 } from './Address'
 
-describe('toChecksumAddress: официальные примеры EIP-55', () => {
-  it.each(EIP55_ADDRESSES)('приводит %s к каноническому виду', (address) => {
+describe('toChecksumAddress: official EIP-55 examples', () => {
+  it.each(EIP55_ADDRESSES)('brings %s to canonical form', (address) => {
     expect(toChecksumAddress(address.toLowerCase())).toBe(address)
   })
 
-  it('даёт тот же результат для входа в верхнем регистре', () => {
+  it('gives the same result for an upper-case input', () => {
     const [first] = EIP55_ADDRESSES
 
     expect(toChecksumAddress((first as string).toUpperCase().replace('0X', '0x'))).toBe(first)
   })
 
-  it('идемпотентен', () => {
+  it('is idempotent', () => {
     const [first] = EIP55_ADDRESSES
 
     expect(toChecksumAddress(toChecksumAddress(first as string))).toBe(first)
   })
 })
 
-describe('toAddress: проверка формата', () => {
-  it('принимает адрес в нижнем регистре', () => {
+describe('toAddress: format check', () => {
+  it('accepts a lower-case address', () => {
     expect(toAddress('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')).toBe(
       '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
     )
   })
 
-  it('принимает адрес в верхнем регистре', () => {
+  it('accepts an upper-case address', () => {
     expect(toAddress('0x5AAEB6053F3E94C9B9A09F33669435E7EF1BEAED')).toBe(
       '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
     )
   })
 
-  it('принимает корректный адрес с контрольной суммой', () => {
+  it('accepts a correct checksummed address', () => {
     const [first] = EIP55_ADDRESSES
 
     expect(toAddress(first as string)).toBe(first)
   })
 
-  it('отвергает строку без префикса 0x', () => {
+  it('rejects a string without a 0x prefix', () => {
     expect(() => toAddress('5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')).toThrow(InvalidAddressError)
   })
 
-  it('отвергает слишком короткий адрес', () => {
+  it('rejects an address that is too short', () => {
     expect(() => toAddress('0x5aaeb6053f3e94c9b9a09f33669435e7ef1bea')).toThrow(InvalidAddressError)
   })
 
-  it('отвергает слишком длинный адрес', () => {
+  it('rejects an address that is too long', () => {
     expect(() => toAddress('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaedff')).toThrow(
       InvalidAddressError,
     )
   })
 
-  it('отвергает недопустимые символы', () => {
+  it('rejects illegal characters', () => {
     expect(() => toAddress('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaez')).toThrow(
       InvalidAddressError,
     )
   })
 
-  it('отвергает пустую строку', () => {
+  it('rejects an empty string', () => {
     expect(() => toAddress('')).toThrow(InvalidAddressError)
   })
 })
 
-describe('toAddress: контрольная сумма ловит опечатки', () => {
-  /* Ключевое поведение всего модуля. Адрес EVM не имеет собственной
-     контрольной суммы, поэтому опечатка даёт другой синтаксически
-     корректный адрес, приватного ключа к которому не существует ни у кого.
-     Средства, отправленные туда, теряются безвозвратно. */
+describe('toAddress: the checksum catches typos', () => {
+  /* Key behaviour of the whole module. An EVM address has no checksum
+     of its own, so a typo yields another syntactically valid address
+     to which nobody has a private key. Funds sent there are lost
+     for good. */
 
-  it('отвергает смешанный регистр с неверной контрольной суммой', () => {
+  it('rejects mixed case with a wrong checksum', () => {
     expect(() => toAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD')).toThrow(
       AddressChecksumMismatchError,
     )
   })
 
-  it('не исправляет молча неверную контрольную сумму', () => {
-    /* Приведение такого адреса к правильному регистру лишило бы EIP-55
-       единственного смысла: пользователь получил бы «исправленный» адрес
-       с опечаткой в самих символах. */
+  it('does not silently fix a wrong checksum', () => {
+    /* Bringing such an address to the right case would strip EIP-55
+       of its only purpose: the user would get a "fixed" address with
+       a typo in the characters themselves. */
     expect(() => toAddress('0xD1220a0cf47c7B9Be7A2E6BA89F429762e7b9aDb')).toThrow(
       AddressChecksumMismatchError,
     )
   })
 
-  it('обнаруживает подмену одного символа в адресе с контрольной суммой', () => {
+  it('detects a one-character swap in a checksummed address', () => {
     const tampered = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAee'
 
     expect(() => toAddress(tampered)).toThrow(AddressChecksumMismatchError)
@@ -106,25 +106,25 @@ describe('toAddress: контрольная сумма ловит опечатк
 })
 
 describe('isValidAddress', () => {
-  it('подтверждает корректный адрес', () => {
+  it('confirms a correct address', () => {
     expect(isValidAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')).toBe(true)
   })
 
-  it('подтверждает адрес в нижнем регистре', () => {
+  it('confirms a lower-case address', () => {
     expect(isValidAddress('0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed')).toBe(true)
   })
 
-  it('отклоняет неверную контрольную сумму', () => {
+  it('rejects a wrong checksum', () => {
     expect(isValidAddress('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD')).toBe(false)
   })
 
-  it('отклоняет мусор', () => {
-    expect(isValidAddress('не адрес')).toBe(false)
+  it('rejects garbage', () => {
+    expect(isValidAddress('not-an-address')).toBe(false)
   })
 })
 
 describe('areAddressesEqual', () => {
-  it('сравнивает без учёта регистра', () => {
+  it('compares ignoring case', () => {
     expect(
       areAddressesEqual(
         '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
@@ -133,7 +133,7 @@ describe('areAddressesEqual', () => {
     ).toBe(true)
   })
 
-  it('различает разные адреса', () => {
+  it('distinguishes different addresses', () => {
     const [first, second] = EIP55_ADDRESSES
 
     expect(areAddressesEqual(first as string, second as string)).toBe(false)
@@ -141,8 +141,9 @@ describe('areAddressesEqual', () => {
 })
 
 describe('publicKeyToAddress', () => {
-  /* Публичный ключ точки-генератора secp256k1 — общеизвестное значение,
-     и адрес приватного ключа 0x01 постоянно приводится в документации. */
+  /* The secp256k1 generator-point public key is a well-known value,
+     and the address of private key 0x01 is constantly cited in the
+     documentation. */
   const GENERATOR_COMPRESSED = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
   const GENERATOR_UNCOMPRESSED =
     '0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
@@ -158,41 +159,41 @@ describe('publicKeyToAddress', () => {
     return bytes
   }
 
-  it('выводит адрес из сжатого ключа', () => {
+  it('derives an address from a compressed key', () => {
     expect(publicKeyToAddress(fromHex(GENERATOR_COMPRESSED))).toBe(EXPECTED_ADDRESS)
   })
 
-  it('выводит адрес из несжатого ключа', () => {
+  it('derives an address from an uncompressed key', () => {
     expect(publicKeyToAddress(fromHex(GENERATOR_UNCOMPRESSED))).toBe(EXPECTED_ADDRESS)
   })
 
-  it('выводит адрес из ключа без префикса', () => {
+  it('derives an address from a key without a prefix', () => {
     expect(publicKeyToAddress(fromHex(GENERATOR_UNCOMPRESSED).slice(1))).toBe(EXPECTED_ADDRESS)
   })
 
-  it('возвращает адрес в контрольной сумме EIP-55', () => {
+  it('returns the address in EIP-55 checksum form', () => {
     const address = publicKeyToAddress(fromHex(GENERATOR_COMPRESSED))
 
     expect(address).not.toBe(address.toLowerCase())
     expect(() => toAddress(address)).not.toThrow()
   })
 
-  it('отвергает ключ недопустимой длины', () => {
+  it('rejects a key of an illegal length', () => {
     expect(() => publicKeyToAddress(new Uint8Array(32))).toThrow(InvalidPublicKeyError)
   })
 
-  it('отвергает несжатый ключ без байта 0x04', () => {
+  it('rejects an uncompressed key without the 0x04 byte', () => {
     const wrong = fromHex(GENERATOR_UNCOMPRESSED)
     wrong[0] = 0x05
 
     expect(() => publicKeyToAddress(wrong)).toThrow(InvalidPublicKeyError)
   })
 
-  it('отвергает точку вне кривой', () => {
+  it('rejects a point off the curve', () => {
     const invalid = fromHex(GENERATOR_COMPRESSED)
-    /* Порча координаты X: восстановить Y для такой точки нельзя,
-       поэтому ключ обязан быть отвергнут, а не превращён в адрес,
-       к которому не существует приватного ключа. */
+    /* Corrupt the X coordinate: Y cannot be recovered for such a
+       point, so the key must be rejected, not turned into an
+       address to which no private key exists. */
     invalid.set([(invalid[32] as number) ^ 0xff], 32)
 
     expect(() => publicKeyToAddress(invalid)).toThrow(InvalidPublicKeyError)

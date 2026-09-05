@@ -24,15 +24,15 @@ afterEach(() => {
 })
 
 describe('sendingsSseUrl', () => {
-  it('на том же origin без user_id даёт /v1/sendings', () => {
+  it('on the same origin without user_id yields /v1/sendings', () => {
     expect(sendingsSseUrl('', null)).toBe('/v1/sendings')
   })
 
-  it('добавляет user_id из сохранённого входа', () => {
+  it('adds user_id from the stored sign-in', () => {
     expect(sendingsSseUrl('', '70')).toBe('/v1/sendings?user_id=70')
   })
 
-  it('склеивает с заданным адресом сервера', () => {
+  it('joins onto the given server URL', () => {
     expect(sendingsSseUrl('http://127.0.0.1:8080', '70')).toBe(
       'http://127.0.0.1:8080/v1/sendings?user_id=70',
     )
@@ -40,7 +40,7 @@ describe('sendingsSseUrl', () => {
 })
 
 describe('useSendingsSse', () => {
-  it('открывает поток sendings и закрывает его при размонтировании', () => {
+  it('opens the sendings stream and closes it on unmount', () => {
     const { unmount } = render(<Probe userId="70" />)
 
     expect(TestEventSource.instances).toHaveLength(1)
@@ -52,19 +52,19 @@ describe('useSendingsSse', () => {
     expect(TestEventSource.instances[0]?.closed).toBe(true)
   })
 
-  it('без сохранённого входа открывает поток без фильтра', () => {
+  it('opens an unfiltered stream without a stored sign-in', () => {
     render(<Probe userId={null} />)
 
     expect(TestEventSource.instances[0]?.url).toBe('/v1/sendings')
   })
 
-  it('не открывает поток, пока подписка выключена', () => {
+  it('does not open the stream while the subscription is off', () => {
     render(<Probe userId={null} enabled={false} />)
 
     expect(TestEventSource.instances).toHaveLength(0)
   })
 
-  it('передаёт кадр sendings с type_send create', () => {
+  it('forwards a sendings frame with type_send create', () => {
     const onEvent = vi.fn()
     render(<Probe userId={null} onEvent={onEvent} />)
 
@@ -86,7 +86,7 @@ describe('useSendingsSse', () => {
     expect(onEvent).toHaveBeenCalledWith(frame)
   })
 
-  it('передаёт кадр sendings с type_send update', () => {
+  it('forwards a sendings frame with type_send update', () => {
     const onEvent = vi.fn()
     render(<Probe userId="74" onEvent={onEvent} />)
 

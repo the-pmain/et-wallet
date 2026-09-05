@@ -13,22 +13,21 @@ import {
 const SERVICE_NAME = 'PriceService'
 
 /**
- * Сколько котировка считается свежей.
+ * How long a quote is treated as fresh.
  *
- * Минута — компромисс между точностью показа и частотой обращений
- * к стороннему сервису. Каждое обращение раскрывает состав портфеля
- * и тратит жёсткий лимит бесплатного доступа, поэтому чаще опрашивать
- * не только бесполезно, но и вредно.
+ * A minute is a compromise between display accuracy and how often
+ * a third-party service is hit. Every call reveals the portfolio
+ * composition and spends a hard free-tier limit, so polling more
+ * often is not only useless but harmful.
  *
- * Курс запрашивается по действию: открытие кошелька, обновление,
- * смена сети или аккаунта. Фонового опроса нет — он был сделан
- * и снят, см. запись A-171 в TECH_DEBT. Поэтому котировка на экране
- * может быть заметно старше минуты, и рядом с оценкой показано время,
- * на которое она действительна.
+ * The rate is requested on action: opening the wallet, refresh,
+ * network or account change. There is no background poll — it was
+ * built and removed, see record A-171 in TECH_DEBT. Therefore the
+ * quote on screen may be noticeably older than a minute, and next
+ * to the estimate the time it is valid for is shown.
  */
 const DEFAULT_TTL_MS = 60_000
 
-/** Зависимости сервиса. */
 export interface IPriceServiceDependencies {
   readonly provider: IPriceProvider
   readonly clock: IClock
@@ -38,26 +37,26 @@ export interface IPriceServiceDependencies {
   readonly ttlMs?: number
 }
 
-/** Запись кэша. */
 interface ICacheEntry {
   readonly quote: IPriceQuote
 
-  /** Момент получения, а не момент котировки: устаревание считается от него. */
+  /** Instant of receipt, not of the quote: staleness is counted from it. */
   readonly fetchedAt: number
 }
 
 /**
- * Курсы с кэшированием.
+ * Rates with caching.
  *
- * ЧАСТИЧНЫЙ РЕЗУЛЬТАТ — НОРМАЛЬНЫЙ РЕЗУЛЬТАТ. Отсутствие курса
- * в ответе означает «неизвестен» и обязано отличаться от нуля:
- * актив без курса не должен обнулять оценку портфеля, он должен
- * из неё выпасть с явной пометкой.
+ * A PARTIAL RESULT IS A NORMAL RESULT. A missing rate in the reply
+ * means "unknown" and must differ from zero: an asset without a
+ * rate must not zero the portfolio estimate, it must drop out of
+ * it with an explicit mark.
  *
- * ОТКАЗ ИСТОЧНИКА НЕ ВЫБРАСЫВАЕТСЯ НАРУЖУ. Портфель без стоимости
- * лучше пустого экрана: балансы известны и без курсов. Причина отказа
- * записывается в журнал и доступна через `lastError` — интерфейс
- * обязан сказать, что стоимость не получена, а не показать её нулём.
+ * A SOURCE REFUSAL IS NOT THROWN OUTWARD. A portfolio without a
+ * value is better than an empty screen: balances are known without
+ * rates. The refusal reason is written to the log and available
+ * through `lastError` — the UI must say that the value was not
+ * obtained, not show it as zero.
  */
 export class PriceService implements IPriceService {
   readonly #provider: IPriceProvider
@@ -68,7 +67,7 @@ export class PriceService implements IPriceService {
 
   readonly #cache = new Map<string, ICacheEntry>()
 
-  /** Причина последнего отказа источника. `null`, если отказа не было. */
+  /** Reason of the last source refusal. `null` if there was none. */
   #lastError: string | null = null
 
   constructor(dependencies: IPriceServiceDependencies) {
@@ -79,7 +78,7 @@ export class PriceService implements IPriceService {
     this.#ttlMs = dependencies.ttlMs ?? DEFAULT_TTL_MS
   }
 
-  /** Имя источника. Пользователь вправе знать, кому уходят запросы. */
+  /** Source name. The user is entitled to know where the requests go. */
   get providerName(): string {
     return this.#provider.name
   }
@@ -122,9 +121,9 @@ export class PriceService implements IPriceService {
 
       this.#logger.warn('Prices could not be fetched', { reason: this.#lastError })
 
-      /* Устаревшие котировки лучше отсутствующих: стоимость минутной
-         давности показывает порядок величины, а пустой экран
-         не показывает ничего. Возраст виден по `updatedAt`. */
+      /* Stale quotes are better than missing ones: a minute-old
+         value shows the order of magnitude, and an empty screen
+         shows nothing. Age is visible from `updatedAt`. */
       for (const ref of missing) {
         const key = priceRefKey(ref)
         const stale = this.#cache.get(key)

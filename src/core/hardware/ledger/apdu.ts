@@ -1,9 +1,7 @@
 import { HardwareDeviceError, USER_REJECTED_ON_DEVICE } from './errors'
 
-/** Класс команд приложения Ethereum. */
 export const CLA = 0xe0
 
-/** Коды команд. */
 export const INS = {
   GetAddress: 0x02,
   SignTransaction: 0x04,
@@ -12,39 +10,38 @@ export const INS = {
   SignTypedDataHashed: 0x0c,
 } as const
 
-/** Первая часть многочастной команды. */
+/** First chunk of a multi-part command. */
 export const P1_FIRST = 0x00
 
-/** Продолжение многочастной команды. */
+/** Continuation of a multi-part command. */
 export const P1_MORE = 0x80
 
-/** Показать значение на экране устройства и ждать подтверждения. */
+/** Show the value on the device screen and wait for confirmation. */
 export const P1_CONFIRM = 0x01
 
-/** Второй параметр, когда он не несёт смысла. */
+/** Second parameter when it carries no meaning. */
 export const P2_NONE = 0x00
 
 /**
- * Наибольший размер данных одной команды.
+ * Largest data size of a single command.
  *
- * Ограничение протокола APDU: длина поля данных кодируется одним
- * байтом. Всё, что длиннее, обязано делиться на части.
+ * An APDU protocol limit: the data-field length is encoded in one
+ * byte. Anything longer must be split into chunks.
  */
 export const MAX_DATA_LENGTH = 255
 
-/** Длина слова состояния в конце ответа. */
 const STATUS_LENGTH = 2
 
-/** Успешное завершение. */
 const STATUS_OK = 0x9000
 
 /**
- * Слова состояния, у которых есть внятное объяснение.
+ * Status words that have a clear explanation.
  *
- * ОБЪЯСНЕНИЕ ВАЖНЕЕ КОДА. «Ошибка 0x6985» не говорит человеку ничего,
- * тогда как «вы отклонили операцию на устройстве» описывает ровно то,
- * что произошло, и подсказывает, что делать дальше. Неизвестный код
- * показывается числом: выдумывать ему толкование недопустимо.
+ * THE EXPLANATION MATTERS MORE THAN THE CODE. "Error 0x6985" tells
+ * a person nothing, while "you rejected the operation on the device"
+ * describes exactly what happened and what to do next. An unknown
+ * code is shown as a number: inventing a meaning for it is not
+ * allowed.
  */
 const STATUS_MEANINGS: ReadonlyMap<number, string> = new Map([
   [0x6985, USER_REJECTED_ON_DEVICE],
@@ -62,10 +59,10 @@ const STATUS_MEANINGS: ReadonlyMap<number, string> = new Map([
 ])
 
 /**
- * Собирает команду APDU.
+ * Builds an APDU command.
  *
- * Заголовок из пяти байтов: класс, код команды, два параметра и длина
- * данных. Такова структура ISO 7816, которой следует устройство.
+ * A five-byte header: class, instruction, two parameters, and data
+ * length. That is the ISO 7816 structure the device follows.
  */
 export function buildApdu(
   instruction: number,
@@ -74,8 +71,8 @@ export function buildApdu(
   data: Uint8Array,
 ): Uint8Array {
   if (data.length > MAX_DATA_LENGTH) {
-    /* Молча обрезать данные значило бы отправить на подпись не то,
-       что показано пользователю. */
+    /* Silently truncating the data would send something other than
+       what was shown to the user to be signed. */
     throw new HardwareDeviceError(
       `the command data is longer than the protocol allows: ${data.length.toString()} bytes`,
     )
@@ -94,11 +91,11 @@ export function buildApdu(
 }
 
 /**
- * Отделяет полезные данные ответа от слова состояния.
+ * Splits response payload from the status word.
  *
- * ЛЮБОЙ КОД, КРОМЕ УСПЕХА, — ЭТО ОТКАЗ. Продолжить работу с данными
- * неуспешного ответа нельзя: там либо пусто, либо часть предыдущего
- * обмена.
+ * ANY CODE OTHER THAN SUCCESS IS A REFUSAL. Work must not continue
+ * with the data of a failed reply: it is either empty or leftover
+ * from a previous exchange.
  *
  * @throws HardwareDeviceError
  */
@@ -107,8 +104,8 @@ export function readResponse(response: Uint8Array): Uint8Array {
     throw new HardwareDeviceError('the device returned a response that is too short')
   }
 
-  /* Копия, а не окно в исходный буфер: ответ живёт дольше самого
-     обмена, и разделяемая память привела бы к чтению чужих данных. */
+  /* A copy, not a window into the original buffer: the reply outlives
+     the exchange itself, and shared memory would read foreign data. */
   const body = response.slice(0, response.length - STATUS_LENGTH)
   const status = ((response[response.length - 2] ?? 0) << 8) | (response[response.length - 1] ?? 0)
 

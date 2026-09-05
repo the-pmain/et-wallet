@@ -3,35 +3,30 @@ import { cn } from '@/shared/lib/utils'
 interface AccountAvatarProps {
   readonly address: string
   readonly className?: string
-  /** Подпись для программы чтения. По умолчанию — отпечаток адреса. */
+  /** Screen-reader label. Defaults to the address fingerprint. */
   readonly label?: string
 }
 
-/** Сколько ячеек по стороне. Нечётное число даёт центральную ось симметрии. */
+/** Cells per side. An odd count gives a central axis of symmetry. */
 const GRID = 5
 
-/** Половина ширины, отражаемая зеркально. */
+/** Half-width mirrored across the vertical axis. */
 const HALF = Math.ceil(GRID / 2)
 
 /**
- * Визуальный отпечаток адреса.
+ * Visual address fingerprint.
  *
- * ЭТО ЗАЩИТНАЯ ФУНКЦИЯ, А НЕ УКРАШЕНИЕ. Пользователь опознаёт адрес
- * по четырём-шести символам, а подобрать адрес с нужными крайними
- * символами вычислительно дёшево. Картинка зависит от всех сорока
- * символов сразу: подменённый адрес меняет её целиком, и разница
- * заметна боковым зрением, без вчитывания.
+ * This is a safety aid, not decoration. People recognize an address by
+ * four to six characters, and crafting an address with matching ends is
+ * cheap. The picture depends on all forty characters: a swapped address
+ * changes the whole image, visible in peripheral vision.
  *
- * ОТПЕЧАТОК НЕ ЗАМЕНЯЕТ СВЕРКУ. Совпадение картинок означает лишь, что
- * адреса совпали по этой свёртке; проверка перед отправкой средств
- * по-прежнему делается посимвольно.
+ * A matching picture only means the addresses matched this hash;
+ * before sending funds the check is still character by character.
  *
- * Симметрия по вертикали — не эстетика: зеркальные узоры человек
- * запоминает и различает заметно лучше, чем случайный шум.
- *
- * Рисуется своим кодом без внешней библиотеки: зависимость ради
- * двадцати строк арифметики расширяет поверхность атаки на приложение,
- * работающее рядом с ключами.
+ * Vertical symmetry is for memory, not aesthetics. Drawn in-house:
+ * a dependency for twenty lines of arithmetic widens the attack
+ * surface of an app that sits next to keys.
  */
 export function AccountAvatar({
   address,
@@ -66,16 +61,15 @@ export function AccountAvatar({
 }
 
 /**
- * Свёртка адреса в число.
+ * Fold the address into a number.
  *
- * Алгоритм FNV-1a: простой, детерминированный и хорошо перемешивающий
- * короткие строки. Криптографическая стойкость здесь не требуется
- * и не подразумевается — от свёртки нужна только различимость картинок,
- * а не стойкость к подбору. Использовать её для чего-либо ещё нельзя.
+ * FNV-1a: simple, deterministic, mixes short strings well.
+ * Cryptographic strength is neither required nor implied — only
+ * picture distinctness. Do not reuse this hash for anything else.
  *
- * Регистр приводится к нижнему: один и тот же адрес приходит и в записи
- * EIP-55, и в нижнем регистре из ответов RPC, а две картинки для одного
- * адреса лишили бы отпечаток смысла.
+ * Lowercased first: the same address arrives in EIP-55 and in
+ * lowercase from RPC; two pictures for one address would void the
+ * fingerprint.
  */
 function hashAddress(address: string): number {
   const normalized = address.toLowerCase()
@@ -90,7 +84,7 @@ function hashAddress(address: string): number {
   return hash
 }
 
-/** Заполненные ячейки решётки, зеркальные относительно вертикальной оси. */
+/** Filled grid cells, mirrored across the vertical axis. */
 function buildCells(seed: number): readonly { x: number; y: number }[] {
   const cells: { x: number; y: number }[] = []
 
@@ -98,8 +92,7 @@ function buildCells(seed: number): readonly { x: number; y: number }[] {
 
   for (let y = 0; y < GRID; y += 1) {
     for (let x = 0; x < HALF; x += 1) {
-      /* Линейный конгруэнтный генератор: детерминированная
-         последовательность из одной начальной величины. */
+      /* Linear congruential generator: a deterministic stream from one seed. */
       state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0
 
       if (state % 100 < 50) {

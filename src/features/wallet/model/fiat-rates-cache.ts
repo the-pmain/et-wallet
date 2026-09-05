@@ -3,7 +3,7 @@ import { FiatRatesClient } from '@/core'
 import { USD_ONLY_RATES, type IFiatRates } from '../lib/display-currency'
 
 /**
- * Курсы EUR/GBP к доллару. Один запрос на сессию приложения.
+ * EUR/GBP rates against the dollar. One request per app session.
  */
 export class FiatRatesCache {
   #snapshot: IFiatRates = USD_ONLY_RATES
@@ -52,8 +52,8 @@ export class FiatRatesCache {
         this.#notify()
       })
       .catch(() => {
-        /* Повтор при следующем ensureLoaded: первый сбой не должен
-           закреплять курс 1:1 на всю сессию. */
+        /* Retry on the next ensureLoaded: a first failure must not
+           pin a 1:1 rate for the whole session. */
         if (generation === this.#generation) {
           this.#load = null
         }

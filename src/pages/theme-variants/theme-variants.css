@@ -1,9 +1,9 @@
 /*
-  Изолированные темы этюдов кошелька.
+  Isolated themes for the wallet studies.
 
-  Токены живут на корне с `data-wallet-theme` и перекрывают переменные
-  приложения только внутри этого корня. Боевой кабинет переменных не
-  видит: файл подключается ленивым экраном варианта.
+  Tokens live on the root with `data-wallet-theme` and override app
+  variables only inside that root. The production cabinet never sees
+  them: the file is loaded by the lazy variant screen.
 */
 
 .tv-root {

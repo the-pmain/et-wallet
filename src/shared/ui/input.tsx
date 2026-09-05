@@ -3,12 +3,12 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 /**
- * Базовое поле ввода shadcn/ui (стиль new-york).
+ * Base shadcn/ui input (new-york style).
  *
- * Отличие от поставки библиотеки: `spellCheck` выключён по умолчанию.
- * Проверка орфографии в браузере отправляет содержимое поля во внешние
- * службы у части поставщиков, а поля этого кошелька содержат пароли,
- * seed-фразы и адреса. Включить проверку можно явно, там где это уместно.
+ * Difference from the library default: `spellCheck` is off. Browser
+ * spell-check sends field contents to external services at some
+ * vendors, and this wallet's fields hold passwords, seed phrases, and
+ * addresses. Spell-check can be turned on explicitly where it belongs.
  */
 export function Input({ className, type, spellCheck = false, ...props }: ComponentProps<'input'>) {
   return (

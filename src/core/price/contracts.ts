@@ -3,48 +3,47 @@ import type { ChainId } from '@/core/types'
 import type { FiatCurrency, IPriceRef, PriceMap } from './types'
 
 /**
- * Источник курсов.
+ * Price source.
  *
- * ЧАСТИЧНЫЙ ОТВЕТ — ОБЫЧНОЕ ДЕЛО, А НЕ СБОЙ. Источник не обязан знать
- * курс каждого запрошенного актива: у токена, выпущенного вчера, курса
- * нет ни у кого. Поэтому возвращается словарь найденного, а не список
- * той же длины, что и запрос: отсутствие записи означает «курс
- * неизвестен» и обязано отличаться от нуля.
+ * A PARTIAL REPLY IS ORDINARY, NOT A FAULT. The source is not
+ * obliged to know the rate of every requested asset: a token issued
+ * yesterday has a rate nowhere. Therefore a map of what was found
+ * is returned, not a list of the same length as the request: a
+ * missing entry means "the rate is unknown" and must differ from
+ * zero.
  *
- * ОТКАЗ ИСТОЧНИКА — ЭТО ИСКЛЮЧЕНИЕ. Пустой словарь и недоступность
- * сервиса — разные события: первое означает «таких курсов нет»,
- * второе — «узнать не удалось». Сведение их воедино заставило бы
- * интерфейс показать портфель без стоимости, не сказав почему.
+ * A SOURCE REFUSAL IS AN EXCEPTION. An empty map and an unavailable
+ * service are different events: the first means "there are no such
+ * rates", the second — "could not find out". Collapsing them would
+ * force the UI to show a portfolio without a value and not say why.
  */
 export interface IPriceProvider {
-  /** Устойчивый идентификатор. Попадает в журнал и в интерфейс. */
+  /** Stable identifier. Goes into the log and the UI. */
   readonly id: string
 
-  /** Имя для показа пользователю: он вправе знать, кому уходят запросы. */
+  /** Display name: the user is entitled to know where the requests go. */
   readonly name: string
 
-  /** Поддерживает ли источник эту сеть. */
   supports(chainId: ChainId): boolean
 
   /**
-   * Запрашивает курсы.
+   * Requests rates.
    *
-   * @throws Error если источник недоступен либо отказал.
+   * @throws Error if the source is unavailable or refused.
    */
   getPrices(refs: readonly IPriceRef[], currency: FiatCurrency): Promise<PriceMap>
 }
 
-/** Доступ к курсам с кэшированием. */
 export interface IPriceService {
   /**
-   * Возвращает курсы, обращаясь к источнику только за отсутствующими
-   * либо устаревшими.
+   * Returns rates, hitting the source only for missing or stale
+   * ones.
    *
-   * Не бросает исключение, если часть курсов получить не удалось:
-   * известное отдаётся, неизвестное отсутствует в словаре.
+   * Does not throw if some rates could not be obtained: what is
+   * known is returned, what is unknown is absent from the map.
    */
   getPrices(refs: readonly IPriceRef[]): Promise<PriceMap>
 
-  /** Сбрасывает кэш: следующий запрос уйдёт к источнику. */
+  /** Clears the cache: the next request will go to the source. */
   invalidate(): void
 }

@@ -10,7 +10,7 @@ describe('FiatRatesCache', () => {
     globalThis.fetch = mockDirectoryAndPriceFetch({ id: '1' })
   })
 
-  it('загружает курсы с Frankfurter v1', async () => {
+  it('loads rates from Frankfurter v1', async () => {
     const cache = new FiatRatesCache(
       new FiatRatesClient({
         sources: ['https://api.frankfurter.dev/v1/latest?from=USD&to=EUR,GBP'],
@@ -22,7 +22,7 @@ describe('FiatRatesCache', () => {
     expect(cache.getSnapshot()).toEqual({ USD: 1, EUR: 0.92, GBP: 0.78 })
   })
 
-  it('не повторяет запрос при втором ensureLoaded', async () => {
+  it('does not repeat the request on a second ensureLoaded', async () => {
     const fetchMock = mockDirectoryAndPriceFetch({ id: '1' })
     globalThis.fetch = fetchMock
     const cache = new FiatRatesCache(

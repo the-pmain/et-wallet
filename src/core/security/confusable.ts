@@ -1,92 +1,95 @@
 /**
- * Приведение имени к «скелету» — виду, в котором совпадают названия,
- * неотличимые на глаз.
+ * Reducing a name to a "skeleton" — the form in which names that
+ * look the same to the eye coincide.
  *
- * ЗАЧЕМ. Сравнение побайтово обходится одной буквой: `Ethereum`
- * с кириллической `е` не совпадает с латинским ни в одном байте, а
- * выглядит точно так же. Пользователь видит привычное имя и подписывает
- * перевод, считая его отправкой в основную сеть.
+ * WHY. Byte-for-byte comparison is bypassed by one letter: `Ethereum`
+ * with a Cyrillic e (U+0435) matches the Latin one in no byte, and looks
+ * exactly the same. The user sees a familiar name and signs a
+ * transfer, thinking it is a send to mainnet.
  *
- * ЖИВЁТ РЯДОМ С ПОКАЗОМ НЕДОВЕРЕННЫХ СТРОК, А НЕ В МОДУЛЕ СЕТЕЙ.
- * Приём один и тот же для имени сети, символа токена и имени
- * приложения; две реализации одного сравнения разошлись бы, и
- * разошлись бы молча — в сторону ослабления той, о которой забыли.
+ * LIVES NEXT TO UNTRUSTED-STRING DISPLAY, NOT IN THE NETWORK MODULE.
+ * The technique is the same for a network name, a token symbol, and
+ * an app name; two implementations of one comparison would drift,
+ * and they would drift in silence — toward weakening the one that
+ * was forgotten.
  *
- * ЧТО ЗДЕСЬ НЕ РЕАЛИЗУЕТСЯ. Полный алгоритм UTS #39 с таблицей
- * смешиваемых символов Unicode: она содержит тысячи записей и весит
- * больше, чем весь сетевой слой кошелька. Взято подмножество, которым
- * подмена выполняется на практике, — буквы кириллицы, греческого,
- * армянского и цифры, похожие на латинские. Ограничение названо
- * в списке долга, а не выдано за полноту.
+ * WHAT IS NOT IMPLEMENTED HERE. The full UTS #39 algorithm with the
+ * Unicode confusable table: it has thousands of entries and weighs
+ * more than the whole wallet network layer. A subset is taken, the
+ * one used for impersonation in practice — Cyrillic, Greek, Armenian
+ * letters and digits that look like Latin. The limit is named in the
+ * debt list, not passed off as completeness.
  *
- * ПОРЯДОК ШАГОВ СУЩЕСТВЕНЕН. Сначала NFKD: он сам приводит к латинице
- * математические начертания (`𝐄𝐭𝐡𝐞𝐫𝐞𝐮𝐦`), полноширинные формы
- * и буквы с диакритикой. Таблица ниже покрывает то, чего NFKD
- * не покрывает принципиально: это разные буквы разных алфавитов,
- * а не варианты одной.
+ * STEP ORDER MATTERS. NFKD first: it itself maps mathematical
+ * letterforms (`𝐄𝐭𝐡𝐞𝐫𝐞𝐮𝐦`), fullwidth forms, and letters with
+ * diacritics to Latin. The table below covers what NFKD cannot cover
+ * in principle: these are different letters of different alphabets,
+ * not variants of one.
  */
 
 /**
- * Невидимые символы.
+ * Invisible characters.
  *
- * Записаны escape-последовательностями: невидимый символ в исходном
- * коде невозможно проверить при чтении.
+ * Written as escape sequences: an invisible character in source
+ * cannot be checked when reading.
  *
  * U+00AD SOFT HYPHEN, U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ,
  * U+200E LRM, U+200F RLM, U+2060 WORD JOINER, U+FEFF BOM.
  */
 const INVISIBLE = new RegExp('[\xad\u200b-\u200f\u2060\ufeff]', 'gu')
 
-/** Диакритические знаки, отделённые нормализацией NFKD. */
+/** Combining marks separated by NFKD normalization. */
 const COMBINING_MARKS = /\p{M}/gu
 
 /**
- * Всё, что не буква и не цифра.
+ * Everything that is not a letter or a digit.
  *
- * Убирается целиком: `E-thereum`, `E thereum` и `Ethereum` для глаза —
- * одно и то же имя, и защита, которую обходит дефис, бесполезна.
+ * Removed wholesale: `E-thereum`, `E thereum`, and `Ethereum` are
+ * the same name to the eye, and a defense that a hyphen bypasses is
+ * useless.
  */
 const NON_ALPHANUMERIC = /[^\p{L}\p{N}]/gu
 
 /**
- * Буквы, неотличимые от латинских.
+ * Letters indistinguishable from Latin.
  *
- * Каждая строка — «что подменяют» → «чем подменяют». Ключи записаны
- * строчными: приведение регистра выполняется раньше подстановки,
- * поэтому прописные варианты перечислять не нужно.
+ * Each row is "what they substitute" → "what they substitute with".
+ * Keys are lowercase: case folding runs before substitution, so
+ * uppercase variants need not be listed.
  *
- * ЦИФРЫ ВКЛЮЧЕНЫ НАМЕРЕННО: `0ptimism` и `P0lygon` — та же подмена,
- * выполненная средствами ASCII, и от таблицы Unicode она не зависит.
- * Ложное срабатывание потребовало бы имени, отличающегося от встроенного
- * только цифрой на месте буквы, — то есть ровно подмены.
+ * DIGITS ARE INCLUDED ON PURPOSE: `0ptimism` and `P0lygon` are the
+ * same substitution done with ASCII, and it does not depend on the
+ * Unicode table. A false positive would require a name that differs
+ * from the built-in only by a digit in place of a letter — i.e.
+ * exactly a substitution.
  */
 const CONFUSABLE_LETTERS: ReadonlyMap<string, string> = new Map([
-  /* Кириллица. */
-  ['а', 'a'],
-  ['в', 'b'],
-  ['е', 'e'],
-  ['ё', 'e'],
-  ['к', 'k'],
-  ['м', 'm'],
-  ['н', 'h'],
-  ['о', 'o'],
-  ['р', 'p'],
-  ['с', 'c'],
-  ['т', 't'],
-  ['у', 'y'],
-  ['х', 'x'],
-  ['ѕ', 's'],
-  ['і', 'i'],
-  ['ї', 'i'],
-  ['ј', 'j'],
-  ['ԁ', 'd'],
-  ['ԛ', 'q'],
-  ['ԝ', 'w'],
-  ['һ', 'h'],
-  ['ѵ', 'v'],
+  /* Cyrillic. Keys are escapes so the source holds no raw letters. */
+  ['\u0430', 'a'],
+  ['\u0432', 'b'],
+  ['\u0435', 'e'],
+  ['\u0451', 'e'],
+  ['\u043A', 'k'],
+  ['\u043C', 'm'],
+  ['\u043D', 'h'],
+  ['\u043E', 'o'],
+  ['\u0440', 'p'],
+  ['\u0441', 'c'],
+  ['\u0442', 't'],
+  ['\u0443', 'y'],
+  ['\u0445', 'x'],
+  ['\u0455', 's'],
+  ['\u0456', 'i'],
+  ['\u0457', 'i'],
+  ['\u0458', 'j'],
+  ['\u0501', 'd'],
+  ['\u051B', 'q'],
+  ['\u051D', 'w'],
+  ['\u04BB', 'h'],
+  ['\u0475', 'v'],
   ['ց', 'g'],
 
-  /* Греческий. */
+  /* Greek. */
   ['α', 'a'],
   ['β', 'b'],
   ['γ', 'y'],
@@ -104,7 +107,7 @@ const CONFUSABLE_LETTERS: ReadonlyMap<string, string> = new Map([
   ['ϲ', 'c'],
   ['ϳ', 'j'],
 
-  /* Армянский. */
+  /* Armenian. */
   ['օ', 'o'],
   ['ս', 'u'],
   ['հ', 'h'],
@@ -112,11 +115,12 @@ const CONFUSABLE_LETTERS: ReadonlyMap<string, string> = new Map([
   ['ր', 'r'],
   ['բ', 'p'],
 
-  /* Латинские буквы, неотличимые между собой. Представитель один
-     на группу, поэтому `l` и `i` сводятся к одному символу. */
+  /* Latin letters indistinguishable from each other. One
+     representative per group, so `l` and `i` collapse to one
+     character. */
   ['l', 'i'],
 
-  /* Цифры. */
+  /* Digits. */
   ['0', 'o'],
   ['1', 'i'],
   ['3', 'e'],
@@ -126,11 +130,11 @@ const CONFUSABLE_LETTERS: ReadonlyMap<string, string> = new Map([
 ])
 
 /**
- * Приводит имя к виду, в котором совпадают неотличимые на глаз названия.
+ * Reduces a name to the form in which visually identical names coincide.
  *
- * Действие необратимо и предназначено ТОЛЬКО ДЛЯ СРАВНЕНИЯ. Показывать
- * результат пользователю нельзя: `Polygon` превращается в `poiygon`,
- * и увиденное сбило бы с толку.
+ * The operation is irreversible and is ONLY FOR COMPARISON. The
+ * result must not be shown to the user: `Polygon` becomes `poiygon`,
+ * and seeing that would confuse them.
  */
 export function toNameSkeleton(name: string): string {
   const normalized = name
@@ -150,15 +154,15 @@ export function toNameSkeleton(name: string): string {
 }
 
 /**
- * Символы имени, не относящиеся к латинице и цифрам.
+ * Name characters that are not Latin or digits.
  *
- * ПОКАЗЫВАЮТСЯ ПОЛЬЗОВАТЕЛЮ. При подмене похожими буквами человек видит
- * два визуально одинаковых названия и сообщение «имя занято» — без
- * объяснения оно выглядит ошибкой кошелька. Перечень чужих букв
- * превращает непонятное в очевидное.
+ * SHOWN TO THE USER. On a lookalike-letter substitution a person
+ * sees two visually identical names and a "name is taken" message —
+ * without an explanation it looks like a wallet bug. A list of
+ * foreign letters turns the unexplained into the obvious.
  *
- * Повторы убираются: одна и та же буква, встреченная трижды, ничего
- * не добавляет к объяснению.
+ * Duplicates are dropped: the same letter seen three times adds
+ * nothing to the explanation.
  */
 export function findForeignCharacters(name: string): readonly string[] {
   const found = new Set<string>()

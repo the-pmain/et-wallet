@@ -10,21 +10,22 @@ interface SeedPhraseDisplayProps {
 }
 
 /**
- * Показ мнемонической фразы при создании кошелька.
+ * Shows the mnemonic phrase when creating a wallet.
  *
- * ГРАНИЦА ЧЕСТНОСТИ. Правило проекта — секреты не попадают в состояние UI.
- * Здесь оно неизбежно нарушается: фразу нужно показать, значит она
- * существует строкой в дереве React и в памяти вкладки. Строки в JavaScript
- * неочищаемы. Устранить это нельзя, поэтому:
+ * HONESTY BOUNDARY. Project rule: secrets do not enter UI state.
+ * Here that rule is inevitably broken: the phrase must be shown, so
+ * it exists as a string in the React tree and in tab memory.
+ * JavaScript strings cannot be wiped. That cannot be fixed, so:
  *
- * - фраза не поднимается в глобальное состояние и не переживает экран;
- * - слова скрыты до явного действия пользователя — случайный взгляд
- *   через плечо и скриншот окна не раскроют их сразу;
- * - предупреждения о буфере обмена и скриншотах показаны рядом,
- *   а не спрятаны в справке.
+ * - the phrase is not lifted into global state and does not outlive
+ *   the screen;
+ * - words stay hidden until an explicit user action — a glance over
+ *   the shoulder or a window screenshot will not reveal them at once;
+ * - clipboard and screenshot warnings sit next to the phrase, not
+ *   buried in help.
  *
- * `user-select` не отключается: пользователю нужно иметь возможность
- * выделить фразу и записать её вручную.
+ * `user-select` is left on: the user must be able to highlight the
+ * phrase and write it down by hand.
  */
 export function SeedPhraseDisplay({ words, onCopy }: SeedPhraseDisplayProps) {
   const [isRevealed, setIsRevealed] = useState(false)

@@ -5,31 +5,32 @@ interface AppErrorBoundaryProps {
 }
 
 interface AppErrorBoundaryState {
-  /** Сообщение отказа. `null`, пока сбоя не было. */
+  /** Failure message. `null` until a crash. */
   readonly reason: string | null
 }
 
 /**
- * Перехват сбоев отрисовки.
+ * Catch of render failures.
  *
- * ЗАЧЕМ ЭТО КОШЕЛЬКУ. Необработанная ошибка в React размонтирует всё
- * дерево: пользователь видит белый экран. Для владельца средств пустой
- * экран неотличим от пропажи денег — а в действительности не произошло
- * ничего: ключи зашифрованы на диске, seed-фраза цела, транзакции
- * в блокчейне не зависят от того, что нарисовал браузер.
+ * WHY A WALLET NEEDS THIS. An unhandled React error unmounts the
+ * whole tree: the user sees a white screen. For the owner of funds
+ * a blank screen is indistinguishable from money gone — and in fact
+ * nothing happened: keys are encrypted on disk, the seed phrase is
+ * intact, on-chain transactions do not depend on what the browser
+ * drew.
  *
- * ПОЭТОМУ ЭКРАН ОТКАЗА ГОВОРИТ ИМЕННО ЭТО. Сообщение «что-то пошло
- * не так» здесь бесполезно: оно не отвечает на единственный вопрос,
- * который возникает у человека, — целы ли средства.
+ * SO THE FAILURE SCREEN SAYS EXACTLY THAT. "Something went wrong"
+ * is useless here: it does not answer the only question that arises
+ * — are the funds intact.
  *
- * ПРИЧИНА ПОКАЗЫВАЕТСЯ ДОСЛОВНО. Без неё владелец не сможет ни понять,
- * повторяется ли сбой, ни рассказать о нём. Текст ошибки не содержит
- * секретов: ключи и фраза в сообщения не попадают, а если бы попадали —
- * это была бы отдельная, куда более серьёзная неисправность.
+ * THE CAUSE IS SHOWN VERBATIM. Without it the owner cannot tell
+ * whether the crash repeats, or report it. The error text holds no
+ * secrets: keys and the phrase never go into messages, and if they
+ * did that would be a separate, far more serious fault.
  *
- * КЛАССОВЫЙ КОМПОНЕНТ — ЕДИНСТВЕННЫЙ СПОСОБ. Перехват ошибок отрисовки
- * доступен только через `componentDidCatch`; хука с такой возможностью
- * в React нет.
+ * A CLASS COMPONENT IS THE ONLY WAY. Catching render errors is
+ * available only through `componentDidCatch`; React has no hook
+ * with that capability.
  */
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   override state: AppErrorBoundaryState = { reason: null }
@@ -39,8 +40,8 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    /* Единственное место в приложении, где вывод в консоль оправдан:
-       иначе сведения о сбое исчезают вместе с деревом компонентов. */
+    /* The only place in the app where a console write is justified:
+       otherwise failure details vanish with the component tree. */
     console.error('Rendering failure', error, info.componentStack)
   }
 

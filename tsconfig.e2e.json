@@ -3,13 +3,13 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
 
     /*
-      Сквозные проверки выполняются в Node, но управляют браузером:
-      `page.evaluate` исполняет код внутри страницы, и типы DOM ему нужны.
+      End-to-end checks run in Node but drive a browser:
+      `page.evaluate` executes inside the page and needs DOM types.
 
-      Отдельный проект, а не расширение `tsconfig.node.json`, — потому
-      что тот описывает сценарии сборки, которым DOM недоступен
-      в принципе. Добавив DOM туда, мы разрешили бы обращаться
-      к документу из плагинов Vite, где документа нет.
+      A separate project, not an extension of `tsconfig.node.json`,
+      because that one describes build scripts that have no DOM at
+      all. Adding DOM there would let Vite plugins reach for a
+      document that does not exist.
     */
     "target": "ES2023",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
@@ -32,9 +32,10 @@
     "erasableSyntaxOnly": true,
 
     /*
-      Типы Playwright опираются на глобальные объявления DOM из своей
-      поставки. Проверять их у себя незачем: чужие определения мы
-      не правим, а сбой в них останавливал бы проверку нашего кода.
+      Playwright types rely on global DOM declarations from their
+      own package. Checking them here is pointless: we do not edit
+      other people's definitions, and a failure in them would stop
+      the check of our code.
     */
     "skipLibCheck": true,
 

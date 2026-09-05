@@ -6,18 +6,18 @@ interface UserAvatarProps {
   readonly className?: string
 }
 
-/** Сколько ячеек по стороне. Нечётное число даёт центральную ось симметрии. */
+/** Cells per side. An odd count gives a central axis of symmetry. */
 const GRID = 5
 
-/** Половина ширины, отражаемая зеркально. */
 const HALF = Math.ceil(GRID / 2)
 
 /**
- * Отпечаток записи пользователя.
+ * Fingerprint of a user record.
  *
- * Картинка считается из `id` и почты: два разных человека не получают
- * один узор, а одна и та же запись выглядит одинаково в списке
- * и в профиле. Это ориентир в кабинете, не сверка адреса.
+ * The picture is computed from `id` and email: two different people
+ * do not get the same pattern, and the same record looks the same
+ * in the list and in the profile. A cabinet landmark, not an
+ * address check.
  */
 export function UserAvatar({ userId, email, className }: UserAvatarProps) {
   const seed = hashIdentity(`${userId}:${email ?? ''}`)

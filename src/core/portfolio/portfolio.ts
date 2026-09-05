@@ -3,20 +3,19 @@ import type { IToken } from '@/core/token'
 
 import type { IPortfolioPosition, IPortfolioSummary } from './types'
 
-/** Баланс токена на входе расчёта. */
 export interface ITokenAmount {
   readonly token: IToken
 
-  /** `null` означает «получить не удалось», а не ноль. */
+  /** `null` means "could not be obtained", not zero. */
   readonly balance: bigint | null
 }
 
 /**
- * Пустая сводка.
+ * Empty summary.
  *
- * Отдельная константа, а не сборка на месте: снимок состояния
- * сравнивается по ссылке, и новый объект на каждом вызове вызывал бы
- * лишнюю перерисовку.
+ * A separate constant, not assembled in place: a state snapshot is
+ * compared by reference, and a new object on every call would cause
+ * an extra re-render.
  */
 export const EMPTY_PORTFOLIO: IPortfolioSummary = {
   totalValue: 0,
@@ -30,18 +29,17 @@ export const EMPTY_PORTFOLIO: IPortfolioSummary = {
 }
 
 /**
- * Переводит баланс в целых единицах токена в число.
+ * Converts a balance in whole token units to a number.
  *
- * ТОЧНОСТЬ ЗДЕСЬ ТЕРЯЕТСЯ, И ЭТО ДОПУСТИМО РОВНО ПОТОМУ, ЧТО РЕЗУЛЬТАТ
- * ИДЁТ ТОЛЬКО НА ЭКРАН. Суммы, которые подписываются, считаются целыми
- * числами в минимальных единицах и через это преобразование
- * не проходят никогда: оценка портфеля не участвует в формировании
- * ни одной транзакции.
+ * PRECISION IS LOST HERE, AND THAT IS ACCEPTABLE ONLY BECAUSE THE
+ * RESULT GOES TO THE SCREEN. Amounts that are signed are counted as
+ * integers in smallest units and never pass through this conversion:
+ * the portfolio valuation takes part in forming no transaction.
  *
- * Деление выполняется в виде дроби из двух `bigint`, а не через
- * `Number(balance)`: у токена с восемнадцатью знаками целое значение
- * баланса выходит за пределы точного представления `number`, и прямое
- * преобразование исказило бы результат ещё до деления.
+ * Division is done as a fraction of two `bigint`s, not through
+ * `Number(balance)`: for a token with eighteen decimals the whole
+ * balance is outside the exact range of `number`, and a direct
+ * conversion would distort the result before the division.
  */
 export function toWholeUnits(balance: bigint, decimals: number): number {
   if (decimals === 0) {
@@ -56,12 +54,12 @@ export function toWholeUnits(balance: bigint, decimals: number): number {
 }
 
 /**
- * Собирает сводку портфеля из балансов и курсов.
+ * Builds a portfolio summary from balances and rates.
  *
- * ФУНКЦИЯ ЧИСТАЯ И НЕ ХОДИТ В СЕТЬ. Балансы и курсы получены раньше;
- * здесь только арифметика. Это позволяет проверить самую ответственную
- * часть — что именно попадает в сумму, а что из неё выпадает, — тестом
- * без единого сетевого вызова.
+ * THE FUNCTION IS PURE AND DOES NOT TOUCH THE NETWORK. Balances and
+ * rates were obtained earlier; this is only arithmetic. That lets
+ * the most responsible part — what enters the total and what drops
+ * out of it — be checked by a test with no network call.
  */
 export function buildPortfolio(
   amounts: readonly ITokenAmount[],
@@ -101,10 +99,10 @@ export function buildPortfolio(
     totalValue += value
 
     if (quote.change24hPercent === null) {
-      /* Изменение неизвестно — вчерашняя цена принимается равной
-         сегодняшней. Иначе позиция выпала бы из вчерашней суммы
-         целиком, и изменение портфеля вышло бы завышенным на её
-         полную стоимость. */
+      /* The change is unknown — yesterday's price is taken as
+         today's. Otherwise the position would drop out of
+         yesterday's total entirely, and the portfolio change would
+         be inflated by its full value. */
       previousValue += value
     } else {
       hasChangeData = true
@@ -127,8 +125,8 @@ export function buildPortfolio(
     totalValue,
     previousValue: hasChangeData ? previousValue : null,
     change24hValue: hasChangeData ? totalValue - previousValue : null,
-    /* Деление на ноль даёт бесконечность, а не ошибку: портфель,
-       вчера ничего не стоивший, не имеет процента изменения. */
+    /* Division by zero yields infinity, not an error: a portfolio
+       that was worth nothing yesterday has no percent change. */
     change24hPercent:
       hasChangeData && previousValue > 0
         ? ((totalValue - previousValue) / previousValue) * 100
@@ -141,11 +139,11 @@ export function buildPortfolio(
 }
 
 /**
- * Упорядочивает позиции по убыванию оценки.
+ * Orders positions by descending valuation.
  *
- * Позиции без оценки уходят в конец, а не исчезают: актив, курс
- * которого неизвестен, остаётся активом, и не показать его значило бы
- * скрыть от владельца часть его средств.
+ * Positions without a valuation go to the end, they do not vanish:
+ * an asset whose rate is unknown is still an asset, and not showing
+ * it would hide part of the owner's funds.
  */
 function sortByValue(positions: readonly IPortfolioPosition[]): readonly IPortfolioPosition[] {
   return [...positions].sort((left, right) => {

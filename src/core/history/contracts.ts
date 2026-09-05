@@ -3,57 +3,58 @@ import type { Address, ChainId } from '@/core/types'
 
 import type { IHistoryCursor, IHistoryPage } from './types'
 
-/** Параметры запроса истории. */
+/** History query parameters. */
 export interface IHistoryQuery {
   readonly owner: Address
   readonly chainId: ChainId
 
   /**
-   * Верхняя граница числа записей.
+   * Upper bound on the number of records.
    *
-   * Ограничение обязательно: адрес, участвовавший в раздаче токенов,
-   * имеет десятки тысяч переводов, и попытка получить их целиком
-   * исчерпает память вкладки.
+   * The cap is required: an address that took part in a token drop
+   * has tens of thousands of transfers, and trying to fetch them
+   * all would exhaust the tab's memory.
    */
   readonly limit: number
 
   /**
-   * Продолжение предыдущей выдачи.
+   * Continuation of a previous page.
    *
-   * Отсутствие означает первую страницу — от самых свежих записей.
+   * Absence means the first page — from the newest records.
    */
   readonly cursor?: IHistoryCursor | null | undefined
 }
 
 /**
- * Источник истории переводов.
+ * A transfer-history source.
  *
- * ДВЕ РЕАЛИЗАЦИИ РЕШАЮТ РАЗНЫЕ ЗАДАЧИ, А НЕ ДУБЛИРУЮТ ДРУГ ДРУГА.
+ * THE TWO IMPLEMENTATIONS SOLVE DIFFERENT PROBLEMS AND DO NOT
+ * DUPLICATE EACH OTHER.
  *
- * Разбор журналов узла работает везде и без ключа, но принципиально
- * не видит переводов нативной валюты: они не порождают событий, и в
- * журналах их нет. Кроме того, публичные узлы ограничивают диапазон
- * выборки, поэтому доступно лишь недавнее окно.
+ * A node-log scan works everywhere and needs no key, but
+ * fundamentally cannot see native-currency transfers: they emit
+ * no events and are not in the logs. Public nodes also cap the
+ * query range, so only a recent window is available.
  *
- * Индексатор отдаёт полную историю всех категорий, но получает адрес
- * пользователя и возвращает всю его финансовую жизнь — оператор узнаёт
- * размер портфеля, контрагентов и время каждой операции разом. Это
- * заметно больше того, что видит обычный RPC-узел, и решение о таком
- * обмене принимает владелец кошелька.
+ * An indexer returns the full history of every category, but
+ * receives the user's address and returns their entire financial
+ * life — the operator learns portfolio size, counterparties, and
+ * the time of every operation at once. That is noticeably more
+ * than an ordinary RPC node sees, and the wallet owner decides
+ * whether to make that trade.
  */
 export interface IHistoryProvider {
   readonly id: string
   readonly name: string
 
-  /** Обслуживает ли источник сеть. */
   supports(chainId: ChainId): boolean
 
   /**
-   * Запрашивает историю.
+   * Fetches history.
    *
-   * @param provider Соединение с узлом. Передаётся снаружи, чтобы
-   *        источник не заводил собственного транспорта и подчинялся
-   *        общему переключению на резервный узел.
+   * @param provider Connection to the node. Passed in so the
+   *        source does not start its own transport and follows
+   *        the shared failover to a backup node.
    */
   fetch(query: IHistoryQuery, provider: IProvider): Promise<IHistoryPage>
 }

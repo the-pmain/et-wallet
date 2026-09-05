@@ -1,20 +1,22 @@
 /**
- * Эталонные тестовые данные для HD-кошелька.
+ * Reference test data for the HD wallet.
  *
- * Стратегия проверки — послойная, а не «одним махом от фразы до адреса».
- * Слоёв три, и каждый проверяется своим общепризнанным набором данных:
+ * The check strategy is layered, not "phrase to address in one go".
+ * There are three layers, each checked against its own recognised
+ * data set:
  *
- * 1. Деривация BIP-32 — официальными векторами из текста BIP-32
- *    (расширенные ключи проверяются как строки base58).
- * 2. Контрольная сумма EIP-55 — примерами из текста самого EIP.
- * 3. Композиция «мнемоника -> адрес» — общеизвестными адресами тестовой
- *    фразы `abandon ... about`.
+ * 1. BIP-32 derivation — official vectors from the BIP-32 text
+ *    (extended keys are compared as base58 strings).
+ * 2. EIP-55 checksum — examples from the EIP text itself.
+ * 3. The composition "mnemonic -> address" — well-known addresses
+ *    of the test phrase `abandon ... about`.
  *
- * Смысл разделения: при расхождении сразу видно, какой слой сломан.
- * Единственный сквозной тест показал бы только факт поломки.
+ * The point of the split: a mismatch shows immediately which layer
+ * is broken. A single end-to-end test would show only that
+ * something broke.
  */
 
-/** Официальный вектор 1 из текста BIP-32. */
+/** Official vector 1 from the BIP-32 text. */
 export const BIP32_VECTOR_1 = {
   seedHex: '000102030405060708090a0b0c0d0e0f',
   masterXprv:
@@ -24,9 +26,10 @@ export const BIP32_VECTOR_1 = {
 } as const
 
 /**
- * Примеры контрольной суммы из текста EIP-55.
+ * Checksum examples from the EIP-55 text.
  *
- * Именно эти четыре адреса приведены в самом стандарте как эталонные.
+ * These four addresses are the ones the standard itself gives as
+ * references.
  */
 export const EIP55_ADDRESSES: readonly string[] = [
   '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
@@ -36,21 +39,22 @@ export const EIP55_ADDRESSES: readonly string[] = [
 ]
 
 /**
- * Тестовая мнемоническая фраза.
+ * Test mnemonic phrase.
  *
- * Соответствует нулевой энтропии и применяется как эталон во всей отрасли.
- * ИСПОЛЬЗОВАТЬ ЕЁ ДЛЯ РЕАЛЬНЫХ СРЕДСТВ НЕЛЬЗЯ: приватные ключи этой фразы
- * известны каждому, и любые поступления на её адреса выводятся ботами
- * в течение секунд.
+ * Corresponds to zero entropy and is used as a reference across
+ * the industry. MUST NOT BE USED FOR REAL FUNDS: the private keys
+ * of this phrase are known to everyone, and any incoming funds to
+ * its addresses are swept by bots within seconds.
  */
 export const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
 /**
- * Адреса тестовой фразы по пути `m/44'/60'/0'/0/n` при пустой парольной фразе.
+ * Addresses of the test phrase on path `m/44'/60'/0'/0/n` with an
+ * empty passphrase.
  *
- * Совпадают с тем, что показывают MetaMask, Rabby и Trust Wallet
- * при импорте этой мнемоники.
+ * They match what MetaMask, Rabby, and Trust Wallet show when this
+ * mnemonic is imported.
  */
 export const TEST_MNEMONIC_ADDRESSES: readonly string[] = [
   '0x9858EfFD232B4033E47d90003D41EC34EcaEda94',

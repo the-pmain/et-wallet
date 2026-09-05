@@ -11,7 +11,7 @@ import type { INetworkConfig } from './types'
 
 const CUSTOM_CHAIN = toChainId(999n)
 
-/** Адрес узла с ключом учётной записи в строке — обычный вид у оператора. */
+/** A node URL with an account key in the path — the usual form from an operator. */
 const SECRET_RPC = 'https://rpc.example.com/v2/9f8c1b7e5a3d4f2e'
 
 function config(overrides: Partial<INetworkConfig> = {}): INetworkConfig {
@@ -29,10 +29,10 @@ function config(overrides: Partial<INetworkConfig> = {}): INetworkConfig {
 }
 
 /**
- * Сырое содержимое хранилища строкой.
+ * Raw storage contents as a string.
  *
- * Проверка секретов возможна только по тому, что реально лежит
- * на диске: значение, прошедшее через репозиторий, уже расшифровано.
+ * Secrets can only be checked against what actually sits on disk:
+ * a value that went through the repository is already decrypted.
  */
 async function rawDump(storage: MemoryStorageService): Promise<string> {
   const parts: string[] = []
@@ -56,8 +56,8 @@ beforeEach(async () => {
   repository = new NetworkRepository(secure, plain)
 })
 
-describe('Хранение сетей', () => {
-  it('сохранённая сеть читается обратно', async () => {
+describe('Storing networks', () => {
+  it('a saved network is read back', async () => {
     await repository.save(config())
 
     const restored = await repository.findByChainId(CUSTOM_CHAIN)
@@ -65,10 +65,10 @@ describe('Хранение сетей', () => {
     expect(restored?.rpcUrls).toEqual([SECRET_RPC])
   })
 
-  it('адрес узла не лежит в хранилище открытым текстом', async () => {
-    /* У пользовательской сети в `rpcUrls` обычно стоит адрес с ключом
-       учётной записи прямо в строке. Открытым текстом на диске это
-       равнозначно записанному паролю от стороннего сервиса. */
+  it('the node URL does not sit in storage in the clear', async () => {
+    /* A custom network's `rpcUrls` usually hold a URL with an account
+       key right in the path. In the clear on disk that is the same
+       as a written-down password to a third-party service. */
     await repository.save(config())
 
     const dump = await rawDump(plain)
@@ -77,7 +77,7 @@ describe('Хранение сетей', () => {
     expect(dump).not.toContain('rpc.example.com')
   })
 
-  it('удалённая сеть больше не находится', async () => {
+  it('a deleted network is no longer found', async () => {
     await repository.save(config())
     await repository.delete(CUSTOM_CHAIN)
 
@@ -85,8 +85,8 @@ describe('Хранение сетей', () => {
   })
 })
 
-describe('Перенос из открытого хранилища', () => {
-  /** Кладёт сеть так, как её писали прежние версии: открытым текстом. */
+describe('Migration from clear storage', () => {
+  /** Writes a network the way older versions did: in the clear. */
   async function writeLegacy(chainId: ChainId = CUSTOM_CHAIN): Promise<void> {
     await plain.set(STORAGE_NAMESPACE.Networks, toStorageKey(chainId.toString()), {
       chainId: chainId.toString(),
@@ -100,9 +100,9 @@ describe('Перенос из открытого хранилища', () => {
     })
   }
 
-  it('сеть прежнего формата не теряется', async () => {
-    /* Кошельки, созданные до шифрования сетей, обязаны продолжать
-       работать: пользовательская сеть — это его настройка, а не кэш. */
+  it('a network in the old format is not lost', async () => {
+    /* Wallets created before network encryption must keep working:
+       a custom network is the user's setting, not a cache. */
     await writeLegacy()
 
     const restored = await repository.findAll()
@@ -111,8 +111,8 @@ describe('Перенос из открытого хранилища', () => {
     expect(restored[0]?.rpcUrls).toEqual([SECRET_RPC])
   })
 
-  it('после переноса открытая запись удаляется', async () => {
-    /* Оставить её значило бы, что шифрование ничего не даёт. */
+  it('the clear record is removed after migration', async () => {
+    /* Leaving it would mean encryption achieves nothing. */
     await writeLegacy()
     await repository.findAll()
 
@@ -121,22 +121,22 @@ describe('Перенос из открытого хранилища', () => {
     expect(dump).not.toContain('9f8c1b7e5a3d4f2e')
   })
 
-  it('перенос выполняется и при поиске по идентификатору', async () => {
+  it('migration also runs on a lookup by identifier', async () => {
     await writeLegacy()
 
     expect(await repository.findByChainId(CUSTOM_CHAIN)).not.toBeNull()
   })
 
-  it('повторный перенос ничего не ломает', async () => {
+  it('a second migration breaks nothing', async () => {
     await writeLegacy()
     await repository.findAll()
 
     expect(await repository.findAll()).toHaveLength(1)
   })
 
-  it('без открытого хранилища перенос не выполняется', async () => {
-    /* Репозиторий, собранный без прежнего хранилища, работает как
-       обычно: переносить нечего. */
+  it('without clear storage, migration does not run', async () => {
+    /* A repository built without the old store works as usual:
+       there is nothing to migrate. */
     const isolated = new NetworkRepository(secure)
 
     await isolated.save(config({ chainId: BUILT_IN_CHAIN_ID.Ethereum }))

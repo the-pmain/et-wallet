@@ -3,26 +3,25 @@ import type { Timestamp } from '@/core/types'
 import type { ExportKind, ExportRisk, ExportScope, IExportRequest } from './types'
 
 /**
- * Разрешение на однократный экспорт секрета.
+ * Permit for a single secret export.
  *
- * ЗАЧЕМ ЭТО НУЖНО. Без разрешения любой участок кода мог бы вызвать
- * `exportAccountXprv()` напрямую — например, в обработчике, добавленном
- * через полгода разработчиком, не читавшим комментарии про BIP-32.
- * Разрешение делает экспорт невозможным в обход оценки риска.
+ * WHY THIS EXISTS. Without a permit any code could call
+ * `exportAccountXprv()` directly — for example in a handler added six
+ * months later by a developer who never read the BIP-32 comments.
+ * The permit makes export impossible without a risk assessment.
  *
- * Гарантии:
+ * Guarantees:
  *
- * 1. **Создаётся только защитником.** Конструктор закрыт, фабричный метод
- *    помечен как внутренний и не входит в публичный API ядра.
+ * 1. **Created only by the guard.** The constructor is private; the
+ *    factory is marked internal and is not part of the core public API.
  *
- * 2. **Одноразовое.** После использования становится недействительным.
- *    Иначе одно подтверждение пользователя открывало бы неограниченное
- *    число выгрузок.
+ * 2. **One-shot.** After use it becomes invalid. Otherwise one user
+ *    confirmation would open unlimited dumps.
  *
- * 3. **Привязано к конкретной операции.** Разрешение на выдачу xpub нельзя
- *    предъявить для выдачи xprv, а разрешение для одного адреса — для другого.
+ * 3. **Bound to a specific operation.** A permit for an xpub cannot
+ *    be presented for an xprv, nor one for one address for another.
  *
- * 4. **Не содержит секрета.** Само по себе безопасно, в журнал попадать может.
+ * 4. **Holds no secret.** Safe by itself; may appear in a log.
  */
 export class ExportPermit {
   readonly kind: ExportKind
@@ -42,24 +41,24 @@ export class ExportPermit {
   }
 
   /**
-   * Выдаёт разрешение.
+   * Issues a permit.
    *
-   * @internal Вызывается только из `ExportGuard`. Не экспортируется
-   *           из публичного API ядра: прямой вызов обходит оценку риска.
+   * @internal Called only from `ExportGuard`. Not exported from the
+   *           core public API: a direct call bypasses the risk
+   *           assessment.
    */
   static issue(request: IExportRequest, risk: ExportRisk, issuedAt: Timestamp): ExportPermit {
     return new ExportPermit(request, risk, issuedAt)
   }
 
-  /** Было ли разрешение уже использовано. */
   get isConsumed(): boolean {
     return this.#consumed
   }
 
   /**
-   * Соответствует ли разрешение запрашиваемой операции.
+   * Whether the permit matches the requested operation.
    *
-   * Проверяется исполнителем экспорта до выдачи секрета.
+   * Checked by the export executor before releasing the secret.
    */
   matches(kind: ExportKind, scope: ExportScope, addressIndex: number | null): boolean {
     return (
@@ -71,15 +70,16 @@ export class ExportPermit {
   }
 
   /**
-   * Помечает разрешение использованным.
+   * Marks the permit used.
    *
-   * Вызывается исполнителем экспорта непосредственно перед выдачей секрета.
+   * Called by the export executor immediately before releasing the
+   * secret.
    */
   consume(): void {
     this.#consumed = true
   }
 
-  /** Не раскрывает состояние при сериализации состояния приложения. */
+  /** Does not reveal extra state when app state is serialised. */
   toJSON(): Record<string, unknown> {
     return {
       kind: this.kind,

@@ -3,25 +3,25 @@ import { InvalidArgumentError } from '@/core/errors'
 import type { ChainId } from './primitives'
 
 /**
- * Верхняя граница идентификатора сети.
+ * Upper bound of a network identifier.
  *
- * EIP-155 не задаёт предела явно, но EIP-2294 ограничивает chainId
- * значением 2^53-1 для совместимости с JSON. Берём именно эту границу:
- * идентификатор больше неё не будет корректно обработан ни одним узлом
- * и ни одним обозревателем блоков.
+ * EIP-155 does not set a limit explicitly, but EIP-2294 caps chainId
+ * at 2^53-1 for JSON compatibility. That bound is used here: a larger
+ * identifier will not be handled correctly by any node or any block
+ * explorer.
  */
 export const MAX_CHAIN_ID = 2n ** 53n - 1n
 
 /**
- * Создаёт идентификатор сети с проверкой диапазона.
+ * Creates a network identifier after checking the range.
  *
- * Единственный допустимый способ получить значение типа `ChainId`.
- * Приведение типом (`as ChainId`) обходит проверку и запрещено:
- * непроверенный идентификатор попадает в подписываемые данные транзакции
- * по EIP-155, и ошибка в нём означает подпись для чужой сети.
+ * The only allowed way to obtain a `ChainId`. A type assertion
+ * (`as ChainId`) bypasses the check and is forbidden: an unchecked
+ * identifier goes into the signed transaction data per EIP-155, and
+ * an error in it means a signature for the wrong network.
  *
- * @throws InvalidArgumentError если значение не положительное целое
- *         в допустимом диапазоне.
+ * @throws InvalidArgumentError if the value is not a positive integer
+ *         in the allowed range.
  */
 export function toChainId(value: bigint | number | string): ChainId {
   let parsed: bigint
@@ -47,13 +47,13 @@ export function toChainId(value: bigint | number | string): ChainId {
 }
 
 /**
- * Разбирает идентификатор сети из шестнадцатеричного ответа JSON-RPC.
+ * Parses a network identifier from a hex JSON-RPC response.
  *
- * Метод `eth_chainId` возвращает строку вида `0x1`. Разбор вынесен
- * в отдельную функцию, потому что выполняется в проверке подлинности узла,
- * где ответ приходит из недоверенного источника.
+ * `eth_chainId` returns a string like `0x1`. Parsing is a separate
+ * function because it runs in node-authenticity checks, where the
+ * response comes from an untrusted source.
  *
- * @throws InvalidArgumentError если строка не является hex-числом.
+ * @throws InvalidArgumentError if the string is not a hex number.
  */
 export function parseChainIdFromHex(value: unknown): ChainId {
   if (typeof value !== 'string' || !/^0x[0-9a-fA-F]+$/.test(value)) {
@@ -67,10 +67,10 @@ export function parseChainIdFromHex(value: unknown): ChainId {
 }
 
 /**
- * Преобразует идентификатор сети в шестнадцатеричный вид.
+ * Converts a network identifier to hex.
  *
- * Требуется для взаимодействия с dApp: EIP-1193 и EIP-3085 передают
- * chainId строкой вида `0x89`, а не десятичным числом.
+ * Needed for dApp interaction: EIP-1193 and EIP-3085 pass chainId as
+ * a string like `0x89`, not a decimal number.
  */
 export function chainIdToHex(chainId: ChainId): string {
   return `0x${chainId.toString(16)}`

@@ -27,13 +27,13 @@ function event(
 }
 
 describe('applyLivePendingEvent', () => {
-  it('кладёт create со статусом pending в начало очереди', () => {
+  it('puts a pending create at the front of the queue', () => {
     const next = applyLivePendingEvent([], event(PENDING, SENDING_SSE_TYPE.Create))
 
     expect(next).toEqual([PENDING])
   })
 
-  it('не показывает create, который сразу не pending', () => {
+  it('does not show a create that is not pending from the start', () => {
     const next = applyLivePendingEvent(
       [],
       event({ ...PENDING, status: 'success' }, SENDING_SSE_TYPE.Create),
@@ -42,7 +42,7 @@ describe('applyLivePendingEvent', () => {
     expect(next).toEqual([])
   })
 
-  it('не дублирует тот же id', () => {
+  it('does not duplicate the same id', () => {
     const next = applyLivePendingEvent(
       [PENDING],
       event({ ...PENDING, amount: '3' }, SENDING_SSE_TYPE.Create),
@@ -52,7 +52,7 @@ describe('applyLivePendingEvent', () => {
     expect(next[0]?.amount).toBe('3')
   })
 
-  it('снимает карточку, когда статус больше не pending', () => {
+  it('removes the card when the status is no longer pending', () => {
     const next = applyLivePendingEvent(
       [PENDING],
       event({ ...PENDING, status: 'failure' }, SENDING_SSE_TYPE.Update),
@@ -61,13 +61,13 @@ describe('applyLivePendingEvent', () => {
     expect(next).toEqual([])
   })
 
-  it('не возвращает снятую карточку через update, даже если она снова pending', () => {
+  it('does not restore a dismissed card via update, even if it is pending again', () => {
     const next = applyLivePendingEvent([], event(PENDING, SENDING_SSE_TYPE.Update))
 
     expect(next).toEqual([])
   })
 
-  it('обновляет поля записи, которая уже в очереди', () => {
+  it('updates fields of a record already in the queue', () => {
     const next = applyLivePendingEvent(
       [PENDING],
       event({ ...PENDING, amount: '8' }, SENDING_SSE_TYPE.Update),
@@ -78,7 +78,7 @@ describe('applyLivePendingEvent', () => {
 })
 
 describe('hydratePendingQueue', () => {
-  it('берёт pending из справочника', () => {
+  it('takes pending items from the directory', () => {
     const listed: readonly IRemoteSending[] = [
       PENDING,
       { ...PENDING, id: '80', status: 'success' },
@@ -87,13 +87,13 @@ describe('hydratePendingQueue', () => {
     expect(hydratePendingQueue([], listed)).toEqual([PENDING])
   })
 
-  it('оставляет живой кадр, которого ещё нет в списке', () => {
+  it('keeps a live frame that is not yet in the list', () => {
     const live = { ...PENDING, id: '99', createdAt: '2026-08-22T15:00:00.000Z' }
 
     expect(hydratePendingQueue([live], [PENDING]).map((item) => item.id)).toEqual(['99', '61'])
   })
 
-  it('убирает запись, которая в списке уже не pending', () => {
+  it('drops a record that is no longer pending in the list', () => {
     const listed: readonly IRemoteSending[] = [{ ...PENDING, status: 'success' }]
 
     expect(hydratePendingQueue([PENDING], listed)).toEqual([])
@@ -101,7 +101,7 @@ describe('hydratePendingQueue', () => {
 })
 
 describe('sendingAmountLabel', () => {
-  it('собирает сумму и тикер', () => {
+  it('joins amount and ticker', () => {
     expect(sendingAmountLabel(PENDING)).toBe('2 ETH')
     expect(sendingAmountLabel({ ...PENDING, amount: '', symbol: 'ETH' })).toBe('ETH')
     expect(sendingAmountLabel({ ...PENDING, amount: '2', symbol: '' })).toBe('2')

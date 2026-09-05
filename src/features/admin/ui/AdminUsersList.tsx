@@ -10,9 +10,6 @@ import { useAdminSession } from '../model/admin-context'
 import { userMatchesAdminQuery } from '../model/admin-query'
 import { UserAvatar } from './UserAvatar'
 
-/**
- * Список всех записей `users`. Переход ведёт в профиль.
- */
 export function AdminUsersList() {
   const { client, lock } = useAdminSession()
   const [users, setUsers] = useState<readonly IRemoteUser[] | null>(null)

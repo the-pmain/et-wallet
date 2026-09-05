@@ -1,36 +1,33 @@
 import { createContext, use } from 'react'
 
-/** Доступные режимы оформления. `system` следует настройке операционной системы. */
+/** Available themes. `system` follows the operating-system setting. */
 export type Theme = 'light' | 'dark' | 'system'
 
 export interface ThemeContextValue {
-  /** Выбранный пользователем режим. */
   readonly theme: Theme
-  /** Фактически применённое оформление после разрешения режима `system`. */
+  /** Theme actually applied after resolving `system`. */
   readonly resolvedTheme: 'light' | 'dark'
-  /** Меняет режим оформления. */
   setTheme: (theme: Theme) => void
 }
 
 /**
- * Контекст темы.
+ * Theme context.
  *
- * ПОЧЕМУ В СЛОЕ `shared`, А НЕ РЯДОМ С ПРОВАЙДЕРОМ. Переключатель
- * оформления живёт на экране настроек, то есть в слое `pages`, которому
- * запрещено обращаться к слою `app`. Провайдер остаётся в `app` — там
- * ему и место, он часть композиции приложения, — а контракт опущен
- * в самый нижний слой, доступный всем.
+ * WHY IN `shared`, NOT NEXT TO THE PROVIDER. The theme switch lives
+ * on the settings screen, in the `pages` layer, which must not import
+ * from `app`. The provider stays in `app` — that is composition —
+ * and the contract is dropped to the lowest layer, available to all.
  *
- * Значение по умолчанию отсутствует намеренно: обращение к теме вне
- * провайдера — ошибка композиции, и она должна проявляться сразу,
- * а не деградировать до светлой темы.
+ * There is no default on purpose: reading the theme outside the
+ * provider is a composition error and must fail immediately, not
+ * degrade to the light theme.
  */
 export const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 /**
- * Доступ к текущей теме.
+ * Access to the current theme.
  *
- * @throws Если вызван вне ThemeProvider.
+ * @throws If called outside ThemeProvider.
  */
 export function useTheme(): ThemeContextValue {
   const context = use(ThemeContext)

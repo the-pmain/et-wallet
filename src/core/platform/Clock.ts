@@ -1,30 +1,28 @@
 import type { Timestamp, Unsubscribe } from '@/core/types'
 
 /**
- * Источник времени и отложенного выполнения.
+ * Source of time and deferred execution.
  *
- * Внедряется, а не используется напрямую через `Date.now` и `setTimeout`.
- * Причина — автоблокировка кошелька: её поведение обязано быть покрыто
- * тестами, а тест, который реально ждёт пятнадцать минут, бесполезен.
- * Подменяемые часы позволяют проверить срабатывание таймаута мгновенно
- * и детерминированно.
+ * Injected, not used directly through `Date.now` and `setTimeout`.
+ * The reason is wallet auto-lock: its behaviour must be covered by
+ * tests, and a test that really waits fifteen minutes is useless.
+ * A swappable clock lets the timeout fire instantly and
+ * deterministically.
  *
- * Второе назначение — независимость от системного времени при сравнении
- * меток: подмена часов пользователем не должна ломать логику ядра.
+ * A second purpose is independence from system time when comparing
+ * timestamps: the user changing the clock must not break core logic.
  */
 export interface IClock {
-  /** Текущий момент времени. */
   now(): Timestamp
 
   /**
-   * Планирует одноразовый вызов.
+   * Schedules a one-shot call.
    *
-   * @returns Функция отмены. Возврат функции вместо числового идентификатора
-   *          избавляет вызывающий код от знания о платформенном типе таймера
-   *          (в Node и в браузере он разный).
+   * @returns Cancel function. Returning a function instead of a
+   *          numeric id frees the caller from knowing the platform
+   *          timer type (it differs in Node and in the browser).
    */
   setTimeout(handler: () => void, delayMs: number): Unsubscribe
 
-  /** Планирует периодический вызов. */
   setInterval(handler: () => void, intervalMs: number): Unsubscribe
 }

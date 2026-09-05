@@ -1,45 +1,42 @@
 import { HardwareDeviceError, type IApduTransport } from '@/core'
 
 /**
- * Размер пакета обмена.
+ * Exchange packet size.
  *
- * Задан устройством: отчёты HID у Ledger всегда шестидесятичетырёхбайтовые,
- * недостающее дополняется нулями.
+ * Set by the device: Ledger HID reports are always sixty-four
+ * bytes; the rest is padded with zeros.
  */
 const PACKET_SIZE = 64
 
-/** Признак пакета обмена командами. */
 const TAG_APDU = 0x05
 
 /**
- * Номер канала.
+ * Channel number.
  *
- * Устройство не различает каналы, но требует, чтобы номер в ответе
- * совпадал с номером в запросе. Значение выбрано произвольно
- * и постоянно.
+ * The device does not distinguish channels, but requires the
+ * number in the reply to match the request. The value is chosen
+ * arbitrarily and held constant.
  */
 const CHANNEL = 0x0101
 
-/** Заголовок первого пакета: канал, признак, номер, длина команды. */
 const FIRST_HEADER_SIZE = 7
 
-/** Заголовок продолжающего пакета: канал, признак, номер. */
 const NEXT_HEADER_SIZE = 5
 
-/** Ожидание ответа устройства. */
 const RESPONSE_TIMEOUT_MS = 90_000
 
-/** Идентификатор производителя Ledger. Нужен фильтру выбора устройства. */
+/** Ledger vendor id. Needed by the device-picker filter. */
 export const LEDGER_VENDOR_ID = 0x2c97
 
 /*
-  ОПИСАНИЕ WEBHID ЗАДАНО ЗДЕСЬ, А НЕ ВЗЯТО ПАКЕТОМ ТИПОВ.
+  THE WEBHID DESCRIPTION IS WRITTEN HERE, NOT TAKEN FROM A TYPES
+  PACKAGE.
 
-  Интерфейс поддержан не всеми браузерами и в стандартную библиотеку
-  описаний TypeScript не входит. Отдельная зависимость ради четырёх
-  методов в кошельке не окупается: каждая добавленная зависимость —
-  ещё один путь к seed-фразе. Описано ровно то, чем пользуемся;
-  всё прочее в этих типах отсутствует намеренно.
+  The interface is not supported by every browser and is not in
+  the standard TypeScript library. A separate dependency for four
+  methods is not worth it in a wallet: each added dependency is
+  another path to the seed phrase. Only what we use is described;
+  everything else is left out of these types on purpose.
 */
 
 interface IHidInputReportEvent extends Event {
@@ -59,7 +56,6 @@ interface IHid {
   }): Promise<readonly IHidDevice[]>
 }
 
-/** Доступ к устройствам, если браузер его предоставляет. */
 function getHid(): IHid | null {
   const hid = (navigator as Navigator & { hid?: IHid }).hid
 
@@ -67,17 +63,19 @@ function getHid(): IHid | null {
 }
 
 /**
- * Соединение с устройством по WebHID.
+ * Connection to a device over WebHID.
  *
- * ЗДЕСЬ ТОЛЬКО ПЕРЕВОЗКА. Команды составляет и разбирает ядро; этот
- * класс делит их на пакеты, отправляет и собирает ответ обратно.
- * Разделение не декоративное: протокол так проверяется тестами без
- * устройства, а браузерный интерфейс не проникает в ядро.
+ * TRANSPORT ONLY. The core builds and parses commands; this class
+ * splits them into packets, sends them, and assembles the reply.
+ * The split is not decorative: the protocol can then be tested
+ * without a device, and the browser interface does not leak into
+ * the core.
  *
- * ОЖИДАНИЕ ДОЛГОЕ НАМЕРЕННО. Между отправкой команды и ответом человек
- * читает данные на экране устройства и нажимает кнопки. Полторы минуты —
- * не запас на медленную связь, а время на осмысленное решение;
- * короткое ожидание превращало бы внимательность в ошибку связи.
+ * THE WAIT IS LONG ON PURPOSE. Between sending a command and the
+ * reply, the person reads data on the device screen and presses
+ * buttons. A minute and a half is not slack for a slow link — it
+ * is time for a considered decision; a short wait would turn
+ * carefulness into a connection error.
  */
 export class WebHidTransport implements IApduTransport {
   readonly #device: IHidDevice
@@ -87,12 +85,12 @@ export class WebHidTransport implements IApduTransport {
   }
 
   /**
-   * Просит пользователя выбрать устройство и открывает его.
+   * Ask the user to pick a device and open it.
    *
-   * ВЫБОР ДЕЛАЕТ БРАУЗЕР, А НЕ МЫ. Страница не может ни перечислить
-   * устройства, ни открыть их без явного действия человека в окне
-   * браузера — и это правильно: доступ к устройству подписи выдаётся
-   * поимённо и осознанно.
+   * THE BROWSER MAKES THE CHOICE, NOT US. The page cannot list
+   * devices or open them without an explicit human action in a
+   * browser prompt — and that is correct: access to a signing
+   * device is granted by name and on purpose.
    */
   static async connect(): Promise<WebHidTransport> {
     const hid = getHid()
@@ -116,7 +114,7 @@ export class WebHidTransport implements IApduTransport {
     return new WebHidTransport(device)
   }
 
-  /** Закрывает соединение. Устройство остаётся доступным для нового. */
+  /** Close the connection. The device stays available for a new one. */
   async close(): Promise<void> {
     if (this.#device.opened) {
       await this.#device.close()
@@ -127,7 +125,7 @@ export class WebHidTransport implements IApduTransport {
     const response = this.#awaitResponse()
 
     for (const packet of splitIntoPackets(command)) {
-      /* Номер отчёта нулевой: у устройства один интерфейс. */
+      /* Report id is zero: the device has one interface. */
       await this.#device.sendReport(0, packet)
     }
 
@@ -135,10 +133,11 @@ export class WebHidTransport implements IApduTransport {
   }
 
   /**
-   * Собирает ответ из пакетов.
+   * Assemble the reply from packets.
    *
-   * Подписка ставится ДО отправки команды: устройство отвечает быстро,
-   * и подписка после отправки успевала бы пропустить первый пакет.
+   * The listener is attached BEFORE the command is sent: the
+   * device answers quickly, and a listener attached after send
+   * would miss the first packet.
    */
   #awaitResponse(): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
@@ -183,11 +182,11 @@ export class WebHidTransport implements IApduTransport {
 }
 
 /**
- * Делит команду на пакеты обмена.
+ * Split a command into exchange packets.
  *
- * Первый пакет несёт объявленную длину команды, остальные — только
- * порядковый номер. Номер проверяется устройством: пакеты, пришедшие
- * не по порядку, оно отвергает.
+ * The first packet carries the declared command length; the rest
+ * carry only a sequence number. The device checks the number:
+ * packets that arrive out of order are rejected.
  */
 export function splitIntoPackets(command: Uint8Array): readonly Uint8Array[] {
   const packets: Uint8Array[] = []
@@ -222,23 +221,24 @@ export function splitIntoPackets(command: Uint8Array): readonly Uint8Array[] {
 }
 
 /**
- * Складывает ответ из пакетов.
+ * Assemble a reply from packets.
  *
- * ДЛИНА БЕРЁТСЯ ИЗ ПЕРВОГО ПАКЕТА, а не по числу пришедших: последний
- * пакет дополнен нулями, и отличить дополнение от данных иначе нечем.
+ * LENGTH IS TAKEN FROM THE FIRST PACKET, not from how many arrived:
+ * the last packet is padded with zeros, and there is no other way
+ * to tell padding from data.
  */
 export class ResponseAssembler {
   #expected: number | null = null
   #body: number[] = []
   #index = 0
 
-  /** Возвращает собранный ответ либо `null`, если он ещё не полон. */
   push(packet: Uint8Array): Uint8Array | null {
     const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength)
 
     if (view.getUint16(0, false) !== CHANNEL || packet[2] !== TAG_APDU) {
-      /* Чужой пакет: устройство могло прислать сообщение другого рода.
-         Пропускается молча — прерывать обмен из-за него неправильно. */
+      /* Foreign packet: the device may have sent a message of
+         another kind. Skipped silently — aborting the exchange
+         over it would be wrong. */
       return null
     }
 

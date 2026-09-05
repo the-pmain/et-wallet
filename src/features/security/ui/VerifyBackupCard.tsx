@@ -17,34 +17,32 @@ import {
 
 interface VerifyBackupCardProps {
   /**
-   * Сверяет введённое с хранимым.
+   * Compare the entered phrase with the stored one.
    *
-   * Возвращает один бит. Указание на отличающееся слово помогло бы
-   * не только владельцу.
+   * Returns one bit. Pointing at the differing word would help
+   * more than the owner.
    */
   readonly onVerify: (phrase: string, password: string) => Promise<boolean>
 }
 
-/** Что показывать после проверки. */
 type Verdict = 'match' | 'mismatch' | 'wrong-password' | 'failed'
 
 /**
- * Проверка записанной копии seed-фразы.
+ * Check a written copy of the seed phrase.
  *
- * ЗАЧЕМ ЭКРАН СУЩЕСТВУЕТ. Единственным способом убедиться, что фраза
- * переписана верно, был повторный её показ и сверка глазами — то есть
- * лишнее раскрытие ровно того, что фраза защищает. Ошибка при
- * переписывании обнаруживается при восстановлении, когда исправить
- * уже нечего.
+ * WHY THE SCREEN EXISTS. The only way to confirm the phrase was
+ * copied correctly used to be showing it again and comparing by
+ * eye — another reveal of exactly what the phrase protects. A
+ * copy error is found at recovery, when it is too late to fix.
  *
- * ФРАЗА ЗДЕСЬ НЕ ПОКАЗЫВАЕТСЯ НИКОГДА, ни при совпадении, ни при
- * расхождении. Показ «правильного варианта» после неудачи свёл бы
- * пользу к нулю.
+ * THE PHRASE IS NEVER SHOWN HERE, on a match or a mismatch.
+ * Showing the "correct version" after a failure would erase the
+ * point of the check.
  *
- * ПОЛЕ ВВОДА ФРАЗЫ НЕ СКРЫВАЕТ ТЕКСТ. Переписывают с бумаги, сверяя
- * слово за словом, и точки вместо букв превратили бы проверку копии
- * в проверку слепого набора. Ввод не сохраняется и очищается сразу
- * после ответа.
+ * THE PHRASE FIELD DOES NOT MASK TEXT. People copy from paper
+ * word by word, and dots instead of letters would turn a copy
+ * check into a blind-typing check. The input is not saved and
+ * is cleared immediately after the answer.
  */
 export function VerifyBackupCard({ onVerify }: VerifyBackupCardProps) {
   const phraseId = useId()
@@ -65,9 +63,9 @@ export function VerifyBackupCard({ onVerify }: VerifyBackupCardProps) {
         setBusy(false)
         setVerdict(matches ? 'match' : 'mismatch')
 
-        /* Ввод стирается независимо от исхода: оставленная в поле фраза
-           видна каждому, кто подойдёт к устройству, и остаётся в памяти
-           вкладки дольше, чем нужно. */
+        /* Input is cleared regardless of outcome: a phrase left in
+           the field is visible to anyone who approaches the device
+           and stays in tab memory longer than needed. */
         setPhrase('')
         setPassword('')
       },
@@ -127,8 +125,9 @@ export function VerifyBackupCard({ onVerify }: VerifyBackupCardProps) {
                 setVerdict(null)
               }}
             />
-            {/* Требование пароля объяснено: без объяснения оно выглядит
-                придиркой на экране, где кошелёк уже разблокирован. */}
+            {/* The password requirement is explained: without that it
+                looks like nitpicking on a screen where the wallet is
+                already unlocked. */}
             <span className="text-xs text-muted-foreground">
               Asked so that this screen cannot be used to guess a phrase somebody found written
               down.
@@ -144,7 +143,6 @@ export function VerifyBackupCard({ onVerify }: VerifyBackupCardProps) {
   )
 }
 
-/** Итог проверки. */
 function Verdict({ verdict }: { readonly verdict: Verdict }) {
   if (verdict === 'match') {
     return (

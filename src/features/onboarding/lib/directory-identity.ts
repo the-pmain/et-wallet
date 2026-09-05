@@ -1,8 +1,9 @@
 /**
- * Подпись кабинета в шапке: имя из почты, без служебного номера записи.
+ * Cabinet header label: a name from the email, never the record id.
  *
- * НОМЕР ЗАПИСИ В ШАПКУ НЕ ПОПАДАЕТ. Это ключ хранилища, а не то, чем
- * человек представляется. На экране — имя, почта и месяц входа в сервис.
+ * THE RECORD ID NEVER APPEARS IN THE HEADER. It is a storage key, not
+ * how the person presents themselves. The screen shows name, email,
+ * and the month they joined.
  */
 
 const LOCAL_PART_SEPARATOR = /[._-]+/u

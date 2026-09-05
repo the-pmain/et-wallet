@@ -48,10 +48,10 @@ function toHex(bytes: Uint8Array): string {
 }
 
 /**
- * Выдаёт разрешение на экспорт с подтверждением максимального уровня риска.
+ * Issues an export permit with confirmation at the highest risk level.
  *
- * Тесты `HDWalletService` проверяют соответствие разрешения операции,
- * а не оценку риска — она покрыта отдельно в тестах `ExportGuard`.
+ * `HDWalletService` tests check that the permit matches the operation,
+ * not the risk rating — that is covered separately in `ExportGuard` tests.
  */
 async function permitFor(
   kind: (typeof EXPORT_KIND)[keyof typeof EXPORT_KIND],
@@ -82,12 +82,12 @@ async function seedFromTestMnemonic(): Promise<ISecretBuffer> {
   }
 }
 
-describe('слой BIP-32: официальный вектор 1', () => {
-  /* Проверяется сама деривация, независимо от адресов Ethereum.
-     Расширенные ключи сравниваются как строки base58 — в них закодированы
-     и ключ, и код цепочки, и отпечаток родителя, поэтому совпадение строки
-     означает совпадение всего узла. */
-  it('даёт эталонные расширенные ключи корня', () => {
+describe('BIP-32 layer: official vector 1', () => {
+  /* Derivation itself is checked, independent of Ethereum addresses.
+     Extended keys are compared as base58 strings — they encode the
+     key, the chain code and the parent fingerprint, so a string match
+     means the whole node matches. */
+  it('yields the reference extended keys of the root', () => {
     const root = HDKey.fromMasterSeed(fromHex(BIP32_VECTOR_1.seedHex))
 
     expect(root.privateExtendedKey).toBe(BIP32_VECTOR_1.masterXprv)
@@ -95,7 +95,7 @@ describe('слой BIP-32: официальный вектор 1', () => {
   })
 })
 
-describe('HDWalletService: адреса тестовой мнемоники', () => {
+describe('HDWalletService: addresses of the test mnemonic', () => {
   let seed: ISecretBuffer
   let wallet: HDWalletService
 
@@ -105,30 +105,30 @@ describe('HDWalletService: адреса тестовой мнемоники', ()
   })
 
   it.each(TEST_MNEMONIC_ADDRESSES.map((address, index) => ({ address, index })))(
-    'адрес по индексу $index совпадает с эталоном',
+    'the address at index $index matches the reference',
     ({ address, index }) => {
       expect(wallet.getAddress(index)).toBe(address)
     },
   )
 
-  it("использует путь m/44'/60'/0'/0/n", () => {
+  it("uses the path m/44'/60'/0'/0/n", () => {
     expect(wallet.accountPath).toBe("m/44'/60'/0'")
     expect(wallet.deriveAccount(3).path).toBe("m/44'/60'/0'/0/3")
   })
 
-  it('возвращает адреса в контрольной сумме EIP-55', () => {
+  it('returns addresses in EIP-55 checksum', () => {
     const address = wallet.getAddress(0)
 
     expect(() => toAddress(address)).not.toThrow()
     expect(address).not.toBe(address.toLowerCase())
   })
 
-  it('даёт разные адреса при соглашении Ledger Live', () => {
+  it('yields different addresses under the Ledger Live convention', () => {
     const ledgerStyle = HDWalletService.fromSeed(seed, { accountIndex: 1 })
 
     try {
-      /* Разные ветви дерева. Кошелёк, поддерживающий только одно
-         соглашение, покажет при импорте пустой баланс. */
+      /* Different branches of the tree. A wallet that supports only
+         one convention will show an empty balance on import. */
       expect(ledgerStyle.getAddress(0)).not.toBe(wallet.getAddress(0))
     } finally {
       ledgerStyle.wipe()
@@ -136,7 +136,7 @@ describe('HDWalletService: адреса тестовой мнемоники', ()
   })
 })
 
-describe('HDWalletService: создание аккаунтов', () => {
+describe('HDWalletService: creating accounts', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -145,7 +145,7 @@ describe('HDWalletService: создание аккаунтов', () => {
     seed.wipe()
   })
 
-  it('выводит аккаунт с полным набором публичных данных', () => {
+  it('derives an account with a full set of public data', () => {
     const account = wallet.deriveAccount(0)
 
     expect(account.addressIndex).toBe(0)
@@ -154,46 +154,46 @@ describe('HDWalletService: создание аккаунтов', () => {
     expect(account.publicKey).toHaveLength(33)
   })
 
-  it('не содержит приватного ключа в структуре аккаунта', () => {
+  it('does not contain a private key in the account structure', () => {
     const account = wallet.deriveAccount(0)
 
     expect(JSON.stringify(account)).not.toContain('privateKey')
     expect(Object.keys(account)).toEqual(['addressIndex', 'path', 'address', 'publicKey'])
   })
 
-  it('выводит несколько аккаунтов подряд', () => {
+  it('derives several accounts in a row', () => {
     const accounts = wallet.deriveAccounts(0, 5)
 
     expect(accounts.map((account) => account.address)).toEqual(TEST_MNEMONIC_ADDRESSES)
   })
 
-  it('выводит аккаунты начиная с заданного индекса', () => {
+  it('derives accounts starting from a given index', () => {
     const accounts = wallet.deriveAccounts(2, 2)
 
     expect(accounts[0]?.addressIndex).toBe(2)
     expect(accounts[1]?.addressIndex).toBe(3)
   })
 
-  it('детерминирован: повторная деривация даёт тот же адрес', () => {
+  it('is deterministic: a second derivation yields the same address', () => {
     expect(wallet.getAddress(17)).toBe(wallet.getAddress(17))
   })
 
-  it('ограничивает число аккаунтов за один вызов', () => {
+  it('limits the number of accounts in one call', () => {
     expect(() => wallet.deriveAccounts(0, MAX_ACCOUNTS_PER_CALL + 1)).toThrow(
       InvalidExtendedKeyError,
     )
   })
 
-  it('отвергает нулевое количество', () => {
+  it('rejects a zero count', () => {
     expect(() => wallet.deriveAccounts(0, 0)).toThrow(InvalidExtendedKeyError)
   })
 
-  it('отвергает индекс из диапазона закалённой деривации', () => {
+  it('rejects an index from the hardened-derivation range', () => {
     expect(() => wallet.deriveAccount(0x80000000)).toThrow(InvalidDerivationPathError)
   })
 })
 
-describe('HDWalletService: ключи', () => {
+describe('HDWalletService: keys', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -202,7 +202,7 @@ describe('HDWalletService: ключи', () => {
     seed.wipe()
   })
 
-  it('выдаёт приватный ключ длиной 32 байта', async () => {
+  it('issues a 32-byte private key', async () => {
     const key = wallet.exportPrivateKey(
       0,
       await permitFor(EXPORT_KIND.PrivateKey, wallet.accountPath, 0),
@@ -215,7 +215,7 @@ describe('HDWalletService: ключи', () => {
     }
   })
 
-  it('выдаёт разные приватные ключи для разных индексов', async () => {
+  it('issues different private keys for different indexes', async () => {
     const first = wallet.exportPrivateKey(
       0,
       await permitFor(EXPORT_KIND.PrivateKey, wallet.accountPath, 0),
@@ -233,16 +233,16 @@ describe('HDWalletService: ключи', () => {
     }
   })
 
-  it('приватный ключ соответствует адресу', async () => {
+  it('the private key matches the address', async () => {
     const key = wallet.exportPrivateKey(
       0,
       await permitFor(EXPORT_KIND.PrivateKey, wallet.accountPath, 0),
     )
 
     try {
-      /* Публичный ключ, восстановленный из приватного, обязан давать
-         тот же адрес. Расхождение означало бы, что кошелёк показывает
-         адрес, которым не может подписать. */
+      /* A public key recovered from the private one must yield the
+         same address. A mismatch would mean the wallet shows an
+         address it cannot sign for. */
       const node = new HDKey({ privateKey: key.bytes, chainCode: new Uint8Array(32) })
 
       expect(node.publicKey).not.toBeNull()
@@ -252,7 +252,7 @@ describe('HDWalletService: ключи', () => {
     }
   })
 
-  it('возвращает копию приватного ключа, а не внутренний буфер', async () => {
+  it('returns a copy of the private key, not the internal buffer', async () => {
     const first = wallet.exportPrivateKey(
       0,
       await permitFor(EXPORT_KIND.PrivateKey, wallet.accountPath, 0),
@@ -272,25 +272,25 @@ describe('HDWalletService: ключи', () => {
     }
   })
 
-  it('выдаёт сжатый публичный ключ по умолчанию', () => {
+  it('issues a compressed public key by default', () => {
     expect(wallet.getPublicKey(0)).toHaveLength(33)
   })
 
-  it('выдаёт несжатый публичный ключ по запросу', () => {
+  it('issues an uncompressed public key on request', () => {
     const uncompressed = wallet.getPublicKey(0, PUBLIC_KEY_FORMAT.Uncompressed)
 
     expect(uncompressed).toHaveLength(65)
     expect(uncompressed[0]).toBe(0x04)
   })
 
-  it('обе формы публичного ключа дают один адрес', () => {
+  it('both public-key forms yield one address', () => {
     const account = wallet.deriveAccount(0)
 
     expect(account.address).toBe(TEST_MNEMONIC_ADDRESSES[0])
   })
 })
 
-describe('HDWalletService: подпись', () => {
+describe('HDWalletService: signing', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -299,24 +299,24 @@ describe('HDWalletService: подпись', () => {
     seed.wipe()
   })
 
-  it('подписывает сообщение ключом указанного адреса', () => {
-    /* Сквозная проверка: мнемоника -> seed -> BIP-32 -> подпись ->
-       восстановление адреса. Совпадение с адресом по тому же индексу
-       означает, что кошелёк подписывает именно тем ключом, который
-       соответствует показанному адресу. */
+  it('signs a message with the key of the given address', () => {
+    /* End-to-end check: mnemonic -> seed -> BIP-32 -> signature ->
+       address recovery. A match with the address at the same index
+       means the wallet signs with the key that belongs to the shown
+       address. */
     const signing = new SigningService()
-    const signature = wallet.signMessage(2, 'Подтверждаю вход')
+    const signature = wallet.signMessage(2, 'I confirm sign-in')
 
-    expect(signing.recoverMessageSigner('Подтверждаю вход', signature)).toBe(wallet.getAddress(2))
+    expect(signing.recoverMessageSigner('I confirm sign-in', signature)).toBe(wallet.getAddress(2))
   })
 
-  it('разные индексы дают разные подписи', () => {
-    expect(wallet.signMessage(0, 'одно сообщение')).not.toBe(
-      wallet.signMessage(1, 'одно сообщение'),
+  it('different indexes yield different signatures', () => {
+    expect(wallet.signMessage(0, 'one message')).not.toBe(
+      wallet.signMessage(1, 'one message'),
     )
   })
 
-  it('подписывает транзакцию от собственного адреса', () => {
+  it('signs a transaction from its own address', () => {
     const signed = wallet.signTransaction(0, {
       type: TRANSACTION_TYPE.Eip1559,
       chainId: toChainId(1),
@@ -335,9 +335,10 @@ describe('HDWalletService: подпись', () => {
     expect(signed.hash).toMatch(/^0x[0-9a-f]{64}$/)
   })
 
-  it('отвергает транзакцию от чужого адреса', () => {
-    /* Индекс адреса и поле `from` обязаны совпадать: иначе средства
-       ушли бы не с того аккаунта, который показан пользователю. */
+  it('rejects a transaction from a foreign address', () => {
+    /* The address index and the `from` field must match: otherwise
+       funds would leave an account other than the one shown to the
+       user. */
     expect(() =>
       wallet.signTransaction(0, {
         type: TRANSACTION_TYPE.Eip1559,
@@ -355,25 +356,25 @@ describe('HDWalletService: подпись', () => {
     ).toThrow(InvalidArgumentError)
   })
 
-  it('подписывает структурированные данные при совпадении сети', () => {
+  it('signs structured data when the network matches', () => {
     const signing = new SigningService()
     const signature = wallet.signTypedData(0, EIP712_MAIL, toChainId(1))
 
     expect(signing.recoverTypedDataSigner(EIP712_MAIL, signature)).toBe(wallet.getAddress(0))
   })
 
-  it('отвергает структуру, предназначенную для другой сети', () => {
+  it('rejects a structure intended for another network', () => {
     expect(() => wallet.signTypedData(0, EIP712_MAIL, toChainId(137))).toThrow(InvalidArgumentError)
   })
 
-  it('отказывает в подписи после затирания', () => {
+  it('refuses to sign after a wipe', () => {
     wallet.wipe()
 
     expect(() => wallet.signMessage(0, 'message')).toThrow(NotInitializedError)
   })
 })
 
-describe('HDWalletService: расширенные ключи', () => {
+describe('HDWalletService: extended keys', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -382,26 +383,26 @@ describe('HDWalletService: расширенные ключи', () => {
     seed.wipe()
   })
 
-  it('экспортирует xpub уровня аккаунта', async () => {
+  it('exports the account-level xpub', async () => {
     expect(wallet.exportAccountXpub(await permitFor(EXPORT_KIND.Xpub, wallet.accountPath))).toMatch(
       /^xpub/,
     )
   })
 
-  it('экспортирует xpub уровня цепочки', async () => {
+  it('exports the chain-level xpub', async () => {
     expect(wallet.exportChangeXpub(await permitFor(EXPORT_KIND.Xpub, wallet.accountPath))).toMatch(
       /^xpub/,
     )
   })
 
-  it('xpub аккаунта и цепочки различаются', async () => {
+  it('account and chain xpubs differ', async () => {
     const account = wallet.exportAccountXpub(await permitFor(EXPORT_KIND.Xpub, wallet.accountPath))
     const change = wallet.exportChangeXpub(await permitFor(EXPORT_KIND.Xpub, wallet.accountPath))
 
     expect(account).not.toBe(change)
   })
 
-  it('экспортирует xprv уровня аккаунта', async () => {
+  it('exports the account-level xprv', async () => {
     const xprv = wallet.exportAccountXprv(await permitFor(EXPORT_KIND.Xprv, wallet.accountPath))
 
     try {
@@ -411,7 +412,7 @@ describe('HDWalletService: расширенные ключи', () => {
     }
   })
 
-  it('xprv не раскрывается при сериализации состояния', async () => {
+  it('xprv is not disclosed when serialising state', async () => {
     const xprv = wallet.exportAccountXprv(await permitFor(EXPORT_KIND.Xprv, wallet.accountPath))
 
     try {
@@ -421,12 +422,12 @@ describe('HDWalletService: расширенные ключи', () => {
     }
   })
 
-  it('раскрывает xpub внутренним потребителям без разрешения', () => {
+  it('discloses xpub to internal consumers without a permit', () => {
     expect(wallet.peekAccountXpub()).toMatch(/^xpub/)
   })
 })
 
-describe('HDWalletService: разрешения на экспорт', () => {
+describe('HDWalletService: export permits', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -435,7 +436,7 @@ describe('HDWalletService: разрешения на экспорт', () => {
     seed.wipe()
   })
 
-  it('выдаёт приватный ключ по действительному разрешению', async () => {
+  it('issues a private key on a valid permit', async () => {
     const key = wallet.exportPrivateKey(
       0,
       await permitFor(EXPORT_KIND.PrivateKey, wallet.accountPath, 0),
@@ -448,25 +449,25 @@ describe('HDWalletService: разрешения на экспорт', () => {
     }
   })
 
-  it('отвергает разрешение, выданное на другой вид экспорта', async () => {
+  it('rejects a permit issued for another export kind', async () => {
     const permit = await permitFor(EXPORT_KIND.Xpub, wallet.accountPath)
 
     expect(() => wallet.exportAccountXprv(permit)).toThrow(ExportNotPermittedError)
   })
 
-  it('отвергает разрешение, выданное на другой адрес', async () => {
+  it('rejects a permit issued for another address', async () => {
     const permit = await permitFor(EXPORT_KIND.PrivateKey, wallet.accountPath, 0)
 
     expect(() => wallet.exportPrivateKey(1, permit)).toThrow(ExportNotPermittedError)
   })
 
-  it('отвергает разрешение, выданное для другого аккаунта', async () => {
+  it('rejects a permit issued for another account', async () => {
     const permit = await permitFor(EXPORT_KIND.Xpub, toDerivationPath("m/44'/60'/7'"))
 
     expect(() => wallet.exportAccountXpub(permit)).toThrow(ExportNotPermittedError)
   })
 
-  it('гасит разрешение после использования', async () => {
+  it('consumes the permit after use', async () => {
     const permit = await permitFor(EXPORT_KIND.Xpub, wallet.accountPath)
     wallet.exportAccountXpub(permit)
 
@@ -474,16 +475,16 @@ describe('HDWalletService: разрешения на экспорт', () => {
     expect(() => wallet.exportAccountXpub(permit)).toThrow(ExportNotPermittedError)
   })
 
-  it('не требует разрешения на подпись', () => {
-    /* Подпись выполняется внутри модуля, ключ наружу не выходит,
-       поэтому разрешение на экспорт здесь не нужно и не запрашивается. */
-    const signature = wallet.signMessage(0, 'привет')
+  it('does not require a permit to sign', () => {
+    /* Signing happens inside the module, the key does not leave, so
+       an export permit is not needed here and is not requested. */
+    const signature = wallet.signMessage(0, 'hello')
 
     expect(signature).toMatch(/^0x[0-9a-f]{130}$/)
   })
 })
 
-describe('HDWalletService: режим наблюдения из xpub', () => {
+describe('HDWalletService: watch-only mode from xpub', () => {
   let wallet: HDWalletService
   let watchOnly: HDWalletService
 
@@ -494,33 +495,33 @@ describe('HDWalletService: режим наблюдения из xpub', () => {
     watchOnly = HDWalletService.fromAccountExtendedKey(wallet.peekAccountXpub())
   })
 
-  it('выводит те же адреса, что и полный кошелёк', () => {
+  it('derives the same addresses as the full wallet', () => {
     expect(watchOnly.getAddress(0)).toBe(wallet.getAddress(0))
     expect(watchOnly.getAddress(9)).toBe(wallet.getAddress(9))
   })
 
-  it('сообщает о невозможности выдать приватные ключи', () => {
+  it('reports that it cannot issue private keys', () => {
     expect(watchOnly.canDerivePrivateKeys).toBe(false)
     expect(wallet.canDerivePrivateKeys).toBe(true)
   })
 
-  it('отказывает в подписи', () => {
-    expect(() => watchOnly.signMessage(0, 'привет')).toThrow(KeyringCannotSignError)
+  it('refuses to sign', () => {
+    expect(() => watchOnly.signMessage(0, 'hello')).toThrow(KeyringCannotSignError)
   })
 
-  it('отказывает в экспорте приватного ключа', async () => {
+  it('refuses to export a private key', async () => {
     const permit = await permitFor(EXPORT_KIND.PrivateKey, watchOnly.accountPath, 0)
 
     expect(() => watchOnly.exportPrivateKey(0, permit)).toThrow(KeyringCannotSignError)
   })
 
-  it('отказывает в экспорте xprv', async () => {
+  it('refuses to export xprv', async () => {
     const permit = await permitFor(EXPORT_KIND.Xprv, watchOnly.accountPath)
 
     expect(() => watchOnly.exportAccountXprv(permit)).toThrow(KeyringCannotSignError)
   })
 
-  it('восстанавливается и из xprv, сохраняя возможность подписи', async () => {
+  it('also restores from xprv, keeping the ability to sign', async () => {
     const xprv = wallet.exportAccountXprv(await permitFor(EXPORT_KIND.Xprv, wallet.accountPath))
 
     try {
@@ -537,22 +538,22 @@ describe('HDWalletService: режим наблюдения из xpub', () => {
     }
   })
 
-  it('отвергает нечитаемый расширенный ключ', () => {
-    expect(() => HDWalletService.fromAccountExtendedKey('не ключ')).toThrow(InvalidExtendedKeyError)
+  it('rejects an unreadable extended key', () => {
+    expect(() => HDWalletService.fromAccountExtendedKey('not-a-key')).toThrow(InvalidExtendedKeyError)
   })
 
-  it('не раскрывает разбираемый ключ в тексте ошибки', () => {
+  it('does not disclose the parsed key in the error text', () => {
     expect.assertions(1)
 
     try {
-      HDWalletService.fromAccountExtendedKey('xprvПоддельныйСекрет')
+      HDWalletService.fromAccountExtendedKey('xprvFakeSecret')
     } catch (error) {
-      expect((error as Error).message).not.toContain('ПоддельныйСекрет')
+      expect((error as Error).message).not.toContain('FakeSecret')
     }
   })
 })
 
-describe('HDWalletService: произвольный путь', () => {
+describe('HDWalletService: arbitrary path', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -561,26 +562,26 @@ describe('HDWalletService: произвольный путь', () => {
     seed.wipe()
   })
 
-  it('выводит аккаунт по полному пути', () => {
+  it('derives an account from a full path', () => {
     const account = wallet.deriveByPath(toDerivationPath("m/44'/60'/0'/0/2"))
 
     expect(account.address).toBe(TEST_MNEMONIC_ADDRESSES[2])
   })
 
-  it('выводит адрес внутренней цепочки', () => {
+  it('derives an address of the internal chain', () => {
     const account = wallet.deriveByPath(toDerivationPath("m/44'/60'/0'/1/0"))
 
     expect(account.address).not.toBe(TEST_MNEMONIC_ADDRESSES[0])
   })
 
-  it('отвергает путь вне ветви аккаунта', () => {
+  it('rejects a path outside the account branch', () => {
     expect(() => wallet.deriveByPath(toDerivationPath("m/44'/61'/0'/0/0"))).toThrow(
       InvalidExtendedKeyError,
     )
   })
 })
 
-describe('HDWalletService: затирание', () => {
+describe('HDWalletService: wiping', () => {
   let wallet: HDWalletService
 
   beforeEach(async () => {
@@ -589,26 +590,26 @@ describe('HDWalletService: затирание', () => {
     seed.wipe()
   })
 
-  it('помечает экземпляр затёртым', () => {
+  it('marks the instance as wiped', () => {
     wallet.wipe()
 
     expect(wallet.isWiped).toBe(true)
   })
 
-  it('отказывает в деривации после затирания', () => {
+  it('refuses derivation after a wipe', () => {
     wallet.wipe()
 
     expect(() => wallet.getAddress(0)).toThrow(NotInitializedError)
   })
 
-  it('отказывает в экспорте xpub после затирания', async () => {
+  it('refuses to export xpub after a wipe', async () => {
     const permit = await permitFor(EXPORT_KIND.Xpub, wallet.accountPath)
     wallet.wipe()
 
     expect(() => wallet.exportAccountXpub(permit)).toThrow(NotInitializedError)
   })
 
-  it('допускает повторное затирание', () => {
+  it('allows a second wipe', () => {
     wallet.wipe()
 
     expect(() => {
@@ -617,8 +618,8 @@ describe('HDWalletService: затирание', () => {
   })
 })
 
-describe('HDWalletService: проверка seed', () => {
-  it('отвергает слишком короткий seed', () => {
+describe('HDWalletService: seed checks', () => {
+  it('rejects a seed that is too short', () => {
     const seed = SecretBuffer.allocate(8)
 
     try {
@@ -628,7 +629,7 @@ describe('HDWalletService: проверка seed', () => {
     }
   })
 
-  it('отвергает слишком длинный seed', () => {
+  it('rejects a seed that is too long', () => {
     const seed = SecretBuffer.allocate(65)
 
     try {
@@ -638,7 +639,7 @@ describe('HDWalletService: проверка seed', () => {
     }
   })
 
-  it('не затирает переданный seed: владение остаётся за вызывающим', async () => {
+  it('does not wipe the given seed: ownership stays with the caller', async () => {
     const seed = await seedFromTestMnemonic()
 
     try {

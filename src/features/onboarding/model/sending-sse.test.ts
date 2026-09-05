@@ -15,21 +15,21 @@ const CREATE = {
 }
 
 describe('parseSendingSseEvent', () => {
-  it('разбирает кадр type_send create', () => {
+  it('parses a type_send create frame', () => {
     expect(parseSendingSseEvent(JSON.stringify(CREATE))).toEqual(CREATE)
   })
 
-  it('разбирает кадр type_send update', () => {
+  it('parses a type_send update frame', () => {
     const update = { ...CREATE, status: 'failure', type_send: SENDING_SSE_TYPE.Update }
 
     expect(parseSendingSseEvent(JSON.stringify(update))).toEqual(update)
   })
 
-  it('отбрасывает кадр с неизвестным type_send', () => {
+  it('drops a frame with an unknown type_send', () => {
     expect(parseSendingSseEvent(JSON.stringify({ ...CREATE, type_send: 'other' }))).toBeNull()
   })
 
-  it('отбрасывает битый JSON', () => {
+  it('drops broken JSON', () => {
     expect(parseSendingSseEvent('not-json')).toBeNull()
   })
 })

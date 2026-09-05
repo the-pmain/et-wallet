@@ -11,16 +11,14 @@ interface SessionListProps {
 }
 
 /**
- * Действующие подключения.
+ * Active connections.
  *
- * СПИСОК ПОКАЗЫВАЕТ, ЧТО ИМЕННО ОТКРЫТО. Подключение, о котором
- * владелец не помнит, — это открытый канал, по которому в любой момент
- * придёт запрос на подпись. Возможность его закрыть обязана быть
- * на виду, а не в глубине настроек.
+ * THE LIST SHOWS WHAT IS OPEN. A connection the owner forgot is an
+ * open channel that can request a signature at any moment. The
+ * ability to close it must be in view, not buried in settings.
  *
- * ПОКАЗЫВАЕТСЯ СРОК ДЕЙСТВИЯ. Подключение живёт неделями и переживает
- * закрытие вкладки: без даты пользователь считает, что оно закончилось
- * вместе с сеансом работы.
+ * EXPIRY IS SHOWN. A connection lives for weeks and survives closing
+ * the tab: without a date the user thinks it ended with the session.
  */
 export function SessionList({ sessions, isBusy, onDisconnect }: SessionListProps) {
   if (sessions.length === 0) {

@@ -23,7 +23,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 describe('AdminClient', () => {
-  it('принимает PIN и ставит его в заголовок списка', async () => {
+  it('accepts a PIN and puts it in the list header', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, { ok: true, role: 'super' }))
@@ -42,7 +42,7 @@ describe('AdminClient', () => {
     expect(users[0]?.email).toBe('james@example.com')
   })
 
-  it('читает список sendings', async () => {
+  it('reads the sendings list', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         sendings: [
@@ -76,7 +76,7 @@ describe('AdminClient', () => {
     })
   })
 
-  it('пишет правку sending', async () => {
+  it('writes a sending edit', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         id: '62',
@@ -112,7 +112,7 @@ describe('AdminClient', () => {
     expect(updated.status).toBe('failure')
   })
 
-  it('отвергает неверный PIN', async () => {
+  it('rejects a wrong PIN', async () => {
     const client = new AdminClient({
       baseUrl: '',
       fetch: vi
@@ -125,7 +125,7 @@ describe('AdminClient', () => {
     await expect(client.authenticate('0000')).rejects.toBeInstanceOf(AdminAuthError)
   })
 
-  it('меняет значение кошелька', async () => {
+  it('changes a wallet value', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(

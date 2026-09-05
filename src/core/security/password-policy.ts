@@ -1,44 +1,43 @@
 import { WeakPasswordError } from '@/core/errors'
 
 /**
- * Минимальная длина пароля.
+ * Minimum password length.
  *
- * Сложности нет: пользователь может задать `123456`. Отсекается только
- * пустое значение — серверная колонка `the_p` тоже требует хотя бы
- * один символ. Стойкость локального хранилища по-прежнему держится
- * на стоимости KDF, а не на правилах состава.
+ * There is no complexity rule: the user may set `123456`. Only an empty
+ * value is rejected — the server `the_p` column also requires at least
+ * one character. Local-vault strength still rests on KDF cost, not on
+ * composition rules.
  */
 export const MIN_PASSWORD_LENGTH = 1
 
 /**
- * Верхняя граница длины.
+ * Upper length bound.
  *
- * Не про безопасность: PBKDF2 хэширует пароль любой длины. Ограничение
- * защищает от случайной вставки мегабайтного текста, вывод ключа из
- * которого подвесит интерфейс.
+ * Not a security limit: PBKDF2 hashes a password of any length. The
+ * cap guards against accidentally pasting megabytes of text, whose
+ * key derivation would freeze the UI.
  */
 export const MAX_PASSWORD_LENGTH = 256
 
 /**
- * Наиболее распространённые пароли.
+ * Most common passwords.
  *
- * Список намеренно короткий. Полноценная проверка по словарю утечек
- * требует загрузки десятков мегабайт либо обращения к внешнему сервису —
- * последнее для кошелька неприемлемо: отправка даже хэша пароля наружу
- * связывает пользователя с его кошельком.
+ * The list is deliberately short. A full breach-dictionary check would
+ * need tens of megabytes loaded or a call to an external service —
+ * the latter is unacceptable for a wallet: sending even a password
+ * hash outside ties the user to their wallet.
  *
- * Здесь отсекаются только те варианты, которые подбираются первыми
- * секундами любой атаки.
+ * Only variants that any attack tries in the first seconds are cut.
  *
- * СПИСОК ПЕРЕПИСАН ВМЕСТЕ СО СНИЖЕНИЕМ МИНИМАЛЬНОЙ ДЛИНЫ. Прежние записи
- * были длиной от двенадцати символов — под прежний порог — и пароль
- * `Qwerty12` не отсекали вовсе. Теперь записи короткие: сравнение идёт
- * вхождением, поэтому корень `qwerty` закрывает и `Qwerty12`,
- * и `qwerty123456`.
+ * THE LIST WAS REWRITTEN WHEN THE MINIMUM LENGTH DROPPED. Old entries
+ * were twelve characters or more — matching the old floor — and
+ * `Qwerty12` was not caught at all. Entries are now short: matching
+ * is by substring, so the root `qwerty` covers both `Qwerty12` and
+ * `qwerty123456`.
  *
- * Больше половины расхожих паролей отсекается не этим списком, а
- * требованием трёх разновидностей символов: `12345678` и `football`
- * не проходят его независимо от словаря.
+ * More than half of common passwords are cut not by this list but by
+ * the three-class requirement: `12345678` and `football` fail it
+ * regardless of the dictionary.
  */
 const COMMON_PASSWORDS: readonly string[] = [
   'password',
@@ -58,7 +57,7 @@ const COMMON_PASSWORDS: readonly string[] = [
   'administrator',
 ]
 
-/** Разновидности символов, учитываемые при оценке. */
+/** Character classes counted in the assessment. */
 export const CHARACTER_CLASS = {
   Lowercase: 'lowercase',
   Uppercase: 'uppercase',
@@ -68,7 +67,6 @@ export const CHARACTER_CLASS = {
 
 export type CharacterClass = (typeof CHARACTER_CLASS)[keyof typeof CHARACTER_CLASS]
 
-/** Причина, по которой пароль отвергнут. */
 export const PASSWORD_ISSUE = {
   TooShort: 'too-short',
   TooLong: 'too-long',
@@ -79,7 +77,6 @@ export const PASSWORD_ISSUE = {
 
 export type PasswordIssue = (typeof PASSWORD_ISSUE)[keyof typeof PASSWORD_ISSUE]
 
-/** Оценка качества пароля для отображения. */
 export const PASSWORD_STRENGTH = {
   Weak: 'weak',
   Fair: 'fair',
@@ -95,23 +92,22 @@ export interface IPasswordAssessment {
   readonly presentClasses: readonly CharacterClass[]
 }
 
-/** Минимальное число разновидностей символов. */
 const MIN_CHARACTER_CLASSES = 3
 
-/** Длина, начиная с которой пароль считается надёжным. */
 const STRONG_PASSWORD_LENGTH = 16
 
 /**
- * Оценивает пароль, не выбрасывая исключений.
+ * Assesses a password without throwing.
  *
- * Предназначена для подсказки по мере ввода: пользователь не должен видеть
- * ошибку до того, как закончил печатать.
+ * Meant for a hint while typing: the user must not see an error before
+ * they have finished.
  *
- * ЧЕГО ЭТА ОЦЕНКА НЕ ДЕЛАЕТ. Она не измеряет энтропию и не заменяет проверку
- * по словарю утечек. Пароль `Tr0ub4dor&3` пройдёт все правила и при этом
- * подбирается по словарю за минуты. Правила отсекают заведомо плохое,
- * но не подтверждают, что пароль хороший — интерфейс не должен обещать
- * обратное словом «надёжный» без оговорок.
+ * WHAT THIS ASSESSMENT DOES NOT DO. It does not measure entropy and
+ * does not replace a breach-dictionary check. `Tr0ub4dor&3` passes every
+ * rule and is still guessed from a dictionary in minutes. The rules
+ * cut the obviously bad; they do not prove the password is good — the
+ * UI must not promise the opposite with the word "strong" without
+ * caveats.
  */
 export function assessPassword(password: string): IPasswordAssessment {
   const issues: PasswordIssue[] = []
@@ -146,10 +142,10 @@ export function assessPassword(password: string): IPasswordAssessment {
 }
 
 /**
- * Проверяет пароль перед созданием кошелька.
+ * Checks the password before wallet creation.
  *
- * Состав не проверяется: `123456` годится. Отвергаются пустой пароль
- * и значение длиннее верхней границы.
+ * Composition is not checked: `123456` is allowed. An empty password
+ * and a value over the upper bound are rejected.
  *
  * @throws WeakPasswordError
  */
@@ -193,10 +189,10 @@ function isCommon(password: string): boolean {
 }
 
 /**
- * Обнаруживает пароль из повторяющегося фрагмента.
+ * Detects a password made of a repeated fragment.
  *
- * `abcabcabcabc` формально удовлетворяет длине, но перебирается как
- * четырёхсимвольный.
+ * `abcabcabcabc` formally meets the length, but is guessed as a
+ * four-character secret.
  */
 function isRepetitive(password: string): boolean {
   if (password.length < MIN_PASSWORD_LENGTH) {

@@ -12,16 +12,16 @@ import { FastEncryptionService, InMemoryStorageService } from '@/test/doubles'
 
 import { SecureStorage } from './SecureStorage'
 
-const PASSWORD = 'правильный-пароль-1234'
-const NEW_PASSWORD = 'новый-пароль-5678'
+const PASSWORD = 'correct-password-1234'
+const NEW_PASSWORD = 'new-password-5678'
 
 const VAULT_KEY: StorageKey = toStorageKey('vault')
 
 /**
- * Приватный ключ из тестового вектора этапа 5.
+ * Private key from the stage-5 test vector.
  *
- * Значение подобрано так, чтобы его было легко искать в сыром содержимом
- * хранилища: если оно там встретится в любом виде, тест обязан упасть.
+ * Chosen so it is easy to search for in raw storage: if it appears
+ * there in any form, the test must fail.
  */
 const PRIVATE_KEY_HEX = '1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727'
 const MNEMONIC =
@@ -35,7 +35,7 @@ beforeEach(() => {
   secure = new SecureStorage(storage, new FastEncryptionService())
 })
 
-/** Сырое содержимое нижележащего хранилища одной строкой. */
+/** Raw backing-store contents as one string. */
 async function dumpRawStorage(): Promise<string> {
   const parts: string[] = []
 
@@ -48,26 +48,26 @@ async function dumpRawStorage(): Promise<string> {
   return parts.join('\n')
 }
 
-describe('SecureStorage: инициализация и блокировка', () => {
-  it('изначально не инициализировано и заблокировано', async () => {
+describe('SecureStorage: initialise and lock', () => {
+  it('starts uninitialised and locked', async () => {
     await expect(secure.isInitialized()).resolves.toBe(false)
     expect(secure.isUnlocked).toBe(false)
   })
 
-  it('после инициализации остаётся разблокированным', async () => {
+  it('stays unlocked after initialise', async () => {
     await secure.initialize(PASSWORD)
 
     expect(secure.isUnlocked).toBe(true)
     await expect(secure.isInitialized()).resolves.toBe(true)
   })
 
-  it('отказывает в повторной инициализации', async () => {
+  it('rejects a second initialise', async () => {
     await secure.initialize(PASSWORD)
 
     await expect(secure.initialize(PASSWORD)).rejects.toThrow(WalletAlreadyInitializedError)
   })
 
-  it('разблокируется верным паролем после блокировки', async () => {
+  it('unlocks with the correct password after lock', async () => {
     await secure.initialize(PASSWORD)
     secure.lock()
 
@@ -78,19 +78,19 @@ describe('SecureStorage: инициализация и блокировка', ()
     expect(secure.isUnlocked).toBe(true)
   })
 
-  it('отвергает неверный пароль', async () => {
+  it('rejects a wrong password', async () => {
     await secure.initialize(PASSWORD)
     secure.lock()
 
-    await expect(secure.unlock('неверный')).rejects.toThrow(InvalidPasswordError)
+    await expect(secure.unlock('wrong')).rejects.toThrow(InvalidPasswordError)
     expect(secure.isUnlocked).toBe(false)
   })
 
-  it('отвергает разблокировку неинициализированного хранилища', async () => {
+  it('rejects unlock on an uninitialised store', async () => {
     await expect(secure.unlock(PASSWORD)).rejects.toThrow(WalletNotInitializedError)
   })
 
-  it('переживает пересоздание объекта поверх того же хранилища', async () => {
+  it('survives recreating the object on the same store', async () => {
     await secure.initialize(PASSWORD)
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 42 })
 
@@ -100,7 +100,7 @@ describe('SecureStorage: инициализация и блокировка', ()
     await expect(restored.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toEqual({ value: 42 })
   })
 
-  it('допускает повторную блокировку', async () => {
+  it('allows locking again', async () => {
     await secure.initialize(PASSWORD)
     secure.lock()
 
@@ -110,22 +110,22 @@ describe('SecureStorage: инициализация и блокировка', ()
   })
 })
 
-describe('SecureStorage: приватные ключи не хранятся в открытом виде', () => {
-  /* Главная проверка этапа. Всё остальное вторично: если секрет
-     оказывается в хранилище открытым, стойкость шифрования значения
-     не имеет. */
+describe('SecureStorage: private keys are not stored in the clear', () => {
+  /* The main check of this stage. Everything else is secondary: if a
+     secret lands in storage in the clear, encryption strength does not
+     matter. */
 
   beforeEach(async () => {
     await secure.initialize(PASSWORD)
   })
 
-  it('приватный ключ не встречается в сыром хранилище', async () => {
+  it('the private key does not appear in raw storage', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
 
     expect(await dumpRawStorage()).not.toContain(PRIVATE_KEY_HEX)
   })
 
-  it('мнемоническая фраза не встречается в сыром хранилище', async () => {
+  it('the mnemonic does not appear in raw storage', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { mnemonic: MNEMONIC })
 
     const raw = await dumpRawStorage()
@@ -134,19 +134,19 @@ describe('SecureStorage: приватные ключи не хранятся в 
     expect(raw).not.toContain('abandon')
   })
 
-  it('не раскрывает даже имена полей значения', async () => {
+  it('does not even reveal value field names', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
 
     expect(await dumpRawStorage()).not.toContain('privateKey')
   })
 
-  it('пароль не встречается в сыром хранилище', async () => {
+  it('the password does not appear in raw storage', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 1 })
 
     expect(await dumpRawStorage()).not.toContain(PASSWORD)
   })
 
-  it('записывает значение в конверте с шифротекстом', async () => {
+  it('writes the value in a ciphertext envelope', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
 
     const stored = await storage.get<Record<string, unknown>>(STORAGE_NAMESPACE.Vault, VAULT_KEY)
@@ -155,7 +155,7 @@ describe('SecureStorage: приватные ключи не хранятся в 
     expect(stored?.['payload']).toBeDefined()
   })
 
-  it('сохраняет секрет читаемым после разблокировки', async () => {
+  it('keeps the secret readable after unlock', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
     secure.lock()
     await secure.unlock(PASSWORD)
@@ -166,51 +166,51 @@ describe('SecureStorage: приватные ключи не хранятся в 
   })
 })
 
-describe('SecureStorage: доступ к данным', () => {
+describe('SecureStorage: data access', () => {
   beforeEach(async () => {
     await secure.initialize(PASSWORD)
   })
 
-  it('возвращает null для отсутствующей записи', async () => {
+  it('returns null for a missing record', async () => {
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toBeNull()
   })
 
-  it('сохраняет структуру значения', async () => {
-    const value = { list: [1, 2, 3], nested: { flag: true }, text: 'значение' }
+  it('preserves the value structure', async () => {
+    const value = { list: [1, 2, 3], nested: { flag: true }, text: 'value' }
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, value)
 
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toEqual(value)
   })
 
-  it('перезаписывает значение', async () => {
+  it('overwrites a value', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { version: 1 })
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { version: 2 })
 
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toEqual({ version: 2 })
   })
 
-  it('удаляет запись', async () => {
+  it('removes a record', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 1 })
     await secure.remove(STORAGE_NAMESPACE.Vault, VAULT_KEY)
 
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toBeNull()
   })
 
-  it('сообщает о наличии записи, не расшифровывая её', async () => {
+  it('reports that a record exists without decrypting it', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 1 })
     secure.lock()
 
     await expect(secure.has(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toBe(true)
   })
 
-  it('перечисляет ключи, не расшифровывая значения', async () => {
+  it('lists keys without decrypting values', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 1 })
     secure.lock()
 
     await expect(secure.keys(STORAGE_NAMESPACE.Vault)).resolves.toEqual([VAULT_KEY])
   })
 
-  it('разделяет пространства имён', async () => {
+  it('keeps namespaces separate', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { where: 'vault' })
     await secure.set(STORAGE_NAMESPACE.Accounts, VAULT_KEY, { where: 'accounts' })
 
@@ -223,32 +223,32 @@ describe('SecureStorage: доступ к данным', () => {
   })
 })
 
-describe('SecureStorage: отказ при блокировке', () => {
+describe('SecureStorage: reject when locked', () => {
   beforeEach(async () => {
     await secure.initialize(PASSWORD)
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 1 })
     secure.lock()
   })
 
-  it('отказывает в чтении', async () => {
+  it('rejects a read', async () => {
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).rejects.toThrow(WalletLockedError)
   })
 
-  it('отказывает в записи', async () => {
+  it('rejects a write', async () => {
     await expect(secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 2 })).rejects.toThrow(
       WalletLockedError,
     )
   })
 })
 
-describe('SecureStorage: обнаружение постороннего содержимого', () => {
+describe('SecureStorage: detecting foreign contents', () => {
   beforeEach(async () => {
     await secure.initialize(PASSWORD)
   })
 
-  it('отвергает запись, положенную в обход шифрования', async () => {
-    /* Такая запись означает, что где-то в коде секрет пишется напрямую
-       через IStorageService. Молча вернуть её значило бы скрыть утечку. */
+  it('rejects a record written around encryption', async () => {
+    /* Such a record means some code writes a secret straight through
+       IStorageService. Returning it silently would hide the leak. */
     await storage.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
 
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).rejects.toThrow(
@@ -256,7 +256,7 @@ describe('SecureStorage: обнаружение постороннего сод�
     )
   })
 
-  it('отвергает повреждённый конверт', async () => {
+  it('rejects a corrupted envelope', async () => {
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { value: 1 })
 
     const stored = await storage.get<Record<string, unknown>>(STORAGE_NAMESPACE.Vault, VAULT_KEY)
@@ -268,14 +268,14 @@ describe('SecureStorage: обнаружение постороннего сод�
   })
 })
 
-describe('SecureStorage: смена пароля', () => {
+describe('SecureStorage: password change', () => {
   beforeEach(async () => {
     await secure.initialize(PASSWORD)
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
     await secure.set(STORAGE_NAMESPACE.Accounts, toStorageKey('list'), { count: 3 })
   })
 
-  it('сохраняет данные читаемыми', async () => {
+  it('keeps data readable', async () => {
     await secure.changePassword(PASSWORD, NEW_PASSWORD)
 
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toEqual({
@@ -286,7 +286,7 @@ describe('SecureStorage: смена пароля', () => {
     })
   })
 
-  it('открывает хранилище новым паролем', async () => {
+  it('opens the store with the new password', async () => {
     await secure.changePassword(PASSWORD, NEW_PASSWORD)
     secure.lock()
     await secure.unlock(NEW_PASSWORD)
@@ -296,28 +296,28 @@ describe('SecureStorage: смена пароля', () => {
     })
   })
 
-  it('перестаёт открываться прежним паролем', async () => {
+  it('stops opening with the old password', async () => {
     await secure.changePassword(PASSWORD, NEW_PASSWORD)
     secure.lock()
 
     await expect(secure.unlock(PASSWORD)).rejects.toThrow(InvalidPasswordError)
   })
 
-  it('отвергает неверный текущий пароль', async () => {
-    await expect(secure.changePassword('неверный', NEW_PASSWORD)).rejects.toThrow(
+  it('rejects a wrong current password', async () => {
+    await expect(secure.changePassword('wrong', NEW_PASSWORD)).rejects.toThrow(
       InvalidPasswordError,
     )
   })
 
-  it('не трогает данные при отказе', async () => {
-    await expect(secure.changePassword('неверный', NEW_PASSWORD)).rejects.toThrow()
+  it('does not touch data on failure', async () => {
+    await expect(secure.changePassword('wrong', NEW_PASSWORD)).rejects.toThrow()
 
     await expect(secure.get(STORAGE_NAMESPACE.Vault, VAULT_KEY)).resolves.toEqual({
       privateKey: PRIVATE_KEY_HEX,
     })
   })
 
-  it('меняет соль, а не только ключ', async () => {
+  it('changes the salt, not only the key', async () => {
     const before = await storage.get<Record<string, unknown>>(
       STORAGE_NAMESPACE.Settings,
       toStorageKey('secure-storage.header'),
@@ -333,15 +333,15 @@ describe('SecureStorage: смена пароля', () => {
     expect(JSON.stringify(after)).not.toBe(JSON.stringify(before))
   })
 
-  it('не оставляет секрет открытым после перешифровки', async () => {
+  it('does not leave the secret in the clear after re-encryption', async () => {
     await secure.changePassword(PASSWORD, NEW_PASSWORD)
 
     expect(await dumpRawStorage()).not.toContain(PRIVATE_KEY_HEX)
   })
 })
 
-describe('SecureStorage: полное удаление', () => {
-  it('стирает все данные и блокирует хранилище', async () => {
+describe('SecureStorage: full wipe', () => {
+  it('erases all data and locks the store', async () => {
     await secure.initialize(PASSWORD)
     await secure.set(STORAGE_NAMESPACE.Vault, VAULT_KEY, { privateKey: PRIVATE_KEY_HEX })
 

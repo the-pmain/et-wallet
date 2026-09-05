@@ -1,27 +1,28 @@
 import { toChainId, type ChainId } from '@/core/types'
 
 /**
- * Соответствие сетей идентификаторам CoinGecko.
+ * Mapping of networks to CoinGecko identifiers.
  *
- * ЗНАЧЕНИЯ ПОЛУЧЕНЫ ИЗ `GET /api/v3/asset_platforms`, А НЕ ВПИСАНЫ
- * ПО ПАМЯТИ. Идентификатор платформы непроверяем при чтении кода:
- * `optimism` вместо `optimistic-ethereum` даёт не ошибку, а пустой
- * ответ — то есть портфель без стоимости и ни одного сообщения
- * о причине. Сверка выполнена 31 июля 2026 года.
+ * VALUES COME FROM `GET /api/v3/asset_platforms`, NOT FROM MEMORY.
+ * A platform id is unverifiable when reading the code: `optimism`
+ * instead of `optimistic-ethereum` yields not an error but an empty
+ * response — i.e. a portfolio with no value and no message about
+ * why. Checked on 31 July 2026.
  *
- * Идентификатор нативной монеты взят оттуда же, из поля `native_coin_id`
- * той же записи: у Arbitrum, OP Mainnet и Base это `ethereum`, потому
- * что нативная валюта у них — тот же эфир.
+ * The native-coin id is taken from the same place, from
+ * `native_coin_id` of the same record: on Arbitrum, OP Mainnet, and
+ * Base it is `ethereum`, because their native currency is the same
+ * ether.
  */
 export interface ICoinGeckoPlatform {
-  /** Идентификатор платформы для запроса цен по адресу контракта. */
+  /** Platform id for a price request by contract address. */
   readonly platformId: string
 
-  /** Идентификатор нативной монеты для запроса цены по имени. */
+  /** Native-coin id for a price request by name. */
   readonly nativeCoinId: string
 }
 
-/** Ключ — идентификатор сети десятичной строкой. */
+/** Key is the network id as a decimal string. */
 const PLATFORMS: ReadonlyMap<string, ICoinGeckoPlatform> = new Map([
   ['1', { platformId: 'ethereum', nativeCoinId: 'ethereum' }],
   ['56', { platformId: 'binance-smart-chain', nativeCoinId: 'binancecoin' }],
@@ -33,17 +34,17 @@ const PLATFORMS: ReadonlyMap<string, ICoinGeckoPlatform> = new Map([
 ])
 
 /**
- * Возвращает соответствие для сети.
+ * Returns the mapping for a network.
  *
- * `null` для сети, которой нет в перечне: пользовательская сеть может
- * не поддерживаться источником вовсе, и подставить сюда похожую значило
- * бы показать курс чужого актива.
+ * `null` for a network not in the list: a custom network may not be
+ * supported by the source at all, and substituting a similar one
+ * would show the rate of a foreign asset.
  */
 export function findCoinGeckoPlatform(chainId: ChainId): ICoinGeckoPlatform | null {
   return PLATFORMS.get(chainId.toString()) ?? null
 }
 
-/** Сети, для которых есть соответствие в справочнике CoinGecko. */
+/** Networks that have a mapping in the CoinGecko directory. */
 export function listCoinGeckoPlatforms(): ReadonlyArray<{
   readonly chainId: ChainId
   readonly platform: ICoinGeckoPlatform

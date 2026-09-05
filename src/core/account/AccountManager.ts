@@ -57,55 +57,56 @@ import type {
 const SERVICE_NAME = 'AccountManager'
 
 /**
- * Создаёт идентификатор набора ключей для импортированного аккаунта.
+ * Creates a key-set identifier for an imported account.
  *
- * Каждый импортированный ключ образует собственный набор: он не связан
- * ни с HD-деревом, ни с другими импортированными ключами, и объединять
- * их под общим идентификатором значило бы утверждать несуществующую связь.
+ * Each imported key forms its own set: it is tied neither to the HD
+ * tree nor to other imported keys, and grouping them under a shared
+ * identifier would assert a link that does not exist.
  */
 function createImportedKeyringId(): KeyringId {
   return `imported-${createAccountId()}` as KeyringId
 }
 
-/** Зависимости менеджера. Внедряются конструктором. */
 export interface IAccountManagerDependencies {
   readonly repository: IAccountRepository
 
-  /** Источник HD-аккаунтов. Выводит адреса и выполняет подпись. */
+  /** HD-account source. Derives addresses and performs signing. */
   readonly hdWallet: IHDWalletService
 
-  /** Защищённое хранилище — для импортированных ключей и проверки пароля. */
+  /** Secure storage — for imported keys and password checks. */
   readonly secureStorage: ISecureStorage
 
   readonly clock: IClock
   readonly logger: ILogger
 
   /**
-   * Соединение с аппаратным кошельком по требованию.
+   * Connection to a hardware wallet on demand.
    *
-   * ФУНКЦИЯ, А НЕ ГОТОВЫЙ ОБЪЕКТ. Устройство подключают к разъёму
-   * и отключают когда угодно, а браузер выдаёт доступ к нему только
-   * по явному действию человека. Держать соединение открытым между
-   * операциями значило бы обещать доступ, которого может уже не быть.
+   * A FUNCTION, NOT A READY OBJECT. The device is plugged in and
+   * unplugged at any time, and the browser grants access to it only
+   * on an explicit human action. Keeping the connection open
+   * between operations would promise access that may already be
+   * gone.
    *
-   * Отсутствие означает сборку без поддержки устройств: подпись
-   * аппаратным аккаунтом в ней отвергается с внятной причиной.
+   * Absence means a build without device support: signing with a
+   * hardware account is then refused with a clear reason.
    */
   readonly connectHardware?: () => Promise<IHardwareDevice>
 }
 
 /**
- * Управление аккаунтами.
+ * Account management.
  *
- * Состояние держится в памяти: список аккаунтов нужен интерфейсу постоянно,
- * а обращение к расшифровке на каждый рендер недопустимо. Хранилище
- * читается один раз при `init()` и пишется при изменениях.
+ * State is held in memory: the UI needs the account list constantly,
+ * and decrypting on every render is not allowed. Storage is read
+ * once at `init()` and written on changes.
  *
- * ГРАНИЦА ОТВЕТСТВЕННОСТИ. Менеджер работает с публичной проекцией ключей.
- * Приватные ключи HD-аккаунтов остаются внутри `HDWalletService` и наружу
- * не выходят; импортированные лежат в `ImportedKeyStore` зашифрованными.
- * Единственный метод, выдающий секрет, — `exportPrivateKey`, и он требует
- * двух независимых подтверждений.
+ * RESPONSIBILITY BOUNDARY. The manager works with the public
+ * projection of keys. Private keys of HD accounts stay inside
+ * `HDWalletService` and do not go out; imported ones sit in
+ * `ImportedKeyStore` encrypted. The only method that reveals a
+ * secret is `exportPrivateKey`, and it requires two independent
+ * confirmations.
  */
 export class AccountManager implements IAccountManager {
   readonly #repository: IAccountRepository
@@ -114,9 +115,9 @@ export class AccountManager implements IAccountManager {
   readonly #connectHardware: (() => Promise<IHardwareDevice>) | null
   readonly #importedKeys: ImportedKeyStore
 
-  /* Подпись импортированным ключом выполняется здесь же: ключ не должен
-     покидать модуль, владеющий им. Для HD-аккаунтов подпись остаётся
-     внутри `HDWalletService` по той же причине. */
+  /* Signing with an imported key is done here: the key must not
+     leave the module that owns it. For HD accounts signing stays
+     inside `HDWalletService` for the same reason. */
   readonly #signing: ISigningService = new SigningService()
   readonly #clock: IClock
   readonly #logger: ILogger
@@ -145,7 +146,6 @@ export class AccountManager implements IAccountManager {
     this.#logger = dependencies.logger.child(SERVICE_NAME)
   }
 
-  /** Собирает менеджер с репозиторием по умолчанию поверх защищённого хранилища. */
   static create(dependencies: Omit<IAccountManagerDependencies, 'repository'>): AccountManager {
     return new AccountManager({
       ...dependencies,
@@ -164,9 +164,9 @@ export class AccountManager implements IAccountManager {
 
     const storedActive = await this.#repository.getActiveId()
 
-    /* Сохранённый выбор мог указывать на удалённый либо скрытый аккаунт.
-       Запасной вариант — первый видимый: интерфейс не должен остаться
-       без выбранного отправителя. */
+    /* The stored choice may have pointed at a removed or hidden
+       account. Fallback is the first visible one: the UI must not
+       be left without a chosen sender. */
     this.#activeId =
       storedActive !== null && this.#isSelectable(storedActive)
         ? storedActive
@@ -201,9 +201,9 @@ export class AccountManager implements IAccountManager {
   }
 
   getByAddress(address: Address): IAccount | null {
-    /* Сравнение без учёта регистра: один и тот же адрес встречается
-       в нижнем регистре (ответы RPC), в верхнем и в контрольной сумме
-       EIP-55. Прямое сравнение строк не нашло бы собственный аккаунт. */
+    /* Case-insensitive comparison: the same address appears in
+       lowercase (RPC replies), uppercase, and EIP-55 checksum. A
+       direct string compare would miss our own account. */
     return this.list().find((account) => areAddressesEqual(account.address, address)) ?? null
   }
 
@@ -230,13 +230,13 @@ export class AccountManager implements IAccountManager {
   async create(params: ICreateAccountParams = {}): Promise<IAccount> {
     this.#assertInitialized()
 
-    /* Индекс берётся как следующий за максимальным из уже созданных,
-       а не как число аккаунтов. Удалить HD-аккаунт нельзя, но можно
-       скрыть, и подсчёт по количеству дал бы повторный индекс — два
-       аккаунта с одним адресом. */
-    /* Явный номер приходит от восстановления: там адреса найдены
-       в дереве, и между ними бывают пропуски. Без него берётся
-       следующий свободный. */
+    /* The index is taken as the one after the maximum already
+       created, not as the account count. An HD account cannot be
+       deleted, but it can be hidden, and counting by quantity would
+       reuse an index — two accounts with one address. */
+    /* An explicit number comes from restore: there addresses were
+       found in the tree, and there may be gaps between them.
+       Without it the next free one is taken. */
     const addressIndex = params.addressIndex ?? this.#nextAddressIndex()
     const order = this.#accounts.size
     const account: IAccount = {
@@ -262,8 +262,8 @@ export class AccountManager implements IAccountManager {
   async importPrivateKey(params: IImportPrivateKeyParams): Promise<IAccount> {
     this.#assertInitialized()
 
-    /* Адрес выводится до сохранения: непригодный ключ не должен попасть
-       в хранилище даже зашифрованным. */
+    /* The address is derived before saving: an unfit key must not
+       enter storage even encrypted. */
     const address = privateKeyToAddress(params.privateKey)
     const existing = this.getByAddress(address)
 
@@ -277,8 +277,8 @@ export class AccountManager implements IAccountManager {
       address,
       name: normalizeAccountName(params.name ?? defaultAccountName(order)),
       source: KEYRING_TYPE.PrivateKey,
-      /* Собственный набор ключей: импортированный ключ не принадлежит
-         HD-дереву и не восстанавливается из seed-фразы. */
+      /* Its own key set: an imported key does not belong to the HD
+         tree and is not recovered from the seed phrase. */
       keyringId: createImportedKeyringId(),
       derivationPath: null,
       addressIndex: null,
@@ -324,9 +324,9 @@ export class AccountManager implements IAccountManager {
     const account = this.#requireAccount(id)
 
     if (account.source !== KEYRING_TYPE.PrivateKey) {
-      /* Аккаунт из HD-дерева появится снова при следующем восстановлении
-         кошелька по той же seed-фразе. Кнопка «удалить», которая на деле
-         лишь прячет запись, вводит пользователя в заблуждение. */
+      /* An account from the HD tree will reappear on the next
+         wallet restore from the same seed phrase. A "delete" button
+         that in fact only hides the record misleads the user. */
       throw new AccountNotRemovableError(
         'the account is derived from the seed phrase and will reappear when the wallet is restored; hide it instead',
       )
@@ -349,9 +349,9 @@ export class AccountManager implements IAccountManager {
       await this.setActive(replacement.id)
     }
 
-    /* Ключ удаляется первым: осиротевшая запись аккаунта без ключа
-       заметна и исправима, а осиротевший ключ без записи невидим
-       и останется в хранилище навсегда. */
+    /* The key is removed first: an orphaned account record without
+       a key is visible and fixable, and an orphaned key without a
+       record is invisible and will stay in storage forever. */
     await this.#importedKeys.remove(id)
     await this.#repository.delete(id)
     this.#accounts.delete(id)
@@ -385,19 +385,19 @@ export class AccountManager implements IAccountManager {
   }
 
   /**
-   * Подписывает транзакцию ключом аккаунта.
+   * Signs a transaction with the account key.
    *
-   * ЕДИНСТВЕННЫЙ ПУТЬ ПОДПИСИ ДЛЯ ОБОИХ ИСТОЧНИКОВ КЛЮЧЕЙ. HD-аккаунт
-   * подписывает внутри `HDWalletService`, где ключ выводится и затирается
-   * не покидая модуля. Импортированный ключ загружается здесь, передаётся
-   * в подпись и затирается в `finally` — наружу он не выходит ни в каком
-   * случае.
+   * THE ONLY SIGNING PATH FOR BOTH KEY SOURCES. An HD account signs
+   * inside `HDWalletService`, where the key is derived and wiped
+   * without leaving the module. An imported key is loaded here,
+   * passed into signing, and wiped in `finally` — it does not go
+   * out in any case.
    *
-   * ПАРОЛЬ НЕ ТРЕБУЕТСЯ, В ОТЛИЧИЕ ОТ ЭКСПОРТА. Экспорт выдаёт ключ
-   * пользователю навсегда, подпись же выполняет действие, которое
-   * пользователь только что подтвердил на экране. Требовать пароль
-   * на каждую подпись значило бы приучить вводить его machinally —
-   * и обесценить требование там, где оно защищает по-настоящему.
+   * NO PASSWORD IS REQUIRED, UNLIKE EXPORT. Export gives the key to
+   * the user forever; signing performs an action the user has just
+   * confirmed on screen. Requiring a password on every signature
+   * would train them to type it mechanically — and devalue the
+   * requirement where it truly protects.
    *
    * @throws AccountNotFoundError, KeyringCannotSignError
    */
@@ -408,9 +408,10 @@ export class AccountManager implements IAccountManager {
     const account = this.#requireAccount(id)
 
     if (account.source === KEYRING_TYPE.PrivateKey) {
-      /* Затирание выражено конструкцией, а не парой `try/finally`:
-         забытый `finally` не даёт ни ошибки компиляции, ни падения
-         теста — он молча оставляет приватный ключ в памяти. */
+      /* Wiping is expressed as a construct, not a `try/finally`
+         pair: a forgotten `finally` gives neither a compile error
+         nor a failing test — it silently leaves the private key in
+         memory. */
       return withSecretSync(await this.#importedKeys.load(id), (key) =>
         this.#signing.signTransaction(transaction, key),
       )
@@ -434,10 +435,10 @@ export class AccountManager implements IAccountManager {
   }
 
   /**
-   * Подписывает произвольное сообщение по EIP-191.
+   * Signs an arbitrary message per EIP-191.
    *
-   * Путь тот же, что у транзакции: импортированный ключ подписывается
-   * здесь и затирается сразу, ключ HD-аккаунта не покидает
+   * The path is the same as for a transaction: an imported key is
+   * signed here and wiped at once, an HD-account key does not leave
    * `HDWalletService`.
    *
    * @throws AccountNotFoundError, KeyringCannotSignError
@@ -465,16 +466,17 @@ export class AccountManager implements IAccountManager {
   }
 
   /**
-   * Подписывает структурированные данные по EIP-712.
+   * Signs structured data per EIP-712.
    *
-   * ОПАСНЕЕ ПОДПИСИ ТРАНЗАКЦИИ. Подписанная структура предъявляется
-   * контракту позже и в истории операций кошелька не отражается:
-   * владелец не увидит ни списания, ни комиссии. Сеть сверяется
-   * обязательно — подпись, сделанная для чужой цепи, может оказаться
-   * действительной там, где её не ждали.
+   * MORE DANGEROUS THAN TRANSACTION SIGNING. The signed structure
+   * is presented to a contract later and does not appear in the
+   * wallet's operation history: the owner will see neither a debit
+   * nor a fee. The network is checked mandatorily — a signature
+   * made for a foreign chain may be valid where it was not
+   * expected.
    *
    * @throws AccountNotFoundError, KeyringCannotSignError,
-   *         InvalidArgumentError при несовпадении сети.
+   *         InvalidArgumentError on a network mismatch.
    */
   async signTypedData(
     id: AccountId,
@@ -490,8 +492,8 @@ export class AccountManager implements IAccountManager {
     }
 
     if (isHardware(account.source)) {
-      /* Сеть сверяется здесь: устройство получит два готовых хэша и
-         проверить домен уже не сможет. */
+      /* The network is checked here: the device will get two ready
+         hashes and will no longer be able to check the domain. */
       assertTypedDataMatchesChain(data, expectedChainId)
 
       return await this.#signOnDevice(account, (device, path) => device.signTypedData(path, data))
@@ -505,14 +507,14 @@ export class AccountManager implements IAccountManager {
   }
 
   /**
-   * Выполняет операцию подписи на устройстве.
+   * Performs a signing operation on the device.
    *
-   * АДРЕС СВЕРЯЕТСЯ ДО ПОДПИСИ. Устройство подписывает тем ключом,
-   * который лежит по указанному пути; путь хранится у нас, а связь
-   * пути с адресом установлена при добавлении аккаунта. Подключи
-   * человек другое устройство — по тому же пути окажется другой ключ,
-   * и подпись ушла бы от чужого имени. Проверка стоит одного обращения
-   * и снимает этот случай целиком.
+   * THE ADDRESS IS CHECKED BEFORE SIGNING. The device signs with
+   * the key that sits at the given path; we store the path, and the
+   * path-to-address link was set when the account was added. If the
+   * person plugs in another device — a different key sits at the
+   * same path, and the signature would go out under a foreign name.
+   * The check costs one request and removes that case entirely.
    */
   async #signOnDevice<TResult>(
     account: IAccount,
@@ -541,12 +543,12 @@ export class AccountManager implements IAccountManager {
   }
 
   /**
-   * Добавляет аккаунт аппаратного кошелька.
+   * Adds a hardware-wallet account.
    *
-   * СЕКРЕТА ЗДЕСЬ НЕТ И БЫТЬ НЕ МОЖЕТ. Сохраняются только адрес и путь;
-   * ключ остаётся в устройстве, и без него аккаунт не подпишет ничего.
-   * Поэтому такой аккаунт можно удалить по-настоящему, в отличие
-   * от выведенного из seed-фразы.
+   * THERE IS NO SECRET HERE AND CANNOT BE. Only the address and
+   * path are saved; the key stays in the device, and without it the
+   * account will sign nothing. That is why such an account can be
+   * deleted for real, unlike one derived from the seed phrase.
    */
   async addHardwareAccount(params: IAddHardwareAccountParams): Promise<IAccount> {
     this.#assertInitialized()
@@ -565,7 +567,7 @@ export class AccountManager implements IAccountManager {
       source: params.type,
       keyringId: hardwareKeyringId(params.type),
       derivationPath: params.path,
-      /* Индекса в нашем дереве у него нет: дерево живёт в устройстве. */
+      /* It has no index in our tree: the tree lives in the device. */
       addressIndex: null,
       order,
       hidden: false,
@@ -586,16 +588,17 @@ export class AccountManager implements IAccountManager {
   ): Promise<ISecretBuffer> {
     const account = this.#requireAccount(id)
 
-    /* Пароль проверяется даже при снятой блокировке. Снятая блокировка
-       означает лишь, что пароль вводили когда-то, а не что за устройством
-       сейчас владелец. */
+    /* The password is checked even when the lock is off. An
+       unlocked lock only means the password was entered at some
+       point, not that the owner is at the device now. */
     if (!(await this.#secureStorage.verifyPassword(password))) {
       throw new InvalidPasswordError()
     }
 
     if (account.source === KEYRING_TYPE.PrivateKey) {
-      /* Разрешение для импортированного ключа гасится здесь: у него нет
-         индекса в HD-дереве, поэтому `HDWalletService` его не проверит. */
+      /* The permit for an imported key is consumed here: it has no
+         index in the HD tree, so `HDWalletService` will not check
+         it. */
       if (!permit.matches(EXPORT_KIND.PrivateKey, importedKeyScope(account.keyringId), null)) {
         throw new ExportNotPermittedError('the permit was issued for a different operation')
       }
@@ -635,7 +638,6 @@ export class AccountManager implements IAccountManager {
     this.#events.off(event, listener)
   }
 
-  /** Сохраняет аккаунт, обновляет память и назначает активным первый созданный. */
   async #persist(account: IAccount): Promise<void> {
     await this.#repository.save(account)
     this.#accounts.set(account.id, account)
@@ -650,10 +652,10 @@ export class AccountManager implements IAccountManager {
   }
 
   /**
-   * Следующий свободный индекс адреса в HD-дереве.
+   * Next free address index in the HD tree.
    *
-   * Максимальный использованный плюс один. Скрытые аккаунты учитываются:
-   * их адреса существуют и могут содержать средства.
+   * Maximum used plus one. Hidden accounts are counted: their
+   * addresses exist and may hold funds.
    */
   #nextAddressIndex(): number {
     let maximum = -1
@@ -705,22 +707,22 @@ export class AccountManager implements IAccountManager {
 }
 
 /**
- * Живёт ли ключ аккаунта в отдельном устройстве.
+ * Whether the account key lives in a separate device.
  *
- * Проверка по типу источника, а не по отсутствию индекса: у наблюдаемого
- * аккаунта индекса тоже нет, но подписать он не может ничем.
+ * Check by source type, not by missing index: a watched account
+ * also has no index, but it cannot sign with anything.
  */
 function isHardware(source: KeyringType): boolean {
   return source === KEYRING_TYPE.Ledger || source === KEYRING_TYPE.Trezor
 }
 
 /**
- * Приводит сообщение к байтам.
+ * Converts a message to bytes.
  *
- * Строка кодируется UTF-8 — тем же способом, что и внутри `personal_sign`.
- * Иначе подпись пришлась бы на другие байты, чем при подписи
- * программным ключом, и два аккаунта одного кошелька давали бы разные
- * подписи одного сообщения.
+ * A string is encoded as UTF-8 — the same way as inside
+ * `personal_sign`. Otherwise the signature would fall on different
+ * bytes than a software-key signature, and two accounts of one
+ * wallet would give different signatures of the same message.
  */
 function toMessageBytes(message: SignableMessage): Uint8Array {
   return typeof message === 'string' ? toUtf8Bytes(message) : Uint8Array.from(message)

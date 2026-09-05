@@ -42,7 +42,7 @@ const USDC: ITokenBalance = {
 }
 
 describe('SendAssetSelect', () => {
-  it('открывает список по нажатию и показывает знак в каждой строке', async () => {
+  it('opens the list on click and shows a mark in each row', async () => {
     const user = userEvent.setup()
     render(
       <SendAssetSelect
@@ -64,7 +64,7 @@ describe('SendAssetSelect', () => {
     expect(usdc.querySelector('img')?.getAttribute('src')).toBe('/logos/usdc.svg')
   })
 
-  it('передаёт выбранный актив и закрывает список', async () => {
+  it('passes the selected asset and closes the list', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     render(
@@ -83,7 +83,7 @@ describe('SendAssetSelect', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
-  it('помечает выбранный актив галочкой', async () => {
+  it('marks the selected asset with a check', async () => {
     const user = userEvent.setup()
     render(
       <SendAssetSelect

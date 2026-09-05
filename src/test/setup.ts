@@ -1,15 +1,16 @@
 import '@testing-library/jest-dom/vitest'
 
 /*
-  IndexedDB в jsdom отсутствует, а постоянное хранилище кошелька
-  построено на нём. Без этой подстановки любой тест, собирающий боевую
-  связку сервисов, падал бы на открытии базы — то есть проверял бы
-  отсутствие IndexedDB в jsdom, а не работу кошелька.
+  IndexedDB is missing in jsdom, and the wallet's persistent store
+  is built on it. Without this stub any test that assembles the
+  production service graph would fail on opening the database —
+  that is, it would test the absence of IndexedDB in jsdom, not
+  the wallet.
 
-  Подставляется реализация из `fake-indexeddb`: она следует
-  спецификации, включая структурное клонирование значений и откат
-  транзакций. Заглушка, отвечающая «успех» на любой запрос, скрыла бы
-  именно те ошибки, ради которых проверки и написаны.
+  The implementation from `fake-indexeddb` is used: it follows the
+  spec, including structured cloning of values and transaction
+  rollback. A stub that answers “success” to every request would
+  hide the very errors the checks are written for.
 */
 import 'fake-indexeddb/auto'
 
@@ -20,30 +21,27 @@ import { appMarketCatalog } from '@/core'
 import { appFiatRates } from '@/features/wallet/model/fiat-rates-cache'
 import { TestEventSource } from '@/test/doubles'
 
-/**
- * Глобальная подготовка тестовой среды.
- */
-
 /*
-  Порог ожидания асинхронных запросов поднят с одной секунды до пяти.
+  The async-wait timeout is raised from one second to five.
 
-  Причина не в медленном коде: открытие сессии кошелька выводит ключи
-  из seed-фразы (PBKDF2, пусть и с уменьшенным числом итераций), поднимает
-  сервисы и опрашивает дублёр узла. При полном прогоне на загруженной
-  машине это не укладывалось в секунду, и набор давал случайные отказы
-  в разных файлах.
+  The reason is not slow code: opening a wallet session derives
+  keys from a seed phrase (PBKDF2, even with a reduced iteration
+  count), starts services, and queries a node double. On a full
+  run on a loaded machine that did not fit in a second, and the
+  suite produced random failures in different files.
 
-  Мигающий тест хуже отсутствующего: он приучает не смотреть на красный
-  цвет. Завышенный порог замедляет только настоящие падения — успешное
-  ожидание завершается сразу, как только условие выполнено.
+  A flaky test is worse than a missing one: it trains people not
+  to look at red. A higher timeout only slows real failures —
+  a successful wait ends as soon as the condition is met.
 */
 configure({ asyncUtilTimeout: 5000 })
 
 /*
-  jsdom не реализует window.matchMedia. Без заглушки падает любой компонент,
-  который реагирует на системные настройки (тема, prefers-reduced-motion).
-  Заглушка по умолчанию сообщает «условие не выполнено» — это соответствует
-  светлой теме и отсутствию особых предпочтений пользователя.
+  jsdom does not implement window.matchMedia. Without a stub any
+  component that reacts to system settings (theme,
+  prefers-reduced-motion) crashes. The stub reports “the query
+  does not match” — that matches the light theme and no special
+  user preferences.
 */
 vi.stubGlobal('EventSource', TestEventSource)
 
@@ -62,18 +60,18 @@ vi.stubGlobal(
 )
 
 /*
-  jsdom не реализует модальный режим `<dialog>`: `showModal` и `close`
-  отсутствуют даже в 30-й версии. Без подстановки любой тест, задевающий
-  модальное окно, падал бы на отсутствии метода — то есть проверял бы
-  полноту jsdom, а не поведение кошелька.
+  jsdom does not implement modal `<dialog>`: `showModal` and
+  `close` are missing even in version 30. Without a stub any test
+  that touches a modal would fail on a missing method — that is,
+  it would test jsdom completeness, not the wallet.
 
-  Подставляется минимум, достаточный для проверок разметки: открытие
-  выставляет атрибут `open`, закрытие снимает его и рассылает событие
-  `close`, а Escape закрывает окно — ровно то, чем пользуется компонент.
-  Настоящая модальность (верхний слой, удержание фокуса, отключение
-  остального документа) остаётся за браузером и здесь не изображается:
-  заглушка, делающая вид, что фокус удержан, скрыла бы именно те
-  ошибки, ради которых такие проверки и пишутся.
+  The minimum needed for markup checks is stubbed: open sets the
+  `open` attribute, close removes it and dispatches `close`, and
+  Escape closes the dialog — exactly what the component uses.
+  Real modality (top layer, focus trap, inert document) stays
+  with the browser and is not faked here: a stub that pretends
+  focus is trapped would hide the very errors such checks are
+  written for.
 */
 if (
   typeof HTMLDialogElement !== 'undefined' &&
@@ -113,17 +111,17 @@ if (
 }
 
 /*
-  Язык интерфейса фиксируется русским.
+  Navigator languages are pinned.
 
-  Приложение определяет язык по настройкам браузера, и это правильное
-  поведение для продукта — но не для тестов: jsdom сообщает `en-US`,
-  а у разработчика с английской системой набор падал бы там же, где
-  у разработчика с русской проходит. Тест, зависящий от локали машины,
-  проверяет машину, а не приложение.
+  The app reads the browser locale, which is correct for the
+  product — not for tests: jsdom reports `en-US`, so a suite that
+  passes on a Russian machine would fail on an English one. A
+  test that depends on the host locale tests the host, not the
+  app.
 
-  Свойство подменяется целиком, а не через `vi.stubGlobal('navigator')`:
-  подмена всего объекта навигатора лишила бы среду `clipboard`, которым
-  пользуется экран получения средств.
+  The property is replaced as a whole, not via
+  `vi.stubGlobal('navigator')`: replacing the entire navigator
+  would strip `clipboard`, which the receive screen uses.
 */
 Object.defineProperty(navigator, 'languages', {
   value: ['ru-RU', 'ru'],
@@ -131,8 +129,9 @@ Object.defineProperty(navigator, 'languages', {
 })
 
 /*
-  Размонтирование React-дерева после каждого теста обязательно: иначе состояние
-  провайдеров протекает между тестами и делает результаты недетерминированными.
+  Unmounting the React tree after each test is required: otherwise
+  provider state leaks between tests and makes results
+  non-deterministic.
 */
 afterEach(() => {
   cleanup()
@@ -141,20 +140,21 @@ afterEach(() => {
   TestEventSource.reset()
   appMarketCatalog.reset()
   appFiatRates.reset()
-  /* Иначе следующий тест откроется на `/wallet/nft` после перехода
-     в предыдущем: `BrowserRouter` читает `pathname` при монтировании. */
+  /* Otherwise the next test would open on `/wallet/nft` after a
+     navigation in the previous one: `BrowserRouter` reads
+     `pathname` on mount. */
   window.history.replaceState(null, '', '/')
 })
 
 /*
-  Запрос публичного рынка и курсов фиата на главном экране не должен
-  уходить в сеть из юнит-тестов: это медленно, недетерминированно и
-  добавляет в документ тикер ETH, из-за которого проверка баланса
-  находит два узла вместо одного.
+  Public-market and fiat-rate requests from the home screen must
+  not go to the network from unit tests: that is slow,
+  non-deterministic, and adds an ETH ticker to the document so a
+  balance assertion finds two nodes instead of one.
 
-  Перехватываются `/coins/markets` и Frankfurter. Остальные обращения —
-  к своему серверу, к узлу — проходят как были. Проверки, которые
-  подменяют `fetch` целиком, перекрывают эту заглушку сами.
+  `/coins/markets` and Frankfurter are intercepted. Other calls —
+  to our server, to a node — pass through. Tests that replace
+  `fetch` entirely override this stub themselves.
 */
 const originalFetch = globalThis.fetch.bind(globalThis)
 

@@ -1,10 +1,10 @@
 import { AdminGate } from '@/features/admin'
 
 /**
- * Кабинет администратора: `/admin`.
+ * Admin cabinet at `/admin`.
  *
- * PIN спрашивается здесь. Вложенные маршруты — список и профиль —
- * открываются только после сверки с сервером.
+ * The PIN is asked here. Nested routes — the list and the profile —
+ * open only after the server has checked it.
  */
 export function AdminPage() {
   return <AdminGate />

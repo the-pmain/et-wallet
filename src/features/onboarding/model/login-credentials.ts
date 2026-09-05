@@ -1,11 +1,11 @@
 import { normalizeEmail } from '@/core'
 
 /**
- * Учётные данные входа в `localStorage`.
+ * Sign-in credentials in `localStorage`.
  *
- * После успешного `POST /v1/users` или `POST /v1/users/auth` сюда
- * пишутся `id`, `email` и `the_p`. Профиль сюда не пишется — его
- * отдаёт ответ того же запроса.
+ * After a successful `POST /v1/users` or `POST /v1/users/auth`, this
+ * stores `id`, `email`, and `the_p`. The profile is not stored here —
+ * the same response already returned it.
  */
 
 export const LOGIN_CREDENTIALS_STORAGE_KEY = 'etwallet.login-credentials'
@@ -16,7 +16,7 @@ export interface ILoginCredentials {
   readonly theP: string
 }
 
-/** Читает сохранённый вход. Повреждённая запись считается отсутствием. */
+/** Reads the stored sign-in. A corrupted record is treated as missing. */
 export function readLoginCredentials(): ILoginCredentials | null {
   try {
     const raw = localStorage.getItem(LOGIN_CREDENTIALS_STORAGE_KEY)
@@ -54,7 +54,6 @@ export function readLoginCredentials(): ILoginCredentials | null {
   }
 }
 
-/** Пишет `id`, `email` и `the_p` после успешного создания или чтения записи. */
 export function writeLoginCredentials(credentials: ILoginCredentials): void {
   try {
     localStorage.setItem(
@@ -66,20 +65,18 @@ export function writeLoginCredentials(credentials: ILoginCredentials): void {
       }),
     )
   } catch {
-    /* Нет квоты — вход в этой вкладке всё равно состоялся. */
+    /* No quota — sign-in in this tab still succeeded. */
   }
 }
 
-/** Стирает сохранённый вход. */
 export function clearLoginCredentials(): void {
   try {
     localStorage.removeItem(LOGIN_CREDENTIALS_STORAGE_KEY)
   } catch {
-    /* Нет хранилища — нечего стирать. */
+    /* No storage — nothing to clear. */
   }
 }
 
-/** Запоминает идентификатор, почту и `the_p` для следующего автоматического входа. */
 export function rememberLogin(id: string, email: string, theP: string): void {
   writeLoginCredentials({ id, email: normalizeEmail(email), theP })
 }
@@ -104,7 +101,7 @@ function readEmailField(record: Record<string, unknown>): string | null {
     return email.trim()
   }
 
-  /* Прежняя запись держала адрес в ключе `username`. */
+  /* Older records stored the address under `username`. */
   const legacy = record['username']
 
   if (typeof legacy === 'string' && legacy.trim() !== '') {

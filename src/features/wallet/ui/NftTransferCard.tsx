@@ -28,24 +28,25 @@ import { useWallet, useWalletSnapshot } from '../model/wallet-context'
 interface NftTransferCardProps {
   readonly item: INftItem
 
-  /** Закрывает форму, ничего не отправив. */
+  /** Closes the form without sending. */
   readonly onCancel: () => void
 
-  /** Вызывается после успешной отправки. */
+  /** Called after a successful send. */
   readonly onSent: (hash: TxHash) => void
 }
 
 /**
- * Передача коллекционного предмета.
+ * Transfer of a collectible.
  *
- * ЦЕНА ОШИБКИ ЗДЕСЬ ВЫШЕ, ЧЕМ У ПЕРЕВОДА ДЕНЕГ. Предмет существует
- * в одном экземпляре: отправленный не туда, он не возвращается
- * и не покупается заново. Поэтому получатель показывается целиком
- * и берётся из данных подписываемой транзакции, а не из поля формы.
+ * The cost of a mistake is higher than with money. The item exists
+ * in one copy: sent to the wrong place, it does not come back and
+ * cannot be bought again. So the recipient is shown in full and
+ * taken from the signed transaction data, not from a form field.
  *
- * ТРАНЗАКЦИЯ АДРЕСОВАНА КОНТРАКТУ, а не получателю: передачу выполняет
- * контракт коллекции. Экран называет оба адреса — иначе человек,
- * сверяющий их, решит, что кошелёк подменил получателя.
+ * The transaction is addressed to the contract, not the recipient:
+ * the collection contract performs the transfer. The screen names
+ * both addresses — otherwise someone checking them would think the
+ * wallet swapped the recipient.
  */
 export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps) {
   const session = useWallet()
@@ -84,12 +85,12 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
         return
       }
 
-      /* ПЕРЕДАЧА ПРЕДМЕТА В ЕГО СОБСТВЕННУЮ КОЛЛЕКЦИЮ — ЗАВЕДОМАЯ
-         ПОТЕРЯ, и предмет существует в одном экземпляре. Адрес контракта
-         легко попадает в поле получателя: он стоит рядом в обозревателе
-         и в самой карточке предмета. В отличие от прочих замечаний это
-         не повод задуматься, а отказ: законного применения у такой
-         операции нет. */
+      /* Sending an item to its own collection is a certain loss, and
+         the item exists in one copy. The contract address easily
+         lands in the recipient field: it sits next to it in the
+         explorer and on the item card. Unlike other remarks this is
+         a refusal, not a prompt to think: the operation has no
+         legitimate use. */
       if (areAddressesEqual(resolution.address, item.contract)) {
         setError(
           'The recipient is the collection contract itself. An item sent there is lost for good: ' +
@@ -139,8 +140,8 @@ export function NftTransferCard({ item, onCancel, onSent }: NftTransferCardProps
     const feePerGas = transaction.maxFeePerGas ?? transaction.gasPrice ?? 0n
     const maxFee = transaction.gasLimit * feePerGas
 
-    /* Получатель читается из подписываемых данных: показанное совпадает
-       с подписываемым по устройству экрана, а не по внимательности. */
+    /* Recipient is read from signed data: what is shown matches what
+       is signed by how the screen is built, not by attentiveness. */
     const confirmedRecipient = decodeSafeTransferRecipient(transaction.data)
 
     return (

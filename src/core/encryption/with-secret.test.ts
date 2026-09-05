@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ISecretBuffer } from './types'
 import { withSecret, withSecretSync } from './with-secret'
 
-/** Буфер-дублёр, считающий вызовы затирания. */
+/** Stand-in buffer that counts wipe calls. */
 interface ICountingSecret extends ISecretBuffer {
   readonly wipeCalls: number
 }
@@ -30,24 +30,23 @@ function createSecret(): ICountingSecret {
 }
 
 describe('withSecret', () => {
-  it('возвращает результат действия', async () => {
+  it('returns the action result', async () => {
     const secret = createSecret()
 
-    await expect(withSecret(secret, () => 'готово')).resolves.toBe('готово')
+    await expect(withSecret(secret, () => 'done')).resolves.toBe('done')
   })
 
-  it('затирает секрет после успешного действия', async () => {
+  it('wipes the secret after a successful action', async () => {
     const secret = createSecret()
 
-    await withSecret(secret, () => 'готово')
+    await withSecret(secret, () => 'done')
 
     expect(secret.wipeCalls).toBe(1)
   })
 
-  it('затирает секрет при исключении', async () => {
-    /* Ошибка посреди работы с ключом — обычное дело. Оставить секрет
-       в памяти именно в этот момент означало бы, что защита работает
-       только когда всё идёт хорошо. */
+  it('wipes the secret on exception', async () => {
+    /* Failures mid-key-use are normal. Leaving the secret in memory
+       then would mean the protection works only when everything goes well. */
     const secret = createSecret()
 
     await expect(
@@ -59,7 +58,7 @@ describe('withSecret', () => {
     expect(secret.wipeCalls).toBe(1)
   })
 
-  it('затирает секрет при отказе обещания', async () => {
+  it('wipes the secret when the promise rejects', async () => {
     const secret = createSecret()
 
     await expect(
@@ -69,8 +68,8 @@ describe('withSecret', () => {
     expect(secret.wipeCalls).toBe(1)
   })
 
-  it('затирает только после завершения асинхронного действия', async () => {
-    /* Затирание до завершения означало бы подпись обнулённым ключом. */
+  it('wipes only after the async action finishes', async () => {
+    /* Wiping before completion would mean signing with a zeroed key. */
     const secret = createSecret()
     let wipedDuringUse: boolean | null = null
 
@@ -87,21 +86,21 @@ describe('withSecret', () => {
 })
 
 describe('withSecretSync', () => {
-  it('возвращает результат и затирает секрет', () => {
+  it('returns the result and wipes the secret', () => {
     const secret = createSecret()
 
     expect(withSecretSync(secret, () => 42)).toBe(42)
     expect(secret.wipeCalls).toBe(1)
   })
 
-  it('затирает секрет при исключении', () => {
+  it('wipes the secret on exception', () => {
     const secret = createSecret()
 
     expect(() => {
       withSecretSync(secret, () => {
-        throw new Error('сбой')
+        throw new Error('failure')
       })
-    }).toThrow('сбой')
+    }).toThrow('failure')
 
     expect(secret.wipeCalls).toBe(1)
   })

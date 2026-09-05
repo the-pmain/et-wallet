@@ -6,16 +6,16 @@ import type { INetworkRepository } from './contracts'
 import type { INativeCurrency, INetworkConfig } from './types'
 
 /**
- * Представление конфигурации сети в хранилище.
+ * Stored representation of a network configuration.
  *
- * Отличается от доменной модели одним полем: `chainId` хранится десятичной
- * строкой, а не `bigint`.
+ * Differs from the domain model in one field: `chainId` is stored
+ * as a decimal string, not a `bigint`.
  *
- * Причина. Домен использует `bigint`, но требовать его поддержки от каждого
- * бэкенда хранилища — лишнее ограничение: `JSON.stringify` на `bigint`
- * выбрасывает исключение, а `chrome.storage` сериализует именно через JSON.
- * Преобразование в строку в одном месте делает данные переносимыми между
- * IndexedDB, `chrome.storage` и реализацией в памяти без кодеков.
+ * Why. The domain uses `bigint`, but requiring every storage backend
+ * to support it is an extra constraint: `JSON.stringify` throws on
+ * `bigint`, and `chrome.storage` serializes through JSON. Converting
+ * to a string in one place makes the data portable across IndexedDB,
+ * `chrome.storage`, and an in-memory implementation without codecs.
  */
 interface INetworkConfigRecord {
   readonly chainId: string
@@ -55,28 +55,30 @@ function fromRecord(record: INetworkConfigRecord): INetworkConfig {
 }
 
 /**
- * Хранение сетей.
+ * Network storage.
  *
- * ЗАПИСИ ШИФРУЮТСЯ. Сама по себе конфигурация сети не секрет: chainId
- * и символ валюты известны всем. Но у сети, добавленной пользователем,
- * в `rpcUrls` лежит адрес его узла, а такой адрес обычно несёт ключ
- * учётной записи у оператора — прямо в строке. Открытым текстом на диске
- * это равнозначно записанному паролю от стороннего сервиса.
+ * RECORDS ARE ENCRYPTED. A network configuration is not a secret
+ * by itself: chainId and the currency symbol are public. But a
+ * user-added network has the user's node address in `rpcUrls`,
+ * and that address usually carries the operator account key —
+ * right in the string. In plaintext on disk that is the same as
+ * a written-down password to a third-party service.
  *
- * СЕТИ НУЖНЫ ТОЛЬКО ПОСЛЕ РАЗБЛОКИРОВКИ. Список читается при открытии
- * сессии, когда ключ шифрования уже выведен, поэтому шифрование ничего
- * не ломает: до ввода пароля кошелёк всё равно не обращается к узлам.
+ * NETWORKS ARE NEEDED ONLY AFTER UNLOCK. The list is read when
+ * the session opens, after the encryption key is already derived,
+ * so encryption breaks nothing: until the password is entered
+ * the wallet does not talk to nodes anyway.
  *
- * ПРЕЖНИЕ ЗАПИСИ ПЕРЕНОСЯТСЯ. Кошельки, созданные до этой правки,
- * хранят сети открытым текстом. Перенос выполняется при первом чтении
- * и удаляет открытые записи: оставить их значило бы, что шифрование
- * ничего не даёт.
+ * LEGACY RECORDS ARE MIGRATED. Wallets created before this change
+ * store networks in plaintext. Migration runs on the first read
+ * and deletes the plaintext records: leaving them would mean
+ * encryption buys nothing.
  */
 export class NetworkRepository implements INetworkRepository {
   readonly #storage: ISecureStorage
 
-  /* Открытое хранилище прежнего формата. `null`, когда переносить
-     нечего — например, в проверках, начинающих с чистого места. */
+  /* Plaintext store of the old format. `null` when there is
+     nothing to migrate — e.g. in checks that start from a clean slate. */
   readonly #legacy: IStorageService | null
 
   constructor(storage: ISecureStorage, legacy: IStorageService | null = null) {
@@ -105,12 +107,12 @@ export class NetworkRepository implements INetworkRepository {
   }
 
   /**
-   * Переносит сети из открытого хранилища в зашифрованное.
+   * Moves networks from the plaintext store into the encrypted one.
    *
-   * ПОРЯДОК ВАЖЕН: сначала запись в зашифрованное, потом удаление
-   * из открытого. Обратный порядок при сбое посреди переноса потерял бы
-   * пользовательскую сеть, а этот в худшем случае оставит копию,
-   * которую уберёт следующий запуск.
+   * ORDER MATTERS: write to encrypted first, then delete from
+   * plaintext. The reverse order would lose a user network if a
+   * crash hit mid-migration; this one at worst leaves a copy that
+   * the next launch will remove.
    */
   async #migrateLegacy(): Promise<void> {
     const legacy = this.#legacy
@@ -168,9 +170,9 @@ export class NetworkRepository implements INetworkRepository {
       return null
     }
 
-    /* Значение из хранилища недоверенное: оно могло быть записано другой
-       версией приложения либо повреждено. Некорректный идентификатор
-       трактуется как отсутствие выбора, а не как повод остановить запуск. */
+    /* A value from storage is untrusted: it may have been written
+       by another app version or corrupted. A bad id is treated as
+       no selection, not as a reason to stop launch. */
     try {
       return toChainId(stored)
     } catch {

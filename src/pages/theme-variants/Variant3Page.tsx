@@ -15,10 +15,10 @@ const CABINET_NAV = [
 ] as const
 
 /**
- * Этюд 3: кабинет ETWallet.
+ * Study 3: ETWallet cabinet.
  *
- * Веб-ширина, фиат первым, отправления вместо ленты DeFi. Это язык
- * самого продукта — не расширения и не мобильного хаба.
+ * Web width, fiat first, sendings instead of a DeFi feed. This is the
+ * product's own language — not an extension and not a mobile hub.
  */
 export function Variant3Page() {
   return (

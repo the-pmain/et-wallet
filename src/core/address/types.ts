@@ -1,14 +1,14 @@
 /**
- * Форма записи публичного ключа secp256k1.
+ * Encoding of a secp256k1 public key.
  *
- * Сжатая (33 байта) содержит координату X и признак чётности Y; применяется
- * в BIP-32 и экономит место. Несжатая (65 байт) содержит обе координаты
- * и требуется при выводе адреса Ethereum.
+ * Compressed (33 bytes) holds the X coordinate and the Y-parity bit;
+ * used in BIP-32 and saves space. Uncompressed (65 bytes) holds both
+ * coordinates and is required when deriving an Ethereum address.
  *
- * Тип объявлен здесь, а не в модуле HD-кошелька, сознательно: адрес
- * выводится и из HD-ключа, и из импортированного приватного ключа.
- * Размещение в `core/address` задаёт направление зависимости
- * `hdwallet -> address` и исключает цикл между модулями.
+ * The type is declared here, not in the HD-wallet module, on
+ * purpose: an address is derived both from an HD key and from an
+ * imported private key. Placing it in `core/address` sets the
+ * dependency direction `hdwallet -> address` and rules out a cycle.
  */
 export const PUBLIC_KEY_FORMAT = {
   Compressed: 'compressed',
@@ -17,17 +17,17 @@ export const PUBLIC_KEY_FORMAT = {
 
 export type PublicKeyFormat = (typeof PUBLIC_KEY_FORMAT)[keyof typeof PUBLIC_KEY_FORMAT]
 
-/** Длина адреса EVM в байтах. */
+/** EVM address length in bytes. */
 export const ADDRESS_BYTE_LENGTH = 20
 
-/** Длина приватного ключа secp256k1 в байтах. */
+/** secp256k1 private-key length in bytes. */
 export const PRIVATE_KEY_LENGTH = 32
 
-/** Сжатый публичный ключ SEC1: префикс 0x02/0x03 и координата X. */
+/** Compressed SEC1 public key: prefix 0x02/0x03 and the X coordinate. */
 export const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
-/** Несжатый публичный ключ SEC1: префикс 0x04 и координаты X, Y. */
+/** Uncompressed SEC1 public key: prefix 0x04 and coordinates X, Y. */
 export const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 65
 
-/** Координаты X и Y без байта префикса — форма, используемая Ethereum. */
+/** Coordinates X and Y without the prefix byte — the form Ethereum uses. */
 export const RAW_PUBLIC_KEY_LENGTH = 64

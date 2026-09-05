@@ -18,28 +18,28 @@ export interface SelectProps<TValue extends string = string> {
   readonly className?: string
 
   /**
-   * Опасное поле — отказ перевода. Цвет тот же, что у остальных
-   * разрушающих контролов, а не отдельная палитра.
+   * Dangerous field — refuse a transfer. Same color as the other
+   * destructive controls, not a separate palette.
    */
   readonly tone?: 'default' | 'danger' | 'success'
 
   /**
-   * Куда раскрывается список. У нижних полей окна список вверх:
-   * иначе его обрезает `overflow` диалога.
+   * Where the list opens. Fields at the bottom of a dialog open
+   * upward: otherwise the dialog `overflow` clips the list.
    */
   readonly menuPlacement?: 'bottom' | 'top'
 }
 
 /**
- * Выбор одного значения из списка.
+ * Choose one value from a list.
  *
- * НЕ НАТИВНЫЙ `<select>`. Системное меню рисует ОС: в тёмном кабинете
- * оно всплывает светлым прямоугольником и ломает ряд полей. Этот
- * компонент повторяет кнопку и карточку приложения.
+ * NOT A NATIVE `<select>`. The system menu is drawn by the OS: in a
+ * dark cabinet it pops up as a light rectangle and breaks the field
+ * row. This component matches the app button and card.
  *
- * СПИСОК В ТОМ ЖЕ ДЕРЕВЕ, НЕ В PORTAL. Модальное `<dialog>` живёт
- * в верхнем слое браузера; портал в `document.body` оказался бы
- * под затемнением и был бы ненажимаем.
+ * THE LIST STAYS IN THE SAME TREE, NOT A PORTAL. A modal `<dialog>`
+ * lives in the browser top layer; a portal into `document.body`
+ * would sit under the backdrop and would not be clickable.
  */
 export function Select<TValue extends string>({
   id,

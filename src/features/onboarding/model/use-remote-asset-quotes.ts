@@ -8,11 +8,11 @@ import type { IRemoteAssetToken } from './RemoteUserDirectory'
 const EMPTY_QUOTES: PriceMap = new Map()
 
 /**
- * Курсы витрины из снимка рынка, загруженного при открытии приложения.
+ * Showcase quotes from the market snapshot loaded when the app opened.
  *
- * ОТДЕЛЬНЫХ ЗАПРОСОВ НЕТ. Раньше каждая карточка и каждый кошелёк
- * поднимали `simple/price` и `token_price` — бесплатный CoinGecko
- * отвечал 429, и доллары появлялись рывком или не появлялись вовсе.
+ * NO SEPARATE REQUESTS. Each card and each wallet used to hit
+ * `simple/price` and `token_price` — free CoinGecko answered 429,
+ * and dollars appeared in a burst or not at all.
  */
 export function useRemoteAssetQuotes(tokens: readonly IRemoteAssetToken[]): {
   readonly quotes: PriceMap

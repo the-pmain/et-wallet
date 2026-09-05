@@ -18,23 +18,23 @@ const WORDS = [
 ]
 
 describe('createConfirmationChallenge', () => {
-  it('проверяет три слова', () => {
+  it('checks three words', () => {
     expect(createConfirmationChallenge(WORDS).positions).toHaveLength(3)
   })
 
-  it('не повторяет позиции', () => {
+  it('does not repeat positions', () => {
     const { positions } = createConfirmationChallenge(WORDS)
 
     expect(new Set(positions).size).toBe(positions.length)
   })
 
-  it('предлагает четыре варианта на каждое слово', () => {
+  it('offers four options per word', () => {
     for (const options of createConfirmationChallenge(WORDS).options) {
       expect(options).toHaveLength(4)
     }
   })
 
-  it('включает правильный ответ в варианты', () => {
+  it('includes the correct answer in the options', () => {
     const challenge = createConfirmationChallenge(WORDS)
 
     challenge.positions.forEach((position, index) => {
@@ -42,16 +42,16 @@ describe('createConfirmationChallenge', () => {
     })
   })
 
-  it('не повторяет варианты внутри вопроса', () => {
+  it('does not repeat options inside a question', () => {
     for (const options of createConfirmationChallenge(WORDS).options) {
       expect(new Set(options).size).toBe(options.length)
     }
   })
 
-  it('берёт отвлекающие варианты из самой фразы', () => {
-    /* Словарная выборка по одному префиксу выдаёт себя: правильное слово
-       выделяется среди похожих друг на друга чужих, и пользователь
-       угадывает его не вспоминая. */
+  it('takes distractors from the phrase itself', () => {
+    /* A dictionary sample by one prefix gives itself away: the
+       correct word stands out among similar strangers, and the user
+       guesses it without remembering. */
     for (const options of createConfirmationChallenge(WORDS).options) {
       for (const option of options) {
         expect(WORDS).toContain(option)
@@ -59,9 +59,9 @@ describe('createConfirmationChallenge', () => {
     }
   })
 
-  it('не ставит правильный ответ всегда на одно место', () => {
-    /* Постоянная позиция правильного ответа превратила бы проверку
-       в нажатие одной и той же кнопки. */
+  it('does not always put the correct answer in one place', () => {
+    /* A fixed position for the correct answer would turn the check
+       into pressing the same button every time. */
     const indexes = new Set<number>()
 
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -74,7 +74,7 @@ describe('createConfirmationChallenge', () => {
     expect(indexes.size).toBeGreaterThan(1)
   })
 
-  it('выбирает разные позиции при повторных вызовах', () => {
+  it('picks different positions across calls', () => {
     const seen = new Set<string>()
 
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -84,7 +84,7 @@ describe('createConfirmationChallenge', () => {
     expect(seen.size).toBeGreaterThan(1)
   })
 
-  it('работает с фразой из 24 слов', () => {
+  it('works with a 24-word phrase', () => {
     const long = [...WORDS, ...WORDS.map((word) => `${word}-2`)]
 
     expect(createConfirmationChallenge(long).positions).toHaveLength(3)
@@ -92,23 +92,23 @@ describe('createConfirmationChallenge', () => {
 })
 
 describe('isConfirmationComplete', () => {
-  it('подтверждает верные ответы', () => {
+  it('accepts correct answers', () => {
     const challenge = createConfirmationChallenge(WORDS)
     const answers = challenge.positions.map((position) => WORDS[position] as string)
 
     expect(isConfirmationComplete(challenge, answers, WORDS)).toBe(true)
   })
 
-  it('отвергает неполные ответы', () => {
+  it('rejects incomplete answers', () => {
     const challenge = createConfirmationChallenge(WORDS)
 
     expect(isConfirmationComplete(challenge, [null, null, null], WORDS)).toBe(false)
   })
 
-  it('отвергает один неверный ответ', () => {
+  it('rejects a single wrong answer', () => {
     const challenge = createConfirmationChallenge(WORDS)
     const answers = challenge.positions.map((position) => WORDS[position] as string)
-    answers[0] = 'неверное'
+    answers[0] = 'wrong'
 
     expect(isConfirmationComplete(challenge, answers, WORDS)).toBe(false)
   })

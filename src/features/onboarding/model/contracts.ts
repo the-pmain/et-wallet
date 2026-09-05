@@ -2,78 +2,68 @@ import type { IMnemonicCheck, ISecretBuffer, IUnlockThrottleState, MnemonicStren
 
 import type { IRemoteUser } from './RemoteUserDirectory'
 
-/** Состояние кошелька, определяющее доступный экран. */
 export const ONBOARDING_STATE = {
-  /** Проверка ещё идёт. */
   Loading: 'loading',
-  /** Кошелёк не создан: доступны создание и импорт. */
   Uninitialized: 'uninitialized',
-  /** Кошелёк создан и заблокирован: требуется пароль. */
   Locked: 'locked',
-  /** Кошелёк разблокирован. */
   Unlocked: 'unlocked',
 } as const
 
 export type OnboardingState = (typeof ONBOARDING_STATE)[keyof typeof ONBOARDING_STATE]
 
 /**
- * Операции онбординга, доступные страницам.
+ * Onboarding operations available to pages.
  *
- * Интерфейс отделён от реализации, потому что страницы не должны знать,
- * чем именно обеспечено хранение: сейчас это хранилище в памяти, дальше
- * появится IndexedDB, а в расширении — `chrome.storage`. Смена не должна
- * затрагивать ни один экран.
+ * The interface is separated from the implementation so pages do not
+ * know how storage is provided: in-memory today, IndexedDB later,
+ * `chrome.storage` in the extension. A swap must not touch any screen.
  *
- * ЧТО НЕ ПОПАДАЕТ В ЭТОТ ИНТЕРФЕЙС: методы, возвращающие секреты кроме
- * `generateMnemonic`. Пароли передаются внутрь и не возвращаются,
- * приватные ключи не появляются здесь вовсе.
+ * WHAT THIS INTERFACE OMITS: methods that return secrets except
+ * `generateMnemonic`. Passwords go in and do not come back; private
+ * keys never appear here.
  */
 export interface IOnboardingService {
-  /** Текущее состояние кошелька. */
   getState(): OnboardingState
 
-  /** Подписка на смену состояния. Возвращает функцию отписки. */
   subscribe(listener: () => void): () => void
 
-  /** Определяет исходное состояние, читая хранилище. */
   initialize(): Promise<void>
 
   /**
-   * Создаёт новую мнемоническую фразу.
+   * Creates a new mnemonic phrase.
    *
-   * Владение переходит вызывающему: буфер обязан быть затёрт после того,
-   * как пользователь подтвердил, что записал фразу.
+   * Ownership passes to the caller: the buffer must be wiped after
+   * the user confirms they wrote the phrase down.
    */
   generateMnemonic(strength: MnemonicStrength): ISecretBuffer
 
-  /** Разбивает фразу на слова для показа. */
   toWords(mnemonic: ISecretBuffer): readonly string[]
 
   /**
-   * Проверяет введённую фразу, не выбрасывая исключений.
+   * Checks an entered phrase without throwing.
    *
-   * ЗАМЕНИЛ СОБОЙ `validateMnemonic`. Возвращаемая структура расширяет
-   * прежнюю, а не заменяет её: все поля старого результата на месте,
-   * добавлено предупреждение о тривиальной энтропии. Держать оба метода
-   * значило бы иметь две проверки фразы, из которых одна слабее, —
-   * и однажды вызвать не ту.
+   * REPLACED `validateMnemonic`. The returned structure extends the
+   * old one rather than replacing it: every previous field remains,
+   * plus a warning about trivial entropy. Keeping both methods would
+   * mean two phrase checks, one weaker — and eventually calling the
+   * wrong one.
    */
   checkMnemonic(phrase: string): IMnemonicCheck
 
-  /** Слова словаря по префиксу — для отвлекающих вариантов при проверке. */
+  /** Dictionary words by prefix — used as confirmation distractors. */
   findWordsByPrefix(prefix: string, limit?: number): readonly string[]
 
   /**
-   * Создаёт кошелёк из показанной пользователю фразы.
+   * Creates a wallet from the phrase shown to the user.
    *
-   * Если на устройстве уже было хранилище, оно заменяется: экран
-   * создания не требует отдельного сброса.
+   * If the device already had a vault, it is replaced: the create
+   * screen does not require a separate reset.
    *
-   * @param username Адрес почты. В таблице `users` он пишется в `email`.
-   *        Необязателен на уровне сервиса: без него кошелёк остаётся
-   *        только на устройстве. Если задан — это почта, не имя.
-   * @throws WeakPasswordError, InvalidArgumentError если адрес задан
-   *         и составлен неверно.
+   * @param username Email address. Written to `email` in the `users`
+   *        table. Optional at the service level: without it the wallet
+   *        stays on-device only. If given, it is email, not a name.
+   * @throws WeakPasswordError, InvalidArgumentError if the address is
+   *         given and malformed.
    */
   createWallet(
     mnemonic: ISecretBuffer,
@@ -82,76 +72,73 @@ export interface IOnboardingService {
   ): Promise<IRemoteUser | null>
 
   /**
-   * Импортирует существующий кошелёк.
+   * Imports an existing wallet.
    *
-   * Прежнее хранилище на устройстве заменяется, как при создании.
+   * The previous on-device vault is replaced, as on create.
    *
    * @throws InvalidMnemonicError, WeakPasswordError, InvalidArgumentError
    */
   importWallet(phrase: string, password: string, username?: string): Promise<IRemoteUser | null>
 
   /**
-   * Снимает блокировку.
+   * Unlocks the wallet.
    *
-   * Требует только пароля: имя пользователя лежит в том же
-   * зашифрованном хранилище и сверяться может лишь после успешной
-   * расшифровки — то есть после того, как пароль уже подошёл.
+   * Takes only a password: the username lives in the same encrypted
+   * store and can be compared only after a successful decrypt — i.e.
+   * after the password already matched.
    */
   unlock(password: string): Promise<void>
 
   /**
-   * Возвращает сохранённый адрес электронной почты.
+   * Returns the stored email address.
    *
-   * Available только после разблокировки: адрес хранится зашифрованным.
-   * `null` означает, что кошелёк создан без него.
+   * Available only after unlock: the address is stored encrypted.
+   * `null` means the wallet was created without one.
    */
   getUsername(): Promise<string | null>
 
   /**
-   * Идентификатор строки в таблице `users`, если кошелёк уже
-   * регистрировался на сервере.
+   * Row id in the `users` table, if the wallet has already registered
+   * on the server.
    *
-   * Available только после разблокировки: значение лежит
-   * в зашифрованном хранилище. `null` — справочника не было
-   * или запись ещё не создавалась.
+   * Available only after unlock: the value lives in encrypted storage.
+   * `null` — no directory, or the row has not been created yet.
    */
   getRemoteUserId(): Promise<string | null>
 
   /**
-   * Проверяет пароль, не меняя состояния блокировки.
+   * Checks the password without changing lock state.
    *
-   * Нужен повторному подтверждению перед рискованным действием: оно
-   * происходит в уже разблокированном кошельке, и разблокировать
-   * заново нечего. Проверка выполняется тем же способом, что
-   * и разблокировка, — расшифровкой контрольного значения.
+   * Used for re-confirmation before a risky action: that happens in an
+   * already unlocked wallet, so there is nothing to unlock again.
+   * The check uses the same path as unlock — decrypting a control value.
    */
   verifyPassword(password: string): Promise<boolean>
 
   /**
-   * Ограничитель попыток выключен: вход не считает неудачи
-   * и не закрывает форму. Метод оставлен, чтобы экран входа
-   * не зависел от того, подключён ли счётчик.
+   * The attempt limiter is off: sign-in does not count failures
+   * and does not lock the form. The method remains so the sign-in
+   * screen does not depend on whether a counter is wired up.
    */
   getUnlockThrottleState(): Promise<IUnlockThrottleState>
 
-  /** Ставит блокировку. */
   lock(): void
 
   /**
-   * Стирает кошелёк целиком.
+   * Erases the wallet entirely.
    *
-   * НЕОБРАТИМАЯ ОПЕРАЦИЯ. Без записанной seed-фразы средства теряются
-   * безвозвратно. Пароль не требуется намеренно: этот путь существует
-   * именно для случая, когда пароль забыт.
+   * IRREVERSIBLE. Without a written seed phrase, funds are lost.
+   * A password is not required on purpose: this path exists for
+   * the case when the password is forgotten.
    */
   reset(): Promise<void>
 
   /**
-   * Принимает стирание кошелька, выполненное в другой вкладке.
+   * Accepts a wallet erase performed in another tab.
    *
-   * Хранилище уже уничтожено той вкладкой; здесь снимается доступ
-   * в этой — иначе она продолжила бы показывать балансы и предлагать
-   * отправку, держа ключи в памяти.
+   * Storage was already destroyed by that tab; this drops access
+   * here — otherwise the tab would keep showing balances and
+   * offering send while holding keys in memory.
    */
   handleExternalReset(): void
 }

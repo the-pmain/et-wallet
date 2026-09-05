@@ -15,10 +15,10 @@ function createAdminClient(): AdminClient {
 }
 
 /**
- * Страж кабинета: PIN на сервере, сессия — в `localStorage`.
+ * Cabinet gate: PIN on the server, session in `localStorage`.
  *
- * Пока PIN не принят, вложенные маршруты не монтируются. После приёма
- * оболочка остаётся на месте при переходе к профилю пользователя.
+ * Nested routes do not mount until the PIN is accepted. After that
+ * the shell stays in place when opening a user profile.
  */
 export function AdminGate() {
   const client = useMemo(() => createAdminClient(), [])

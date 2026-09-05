@@ -28,9 +28,6 @@ interface SendingEditDialogProps {
   readonly onSave: (id: string, patch: IAdminSendingPatch) => void
 }
 
-/**
- * Правка записи перевода. id, время и userId только для чтения.
- */
 export function SendingEditDialog({
   sending,
   isBusy,

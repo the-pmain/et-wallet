@@ -1,12 +1,11 @@
 import { TRANSACTION_STATUS, TRANSFER_SOURCE, type ITransferRecord } from '@/core'
 
 /**
- * Что делают с зависшей транзакцией.
+ * What is done with a stuck transaction.
  *
- * ДВА ДЕЙСТВИЯ РАЗЛИЧАЮТСЯ ПО ПОСЛЕДСТВИЯМ, а не по цене. Ускорение
- * доводит перевод до конца быстрее; отмена пытается не дать ему
- * состояться вовсе. Свести их к одной кнопке «исправить» значит
- * позволить пользователю отменить перевод, думая, что он его ускоряет.
+ * The two actions differ by outcome, not by fee. Speed-up finishes
+ * the transfer sooner; cancel tries to stop it. One "fix" button
+ * would let a user cancel while thinking they are speeding up.
  */
 export const REPLACEMENT_KIND = {
   SpeedUp: 'speed-up',
@@ -16,20 +15,19 @@ export const REPLACEMENT_KIND = {
 export type ReplacementKind = (typeof REPLACEMENT_KIND)[keyof typeof REPLACEMENT_KIND]
 
 /**
- * Можно ли заменить перевод.
+ * Whether a transfer can be replaced.
  *
- * ТОЛЬКО СОБСТВЕННЫЕ ОТПРАВКИ. Замена подписывается ключом отправителя
- * и занимает его номер: чужую транзакцию заменить невозможно в принципе.
- * Записи из индексатора приходят и по чужим переводам, поэтому источник
- * проверяется явно.
+ * Own sends only. Replace is signed with the sender's key and takes
+ * its nonce: someone else's tx cannot be replaced. Indexer records
+ * include foreign transfers, so the source is checked explicitly.
  *
- * ТОЛЬКО ОЖИДАЮЩИЕ. Попавшую в блок транзакцию заменить нельзя: её номер
- * израсходован. Ядро откажет и в этом случае, но показывать кнопку,
- * которая гарантированно даст отказ, — обман.
+ * Pending only. A tx that landed cannot be replaced — its nonce is
+ * spent. The core would refuse anyway; showing a button that is
+ * guaranteed to fail is a lie.
  *
- * Наличие сохранённых параметров здесь не проверяется: без них ускорение
- * невозможно, а отмена — вполне. Разбирается это в ядре, где параметры
- * доступны, и отказ называет причину.
+ * Saved parameters are not checked here: without them speed-up is
+ * impossible, cancel is not. The core has the parameters and names
+ * the reason on refusal.
  */
 export function isReplaceable(record: ITransferRecord): boolean {
   return record.source === TRANSFER_SOURCE.Local && record.status === TRANSACTION_STATUS.Pending

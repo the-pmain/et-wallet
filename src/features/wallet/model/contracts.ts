@@ -34,11 +34,11 @@ import type {
 } from '@/core'
 
 /**
- * Токен вместе с его балансом.
+ * Token together with its balance.
  *
- * Баланс необязателен: контракт мог перестать отвечать, и потерять
- * из-за этого весь список хуже, чем показать строку без величины.
- * `null` означает «прочитать не удалось», а не ноль.
+ * The balance is optional: the contract may have stopped answering,
+ * and losing the whole list for that is worse than showing a row
+ * without an amount. `null` means "could not read", not zero.
  */
 export interface ITokenBalance {
   readonly token: IToken
@@ -46,138 +46,133 @@ export interface ITokenBalance {
 }
 
 /**
- * Подготовленный перевод вместе с вариантами комиссии.
+ * A prepared transfer together with fee options.
  *
- * `transaction` — ровно тот объект, который уйдёт в подпись. Экран
- * подтверждения показывает его поля, и он же передаётся в `sendTransfer`.
+ * `transaction` is exactly the object that will be signed. The
+ * confirmation screen shows its fields, and the same object is
+ * passed to `sendTransfer`.
  */
 export interface IPreparedTransfer {
   readonly transaction: ISignableTransaction
   readonly fees: readonly IFeeEstimate[]
 
   /**
-   * Итог прогона вызова на узле до подписи.
+   * Result of running the call on the node before signing.
    *
-   * ПОКАЗЫВАЕТСЯ ВСЕГДА, включая случай «проверить не удалось».
-   * Молчание кошелька о непроведённой проверке читается как её
-   * успешное прохождение.
+   * Always shown, including "could not check". Wallet silence
+   * about a skipped check reads as the check having passed.
    */
   readonly preflight: IPreflightResult
 
   /**
-   * Что транзакция сделает по нынешнему состоянию цепи.
+   * What the transaction will do against the current chain state.
    *
-   * ПОКАЗЫВАЕТСЯ ВСЕГДА, включая случаи «узел не умеет» и «проверить
-   * не удалось». Пустой перечень перемещений значим только тогда,
-   * когда симуляция прошла: иначе он означал бы «ничего не двинется»
-   * там, где кошелёк попросту не смотрел.
+   * Always shown, including "node cannot" and "could not check".
+   * An empty movement list is meaningful only when the simulation
+   * succeeded: otherwise it would mean "nothing will move" where
+   * the wallet simply did not look.
    */
   readonly simulation: ISimulationResult
 }
 
-/** Итог поиска занятых адресов. */
+/** Result of searching for used addresses. */
 export interface IAccountDiscoverySummary {
-  /** Сколько аккаунтов добавлено. */
   readonly added: number
 
-  /** Сколько адресов проверено. Нужно, чтобы честно назвать глубину. */
+  /** Addresses checked. Needed to name the depth honestly. */
   readonly scanned: number
 
   /**
-   * Поиск прекращён пределом, а не промежутком пустых адресов.
+   * The search stopped at the limit, not at a gap of empty
+   * addresses.
    *
-   * Значит, дальше могли остаться занятые, и говорить «это все ваши
-   * аккаунты» нельзя.
+   * Used addresses may remain beyond it, so it is not allowed
+   * to say "these are all your accounts".
    */
   readonly stoppedByLimit: boolean
 }
 
 /**
- * Итог разбора того, что введено в поле получателя.
+ * Result of parsing what was typed in the recipient field.
  *
- * ПОЧЕМУ СОСТОЯНИЙ СТОЛЬКО. «Имени не существует», «имя написано
- * символами, которых мы не поддерживаем», «ENS не работает в этой сети»
- * и «узел не ответил» требуют от пользователя разных действий. Сведи их
- * к одному «неверный получатель» — и человек, у которого просто отвалился
- * узел, решит, что имени не существует, и отправит средства на адрес,
- * набранный по памяти.
+ * Why so many states. "The name does not exist", "the name uses
+ * characters we do not support", "ENS does not work on this
+ * network", and "the node did not answer" need different user
+ * actions. Collapse them into one "invalid recipient" and a
+ * person whose node just dropped will decide the name does not
+ * exist and send funds to an address typed from memory.
  */
 export const RECIPIENT_STATUS = {
-  /** Поле пусто. */
   Empty: 'empty',
-  /** Введён адрес. */
   Address: 'address',
-  /** Имя разрешено в адрес. */
+  /** The name resolved to an address. */
   NameResolved: 'name-resolved',
-  /** Имя выглядит именем, но записи для него нет. */
+  /** Looks like a name, but there is no record for it. */
   NameNotFound: 'name-not-found',
-  /** Имя содержит символы вне поддерживаемого набора. */
+  /** The name contains characters outside the supported set. */
   NameUnsupported: 'name-unsupported',
-  /** Активна сеть, в которой реестра ENS не существует. */
+  /** The active network has no ENS registry. */
   EnsUnavailable: 'ens-unavailable',
-  /** Узел не ответил: проверить имя не удалось. */
+  /** The node did not answer: the name could not be checked. */
   Failed: 'failed',
-  /** Введённое не является ни адресом, ни именем. */
+  /** The input is neither an address nor a name. */
   Invalid: 'invalid',
 } as const
 
 export type RecipientStatus = (typeof RECIPIENT_STATUS)[keyof typeof RECIPIENT_STATUS]
 
-/** Получатель, разобранный из строки ввода. */
 export interface IRecipientResolution {
   readonly status: RecipientStatus
 
-  /** Адрес получателя. `null`, пока его нет. */
+  /** Recipient address. `null` until one exists. */
   readonly address: Address | null
 
   /**
-   * Имя, связанное с адресом, в виде для показа.
+   * The name linked to the address, in display form.
    *
-   * Для введённого имени — то, из которого получен адрес. Для введённого
-   * адреса — подтверждённая обратная запись, если она есть. `null`
-   * в остальных случаях.
+   * For a typed name — the one the address came from. For a
+   * typed address — a verified reverse record, if any. `null`
+   * otherwise.
    */
   readonly name: string | null
 
   /**
-   * Имя записано только символами ASCII.
+   * The name is written in ASCII only.
    *
-   * ENSIP-15 запрещает смешивать письменности внутри метки, но имя,
-   * целиком записанное другой письменностью и похожее по начертанию
-   * на латинское, остаётся законным и принадлежит другому человеку.
-   * `true` при отсутствии имени: оговаривать нечего.
+   * ENSIP-15 forbids mixing scripts inside a label, but a name
+   * written entirely in another script and look-alike to a Latin
+   * one stays legal and belongs to someone else. `true` when
+   * there is no name: nothing to caveat.
    */
   readonly isAscii: boolean
 }
 
-/** Состояние сессии кошелька. */
 export const SESSION_STATE = {
-  /** Кошелёк заблокирован либо ещё не создан: сервисов не существует. */
+  /** Wallet locked or not yet created: no services exist. */
   Closed: 'closed',
-  /** Идёт вывод ключей и чтение хранилища. */
   Opening: 'opening',
-  /** Сессия готова, данные доступны. */
   Open: 'open',
-  /** Открыть не удалось. Причина в снимке. */
+  /** Could not open. The reason is in the snapshot. */
   Failed: 'failed',
 } as const
 
 export type SessionState = (typeof SESSION_STATE)[keyof typeof SESSION_STATE]
 
 /**
- * Неизменяемый снимок состояния кошелька для интерфейса.
+ * Immutable wallet-state snapshot for the UI.
  *
- * ПОЧЕМУ СНИМОК, А НЕ НАБОР ГЕТТЕРОВ. `useSyncExternalStore` сравнивает
- * результат `getSnapshot()` по ссылке и вызывает перерисовку при её смене.
- * Геттеры, собирающие объект заново при каждом вызове, дали бы новую ссылку
- * на каждом рендере и бесконечный цикл перерисовок.
+ * Why a snapshot, not a set of getters. `useSyncExternalStore`
+ * compares `getSnapshot()` by reference and redraws when it
+ * changes. Getters that assemble a new object on every call
+ * would give a new reference on every render and an infinite
+ * redraw loop.
  *
- * Поля с данными обновляются заменой всего снимка целиком.
+ * Data fields update by replacing the whole snapshot.
  */
 export interface IWalletSnapshot {
   readonly state: SessionState
 
-  /** Причина отказа при `state === Failed`. */
+  /** Failure reason when `state === Failed`. */
   readonly error: string | null
 
   readonly accounts: readonly IAccount[]
@@ -186,228 +181,220 @@ export interface IWalletSnapshot {
   readonly networks: readonly INetworkConfig[]
   readonly activeNetwork: INetworkConfig | null
 
-  /** Баланс активного аккаунта в активной сети. `null`, пока не получен. */
+  /** Active-account balance on the active network. `null` until fetched. */
   readonly balance: IBalance | null
 
-  /** Причина последнего отказа запроса баланса. */
   readonly balanceError: string | null
 
-  /** Идёт первичное получение баланса. */
   readonly isBalanceLoading: boolean
 
   /**
-   * История переводов активного аккаунта в активной сети.
+   * Transfer history of the active account on the active network.
    *
-   * Содержит переводы нативной валюты, токенов ERC-20 и коллекционных
-   * токенов — в объёме, доступном подключённому источнику. Ограничения
-   * описаны в `historyLimits` и обязаны быть показаны: неполная история,
-   * выданная за полную, читается как пропавшие средства.
+   * Includes native, ERC-20, and collectible transfers — in the
+   * volume the connected source can give. Limits live in
+   * `historyLimits` and must be shown: incomplete history passed
+   * off as complete reads as missing funds.
    */
   readonly transfers: readonly ITransferRecord[]
 
-  /** Чем ограничена показанная история. `null`, пока она не загружена. */
+  /** What limits the shown history. `null` until it is loaded. */
   readonly historyLimits: IHistoryLimits | null
 
-  /** Идёт загрузка истории. */
   readonly isHistoryLoading: boolean
 
   /**
-   * Чем продолжить историю. `null` — продолжать нечем.
+   * How to continue history. `null` means there is nothing more.
    *
-   * ОТЛИЧАЕТ «ЭТО ВСЯ ИСТОРИЯ» ОТ «ЭТО ПЕРВЫЙ УЧАСТОК». Отбор
-   * и поиск работают по загруженным записям, и пустой результат при
-   * непустой метке означает лишь «среди загруженного не нашлось»,
-   * а не «таких операций не было».
+   * Distinguishes "this is all history" from "this is the first
+   * stretch". Filter and search run over loaded records, and an
+   * empty result with a non-null cursor means only "none among
+   * what is loaded", not "those operations never happened".
    */
   readonly historyCursor: IHistoryCursor | null
 
-  /** Идёт дозагрузка более раннего участка. */
   readonly isHistoryLoadingMore: boolean
 
   /**
-   * Отслеживаемые токены активной сети с балансами.
+   * Tracked tokens of the active network with balances.
    *
-   * Первым идёт нативная валюта: она есть в любой сети и не убирается.
+   * Native currency comes first: it exists on every network and
+   * cannot be removed.
    */
   readonly tokenBalances: readonly ITokenBalance[]
 
-  /** Идёт загрузка балансов токенов. */
   readonly isTokensLoading: boolean
 
   /**
-   * Коллекционные предметы активного аккаунта в активной сети.
+   * Collectibles of the active account on the active network.
    *
-   * `null` означает «не запрашивали», пустой массив — «предметов
-   * не найдено». Разница существенна: первое не утверждает ничего,
-   * второе утверждает, что искали.
+   * `null` means "never asked", an empty array means "none
+   * found". The difference matters: the first asserts nothing,
+   * the second asserts a search happened.
    *
-   * СПИСОК НЕ ЗАГРУЖАЕТСЯ САМ. Поиск требует выборки журналов и запроса
-   * к каждому найденному контракту — это десятки обращений к узлу
-   * и подробный след активности у его оператора. Владелец запрашивает
-   * их, открывая раздел.
+   * The list is not loaded by itself. Search needs a log scan
+   * and a call to every found contract — dozens of node hits
+   * and a detailed activity trail for its operator. The owner
+   * requests them by opening the section.
    */
   readonly nfts: readonly INftItem[] | null
 
-  /** Чем ограничен показанный список предметов. `null` до запроса. */
+  /** What limits the shown item list. `null` before a request. */
   readonly nftLimits: INftLimits | null
 
-  /** Идёт поиск предметов. */
   readonly isNftLoading: boolean
 
   /**
-   * Разрешения, выданные активным аккаунтом в активной сети.
+   * Approvals issued by the active account on the active network.
    *
-   * `null` означает «не запрашивали», пустой массив — «действующих
-   * разрешений не найдено». Разница существенна: первое не утверждает
-   * ничего, второе утверждает, что искали.
+   * `null` means "never asked", an empty array means "no live
+   * approvals found". The difference matters: the first asserts
+   * nothing, the second asserts a search happened.
    *
-   * СПИСОК НЕ ЗАГРУЖАЕТСЯ САМ — как и предметы: это выборка журналов
-   * и обращение к каждому найденному контракту.
+   * The list is not loaded by itself — same as collectibles: a
+   * log scan and a call to every found contract.
    */
   readonly approvals: readonly IApprovalRecord[] | null
 
-  /** Чем ограничен показанный список разрешений. `null` до запроса. */
+  /** What limits the shown approval list. `null` before a request. */
   readonly approvalLimits: IApprovalLimits | null
 
-  /** Идёт поиск разрешений. */
   readonly isApprovalsLoading: boolean
 
   /**
-   * Оценка портфеля активного аккаунта в активной сети.
+   * Portfolio estimate of the active account on the active network.
    *
-   * `null`, пока курсы не запрошены либо источник не подключён.
-   * Пустая сводка и отсутствие сводки означают разное: первое —
-   * «активов нет», второе — «стоимость неизвестна».
+   * `null` until rates are requested or the source is not
+   * connected. An empty summary and a missing summary mean
+   * different things: the first is "no assets", the second is
+   * "value unknown".
    */
   readonly portfolio: IPortfolioSummary | null
 
   /**
-   * Пользователь разрешил обращаться к стороннему источнику курсов.
+   * The user allowed a third-party price source.
    *
-   * Пока согласия нет, кошелёк курсов не запрашивает: запрос называет
-   * сервису адрес контракта, то есть сообщает состав портфеля.
+   * Until there is consent the wallet does not request rates:
+   * the request names the contract address to the service, i.e.
+   * discloses the portfolio.
    */
   readonly arePricesEnabled: boolean
 
-  /** Идёт загрузка курсов. */
   readonly isPortfolioLoading: boolean
 
-  /** Причина последнего отказа источника курсов. */
   readonly priceError: string | null
 
-  /** Имя подключённого источника курсов. Пользователь вправе его знать. */
+  /** Connected price-source name. The user has a right to know it. */
   readonly priceSourceName: string
 
   /**
-   * Учётные данные стороннего источника симуляции введены.
+   * Credentials for a third-party simulation source are entered.
    *
-   * Отдельно от согласия: данные можно ввести и не включать источник,
-   * а согласие без данных ничего не даёт.
+   * Separate from consent: credentials can be entered without
+   * enabling the source, and consent without data does nothing.
    */
   readonly isTenderlyConfigured: boolean
 
   /**
-   * Согласие на обращение к стороннему источнику симуляции.
+   * Consent to a third-party simulation source.
    *
-   * Пока согласия нет, следствия транзакции считает узел — тот самый,
-   * с которым кошелёк и так разговаривает. Сторонний сервис узнаёт
-   * намерение потратить до подписи, и это решение владельца.
+   * Until there is consent, transaction effects are computed by
+   * the node — the same one the wallet already talks to. A third
+   * party learns the spend intent before signing, and that is
+   * the owner's decision.
    */
   readonly isSimulationSourceEnabled: boolean
 
   /**
-   * Имя источника, который спрашивается первым. `null` — только узел.
+   * Name of the source asked first. `null` — node only.
    *
-   * Экран подтверждения обязан называть того, кто дал ответ: «проверено»
-   * без имени проверяющего не значит ничего.
+   * The confirmation screen must name who answered: "checked"
+   * without the checker's name means nothing.
    */
   readonly simulationSourceName: string | null
 
   /**
-   * Подтверждённые имена ENS аккаунтов кошелька.
+   * Verified ENS names of the wallet's accounts.
    *
-   * Ключ — адрес в нижнем регистре. Присутствие ключа означает, что
-   * обратная запись существует И подтверждена прямым разрешением:
-   * непроверенных имён здесь не бывает.
+   * Key is the address in lowercase. A key's presence means the
+   * reverse record exists AND is confirmed by a forward resolve:
+   * unverified names are never stored here.
    *
-   * Пусто, когда активна сеть без ENS: имя, показанное вне сети,
-   * где оно действительно, утверждало бы больше, чем известно.
+   * Empty when the active network has no ENS: a name shown
+   * outside the network where it is valid would claim more than
+   * is known.
    */
   readonly ensNames: ReadonlyMap<string, string>
 
-  /** Работает ли ENS в активной сети. */
   readonly isEnsSupported: boolean
 
   /**
-   * RPC-адреса активной сети в порядке предпочтения.
+   * RPC endpoints of the active network, in preference order.
    *
-   * Пользователь обязан видеть, к чьему узлу обращается кошелёк:
-   * «работает» и «работает через стороннего оператора, видящего все
-   * ваши адреса» — разные утверждения.
+   * The user must see whose node the wallet talks to: "it works"
+   * and "it works through a third-party operator who sees all
+   * your addresses" are different claims.
    */
   readonly rpcEndpoints: readonly IRpcEndpoint[]
 
-  /** Адрес узла, с которым установлено соединение. `null` до подключения. */
+  /** Node the connection is established with. `null` until connected. */
   readonly activeRpcEndpoint: IRpcEndpoint | null
 }
 
 /**
- * Сессия разблокированного кошелька.
+ * Session of an unlocked wallet.
  *
- * ВРЕМЯ ЖИЗНИ ЖЁСТКО СВЯЗАНО С БЛОКИРОВКОЙ. Сессия владеет выведенным
- * из seed-фразы корневым ключом. `close()` обязан затереть его и разорвать
- * соединения с узлами: иначе заблокированный кошелёк продолжал бы держать
- * ключи в памяти и опрашивать RPC, раскрывая оператору активность
- * пользователя.
+ * Lifetime is tightly bound to the lock. The session owns the
+ * root key derived from the seed phrase. `close()` must wipe it
+ * and drop node connections: otherwise a locked wallet would
+ * keep keys in memory and keep polling RPC, disclosing the
+ * user's activity to the operator.
  */
 export interface IWalletSession {
   getSnapshot(): IWalletSnapshot
   subscribe(listener: () => void): () => void
 
-  /** Выводит ключи, поднимает сервисы и загружает данные. */
+  /** Derive keys, start services, and load data. */
   open(): Promise<void>
 
-  /** Затирает ключи, закрывает соединения, сбрасывает снимок. */
+  /** Wipe keys, close connections, and reset the snapshot. */
   close(): Promise<void>
 
   /**
-   * Резервное копирование секретов: выдача seed-фразы и приватных ключей.
+   * Secret backup: seed phrase and private keys.
    *
-   * Доступен только открытой сессии. Заблокированный кошелёк менеджера
-   * не отдаёт: экран экспорта, оставшийся работоспособным после
-   * автоблокировки, обесценил бы саму автоблокировку.
+   * Available only on an open session. A locked wallet does not
+   * hand over the manager: an export screen that stayed usable
+   * after auto-lock would void auto-lock itself.
    *
-   * @throws NotInitializedError при закрытой сессии.
+   * @throws NotInitializedError when the session is closed.
    */
   getBackup(): IBackupManager
 
-  /** Делает аккаунт активным. */
   selectAccount(id: AccountId): Promise<void>
 
-  /** Создаёт следующий аккаунт HD-дерева. */
   createAccount(name?: string): Promise<void>
 
   /**
-   * Ищет адреса, которыми уже пользовались, и добавляет недостающие.
+   * Find addresses that have already been used and add the missing ones.
    *
-   * Нужен восстановленному кошельку: адреса выводятся из seed-фразы,
-   * но кошелёк о них не знает, пока не выведет.
+   * Needed for a restored wallet: addresses derive from the seed,
+   * but the wallet does not know them until it derives them.
    */
   discoverAccounts(): Promise<IAccountDiscoverySummary>
 
-  /** Переключает активную сеть. */
   switchNetwork(chainId: ChainId): Promise<void>
 
   /**
-   * Добавляет пользовательскую сеть.
+   * Add a user network.
    *
-   * Узел опрашивается до сохранения: сеть, чей узел обслуживает другую
-   * цепь, в хранилище не попадёт.
+   * The node is queried before save: a network whose node serves
+   * another chain will not enter storage.
    *
-   * @throws NetworkImpersonationError если имя совпадает с именем
-   *         встроенной сети при другом идентификаторе. Повторный вызов
-   *         с `allowImpersonation: true` добавит её по согласию
-   *         пользователя.
+   * @throws NetworkImpersonationError if the name matches a
+   *         built-in network under a different id. A second call
+   *         with `allowImpersonation: true` adds it with the
+   *         user's consent.
    * @throws NetworkAlreadyExistsError, InvalidRpcUrlError,
    *         InsecureRpcUrlError, ChainIdMismatchError,
    *         ProviderUnavailableError
@@ -415,72 +402,71 @@ export interface IWalletSession {
   addNetwork(params: IAddNetworkParams): Promise<void>
 
   /**
-   * Удаляет пользовательскую сеть.
+   * Remove a user network.
    *
-   * Встроенные сети удалению не подлежат: их конфигурация — часть
-   * защиты от подмены.
+   * Built-in networks cannot be removed: their config is part of
+   * impersonation protection.
    *
    * @throws BuiltInNetworkImmutableError, NetworkNotFoundError
    */
   removeNetwork(chainId: ChainId): Promise<void>
 
-  /** Перезапрашивает баланс, минуя кэш. */
+  /** Re-fetch the balance, bypassing the cache. */
   refreshBalance(): Promise<void>
 
   /**
-   * Включает и выключает фоновый опрос баланса.
+   * Enable or disable background balance polling.
    *
-   * Вызывается слоем интерфейса при уходе вкладки из виду и возврате
-   * в неё. Опрос невидимого экрана тратит лимиты узла и продолжает
-   * сообщать его оператору, что кошелёк открыт.
+   * Called by the UI layer when the tab leaves and returns.
+   * Polling a hidden screen spends node limits and keeps telling
+   * its operator that the wallet is open.
    */
   setBackgroundRefreshEnabled(enabled: boolean): void
 
   /**
-   * Добавляет аккаунт аппаратного кошелька.
+   * Add a hardware-wallet account.
    *
-   * Адрес обязан быть подтверждён на экране устройства до вызова:
-   * страница загружается с сервера и может показать не то, что
-   * выведено ключом.
+   * The address must be confirmed on the device screen before
+   * the call: the page loads from a server and may show something
+   * other than what the key derived.
    */
   addHardwareAccount(params: IAddHardwareAccountParams): Promise<IAccount>
 
   /**
-   * Прогоняет вызов приложения на узле до показа подтверждения.
+   * Run a dapp call on the node before showing confirmation.
    *
-   * Возвращает «проверить не удалось», а не выбрасывает исключение:
-   * недоступность узла не должна мешать пользователю принять решение
-   * самому.
+   * Returns "could not check" instead of throwing: node
+   * unavailability must not stop the user from deciding
+   * themselves.
    */
   checkDappRequest(request: IDappRequest): Promise<IPreflightResult>
 
-  /** Перезапрашивает историю переводов активного аккаунта с начала. */
   refreshHistory(): Promise<void>
 
   /**
-   * Дозапрашивает более ранний участок истории.
+   * Fetch an earlier stretch of history.
    *
-   * Ничего не делает, когда продолжать нечем либо запрос уже идёт:
-   * повторное нажатие не должно порождать вторую выборку с той же
-   * меткой и удваивать записи.
+   * Does nothing when there is nothing to continue or a request
+   * is already in flight: a second press must not start another
+   * scan with the same cursor and double the records.
    */
   loadMoreHistory(): Promise<void>
 
   /**
-   * Читает метаданные контракта, не добавляя токен.
+   * Read contract metadata without adding the token.
    *
-   * Нужен форме добавления: пользователь обязан увидеть, что за токен
-   * он добавляет, до подтверждения.
+   * Needed by the add form: the user must see which token they
+   * are adding before confirming.
    *
    * @throws InvalidTokenContractError
    */
   previewToken(address: Address): Promise<ITokenMetadata>
 
   /**
-   * Добавляет токен в активную сеть.
+   * Add a token to the active network.
    *
-   * Метаданные читаются из контракта; переданное число знаков сверяется
-   * с ним и расхождение приводит к отказу.
+   * Metadata is read from the contract; the passed decimals are
+   * checked against it, and a mismatch is a refusal.
    *
    * @throws InvalidTokenContractError, UnsupportedTokenStandardError
    */
@@ -489,194 +475,203 @@ export interface IWalletSession {
     symbolOverride?: string,
 
     /**
-     * Согласие добавить контракт, называющийся именем проверенного
-     * токена. Без него такое добавление отвергается.
+     * Consent to add a contract that uses a verified token's
+     * name. Without it such an add is rejected.
      */
     allowImpersonation?: boolean,
   ): Promise<void>
 
-  /** Убирает токен из отслеживаемых. */
   removeToken(address: Address): Promise<void>
 
-  /** Перезапрашивает балансы токенов активного аккаунта. */
   refreshTokens(): Promise<void>
 
   /**
-   * Разбирает введённого получателя: адрес либо имя ENS.
+   * Parse the typed recipient: address or ENS name.
    *
-   * Исключений не бросает: форма вызывает разбор по мере ввода, и отказ
-   * узла обязан стать состоянием на экране, а не ошибкой в консоли.
+   * Does not throw: the form parses as the user types, and a
+   * node failure must become a screen state, not a console
+   * error.
    */
   resolveRecipient(input: string): Promise<IRecipientResolution>
 
   /**
-   * Разрешает обращаться к стороннему источнику курсов и загружает их.
+   * Allow a third-party price source and load rates.
    *
-   * ЭТО РЕШЕНИЕ ВЛАДЕЛЬЦА СРЕДСТВ, А НЕ УМОЛЧАНИЕ. Запрос курса
-   * называет источнику адрес контракта и сеть, то есть сообщает состав
-   * портфеля. Адрес кошелька не передаётся: сервису неизвестно, чей
-   * это портфель.
+   * This is the owner's decision, not a default. A rate request
+   * names the contract address and network to the source, i.e.
+   * discloses the portfolio. The wallet address is not sent: the
+   * service does not know whose portfolio it is.
    */
   enablePrices(): Promise<void>
 
-  /** Отзывает согласие. Курсы перестают запрашиваться, оценка исчезает. */
+  /** Revoke consent. Rates stop being requested; the estimate disappears. */
   disablePrices(): Promise<void>
 
-  /** Перезапрашивает курсы, минуя кэш. */
+  /** Re-fetch rates, bypassing the cache. */
   refreshPrices(): Promise<void>
 
   /**
-   * Сохраняет учётные данные стороннего источника симуляции.
+   * Store credentials for a third-party simulation source.
    *
-   * Согласия не даёт: введённый ключ означает «я готов», а не «начинай».
+   * Does not grant consent: an entered key means "I am ready",
+   * not "start".
    */
   setTenderlyCredentials(credentials: ITenderlyCredentials): Promise<void>
 
-  /** Забывает учётные данные и снимает согласие вместе с ними. */
+  /** Forget the credentials and drop consent with them. */
   clearTenderlyCredentials(): Promise<void>
 
   /**
-   * Разрешает обращаться к стороннему источнику симуляции.
+   * Allow a third-party simulation source.
    *
-   * ЭТО РЕШЕНИЕ ВЛАДЕЛЬЦА СРЕДСТВ. Запрос сообщает оператору адрес,
-   * получателя, сумму и данные вызова — то есть намерение потратить,
-   * до подписи и включая транзакции, от которых владелец откажется.
+   * This is the owner's decision. The request tells the operator
+   * the address, recipient, amount, and call data — i.e. the
+   * spend intent, before signing and including transactions the
+   * owner will reject.
    */
   enableSimulationSource(): Promise<void>
 
-  /** Отзывает согласие. Следствия транзакций снова считает узел. */
+  /** Revoke consent. Transaction effects are computed by the node again. */
   disableSimulationSource(): Promise<void>
 
   /**
-   * Готовит перевод к подписи и считает варианты комиссии.
+   * Prepare a transfer for signing and compute fee options.
    *
-   * Возвращённая транзакция — ровно то, что будет подписано. Экран
-   * подтверждения обязан показывать её поля, а не пересчитывать
-   * значения заново: расхождение показанного с подписанным — основной
-   * класс атак на интерфейс кошелька.
+   * The returned transaction is exactly what will be signed. The
+   * confirmation screen must show its fields, not recompute
+   * values: a mismatch between what is shown and what is signed
+   * is the main class of wallet-UI attacks.
    *
-   * @throws GasEstimationFailedError если вызов завершится откатом,
-   *         InsufficientFundsError если средств не хватает на перевод
-   *         вместе с комиссией.
+   * @throws GasEstimationFailedError if the call would revert,
+   *         InsufficientFundsError if funds do not cover the
+   *         transfer plus the fee.
    */
   prepareTransfer(request: ITransactionRequest): Promise<IPreparedTransfer>
 
   /**
-   * Подписывает и публикует подготовленную транзакцию.
+   * Sign and publish a prepared transaction.
    *
-   * Принимает объект, полученный из `prepareTransfer` и показанный
-   * пользователю, — без промежуточных пересчётов.
+   * Accepts the object from `prepareTransfer` that was shown to
+   * the user — with no intermediate recalculation.
    *
-   * @returns Хэш опубликованной транзакции.
+   * @returns Hash of the published transaction.
    */
   sendTransfer(transaction: ISignableTransaction): Promise<TxHash>
 
   /**
-   * Ищет разрешения, выданные активным аккаунтом.
+   * Find approvals issued by the active account.
    *
-   * Вызывается разделом разрешений при открытии. Повторный вызов
-   * перезапрашивает список.
+   * Called by the approvals section on open. A second call
+   * re-fetches the list.
    */
   loadApprovals(): Promise<void>
 
   /**
-   * Готовит отзыв выданного разрешения.
+   * Prepare a revoke of an issued approval.
    *
-   * Отзыв — обычная транзакция: она стоит газа и требует подписи.
-   * Отправляется тем же `sendTransfer`, что и перевод.
+   * A revoke is an ordinary transaction: it costs gas and needs
+   * a signature. It is sent with the same `sendTransfer` as a
+   * transfer.
    */
   prepareRevokeApproval(request: IRevokeApprovalRequest): Promise<IPreparedTransfer>
 
   /**
-   * Ищет коллекционные предметы активного аккаунта.
+   * Find collectibles of the active account.
    *
-   * Вызывается разделом NFT при открытии. Повторный вызов перезапрашивает
-   * список: он мог измениться с прошлого раза.
+   * Called by the NFT section on open. A second call re-fetches
+   * the list: it may have changed since last time.
    */
   loadNfts(): Promise<void>
 
   /**
-   * Готовит перевод токена ERC-20.
+   * Prepare an ERC-20 token transfer.
    *
-   * Данные вызова собирает ядро: получатель и количество лежат в них,
-   * а не в полях транзакции.
+   * The core assembles the call data: recipient and amount live
+   * there, not in the transaction fields.
    *
-   * @throws InsufficientTokenBalanceError если токенов меньше суммы.
+   * @throws InsufficientTokenBalanceError if tokens are less
+   *         than the amount.
    */
   prepareTokenTransfer(request: ITokenTransferRequest): Promise<IPreparedTransfer>
 
   /**
-   * Готовит передачу коллекционного предмета.
+   * Prepare a collectible transfer.
    *
-   * @throws NftNotOwnedError если предмет не принадлежит отправителю.
+   * @throws NftNotOwnedError if the item does not belong to the
+   *         sender.
    */
   prepareNftTransfer(request: INftTransferRequest): Promise<IPreparedTransfer>
 
   /**
-   * Готовит ускорение зависшей транзакции.
+   * Prepare a speed-up of a stuck transaction.
    *
-   * Повторяет ТУ ЖЕ операцию с тем же номером и большей комиссией.
-   * Результат отправляется обычным `sendTransfer`: замена — такая же
-   * транзакция, и подтверждать её пользователь обязан так же.
+   * Repeats the same operation with the same nonce and a higher
+   * fee. The result is sent with ordinary `sendTransfer`: a
+   * replacement is the same kind of transaction, and the user
+   * must confirm it the same way.
    *
-   * @throws TransactionNotReplaceableError если транзакция уже в блоке
-   *         либо её параметры не сохранены.
+   * @throws TransactionNotReplaceableError if the transaction
+   *         is already in a block or its parameters were not
+   *         stored.
    */
   prepareSpeedUp(hash: TxHash): Promise<IPreparedTransfer>
 
   /**
-   * Готовит отмену зависшей транзакции.
+   * Prepare a cancel of a stuck transaction.
    *
-   * Cancel отправленное нельзя; можно занять его номер переводом
-   * самому себе на нулевую сумму. Успех не гарантирован — исходная
-   * транзакция может попасть в блок первой.
+   * A sent transaction cannot be cancelled; its nonce can be
+   * taken by a zero-value transfer to self. Success is not
+   * guaranteed — the original may land in a block first.
    *
-   * @throws TransactionNotReplaceableError если транзакция уже в блоке.
+   * @throws TransactionNotReplaceableError if the transaction
+   *         is already in a block.
    */
   prepareCancel(hash: TxHash): Promise<IPreparedTransfer>
 
   /**
-   * Определяет, является ли адрес контрактом.
+   * Determine whether an address is a contract.
    *
-   * Нужен предупреждению перед отправкой: нативная валюта, посланная
-   * контракту, который её не принимает, теряется безвозвратно.
+   * Needed for the warning before send: native currency sent to
+   * a contract that does not accept it is lost forever.
    *
-   * @returns `null`, если узел не ответил. «Check не удалось»
-   *          и «не контракт» — разные утверждения, и второе, показанное
-   *          вместо первого, успокаивает без оснований.
+   * @returns `null` if the node did not answer. "Could not
+   *          check" and "not a contract" are different claims,
+   *          and the second shown in place of the first
+   *          reassures without grounds.
    */
   isContractRecipient(address: Address): Promise<boolean | null>
 
   /**
-   * Выполняет запрос приложения, одобренный пользователем.
+   * Execute a dapp request the user approved.
    *
-   * Экраны и оценка рисков остаются выше: этот метод только подписывает
-   * и, если просили, отправляет. Второе место, где решается, что считать
-   * согласием, было бы вторым местом, где это можно решить неверно.
+   * Screens and risk scoring stay above: this method only signs
+   * and, if asked, sends. A second place that decides what
+   * counts as consent would be a second place to decide it
+   * wrongly.
    *
-   * @returns Подпись либо хэш транзакции — то, что ожидает приложение.
+   * @returns A signature or a transaction hash — what the app
+   *          expects.
    */
   executeDappRequest(request: IDappRequest): Promise<string>
 
   /**
-   * Проверяет доступность всех RPC-адресов активной сети.
+   * Check availability of every RPC endpoint of the active network.
    *
-   * Выполняет настоящие подключения и измеряет время ответа: оценить
-   * пригодность узла, не обратившись к нему, невозможно.
+   * Makes real connections and measures response time: a node's
+   * fitness cannot be judged without talking to it.
    */
   checkRpcHealth(): Promise<readonly IRpcEndpointHealth[]>
 
   /**
-   * Добавляет собственный RPC-адрес для активной сети.
+   * Add a custom RPC endpoint for the active network.
    *
-   * Узел проверяется до сохранения: адрес, обслуживающий другую сеть,
-   * в хранилище не попадёт.
+   * The node is checked before save: an address that serves
+   * another network will not enter storage.
    *
    * @throws InvalidRpcUrlError, InsecureRpcUrlError, ChainIdMismatchError,
    *         ProviderUnavailableError
    */
   addRpcEndpoint(url: string): Promise<void>
 
-  /** Удаляет собственный RPC-адрес активной сети. */
   removeRpcEndpoint(url: string): Promise<void>
 }

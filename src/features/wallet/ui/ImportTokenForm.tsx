@@ -23,20 +23,19 @@ interface ImportTokenFormProps {
 }
 
 /**
- * Импорт токена по адресу контракта.
+ * Import a token by contract address.
  *
- * СНАЧАЛА ПОКАЗ, ПОТОМ ДОБАВЛЕНИЕ. Пользователь обязан увидеть, что
- * сообщает контракт, до того как токен попадёт в список: адрес сам по
- * себе ничего не говорит, а подставленное вслепую имя может оказаться
- * подделкой известного.
+ * Show first, then add. The user must see what the contract reports
+ * before the token enters the list: an address alone says nothing,
+ * and a name pasted in blind may be a known-token fake.
  *
- * ЧИСЛО ЗНАКОВ НЕ РЕДАКТИРУЕТСЯ. Оно читается из контракта и определяет
- * порядок величины показанной суммы. Поле для ручного ввода здесь было бы
- * приглашением ошибиться на двенадцать порядков.
+ * Decimals are not editable. They come from the contract and set the
+ * order of magnitude of the shown amount. A manual field here would
+ * be an invitation to be off by twelve orders.
  *
- * СИМВОЛ РЕДАКТИРУЕТСЯ. Это подпись на экране, и пользователь вправе
- * назвать токен так, как ему удобно, — например, чтобы отличить подделку
- * от настоящего.
+ * The symbol is editable. It is an on-screen label, and the user may
+ * name the token as they like — for example to tell a fake from the
+ * real one.
  */
 export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
   const fieldId = useId()
@@ -55,8 +54,8 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
     setAddress(nextAddress)
     setPreview(null)
     setError(null)
-    /* Согласие сбрасывается вместе с адресом: оно давалось
-       на конкретный контракт, а не на форму вообще. */
+    /* Consent is reset with the address: it was given for a
+       specific contract, not for the form in general. */
     setImpersonation(null)
     setSymbol('')
   }
@@ -176,9 +175,9 @@ export function ImportTokenForm({ onPreview, onAdd }: ImportTokenFormProps) {
               Add the token
             </Button>
           ) : (
-            /* ОТКАЗ ПОКАЗЫВАЕТСЯ ВМЕСТО КНОПКИ, А НЕ РЯДОМ С НЕЙ.
-               Кнопка «добавить», оставшаяся на месте, нажимается
-               по привычке — раньше, чем прочитано предупреждение. */
+            /* Refusal replaces the button, it does not sit beside
+               it. An "Add" button left in place is pressed by habit
+               before the warning is read. */
             <Alert variant="danger">
               <ShieldAlert />
               <AlertTitle>The contract impersonates a known token</AlertTitle>

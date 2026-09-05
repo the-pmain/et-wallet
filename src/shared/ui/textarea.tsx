@@ -3,11 +3,11 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 /**
- * Многострочное поле ввода.
+ * Multiline input.
  *
- * Как и `Input`, по умолчанию отключает проверку орфографии: сюда
- * вводится seed-фраза, и отправка её содержимого во внешнюю службу
- * проверки правописания означала бы потерю кошелька.
+ * Like `Input`, spell-check is off by default: a seed phrase is typed
+ * here, and sending that content to an external spelling service would
+ * mean losing the wallet.
  */
 export function Textarea({ className, spellCheck = false, ...props }: ComponentProps<'textarea'>) {
   return (

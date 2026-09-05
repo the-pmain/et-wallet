@@ -7,20 +7,19 @@ import { ImportTokenForm, TokenList, useWallet, useWalletSnapshot } from '@/feat
 import { Alert, AlertDescription, Button, Card, CardContent } from '@/shared/ui'
 
 /**
- * Активы аккаунта.
+ * Account assets.
  *
- * ПОКАЗЫВАЮТСЯ ТОЛЬКО ОТСЛЕЖИВАЕМЫЕ ТОКЕНЫ. Кошелёк не подставляет
- * список известных проектов и не добавляет найденное автоматически:
- * прислать на чужой адрес токен с именем известного проекта может кто
- * угодно и почти бесплатно, а показанный в кошельке токен выглядит
- * одобренным.
+ * ONLY TRACKED TOKENS ARE SHOWN. The wallet does not preload a list of
+ * well-known projects or add discoveries automatically: anyone can send
+ * a token named after a known project to a foreign address, almost for
+ * free, and a token shown in the wallet looks endorsed.
  *
- * ЗАПИСЬ СПРАВОЧНИКА ВАЖНЕЕ ЛОКАЛЬНОГО СНИМКА. После входа витрина
- * лежит в `users.assets`; показывать вместо неё один ETH с нулём —
- * прятать хранимые токены. Локальный список остаётся для кошелька
- * без записи.
+ * THE DIRECTORY RECORD BEATS THE LOCAL SNAPSHOT. After sign-in the
+ * showcase lives in `users.assets`; showing one ETH at zero instead
+ * would hide stored tokens. The local list remains for a wallet
+ * without a record.
  *
- * НЕПРОЧИТАННЫЙ БАЛАНС НЕ ПОКАЗЫВАЕТСЯ НУЛЁМ — см. `TokenList`.
+ * AN UNREAD BALANCE IS NOT SHOWN AS ZERO — see `TokenList`.
  */
 export function AssetsPage() {
   useRefreshRemoteAssets()
@@ -40,7 +39,7 @@ export function AssetsPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Assets</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Assets</h1>
 
         <div className="flex items-center gap-1">
           <Button
@@ -103,10 +102,10 @@ export function AssetsPage() {
           <TokenList
             tokens={displayed.tokens}
             isLoading={isListLoading}
-            /* Оценка собирается из уже имеющегося снимка: курсы
-               запрашиваются тем же обходом, что балансы, и только при
-               данном согласии. Экран активов сам наружу не ходит.
-               У записи справочника курсы уже лежат в витрине. */
+            /* Valuation comes from the existing snapshot: rates are
+               fetched in the same pass as balances, and only after
+               consent. The assets screen itself does not go outside.
+               A directory record already carries rates in the showcase. */
             portfolio={displayed.portfolio}
             {...(showRemote
               ? {}

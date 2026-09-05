@@ -10,17 +10,17 @@ import type { IExportAuditLog } from './contracts'
 import type { ExportKind, ExportRisk, ExportScope, IExportRecord } from './types'
 
 /**
- * Часть хранилища, нужная журналу.
+ * The slice of storage the log needs.
  *
- * ПОЧЕМУ НЕ `IStorageService` ЦЕЛИКОМ. Журналу требуются три метода
- * из десяти, а требование полного интерфейса запрещало бы класть журнал
- * в зашифрованное хранилище: `ISecureStorage` не умеет ни миграций,
- * ни транзакций, ни оценки объёма — и не должен уметь.
+ * WHY NOT THE WHOLE `IStorageService`. The log uses three methods out
+ * of ten, and requiring the full interface would forbid putting the
+ * log in encrypted storage: `ISecureStorage` has no migrations,
+ * transactions, or size estimates — and must not.
  *
- * Записи журнала секретов не содержат, но сообщают наблюдателю с доступом
- * к диску, что владелец выгружал seed-фразу и когда именно. Сузив
- * зависимость до фактически используемого, мы получаем возможность
- * хранить журнал зашифрованным, ничего не ломая существующим вызывающим.
+ * Log records hold no secrets, but they tell an observer with disk
+ * access that the owner dumped the seed phrase and when. Narrowing
+ * the dependency to what is actually used lets the log live encrypted
+ * without breaking existing callers.
  */
 export interface IExportAuditStorage {
   get<TValue>(namespace: StorageNamespace, key: StorageKey): Promise<TValue | null>
@@ -29,10 +29,10 @@ export interface IExportAuditStorage {
 }
 
 /**
- * Представление записи в хранилище.
+ * On-disk record shape.
  *
- * Область не дублируется внутри записи: она служит ключом.
- * Времена хранятся числом — сериализуемо любым бэкендом.
+ * Scope is not duplicated inside the record: it is the key.
+ * Times are numbers — serialisable by any backend.
  */
 interface IExportRecordEntry {
   readonly kind: string
@@ -42,12 +42,12 @@ interface IExportRecordEntry {
 }
 
 /**
- * Журнал экспортов поверх абстрактного хранилища.
+ * Export log on top of abstract storage.
  *
- * Все записи одного аккаунта лежат под одним ключом массивом. Причина:
- * записей на аккаунт единицы, а чтение всей истории требуется целиком
- * при каждой оценке риска. Отдельный ключ на запись означал бы перебор
- * всех ключей пространства имён на каждую проверку.
+ * All records of one account sit under one key as an array. Reason:
+ * there are a handful per account, and the whole history is needed
+ * on every risk assessment. A key per record would mean scanning the
+ * whole namespace on every check.
  */
 export class ExportAuditLog implements IExportAuditLog {
   readonly #storage: IExportAuditStorage
@@ -60,8 +60,8 @@ export class ExportAuditLog implements IExportAuditLog {
     const key = ExportAuditLog.#keyOf(entry.scope)
     const existing = await this.#read(key)
 
-    /* Новая запись добавляется в начало: история читается от новых к старым,
-       и сортировка при каждом чтении была бы лишней работой. */
+    /* Newest first: history is read newest-to-oldest, and sorting on
+       every read would be extra work. */
     const updated: IExportRecordEntry[] = [
       {
         kind: entry.kind,

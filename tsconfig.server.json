@@ -2,7 +2,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
 
-    /* Целевая среда: Node 22 LTS и новее. Не браузер. */
+    /* Target environment: Node 22 LTS and newer. Not the browser. */
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "NodeNext",
@@ -13,8 +13,8 @@
     "isolatedModules": true,
     "noEmit": true,
 
-    /* Импорты указывают расширение `.ts`: тот же исходник Node исполняет
-       напрямую, стирая типы. Сборка в отдельный `dist` не нужна. */
+    /* Imports use the `.ts` extension: Node runs the same source
+       directly, stripping types. A separate `dist` build is not needed. */
     "allowImportingTsExtensions": true,
 
     "strict": true,
@@ -27,14 +27,15 @@
     "noPropertyAccessFromIndexSignature": true,
     "forceConsistentCasingInFileNames": true,
 
-    /* Объявления типов зависимостей не проверяются: они принадлежат чужому
-       коду, а расхождение версий @types/node с внутренними типами Fastify
-       останавливало бы проверку, ни разу не указав на ошибку в нашем коде. */
+    /* Dependency type declarations are not checked: they belong to
+       other people's code, and a version mismatch between @types/node
+       and Fastify's internals would stop the check without ever
+       pointing at an error in ours. */
     "skipLibCheck": true,
 
-    /* Конструкции, требующие кодогенерации, запрещены: Node 22 и новее
-       исполняет TypeScript, стирая типы, и enum либо namespace такой
-       обработке не поддаются. */
+    /* Constructs that need codegen are banned: Node 22 and newer
+       runs TypeScript by stripping types, and enum or namespace
+       cannot be handled that way. */
     "erasableSyntaxOnly": true,
 
     "types": ["node"]

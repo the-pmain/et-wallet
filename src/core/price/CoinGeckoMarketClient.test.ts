@@ -29,7 +29,7 @@ beforeEach(() => {
 })
 
 describe('CoinGeckoMarketClient', () => {
-  it('запрашивает рынок вместе с рядом за семь дней', async () => {
+  it('requests the market together with the seven-day series', async () => {
     responder = () => ({
       status: 200,
       body: [
@@ -56,13 +56,13 @@ describe('CoinGeckoMarketClient', () => {
     expect(coins[0]?.name).toBe('Bitcoin')
   })
 
-  it('не подставляет ключ, которого нет', async () => {
+  it('does not insert a key that is missing', async () => {
     await createClient().getMarkets()
 
     expect(requested).toHaveLength(1)
   })
 
-  it('передаёт ключ демо-доступа заголовком', async () => {
+  it('passes the demo-access key as a header', async () => {
     const headers: string[] = []
     const client = new CoinGeckoMarketClient({
       baseUrl: 'https://prices.test/api/v3',
@@ -82,7 +82,7 @@ describe('CoinGeckoMarketClient', () => {
     expect(headers).toEqual(['demo-key'])
   })
 
-  it('называет отказ сервиса, а не прячет его пустым списком', async () => {
+  it('names a service refusal instead of hiding it as an empty list', async () => {
     responder = () => ({
       status: 200,
       body: { status: { error_code: 429, error_message: 'Rate limit exceeded.' } },
@@ -91,7 +91,7 @@ describe('CoinGeckoMarketClient', () => {
     await expect(createClient().getMarkets()).rejects.toThrow('Rate limit exceeded.')
   })
 
-  it('не принимает код ответа вне 2xx за успех', async () => {
+  it('does not treat a non-2xx status as success', async () => {
     responder = () => ({ status: 502, body: [] })
 
     await expect(createClient().getMarkets()).rejects.toThrow(

@@ -1,8 +1,5 @@
 import type { IRemoteSending } from '@/features/onboarding'
 
-/**
- * Отбор живых переводов: id, пользователь, адрес, сумма, статус, тикер.
- */
 export function sendingMatchesAdminQuery(sending: IRemoteSending, query: string): boolean {
   const needle = query.trim().toLowerCase()
 

@@ -1,11 +1,12 @@
 import type { Address, ChainId } from '@/core/types'
 
 /**
- * Известные контракты → идентификатор монеты в `/coins/markets`.
+ * Known contracts → coin id in `/coins/markets`.
  *
- * Каталог рынка не содержит адресов. Без этой таблицы ERC-20 из витрины
- * остались бы без курса после единственного запроса за топ монет.
- * Нативная валюта сюда не входит: она ищется по `native_coin_id`.
+ * The market catalog contains no addresses. Without this table,
+ * showcase ERC-20s would stay without a rate after the single top-
+ * coins request. Native currency is not here: it is looked up by
+ * `native_coin_id`.
  */
 const KNOWN_MARKET_TOKEN_IDS: ReadonlyMap<string, string> = new Map([
   ['1:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 'usd-coin'],

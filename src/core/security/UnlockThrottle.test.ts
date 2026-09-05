@@ -10,7 +10,7 @@ let storage: InMemoryStorageService
 let clock: FakeClock
 let throttle: UnlockThrottle
 
-/** Записывает указанное число неудач подряд. */
+/** Records the given number of consecutive failures. */
 async function fail(times: number): Promise<void> {
   for (let attempt = 0; attempt < times; attempt += 1) {
     await throttle.recordFailure()
@@ -23,59 +23,59 @@ beforeEach(() => {
   throttle = new UnlockThrottle({ storage, clock, logger: new NullLogger() })
 })
 
-describe('delayFor: таблица задержек', () => {
-  it('первые попытки проходят без задержки', () => {
-    /* Запас на опечатку и на забытую раскладку. */
+describe('delayFor: delay table', () => {
+  it('the first attempts pass with no delay', () => {
+    /* Slack for a typo and a forgotten layout. */
     for (let attempt = 1; attempt <= FREE_UNLOCK_ATTEMPTS; attempt += 1) {
       expect(delayFor(attempt)).toBe(0)
     }
   })
 
-  it('задержка появляется сразу после исчерпания запаса', () => {
+  it('a delay appears as soon as the slack is used up', () => {
     expect(delayFor(FREE_UNLOCK_ATTEMPTS + 1)).toBeGreaterThan(0)
   })
 
-  it('растёт с каждой следующей неудачей', () => {
-    const первая = delayFor(FREE_UNLOCK_ATTEMPTS + 1)
-    const вторая = delayFor(FREE_UNLOCK_ATTEMPTS + 2)
-    const третья = delayFor(FREE_UNLOCK_ATTEMPTS + 3)
+  it('grows with each further failure', () => {
+    const first = delayFor(FREE_UNLOCK_ATTEMPTS + 1)
+    const second = delayFor(FREE_UNLOCK_ATTEMPTS + 2)
+    const third = delayFor(FREE_UNLOCK_ATTEMPTS + 3)
 
-    expect(вторая).toBeGreaterThan(первая)
-    expect(третья).toBeGreaterThan(вторая)
+    expect(second).toBeGreaterThan(first)
+    expect(third).toBeGreaterThan(second)
   })
 
-  it('имеет предел и не запирает кошелёк навсегда', () => {
-    /* Бесконечно растущая задержка означала бы, что владелец теряет
-       доступ к собственным средствам из-за забытой раскладки. */
-    const предел = delayFor(100)
+  it('has a cap and does not lock the wallet forever', () => {
+    /* An endlessly growing delay would mean the owner loses access
+       to their own funds over a forgotten layout. */
+    const cap = delayFor(100)
 
-    expect(предел).toBe(delayFor(1000))
-    expect(предел).toBeLessThanOrEqual(15 * 60_000)
+    expect(cap).toBe(delayFor(1000))
+    expect(cap).toBeLessThanOrEqual(15 * 60_000)
   })
 })
 
-describe('UnlockThrottle: подсчёт попыток', () => {
-  it('на чистом состоянии ввод открыт', async () => {
+describe('UnlockThrottle: attempt counting', () => {
+  it('input is open on a clean state', async () => {
     await expect(throttle.assertAllowed()).resolves.toBeUndefined()
     await expect(throttle.getState()).resolves.toEqual({ failedAttempts: 0, retryAfterMs: 0 })
   })
 
-  it('первые неудачи не закрывают ввод', async () => {
+  it('the first failures do not close input', async () => {
     await fail(FREE_UNLOCK_ATTEMPTS)
 
     await expect(throttle.assertAllowed()).resolves.toBeUndefined()
     expect((await throttle.getState()).failedAttempts).toBe(FREE_UNLOCK_ATTEMPTS)
   })
 
-  it('следующая неудача закрывает ввод', async () => {
+  it('the next failure closes input', async () => {
     await fail(FREE_UNLOCK_ATTEMPTS + 1)
 
     await expect(throttle.assertAllowed()).rejects.toThrow(TooManyAttemptsError)
   })
 
-  it('ошибка сообщает, сколько осталось ждать', async () => {
-    /* Форма, молча переставшая принимать ввод, оставляет владельца
-       в недоумении, почему верный пароль не подходит. */
+  it('the error says how long to wait', async () => {
+    /* A form that silently stops accepting input leaves the owner
+       wondering why the correct password does not work. */
     await fail(FREE_UNLOCK_ATTEMPTS + 1)
 
     await expect(throttle.assertAllowed()).rejects.toMatchObject({
@@ -83,7 +83,7 @@ describe('UnlockThrottle: подсчёт попыток', () => {
     })
   })
 
-  it('ввод открывается по истечении срока', async () => {
+  it('input opens when the wait expires', async () => {
     const { retryAfterMs } = await (async () => {
       await fail(FREE_UNLOCK_ATTEMPTS)
 
@@ -95,9 +95,9 @@ describe('UnlockThrottle: подсчёт попыток', () => {
     await expect(throttle.assertAllowed()).resolves.toBeUndefined()
   })
 
-  it('счётчик не обнуляется истечением срока', async () => {
-    /* Иначе подбирающий получал бы бесплатный запас попыток заново
-       после каждого ожидания. */
+  it('the counter is not cleared by the wait expiring', async () => {
+    /* Otherwise a guesser would get a fresh free slack after every
+       wait. */
     const { retryAfterMs } = await (async () => {
       await fail(FREE_UNLOCK_ATTEMPTS)
 
@@ -110,7 +110,7 @@ describe('UnlockThrottle: подсчёт попыток', () => {
     expect((await throttle.getState()).retryAfterMs).toBe(delayFor(FREE_UNLOCK_ATTEMPTS + 2))
   })
 
-  it('успешный ввод обнуляет счётчик', async () => {
+  it('a successful entry clears the counter', async () => {
     await fail(FREE_UNLOCK_ATTEMPTS + 2)
     await throttle.recordSuccess()
 
@@ -119,20 +119,20 @@ describe('UnlockThrottle: подсчёт попыток', () => {
   })
 })
 
-describe('UnlockThrottle: сохранность состояния', () => {
-  it('счётчик переживает пересоздание', async () => {
-    /* Ограничитель, обнуляемый обновлением страницы, не ограничивает
-       ничего: подбирающий нажимает F5 после каждой неудачи. */
+describe('UnlockThrottle: state persistence', () => {
+  it('the counter survives recreation', async () => {
+    /* A throttle reset by refreshing the page throttles nothing:
+       the guesser hits F5 after every failure. */
     await fail(FREE_UNLOCK_ATTEMPTS + 1)
 
-    const восстановленный = new UnlockThrottle({ storage, clock, logger: new NullLogger() })
+    const restored = new UnlockThrottle({ storage, clock, logger: new NullLogger() })
 
-    await expect(восстановленный.assertAllowed()).rejects.toThrow(TooManyAttemptsError)
+    await expect(restored.assertAllowed()).rejects.toThrow(TooManyAttemptsError)
   })
 
-  it('состояние лежит в незашифрованных настройках', async () => {
-    /* Иначе ограничитель не работал бы до разблокировки — то есть
-       именно тогда, когда он нужен. */
+  it('state lives in unencrypted settings', async () => {
+    /* Otherwise the throttle would not work before unlock — exactly
+       when it is needed. */
     await fail(1)
 
     await expect(
@@ -140,15 +140,15 @@ describe('UnlockThrottle: сохранность состояния', () => {
     ).resolves.not.toBeNull()
   })
 
-  it('испорченная запись не запирает кошелёк', async () => {
-    /* Повреждение настроек не имеет права стать вечной блокировкой
-       владельца в собственном кошельке. */
-    await storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UnlockThrottle, 'мусор')
+  it('a corrupted record does not lock the wallet', async () => {
+    /* Damaged settings must not become a permanent lockout of the
+       owner from their own wallet. */
+    await storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UnlockThrottle, 'garbage')
 
     await expect(throttle.assertAllowed()).resolves.toBeUndefined()
   })
 
-  it('запись без числа попыток считается отсутствующей', async () => {
+  it('a record without an attempt count is treated as missing', async () => {
     await storage.set(STORAGE_NAMESPACE.Settings, SETTINGS_KEY.UnlockThrottle, {
       blockedUntil: 9_999_999_999_999,
     })
@@ -156,11 +156,11 @@ describe('UnlockThrottle: сохранность состояния', () => {
     await expect(throttle.assertAllowed()).resolves.toBeUndefined()
   })
 
-  it('перевод часов назад не отменяет ожидания сверх меры', async () => {
-    /* Полностью защититься от перевода часов на стороне клиента нельзя.
-       Проверяется, что реализация хотя бы не даёт отрицательного
-       ожидания и не открывает ввод раньше срока при движении времени
-       вперёд. */
+  it('turning the clock back does not cancel the wait beyond reason', async () => {
+    /* Full protection against a client-side clock change is
+       impossible. What is checked is that the implementation at least
+       does not produce a negative wait and does not open input early
+       when time moves forward. */
     await fail(FREE_UNLOCK_ATTEMPTS + 1)
 
     clock.advance(1_000)

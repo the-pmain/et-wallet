@@ -5,12 +5,13 @@ import { MemoryUsersRepository } from './MemoryUsersRepository.ts'
 import { SupabaseRestUsersRepository } from './SupabaseRestUsersRepository.ts'
 
 /**
- * Собирает хранилище пользователей.
+ * Builds the users store.
  *
- * Есть `SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` — запись идёт в
- * `public.users` через REST service-role клиентом (обходит RLS) после
- * сверки в Node. Иначе мок живёт в памяти процесса: `POST /v1/users`
- * отвечает 201, `POST /v1/users/auth` сверяет `email` и `the_p`.
+ * With `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — writes go to
+ * `public.users` via the REST service-role client (bypasses RLS) after
+ * the Node check. Otherwise the mock lives in process memory:
+ * `POST /v1/users` answers 201, `POST /v1/users/auth` checks `email`
+ * and `the_p`.
  */
 export function createUsersStore(config: IServerConfig): IUsersStore {
   if (config.supabaseUrl !== null && config.supabaseServiceRoleKey === null) {

@@ -2,96 +2,98 @@ import type { INetworkConfig } from '@/core/network'
 import type { ChainId } from '@/core/types'
 
 /**
- * Известные источники RPC-адресов.
+ * Known RPC-address sources.
  *
- * Идентификатор попадает в журнал и в интерфейс диагностики: пользователь
- * обязан видеть, к чьему узлу обращается кошелёк. «Работает» и «работает
- * через Alchemy» — разные утверждения с точки зрения приватности.
+ * The id ends up in the log and in the diagnostics UI: the user must
+ * see whose node the wallet is talking to. "It works" and "it works
+ * through Alchemy" are different statements for privacy.
  */
 export const RPC_PROVIDER_ID = {
-  /** Адреса, добавленные пользователем вручную. */
+  /** Addresses the user added by hand. */
   Custom: 'custom',
-  /** Управляемые узлы Alchemy. Требуют ключа API. */
+  /** Managed Alchemy nodes. Require an API key. */
   Alchemy: 'alchemy',
-  /** Публичные узлы из конфигурации сети. Ключа не требуют. */
+  /** Public nodes from network config. No key required. */
   Public: 'public',
 } as const
 
 export type RpcProviderId = (typeof RPC_PROVIDER_ID)[keyof typeof RPC_PROVIDER_ID]
 
 /**
- * Адрес одного RPC-узла с указанием происхождения.
+ * One RPC-node address with its origin.
  *
- * ПОЧЕМУ НЕ ПРОСТО СТРОКА. При переборе и в диагностике нужно знать,
- * откуда взялся адрес: отказ публичного узла — обычное дело, отказ
- * узла, указанного пользователем вручную, требует сообщить об этом
- * пользователю, потому что исправить это может только он.
+ * WHY NOT JUST A STRING. Rotation and diagnostics need to know where
+ * the address came from: a public-node failure is routine, a failure
+ * of an address the user typed must be reported to them, because only
+ * they can fix it.
  */
 export interface IRpcEndpoint {
   readonly url: string
   readonly providerId: RpcProviderId
 
-  /** Отображаемое имя источника. */
+  /** Display name of the source. */
   readonly providerName: string
 }
 
 /**
- * Источник RPC-адресов для сети.
+ * Source of RPC addresses for a network.
  *
- * ЭТО НЕ ТРАНСПОРТ. Транспорт один — `RpcClient` поверх JSON-RPC.
- * Alchemy, собственный узел пользователя и публичный узел говорят
- * по одному протоколу и различаются только тем, как получен адрес
- * и какие у него условия: ключ, квота, доверие.
+ * THIS IS NOT TRANSPORT. Transport is one — `RpcClient` over JSON-RPC.
+ * Alchemy, the user's own node, and a public node speak the same
+ * protocol and differ only in how the address was obtained and what
+ * conditions it has: key, quota, trust.
  *
- * Отдельные классы транспорта под каждый источник означали бы копию
- * реализации JSON-RPC на каждого оператора — и ошибку, исправленную
- * в одной копии из трёх.
+ * A separate transport class per source would mean a copy of the
+ * JSON-RPC implementation per operator — and a bug fixed in one copy
+ * of three.
  */
 export interface IRpcProvider {
   readonly id: RpcProviderId
   readonly name: string
 
   /**
-   * Обслуживает ли источник указанную сеть.
+   * Whether the source serves the given network.
    *
-   * Alchemy отвечает `false` для сети вне своего списка и при отсутствии
-   * ключа. Ответ `false` — штатное состояние, а не ошибка: перебор просто
-   * перейдёт к следующему источнику.
+   * Alchemy answers `false` for a network outside its list and when
+   * there is no key. `false` is a normal state, not an error: rotation
+   * simply moves to the next source.
    */
   supports(chainId: ChainId): boolean
 
   /**
-   * Адреса узлов для сети, в порядке предпочтения источника.
+   * Node addresses for the network, in the source's preference order.
    *
-   * Пустой список допустим и означает то же, что `supports === false`.
+   * An empty list is allowed and means the same as `supports === false`.
    */
   listEndpoints(network: INetworkConfig): readonly IRpcEndpoint[]
 }
 
-/** Результат проверки доступности одного адреса. */
+/** Result of checking one address. */
 export interface IRpcEndpointHealth {
   readonly endpoint: IRpcEndpoint
 
-  /** Узел ответил и обслуживает ожидаемую сеть. */
+  /** The node answered and serves the expected network. */
   readonly isHealthy: boolean
 
   /**
-   * Время ответа в миллисекундах. `null`, если ответа не было.
+   * Response time in milliseconds. `null` if there was no response.
    *
-   * Измеряется от начала подключения до получения номера блока, то есть
-   * включает установление соединения. Это то, что почувствует пользователь.
+   * Measured from the start of connect to receiving the block number,
+   * so it includes establishing the connection. That is what the user
+   * will feel.
    */
   readonly latencyMs: number | null
 
-  /** Причина отказа. `null` для исправного узла. */
+  /** Failure reason. `null` for a healthy node. */
   readonly reason: string | null
 
   /**
-   * Узел обслуживает другую сеть.
+   * The node serves another network.
    *
-   * Отделено от прочих отказов намеренно: недоступный узел — это неудобство,
-   * а узел с чужим chainId — либо ошибка настройки, либо попытка подмены.
-   * Второе требует внимания пользователя, первое нет.
+   * Separated from other failures on purpose: an unreachable node is
+   * an inconvenience, a node with a foreign chainId is either a
+   * misconfiguration or an impersonation attempt. The second needs
+   * the user's attention, the first does not.
    */
   readonly isChainMismatch: boolean
 }

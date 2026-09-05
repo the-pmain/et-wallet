@@ -2,63 +2,64 @@
 @import 'tw-animate-css';
 
 /*
-  Шрифт подключается ЛОКАЛЬНО, из пакета npm, а не с Google Fonts.
+  The font is loaded LOCALLY, from an npm package, not from Google Fonts.
 
-  Внешний шрифт означал бы запрос к стороннему серверу при каждом запуске
-  кошелька: оператор получал бы IP-адрес пользователя и точное время, когда
-  тот открывает кошелёк. Для приложения, всё остальное поведение которого
-  выстроено вокруг неразглашения, это неприемлемо.
+  An external font would mean a request to a third-party server on every
+  wallet launch: the operator would get the user's IP and the exact time
+  they open the wallet. For an app whose other behaviour is built around
+  non-disclosure, that is unacceptable.
 
-  Второе основание техническое: `font-src 'self' data:` в боевом CSP
-  такой запрос просто заблокирует, и приложение осталось бы без шрифта.
+  The second reason is technical: `font-src 'self' data:` in production
+  CSP would simply block the request, and the app would have no font.
 
-  Файл содержит подмножества с `unicode-range`, поэтому браузер скачивает
-  только латиницу и кириллицу, а не весь Unicode.
+  The file contains `unicode-range` subsets, so the browser downloads
+  only Latin and Cyrillic, not the whole of Unicode.
 */
 @import '@fontsource-variable/inter/wght.css';
 
 /*
-  Тёмная тема включается классом `dark` на корневом элементе.
-  Управляется ThemeProvider (src/app/providers/ThemeProvider.tsx).
+  Dark theme is toggled by the `dark` class on the root element.
+  Driven by ThemeProvider (src/app/providers/ThemeProvider.tsx).
 */
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Дизайн-токены в формате shadcn/ui.
+  Design tokens in the shadcn/ui format.
 
-  Цвета заданы в OKLCH: это перцептивно равномерное пространство,
-  поэтому изменение светлоты не искажает оттенок — важно для генерации
-  состояний hover/active и для контроля контраста по WCAG.
+  Colours are specified in OKLCH: a perceptually uniform space, so
+  changing lightness does not skew hue — important for generating
+  hover/active states and for WCAG contrast control.
 
-  ПАЛИТРА ИЗ ТРЁХ ЦВЕТОВ. Основной — глубокий фиолетовый, плюс нейтральная
-  шкала и красный для необратимых действий. Ограничение не эстетическое:
-  в кошельке цвет несёт смысл (опасно / безопасно / нейтрально), и четвёртый
-  оттенок неизбежно начинает конкурировать с предупреждениями за внимание.
+  A THREE-COLOUR PALETTE. The primary is a deep purple, plus a
+  neutral scale and red for irreversible actions. The limit is not
+  aesthetic: in a wallet colour carries meaning (dangerous / safe /
+  neutral), and a fourth hue inevitably starts competing with
+  warnings for attention.
 
-  ОСНОВНОЙ ЦВЕТ НАМЕРЕННО ТЁМНЫЙ. Светлый фиолетовый на светлом фоне даёт
-  контраст ниже 4.5:1 — порога WCAG AA для текста. Кнопка «Отправить»,
-  которую плохо видно, это не вопрос вкуса.
+  THE PRIMARY IS DELIBERATELY DARK. A light purple on a light
+  background gives contrast below 4.5:1 — the WCAG AA threshold for
+  text. A "Send" button that is hard to see is not a matter of taste.
 */
 :root {
   /*
-    Скругление увеличено с 0.75rem: прежние углы выдавали происхождение
-    от таблицы настроек, а не от приложения, которое открывают
-    ежедневно. Больше — уже начинает выглядеть игрушкой, а кошелёк
-    обязан выглядеть надёжным.
+    Radius increased from 0.75rem: the old corners advertised an
+    origin in a settings table, not an app opened every day. Larger
+    already starts to look like a toy, and a wallet must look
+    reliable.
   */
   --radius: 0.875rem;
 
   /*
-    Одно семейство на весь интерфейс.
+    One family for the whole interface.
 
-    Отдельный «заголовочный» шрифт из спецификации отвергнут: он платный
-    и распространяется через посредника с сомнительной лицензией, а разница
-    в начертании заголовка не стоит юридического риска. Различие между
-    заголовком и текстом достигается насыщенностью и межбуквенным
-    расстоянием — приёмом, который работает в любом семействе.
+    A separate "display" font from the spec was rejected: it is paid
+    and distributed through a middleman with a dubious licence, and
+    the difference in heading cut is not worth the legal risk.
+    Distinction between heading and body is achieved with weight and
+    letter-spacing — a device that works in any family.
 
-    Системная подстановка на случай, если файл шрифта не загрузился:
-    кошелёк обязан оставаться читаемым при любом состоянии сети.
+    A system fallback if the font file failed to load: the wallet
+    must stay readable in any network state.
   */
   --font-body:
     'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -72,20 +73,21 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.17 0.015 293);
 
-  /* Фиолетовый, светлота 0.5: контраст с белым текстом около 7:1. */
+  /* Purple, lightness 0.5: contrast with white text around 7:1. */
   --primary: oklch(0.5 0.23 293);
   --primary-foreground: oklch(0.99 0.005 293);
 
   /*
-    Тот же фиолетовый для роли ТЕКСТА на фоне страницы.
+    The same purple in the TEXT role on the page background.
 
-    Отдельный токен нужен потому, что одно значение не может служить
-    обеим ролям сразу: цвет, дающий достаточный контраст с белым текстом
-    поверх себя, обязан быть тёмным, а цвет, читаемый как текст на тёмном
-    фоне, — светлым. Попытка обойтись одним привела к контрасту 4.07
-    у подписи активного раздела при пороге 4.5 по WCAG AA.
+    A separate token is needed because one value cannot serve both
+    roles at once: a colour that contrasts enough with white text on
+    top of itself must be dark, and a colour readable as text on a
+    dark background must be light. Trying to use one produced 4.07
+    contrast on the active-section caption against the WCAG AA
+    threshold of 4.5.
 
-    В светлой теме роли совпадают, значения равны.
+    In the light theme the roles coincide and the values are equal.
   */
   --primary-emphasis: oklch(0.5 0.23 293);
 
@@ -103,25 +105,26 @@
   --input: oklch(0.9 0.012 293);
   --ring: oklch(0.5 0.23 293);
 
-  /* Семантические цвета уровней риска. Используются экранами предупреждений
-     о фишинге и подозрительных транзакциях. Задаются здесь, а не в компонентах,
-     чтобы предупреждения выглядели одинаково во всём приложении. */
+  /* Semantic risk-level colours. Used by phishing and suspicious-
+     transaction warning screens. Set here, not in components, so
+     warnings look the same across the app. */
   --risk-low: oklch(0.6 0.15 150);
   --risk-medium: oklch(0.7 0.16 70);
   --risk-high: oklch(0.55 0.22 27);
 
   /*
-    Палитра диаграммы распределения активов.
+    Asset-allocation chart palette.
 
-    Восемь оттенков, разведённых по кругу оттенков не менее чем на 40°:
-    соседние сектора обязаны различаться и в оттенке, и в светлоте, иначе
-    при распространённых видах дальтонизма кольцо превращается в сплошную
-    полосу. Светлота удерживается в диапазоне 0.55–0.72 — на обеих темах
-    сектор остаётся видимым, не сливаясь ни с белым фоном, ни с тёмным.
+    Eight hues, spaced around the hue circle by at least 40°:
+    neighbouring sectors must differ in both hue and lightness,
+    otherwise under common forms of colour blindness the ring
+    becomes a solid band. Lightness is held in 0.55–0.72 — on both
+    themes a sector stays visible, blending with neither the white
+    background nor the dark one.
 
-    Диаграмма при этом никогда не остаётся единственным источником:
-    рядом всегда стоит список с числами. Цвет здесь — вспомогательный
-    признак, а не носитель смысла.
+    The chart is never the only source: a numbered list always sits
+    beside it. Colour here is an auxiliary cue, not the carrier of
+    meaning.
   */
   --chart-1: oklch(0.58 0.24 293);
   --chart-2: oklch(0.66 0.15 195);
@@ -132,84 +135,88 @@
   --chart-7: oklch(0.68 0.13 240);
   --chart-8: oklch(0.72 0.14 110);
 
-  /* Градиент фирменного блока. Второй цвет — тот же оттенок, сдвинутый
-     к синему: два соседних тона читаются как один материал, а не как
-     радуга, и не добавляют четвёртого смысла в палитру. */
+  /* Brand-block gradient. The second colour is the same hue, shifted
+     toward blue: two neighbouring tones read as one material, not a
+     rainbow, and do not add a fourth meaning to the palette. */
   --brand-gradient: linear-gradient(135deg, oklch(0.52 0.24 296), oklch(0.42 0.19 268));
 
   /*
-    ШКАЛА ГЛУБИНЫ. Две ступени, не больше.
+    DEPTH SCALE. Two steps, no more.
 
-    Прежде всё приложение пользовалось одной тенью `shadow-sm`: баланс,
-    быстрые действия и история выглядели тремя одинаковыми плитами, и
-    экран не сообщал, что из них главное. Иерархия — работа не цвета,
-    а расстояния до фона.
+    The whole app used to share one `shadow-sm`: balance, quick
+    actions, and history looked like three identical slabs, and the
+    screen did not say which of them mattered. Hierarchy is the work
+    of distance from the background, not of colour.
 
-    Ступеней ровно две: `surface` для обычной карточки и `raised` для
-    единственного главного объекта экрана. Третья ступень означала бы,
-    что на экране два «самых важных» объекта, — а это уже не иерархия.
+    Exactly two steps: `surface` for an ordinary card and `raised`
+    for the single main object on the screen. A third step would
+    mean two "most important" objects — and that is no longer
+    hierarchy.
 
-    Тени окрашены в фиолетовый, а не в чёрный: серая тень под цветной
-    карточкой выглядит грязью, а тень того же семейства читается
-    как свет, падающий на материал.
+    Shadows are tinted purple, not black: a grey shadow under a
+    coloured card looks like dirt, and a shadow of the same family
+    reads as light falling on the material.
   */
   --elevation-surface: 0 1px 2px oklch(0.17 0.015 293 / 6%), 0 4px 14px oklch(0.17 0.015 293 / 5%);
   --elevation-raised: 0 2px 4px oklch(0.17 0.015 293 / 7%), 0 14px 36px oklch(0.4 0.16 293 / 12%);
 
   /*
-    Волосяная линия по верхнему краю приподнятой поверхности.
+    Hairline along the top edge of a raised surface.
 
-    Один пиксель светлее самой поверхности. Приём физический: у любого
-    предмета верхняя грань освещена сильнее боковых, и глаз читает
-    такую линию как объём, не осознавая приёма.
+    One pixel lighter than the surface itself. A physical device:
+    on any object the top edge is lit more than the sides, and the
+    eye reads such a line as volume without noticing the trick.
   */
   --surface-hairline: oklch(1 0 0 / 80%);
 
   /*
-    Материал карточки баланса.
+    Balance-card material.
 
-    Очень слабый оттенок фирменного цвета: карточка обязана отличаться
-    от соседних, но остаётся подложкой под крупными цифрами. Насыщенный
-    градиент под суммой снизил бы контраст цифр — а сумму читают.
+    A very faint brand tint: the card must differ from its neighbours
+    but remains a substrate under large figures. A saturated gradient
+    under the sum would lower the figures' contrast — and the sum is
+    what is read.
   */
   --hero-gradient: linear-gradient(157deg, oklch(0.97 0.035 296), oklch(0.99 0.012 268));
 
   /*
-    Плотность градиентных пятен фона.
+    Density of the background gradient blobs.
 
-    Задана отдельной величиной, а не вписана в каждый градиент: те же
-    цвета на светлом фоне выглядят вдвое тяжелее, чем на тёмном, и правка
-    трёх градиентов по отдельности рано или поздно рассогласовалась бы.
+    A separate value, not baked into each gradient: the same colours
+    look twice as heavy on a light background as on a dark one, and
+    editing three gradients separately would eventually drift apart.
   */
   --aurora-opacity: 0.55;
 
   /*
-    Непрозрачность фона за панелью кошелька.
+    Background opacity behind the wallet panel.
 
-    Задана отдельной величиной для каждой темы, а не долей от значения
-    выше: на светлом фоне те же пятна выглядят тяжелее, и общий
-    множитель дал бы в одной теме грязь, а в другой — пустоту.
+    A separate value per theme, not a fraction of the one above: on
+    a light background the same blobs look heavier, and a shared
+    multiplier would give dirt in one theme and emptiness in the
+    other.
 
-    Здесь ощутимо ниже, чем на экранах входа: за панелью читают суммы
-    и адреса, и цвет уместен ровно до тех пор, пока не начинает
-    соперничать с ними за внимание.
+    Noticeably lower than on sign-in screens: behind the panel
+    people read amounts and addresses, and colour is appropriate
+    only until it starts competing with them for attention.
   */
   --aurora-ambient-opacity: 0.5;
 
   /*
-    Цвета градиентных пятен, свои для каждой темы.
+    Gradient-blob colours, per theme.
 
-    ПОЧЕМУ НЕ ОДИН НАБОР НА ОБЕ. Пятно светлее фона читается свечением,
-    темнее — грязным разводом. Средний по светлоте фиолетовый на тёмном
-    фоне светлее его и выглядит подсветкой, а на белом оказывается
-    темнее и превращается в серое пятно. Прежде это лечили понижением
-    непрозрачности втрое, отчего светлая тема выглядела пустой рядом
-    с тёмной.
+    WHY NOT ONE SET FOR BOTH. A blob lighter than the background
+    reads as a glow, darker as a dirty stain. A mid-lightness purple
+    on a dark background is lighter than it and looks like lighting;
+    on white it is darker and turns into a grey blot. That used to
+    be fixed by cutting opacity by a factor of three, which made the
+    light theme look empty next to the dark one.
 
-    Здесь для светлой темы взяты те же оттенки, но заметно светлее
-    и чуть насыщеннее: они остаются светлее белого фона по восприятию
-    и дают цвет, не давая тяжести. Карточки непрозрачны, поэтому
-    на читаемость текста это не влияет — цвет виден только на полях.
+    Here the light theme takes the same hues, but noticeably lighter
+    and a little more saturated: they stay lighter than the white
+    background in perception and give colour without weight. Cards
+    are opaque, so this does not affect text readability — colour
+    is visible only in the margins.
   */
   --aurora-blob-1-from: oklch(0.82 0.14 296 / 60%);
   --aurora-blob-1-to: oklch(0.82 0.14 296 / 0%);
@@ -220,8 +227,8 @@
 }
 
 .dark {
-  /* Фон не чёрный, а с фиолетовым подтоном: чистый чёрный рядом
-     с цветными элементами даёт ореол по краям на OLED-экранах. */
+  /* Background is not black but purple-tinted: pure black next to
+     coloured elements produces an edge halo on OLED screens. */
   --background: oklch(0.16 0.018 292);
   --foreground: oklch(0.97 0.005 293);
 
@@ -230,12 +237,13 @@
   --popover: oklch(0.21 0.022 292);
   --popover-foreground: oklch(0.97 0.005 293);
 
-  /* На тёмном фоне светлота поднята до 0.58 — иначе контраст падает
-     ниже порога. Цвет остаётся насыщенным, а не пастельным. */
+  /* On a dark background lightness is raised to 0.58 — otherwise
+     contrast falls below the threshold. The colour stays saturated,
+     not pastel. */
   --primary: oklch(0.58 0.24 293);
   --primary-foreground: oklch(0.99 0.005 293);
 
-  /* Светлее фона заливки: на тёмном фоне читается как текст. */
+  /* Lighter than the fill: on a dark background it reads as text. */
   --primary-emphasis: oklch(0.75 0.17 293);
 
   --secondary: oklch(0.27 0.03 292);
@@ -256,8 +264,8 @@
   --risk-medium: oklch(0.8 0.15 70);
   --risk-high: oklch(0.68 0.19 24);
 
-  /* На тёмном фоне светлота поднята: те же оттенки, но различимые
-     поверх тёмной карточки. */
+  /* On a dark background lightness is raised: the same hues, but
+     distinguishable on top of a dark card. */
   --chart-1: oklch(0.7 0.19 293);
   --chart-2: oklch(0.75 0.13 195);
   --chart-3: oklch(0.8 0.15 70);
@@ -270,13 +278,13 @@
   --brand-gradient: linear-gradient(135deg, oklch(0.58 0.24 296), oklch(0.42 0.2 268));
 
   /*
-    Тени на тёмном фоне работают иначе.
+    Shadows work differently on a dark background.
 
-    Затемнение под карточкой, которая и так тёмная, почти не видно —
-    поэтому глубину здесь даёт не столько тень, сколько цветное
-    свечение под приподнятой поверхностью и более светлая волосяная
-    линия сверху. Чистое затемнение оставлено только вплотную к краю:
-    оно отделяет карточку от фона.
+    Darkening under a card that is already dark is almost invisible —
+    so depth here comes less from shadow than from a coloured glow
+    under the raised surface and a lighter hairline on top. Pure
+    darkening is left only tight to the edge: it separates the card
+    from the background.
   */
   --elevation-surface: 0 1px 2px oklch(0 0 0 / 35%), 0 4px 14px oklch(0 0 0 / 22%);
   --elevation-raised: 0 2px 6px oklch(0 0 0 / 45%), 0 18px 44px oklch(0.35 0.2 293 / 20%);
@@ -287,13 +295,13 @@
 
   --aurora-opacity: 1;
 
-  /* На тёмном фоне пятна читаются мягче, чем на светлом, поэтому
-     значение выше: иначе панель осталась бы тем же чёрным полотном,
-     ради ухода от которого фон и появился. */
+  /* On a dark background the blobs read softer than on a light one,
+     so the value is higher: otherwise the panel would stay the same
+     black sheet the background was introduced to leave. */
   --aurora-ambient-opacity: 0.42;
 
-  /* Средние по светлоте оттенки: на тёмном фоне они светлее его
-     и читаются подсветкой. См. пояснение в светлой теме. */
+  /* Mid-lightness hues: on a dark background they are lighter than
+     it and read as lighting. See the light-theme note. */
   --aurora-blob-1-from: oklch(0.55 0.22 296 / 45%);
   --aurora-blob-1-to: oklch(0.55 0.22 296 / 0%);
   --aurora-blob-2-from: oklch(0.5 0.2 268 / 40%);
@@ -302,10 +310,6 @@
   --aurora-blob-3-to: oklch(0.6 0.19 320 / 0%);
 }
 
-/*
-  Публикация токенов в систему утилит Tailwind.
-  После этого доступны классы вида `bg-background`, `text-foreground`, `border-border`.
-*/
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -336,13 +340,13 @@
   --font-display: var(--font-display);
 
   /*
-    Ступени глубины утилитами, а не собственным правилом CSS.
+    Depth steps as utilities, not a custom CSS rule.
 
-    Так `tailwind-merge` видит их как один и тот же признак и при
-    `shadow-raised` на карточке сам убирает `shadow-surface` из её
-    основного набора. Собственное правило вместо этого молча
-    проигрывало утилите: приподнятая карточка получала обычную тень,
-    и разницу не было видно.
+    That way `tailwind-merge` sees them as the same trait and, when
+    `shadow-raised` is on a card, drops `shadow-surface` from its
+    base set. A custom rule instead lost silently to the utility:
+    the raised card got the ordinary shadow, and the difference
+    was invisible.
   */
   --shadow-surface: var(--elevation-surface);
   --shadow-raised: var(--elevation-raised);
@@ -361,18 +365,18 @@
   }
 
   /*
-    СИСТЕМНЫЕ ЧАСТИ ИНТЕРФЕЙСА СЛЕДУЮТ ТЕМЕ ПРИЛОЖЕНИЯ, А НЕ ТЕМЕ ОС.
+    SYSTEM UI FOLLOWS THE APP THEME, NOT THE OS THEME.
 
-    Раскрывающийся список, полосы прокрутки и прочие части, которые
-    рисует не приложение, а браузер, берут цвета отсюда. Значение
-    `light dark` объявляет «поддерживаю обе» и оставляет выбор
-    за настройкой системы — а тема кошелька переключается своим
-    органом управления и с системной не связана.
+    Dropdowns, scrollbars, and other parts drawn by the browser, not
+    the app, take colours from here. The value `light dark` declares
+    "I support both" and leaves the choice to the system setting —
+    and the wallet theme is switched by its own control and is not
+    tied to the system.
 
-    Расхождение выглядело поломкой: на тёмном экране список активов
-    раскрывался белым, и строка «USDC — verified» оказывалась почти
-    белым по белому — то есть выбрать актив можно было вслепую.
-    В кошельке это не косметика: выбирают, чем платить.
+    The mismatch looked like a bug: on a dark screen the asset list
+    opened white, and the row "USDC — verified" was almost white on
+    white — so the asset had to be picked blindly. In a wallet that
+    is not cosmetics: people choose what to pay with.
   */
   html {
     color-scheme: light;
@@ -383,13 +387,13 @@
   }
 
   /*
-    Пункты раскрывающегося списка красятся явно.
+    Dropdown items are painted explicitly.
 
-    `color-scheme` выше делает подложку тёмной, но это тёмная тема
-    БРАУЗЕРА, а не кошелька: оттенок серого свой. Там, где браузер
-    позволяет красить пункты, список совпадает с палитрой приложения;
-    там, где не позволяет, правило просто не действует, и остаётся
-    приемлемый вид от `color-scheme`.
+    `color-scheme` above makes the substrate dark, but that is the
+    BROWSER dark theme, not the wallet's: the grey is its own. Where
+    the browser lets items be painted, the list matches the app
+    palette; where it does not, the rule simply does nothing, and
+    `color-scheme` leaves an acceptable look.
   */
   select option {
     background-color: var(--popover);
@@ -399,40 +403,40 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
-    /* Запрет выделения интерфейсных элементов не ставим глобально:
-       адреса и суммы пользователь должен иметь возможность скопировать. */
+    /* No global ban on selecting interface elements: the user must
+       be able to copy addresses and amounts. */
   }
 
   /*
-    Числовые значения выводятся моноширинными цифрами.
+    Numeric values are rendered with tabular figures.
 
-    Не украшение: сумма, меняющаяся при обновлении баланса, не должна
-    дёргать соседние элементы, а два адреса в списке должны сравниваться
-    посимвольно по вертикали.
+    Not decoration: a sum that changes on a balance refresh must not
+    jostle its neighbours, and two addresses in a list must compare
+    character-by-character down the column.
   */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
   /*
-    Уважение к системной настройке уменьшенного движения.
+    Respect for the system reduced-motion setting.
 
-    ПРЕЖНЯЯ ПОСЫЛКА БЫЛА НЕВЕРНА. Здесь стояло «анимации в кошельке
-    нигде не несут смысла, поэтому отключаются полностью». Когда это
-    писали, так и было; с тех пор появились указатели работы — на
-    обновлении баланса, в строке токена, при поиске истории и
-    разрешений. В трёх местах вращение остаётся ЕДИНСТВЕННЫМ признаком
-    того, что кошелёк занят: рядом нет ни надписи, ни полосы.
+    THE PREVIOUS PREMISE WAS WRONG. This used to say "animations in
+    the wallet nowhere carry meaning, so they are all turned off".
+    When that was written it was true; since then work indicators
+    have appeared — on balance refresh, in a token row, when
+    searching history and approvals. In three places rotation is
+    the ONLY cue that the wallet is busy: there is no label or bar
+    beside it.
 
-    Правило ниже выключало и их: `iteration-count: 1` при длительности
-    0,01 мс проворачивает указатель один раз мгновенно и останавливает.
-    Человек с этой настройкой видел замерший значок у недоступной
-    кнопки и не мог отличить «идёт обновление» от «сломалось».
+    The rule below turned those off too: `iteration-count: 1` at a
+    duration of 0.01 ms spins the indicator once instantly and
+    stops. A person with this setting saw a frozen icon on a
+    disabled button and could not tell "refreshing" from "broken".
 
-    Отсюда разделение вместо общего запрета: движение, которое
-    рассказывает о состоянии, остаётся; движение, которое украшает,
-    прекращается. Настройка называется «уменьшить движение», а не
-    «спрятать состояние».
+    Hence a split instead of a blanket ban: motion that reports
+    state stays; motion that decorates stops. The setting is called
+    "reduce motion", not "hide state".
   */
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -444,13 +448,13 @@
     }
 
     /*
-      Украшение прекращается, а не замирает.
+      Decoration stops, it does not freeze.
 
-      Правило выше обрывает анимацию на последнем кадре: монеты сбились
-      бы кучей у нижнего края, а пятна фона застыли бы в случайном
-      сдвиге. `animation: none` возвращает их в исходное положение —
-      украшение, потерявшее смысл без движения, обязано исчезнуть,
-      а не оставить после себя мусор.
+      The rule above cuts the animation on the last frame: coins
+      would pile at the bottom edge, and background blobs would
+      freeze in a random shift. `animation: none` returns them to
+      the start — decoration that lost meaning without motion must
+      disappear, not leave debris.
     */
     .coin-rain {
       display: none;
@@ -461,18 +465,20 @@
     }
 
     /*
-      Указатель работы продолжает вращаться — медленнее обычного.
+      The work indicator keeps spinning — slower than usual.
 
-      Мелкий значок диаметром в строку текста не вызывает укачивания:
-      настройка бережёт от крупных перемещений в поле зрения, а не от
-      любого движения вообще. Полторы секунды на оборот вместо одной:
-      достаточно медленно, чтобы не мельтешить, достаточно очевидно,
-      чтобы читаться как «идёт работа».
+      A small icon the diameter of a line of text does not cause
+      motion sickness: the setting protects against large moves in
+      the field of view, not against any motion at all. One and a
+      half seconds per turn instead of one: slow enough not to
+      flicker, obvious enough to read as "work in progress".
 
-      Собственные кадры, а не имя из Tailwind: правило важнее удобства
-      и не должно ломаться от переименования внутри библиотеки.
+      Own keyframes, not a Tailwind name: the rule is more
+      important than convenience and must not break if the library
+      renames an internal class.
     */
-    .animate-spin {
+    .animate-spin,
+    .balance-spinner {
       animation: status-spin 1.5s linear infinite !important;
     }
   }
@@ -480,59 +486,60 @@
 
 @layer components {
   /*
-    Заливка главного объекта экрана.
+    Fill of the screen's main object.
 
-    Здесь только градиент. Тень и волосяная линия задаются рядом
-    утилитами `shadow-raised` и `inset-shadow-hairline`: они делят с
-    обычной тенью карточки одно свойство, и правило CSS в этом споре
-    проигрывает утилите молча — что уже случилось и было поймано
-    измерением, а не глазом.
+    Gradient only here. Shadow and hairline are set beside it with
+    the `shadow-raised` and `inset-shadow-hairline` utilities: they
+    share one property with the ordinary card shadow, and a CSS
+    rule loses that argument to the utility silently — which
+    already happened and was caught by measurement, not by eye.
   */
   .surface-hero {
     background-image: var(--hero-gradient);
   }
 
   /*
-    ОДИН ПРИЁМ ФОКУСА НА ВСЁ ПРИЛОЖЕНИЕ.
+    ONE FOCUS TREATMENT FOR THE WHOLE APP.
 
-    Набор классов кольца был выписан вручную в десяти местах и уже
-    разошёлся: где-то он включал подсветку рамки, где-то нет, где-то
-    снимал системный контур, где-то оставлял. Измерено живьём: из
-    девяноста трёх органов управления пятьдесят восемь показывали
-    собственное кольцо в три пикселя, а тридцать пять — тонкий
-    системный контур. Два разных языка фокуса в одном приложении,
-    и разница не задумывалась — она накопилась.
+    The ring class set was written by hand in ten places and had
+    already drifted: somewhere it included a border highlight,
+    somewhere not, somewhere it removed the system outline,
+    somewhere it left it. Measured live: of ninety-three controls,
+    fifty-eight showed their own three-pixel ring and thirty-five
+    a thin system outline. Two different focus languages in one
+    app, and the difference was not designed — it accumulated.
 
-    Приём собран сюда одним классом. Через `@apply`, а не собственным
-    `box-shadow`: кольцо Tailwind складывается с тенью глубины через
-    общую переменную, и своя тень стёрла бы приподнятость элемента
-    в момент фокуса.
+    The treatment is assembled here as one class. Via `@apply`, not
+    a custom `box-shadow`: Tailwind's ring stacks with the depth
+    shadow through a shared variable, and a custom shadow would
+    wipe the element's raised look at the moment of focus.
   */
   .focus-ring {
     @apply outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50;
   }
 
   /*
-    Расширение области нажатия без изменения вида.
+    Expanding the tap area without changing the look.
 
-    ЗАЧЕМ. Значковые кнопки размером 32–36 пикселей проходят нижний
-    порог WCAG (24×24), но не дотягивают до 44 — размера, с которого
-    попадание пальцем перестаёт быть лотереей. Увеличивать сам значок
-    ради этого не нужно: цель нажатия и нарисованный предмет — разные
-    вещи, и невидимая рамка вокруг значка решает задачу, не утяжеляя
-    экран.
+    WHY. Icon buttons of 32–36 pixels pass the WCAG floor (24×24)
+    but do not reach 44 — the size from which a finger hit stops
+    being a lottery. Enlarging the icon itself for that is
+    unnecessary: the tap target and the drawn object are different
+    things, and an invisible frame around the icon solves it
+    without weighing down the screen.
 
-    ВХОДИТ В БАЗОВЫЙ НАБОР КЛАССОВ КНОПКИ. Точечное применение означало
-    бы, что каждая новая кнопка начинается с нарушения, пока кто-нибудь
-    не вспомнит про класс.
+    IT IS IN THE BUTTON'S BASE CLASS SET. Spot application would
+    mean every new button starts in violation until someone
+    remembers the class.
 
-    ПОЧЕМУ ЭТО БЕЗОПАСНО ТОЛЬКО ВМЕСТЕ С ПОДНЯТОЙ ШКАЛОЙ РАЗМЕРОВ.
-    Рамка расширяет кнопку симметрично, и у соседей, стоящих ближе
-    удвоенного расширения, области нажатия перекрылись бы — нажатие
-    доставалось бы не той кнопке. При прежних 32 пикселях расширение
-    составляло бы шесть с каждой стороны, при нынешних 36–40 — от двух
-    до четырёх. Отсутствие перекрытий проверяется замером, а не на глаз:
-    попарное сравнение областей на всех экранах.
+    WHY THIS IS SAFE ONLY TOGETHER WITH THE RAISED SIZE SCALE.
+    The frame expands the button symmetrically, and neighbours
+    closer than twice the expansion would have overlapping tap
+    areas — the tap would go to the wrong button. At the old 32
+    pixels the expansion would have been six on each side; at
+    today's 36–40 it is two to four. Absence of overlap is
+    checked by measurement, not by eye: pairwise comparison of
+    areas on every screen.
   */
   .tap-target {
     position: relative;
@@ -551,15 +558,15 @@
   }
 
   /*
-    Плитка быстрого действия.
+    Quick-action tile.
 
-    Значок над подписью и одинаковая ширина: у главных действий не
-    бывает старшего и младшего, а разная ширина кнопок в ряду читается
-    именно как разная важность.
+    Icon above the caption and equal width: main actions do not
+    have a senior and a junior, and different button widths in a
+    row read as different importance.
 
-    Высота с запасом от 44 пикселей — нижний предел прицеливания
-    пальцем. Не эстетика: промах по кнопке «Отправить» в кошельке
-    стоит дороже, чем где бы то ни было.
+    Height with margin above 44 pixels — the floor for a finger
+    aim. Not aesthetics: missing the "Send" button in a wallet
+    costs more than anywhere else.
   */
   .action-tile {
     display: flex;
@@ -567,10 +574,11 @@
     flex: 0 0 auto;
 
     /*
-      Ряд больше не растягивается на ширину карточки: плитки стоят
-      слева и занимают столько, сколько нужно подписи. Общая нижняя
-      граница ширины держит их равными — иначе «Smart contract»
-      раздвинул бы одну плитку, и ряд читался бы как разная важность.
+      The row no longer stretches to the card width: tiles sit on
+      the left and take as much as the caption needs. A shared
+      minimum width keeps them equal — otherwise "Smart contract"
+      would widen one tile, and the row would read as different
+      importance.
     */
     min-width: 5.75rem;
     flex-direction: column;
@@ -592,6 +600,77 @@
     transform: scale(0.97);
   }
 
+  /*
+    Balance-loading indicator.
+
+    Spinning an open arc (`Loader2`) is a common flaw: visual mass
+    is offset from the viewBox centre, and the circle orbits even
+    though the cell stays put. A ring of even thickness spins
+    around its geometric centre — the slot does not jump.
+  */
+  .balance-spinner {
+    display: block;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    border-radius: 9999px;
+    border-style: solid;
+    border-width: 3px;
+    border-color: color-mix(in oklab, var(--primary) 22%, transparent);
+    border-top-color: var(--primary);
+    transform-origin: 50% 50%;
+    animation: status-spin 0.8s linear infinite;
+  }
+
+  @media (min-width: 640px) {
+    .balance-spinner {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+  }
+
+  /*
+    Phone column — the same width as the variant-1 study's
+    `.tv-frame`. At `lg` the limit is lifted: the cabinet again
+    occupies `PAGE_COLUMN`.
+  */
+  .wallet-phone-column {
+    display: flex;
+    width: 100%;
+    min-height: 100svh;
+    flex-direction: column;
+  }
+
+  @media (max-width: 1023px) {
+    .wallet-phone-column {
+      max-width: 26.25rem;
+      background: var(--background);
+    }
+
+    /*
+      Variant-1 circles instead of tiles. A tile's frame and fill
+      on a narrow column fight the circle and read as a second
+      card.
+    */
+    .action-tile {
+      min-height: 0;
+      min-width: 4.25rem;
+      gap: 0.45rem;
+      border-color: transparent;
+      background-color: transparent;
+      padding: 0.15rem 0.2rem;
+    }
+  }
+
+  @media (min-width: 480px) and (max-width: 1023px) {
+    .wallet-phone-column {
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--border) 80%, transparent),
+        0 24px 64px rgb(0 0 0 / 45%);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .action-tile {
       transition: none;
@@ -602,67 +681,70 @@
     }
   }
 
-  /* Фирменная заливка. Отдельный класс, а не повторяемый набор утилит:
-     градиент встречается на нескольких экранах и обязан совпадать. */
+  /* Brand fill. A separate class, not a repeated utility set:
+     the gradient appears on several screens and must match. */
   .bg-brand {
     background-image: var(--brand-gradient);
   }
 
   /*
-    Приглушённая подложка под значок.
+    Muted substrate under an icon.
 
-    Часто повторяющееся сочетание: круг цвета основного тона с низкой
-    непрозрачностью. Вынесено, чтобы оттенок менялся в одном месте.
+    A frequently repeated combination: a circle in the primary tone
+    at low opacity. Extracted so the hue changes in one place.
   */
   .icon-tile {
     @apply flex shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-emphasis;
   }
 
   /*
-    ЖИВОЙ ФОН ЭКРАНОВ ВХОДА.
+    LIVE BACKGROUND OF THE SIGN-IN SCREENS.
 
-    ПОЧЕМУ НЕ ВИДЕО. Внешний файл потребовал бы запроса к стороннему серверу
-    при каждом запуске — то есть сообщал бы его оператору IP-адрес
-    пользователя и время открытия кошелька. Боевой CSP такой запрос
-    блокирует, и это правильно. Локальное видео весило бы мегабайты
-    и постоянно занимало декодер: в окне расширения это ощутимый расход
-    батареи ради украшения.
+    WHY NOT VIDEO. An external file would require a request to a
+    third-party server on every launch — telling its operator the
+    user's IP and the time the wallet was opened. Production CSP
+    blocks that request, and rightly so. Local video would weigh
+    megabytes and keep the decoder busy: in an extension window
+    that is a noticeable battery cost for decoration.
 
-    ДВА РЕЖИМА ВМЕСТО ЗАПРЕТА. Раньше фон был только на экранах входа:
-    движение позади сумм и предупреждений мешает читать. Отказ от цвета
-    целиком дал другую крайность — рабочий экран превратился в чёрное
-    полотно. Поэтому за панелью кошелька фон есть, но приглушённый:
-    модификатор `.aurora-ambient` снижает непрозрачность вдвое,
-    замедляет движение до едва заметного и убирает падающие монеты.
+    TWO MODES INSTEAD OF A BAN. The background used to exist only
+    on sign-in screens: motion behind amounts and warnings gets in
+    the way of reading. Dropping colour entirely produced the other
+    extreme — the working screen became a black sheet. So behind
+    the wallet panel the background is there, but subdued: the
+    `.aurora-ambient` modifier halves opacity, slows motion to
+    barely noticeable, and removes falling coins.
 
-    Читаемость при этом не зависит от настроек фона: карточки
-    и панели непрозрачны, текст лежит на них, а не на градиенте.
+    Readability does not depend on background settings: cards and
+    panels are opaque, text sits on them, not on the gradient.
 
-    КАК СДЕЛАНО. Три радиальных градиента, движимые только `transform`, —
-    браузер выполняет это на видеокарте, не перерисовывая слой. Размытие
-    фильтром сознательно не применяется: `filter: blur()` на элементе
-    во весь экран стоит дорого, а градиент и без него мягкий.
+    HOW IT IS DONE. Three radial gradients, moved only by
+    `transform` — the browser does this on the GPU without
+    repainting the layer. Filter blur is deliberately not used:
+    `filter: blur()` on a full-screen element is expensive, and
+    the gradient is soft without it.
 
-    Движение отключается системной настройкой `prefers-reduced-motion`
-    правилом в слое `base`: остаётся статичная заливка, которая выглядит
-    законченной сама по себе.
+    Motion is turned off by the `prefers-reduced-motion` setting
+    in the `base` layer: a static fill remains, which looks
+    finished on its own.
   */
   .aurora {
     @apply pointer-events-none absolute inset-0 overflow-hidden;
   }
 
   /*
-    ПРИГЛУШЁННЫЙ РЕЖИМ ДЛЯ ПАНЕЛИ КОШЕЛЬКА.
+    SUBDUED MODE FOR THE WALLET PANEL.
 
-    Тот же фон, но втрое слабее и вчетверо медленнее. Величины выбраны
-    не на глаз: за панелью пользователь читает суммы и адреса, и цвет
-    там уместен ровно до тех пор, пока не начинает соперничать
-    за внимание. Движение с периодом полторы минуты замечается,
-    только если специально смотреть на пустое место.
+    The same background, but three times weaker and four times
+    slower. The amounts were not chosen by eye: behind the panel
+    the user reads amounts and addresses, and colour there is
+    appropriate only until it starts competing for attention.
+    Motion with a period of a minute and a half is noticed only
+    if you look at empty space on purpose.
 
-    Слой закреплён по окну просмотра, а не по содержимому: панель
-    прокручивается, и фон, уезжающий вместе с ней, оставил бы внизу
-    длинного списка ту самую чёрную пустоту.
+    The layer is fixed to the viewport, not the content: the
+    panel scrolls, and a background that travelled with it would
+    leave the same black void at the bottom of a long list.
   */
   .aurora-ambient {
     position: fixed;
@@ -685,8 +767,8 @@
     position: absolute;
     border-radius: 9999px;
     opacity: var(--aurora-opacity);
-    /* Слой обещает браузеру только смену трансформации: это позволяет
-       держать его на видеокарте и не перерисовывать при каждом кадре. */
+    /* The layer promises the browser only a transform change: that
+       lets it stay on the GPU and not repaint every frame. */
     will-change: transform;
   }
 
@@ -730,15 +812,16 @@
   }
 
   /*
-    ПАДАЮЩИЕ МОНЕТЫ.
+    FALLING COINS.
 
-    Слой лежит между градиентами и сеткой: сетка и виньетка проходят
-    поверх и приглушают монеты у краёв, не давая им спорить с текстом.
+    The layer sits between the gradients and the grid: the grid and
+    vignette pass over and mute the coins at the edges, so they do
+    not compete with text.
 
-    Каждая монета — один элемент, анимирующий только `transform`
-    и `opacity`. Обе величины браузер обрабатывает на видеокарте,
-    не пересчитывая раскладку страницы: тринадцать элементов не стоят
-    ни одного пересчёта геометрии за кадр.
+    Each coin is one element animating only `transform` and
+    `opacity`. The browser handles both on the GPU without
+    recalculating page layout: thirteen elements cost no geometry
+    recalc per frame.
   */
   .coin-rain {
     position: absolute;
@@ -752,8 +835,8 @@
     display: block;
     border-radius: 9999px;
     opacity: 0;
-    /* Металлический блик смещён к верхнему левому краю: одинаковое
-       направление света на всех монетах читается как единая сцена. */
+    /* The metallic highlight is offset toward the top-left: the
+       same light direction on every coin reads as one scene. */
     background: radial-gradient(
       circle at 32% 28%,
       oklch(0.88 0.09 296) 0%,
@@ -770,11 +853,11 @@
   }
 
   /*
-    Сетка поверх градиентов.
+    Grid over the gradients.
 
-    Задаёт масштаб и «цифровой» характер, которого не даёт один градиент.
-    Рисуется повторяющимся линейным градиентом, а не изображением: ноль
-    байт трафика и никакой зависимости от `img-src`.
+    Sets scale and a "digital" character a gradient alone cannot
+    give. Drawn with a repeating linear gradient, not an image:
+    zero bytes of traffic and no `img-src` dependency.
   */
   .aurora-grid {
     position: absolute;
@@ -782,12 +865,12 @@
     background-image:
       repeating-linear-gradient(to right, oklch(0.7 0.05 293 / 6%) 0 1px, transparent 1px 72px),
       repeating-linear-gradient(to bottom, oklch(0.7 0.05 293 / 6%) 0 1px, transparent 1px 72px);
-    /* Виньетка гасит сетку к краям: ровная решётка до самого края
-       выглядит как ошибка вёрстки, а не как фактура. */
+    /* The vignette fades the grid toward the edges: an even lattice
+       all the way to the edge looks like a layout error, not texture. */
     mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
   }
 
-  /* Затемнение к краям — держит внимание на карточке в центре. */
+  /* Darkening toward the edges — keeps attention on the centre card. */
   .aurora-vignette {
     position: absolute;
     inset: 0;
@@ -796,25 +879,26 @@
 }
 
 /*
-  Траектории движения.
+  Motion paths.
 
-  Разные длительности и направления: совпадающие периоды дали бы
-  заметную пульсацию «в такт», которая читается как мигание.
+  Different durations and directions: matching periods would produce
+  a noticeable pulse "in time", which reads as flicker.
 */
 /*
-  Падение монеты: сверху за пределами экрана вниз за его край,
-  с боковым сносом и вращением.
+  Coin fall: from above the screen down past its edge, with sideways
+  drift and rotation.
 
-  Появление и исчезновение по краям вынесены в саму траекторию: монета,
-  возникающая из ничего посреди экрана, выглядит сбоем отрисовки.
+  Appear and disappear at the edges are part of the path itself: a
+  coin that pops into existence in the middle of the screen looks
+  like a render glitch.
 */
 /*
-  Оборот указателя работы.
+  Work-indicator turn.
 
-  Заведён свой, хотя такой же есть в Tailwind: правило уменьшенного
-  движения ссылается на него по имени, и переименование внутри
-  библиотеки молча оставило бы указатели замершими — ровно тот изъян,
-  который это правило и чинит.
+  Defined here even though Tailwind has the same: the reduced-motion
+  rule refers to it by name, and a rename inside the library would
+  silently leave the indicators frozen — exactly the flaw this rule
+  fixes.
 */
 @keyframes status-spin {
   to {

@@ -5,61 +5,59 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
 /**
- * Подготовка значков приложения из исходного логотипа.
+ * Prepare app icons from the source logo.
  *
- * ЗАЧЕМ. Исходный файл — 1024×1024 и около 1.4 МБ. Это правильный размер
- * для полиграфии и витрины магазина расширений, но недопустимый для
- * значка вкладки и тем более для элемента интерфейса: браузер скачал бы
- * полтора мегабайта, чтобы нарисовать квадрат в 56 пикселей.
+ * WHY. The source is 1024×1024 and about 1.4 MB. That size is right for
+ * print and an extension-store listing, but not for a tab icon or a UI
+ * element: the browser would download a megabyte and a half to paint a
+ * 56-pixel square.
  *
- * ВТОРАЯ ПРИЧИНА — расширение. Manifest v3 требует значки размеров
- * 16, 32, 48 и 128 пикселей отдельными файлами. Готовить их вручную
- * означает рано или поздно забыть обновить один из них при смене
- * логотипа.
+ * SECOND REASON — the extension. Manifest v3 wants 16, 32, 48 and 128
+ * pixel icons as separate files. Preparing them by hand means one of
+ * them will eventually be forgotten when the logo changes.
  *
- * ЛИШНЕЕ ПОЛЕ ОБРЕЗАЕТСЯ. В исходнике знак занимает около половины
- * холста, остальное — прозрачные поля. При уменьшении до 16 пикселей
- * от знака осталась бы неразличимая точка в центре. `trim` убирает
- * прозрачные края, после чего знак заполняет кадр целиком.
+ * EXTRA MARGIN IS TRIMMED. In the source the mark fills about half the
+ * canvas; the rest is transparent padding. At 16 pixels the mark would
+ * become an unreadable dot in the centre. `trim` drops the transparent
+ * edges so the mark fills the frame.
  *
- * Запуск: `npm run icons`. Результат попадает в `public/` и в систему
- * контроля версий: сборка не должна зависеть от наличия `sharp`.
+ * Run: `npm run icons`. Output lands in `public/` and in version
+ * control: the build must not depend on `sharp` being present.
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
- * Исходный знак без надписей.
+ * Source mark without lettering.
  *
- * Лежит в `brand/`, а не в `public/`: содержимое `public/` копируется
- * в сборку целиком, и полуторамегабайтный исходник попадал бы
- * в дистрибутив, хотя никем не запрашивается. В `brand/` рядом с ним
- * хранится и полный блок логотипа с надписью — для витрины магазина
- * и документов, где светлый фон уместен.
+ * Lives in `brand/`, not `public/`: `public/` is copied into the build
+ * wholesale, and the 1.4 MB source would ship even though nobody
+ * requests it. `brand/` also holds the full wordmark for store listings
+ * and documents where a light background is appropriate.
  */
 const SOURCE = resolve(ROOT, 'brand/icon.png')
 
 /**
- * Требуемые размеры.
+ * Required sizes.
  *
- * 16, 32, 48, 128 — набор manifest v3. 192 и 512 — для установки
- * веб-приложения на домашний экран.
+ * 16, 32, 48, 128 — the Manifest v3 set. 192 and 512 — for installing
+ * the web app on a home screen.
  */
 const SIZES = [16, 32, 48, 128, 192, 512]
 
 /**
- * Отступ вокруг знака в долях стороны.
+ * Padding around the mark as a fraction of the side.
  *
- * Без поля знак упирается в края и на круглых масках операционных
- * систем обрезается по углам.
+ * Without it the mark hits the edges and is clipped at the corners on
+ * the OS round masks.
  */
 const PADDING_RATIO = 0.08
 
 async function main() {
   const source = await readFile(SOURCE)
 
-  /* Обрезка прозрачных полей выполняется один раз: повторять её для
-     каждого размера значило бы шесть раз декодировать исходник. */
+  /* Transparent margins are trimmed once: doing it per size would
+     decode the source six times. */
   const trimmed = await sharp(source).trim({ threshold: 10 }).png().toBuffer()
   const outputDirectory = resolve(ROOT, 'public/icons')
 
@@ -91,7 +89,7 @@ async function main() {
 
     await writeFile(target, icon)
 
-    console.log(`icon-${String(size)}.png — ${String(Math.round(icon.byteLength / 102.4) / 10)} КБ`)
+    console.log(`icon-${String(size)}.png — ${String(Math.round(icon.byteLength / 102.4) / 10)} KB`)
   }
 }
 

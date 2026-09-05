@@ -15,10 +15,10 @@ import { SendingEditDialog } from './SendingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
 
 /**
- * Список переводов кабинета.
+ * Cabinet transfer list.
  *
- * При входе читает `GET /v1/admin/sendings`, затем слушает поток
- * оболочки: кадр `type_send: create` дописывает строку.
+ * On enter it reads `GET /v1/admin/sendings`, then listens to the
+ * shell stream: a `type_send: create` frame appends a row.
  */
 export function AdminSendingsList() {
   const { client, lock } = useAdminSession()
