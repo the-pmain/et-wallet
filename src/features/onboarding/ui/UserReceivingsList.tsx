@@ -1,5 +1,6 @@
 import { ArrowDownToLine } from 'lucide-react'
 
+import { formatStoredUsdAmount } from '@/features/admin/lib/asset-usd-input'
 import { addableAssetBySymbol } from '@/features/admin/model/addable-assets'
 import { SendingStatusBadge } from '@/features/admin/ui/SendingStatusBadge'
 import { AmountWithUnit } from '@/features/wallet/ui/AmountWithUnit'
@@ -65,7 +66,7 @@ function ReceivingViewRow({ receiving }: { readonly receiving: IRemoteReceiving 
   const symbol = receiving.symbol ?? asset?.token.symbol ?? '—'
   const name = asset?.token.name ?? receiving.symbol ?? 'Unknown asset'
   const failureMessage = receiving.failureMessage?.trim() ?? ''
-  const usdLabel = receiving.usdAmount === null || receiving.usdAmount === '' ? null : `$${receiving.usdAmount}`
+  const usdLabel = formatStoredUsdAmount(receiving.usdAmount)
 
   return (
     <li className="flex items-start gap-3 px-4 py-3 sm:px-6">
@@ -85,7 +86,6 @@ function ReceivingViewRow({ receiving }: { readonly receiving: IRemoteReceiving 
           <span className="truncate">
             {name}
             {asset?.chainName === undefined ? null : ` · ${asset.chainName}`}
-            {usdLabel === null ? null : ` · ${usdLabel}`}
           </span>
           <ReceivingTimestamp value={receiving.createdAt} />
         </span>
@@ -100,6 +100,9 @@ function ReceivingViewRow({ receiving }: { readonly receiving: IRemoteReceiving 
           unit={symbol === '—' ? '' : symbol}
           className="text-sm font-semibold"
         />
+        {usdLabel === null ? null : (
+          <span className="text-xs tabular-nums text-muted-foreground">{usdLabel}</span>
+        )}
         <SendingStatusBadge status={receiving.status} />
       </span>
     </li>

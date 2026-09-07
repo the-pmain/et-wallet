@@ -456,6 +456,7 @@ describe('Dashboard: directory cabinet', () => {
     expect(screen.getByRole('heading', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Receivings' })).toBeInTheDocument()
     expect(screen.getByText('0.2 ETH')).toBeInTheDocument()
+    expect(screen.getByText('$502.27')).toBeInTheDocument()
     expect(screen.getByText('pending')).toBeInTheDocument()
     expect(screen.queryByText('No sendings yet')).not.toBeInTheDocument()
     expect(screen.queryByText('No receivings yet')).not.toBeInTheDocument()

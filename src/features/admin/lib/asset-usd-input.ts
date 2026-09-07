@@ -148,6 +148,27 @@ export function formatUsdDisplay(value: number): string {
   }).format(value)
 }
 
+/** Stored receiving USD (`42347.3`) → `$42,347.30`. */
+export function formatStoredUsdAmount(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  const trimmed = value.trim().replace(/,/gu, '')
+
+  if (trimmed === '' || !/^-?\d+(\.\d+)?$/u.test(trimmed)) {
+    return null
+  }
+
+  const amount = Number(trimmed)
+
+  if (!Number.isFinite(amount)) {
+    return null
+  }
+
+  return formatUsdDisplay(amount)
+}
+
 function formatCryptoEquivalent(whole: number): string {
   if (!Number.isFinite(whole) || whole === 0) {
     return '0'

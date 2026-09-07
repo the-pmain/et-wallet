@@ -7,6 +7,7 @@ import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import { Alert, AlertDescription, Button, EmptyState, Input, Skeleton } from '@/shared/ui'
 
 import { AdminAuthError, type IAdminReceivingPatch } from '../model/AdminClient'
+import { formatStoredUsdAmount } from '../lib/asset-usd-input'
 import { addableAssetBySymbol } from '../model/addable-assets'
 import { useAdminSession } from '../model/admin-context'
 import { sendingMatchesAdminQuery } from '../model/sending-query'
@@ -177,8 +178,7 @@ function ReceivingRow({
   const symbol = receiving.symbol ?? asset?.token.symbol ?? '—'
   const name = asset?.token.name ?? receiving.symbol ?? 'Unknown asset'
   const network = asset?.chainName ?? 'Unknown network'
-  const usdLabel =
-    receiving.usdAmount === null || receiving.usdAmount === '' ? null : `$${receiving.usdAmount}`
+  const usdLabel = formatStoredUsdAmount(receiving.usdAmount)
 
   return (
     <li className="flex items-start justify-between gap-3 px-4 py-3">
@@ -194,7 +194,6 @@ function ReceivingRow({
             <span className="truncate text-sm font-medium">{symbol}</span>
             <span className="truncate text-xs text-muted-foreground">
               {name} · {network}
-              {usdLabel === null ? '' : ` · ${usdLabel}`}
             </span>
           </span>
           <AmountWithUnit
@@ -202,6 +201,9 @@ function ReceivingRow({
             unit={symbol === '—' ? '' : symbol}
             className="text-2xl font-semibold tracking-tight"
           />
+          {usdLabel === null ? null : (
+            <span className="text-sm tabular-nums text-muted-foreground">{usdLabel}</span>
+          )}
           {receiving.failureMessage !== null && receiving.failureMessage !== '' ? (
             <span className="text-sm break-words text-destructive">{receiving.failureMessage}</span>
           ) : null}
