@@ -75,6 +75,24 @@ export function debitToken(
   })
 }
 
+/** Sets the chosen holding to `units` and updates `updatedAt`. */
+export function setTokenBalance(
+  assets: IUserAssets,
+  token: IAssetToken,
+  units: bigint,
+  now: Date = new Date(),
+): IUserAssets {
+  const next = units < 0n ? 0n : units
+
+  return sanitizeAssets({
+    quoteCurrency: assets.quoteCurrency,
+    updatedAt: now.toISOString(),
+    tokens: assets.tokens.map((item) =>
+      sameToken(item, token) ? { ...item, balance: next.toString() } : item,
+    ),
+  })
+}
+
 function sameToken(left: IAssetToken, right: IAssetToken): boolean {
   return (
     left.chainId === right.chainId &&

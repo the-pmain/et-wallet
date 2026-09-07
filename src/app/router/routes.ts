@@ -13,6 +13,7 @@ export const ROUTE = {
   ForgotPassword: '/forgot-password',
   Admin: '/admin',
   AdminSendings: '/admin/sendings',
+  AdminReceivings: '/admin/receivings',
 
   /* What you have to trust when using a wallet in the browser. Open
      before wallet creation: the facts are needed before the decision. */

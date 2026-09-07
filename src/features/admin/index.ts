@@ -15,4 +15,5 @@ export {
 } from './model/admin-pin'
 export { AdminUsersList } from './ui/AdminUsersList'
 export { AdminSendingsList } from './ui/AdminSendingsList'
+export { AdminReceivingsList } from './ui/AdminReceivingsList'
 export { AdminUserProfile } from './ui/AdminUserProfile'

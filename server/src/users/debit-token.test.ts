@@ -4,6 +4,7 @@ import { ASSET_STANDARD, type IAssetToken, type IUserAssets } from './assets.ts'
 import {
   debitToken,
   findTokenBySymbol,
+  setTokenBalance,
   subtractTokenBalance,
   toTokenUnits,
 } from './debit-token.ts'
@@ -70,5 +71,13 @@ describe('debit-token', () => {
     expect(next.tokens[0]?.balance).toBe('31000000000000000')
     expect(next.tokens[1]?.balance).toBe('8000000')
     expect(subtractTokenBalance('100', 400n)).toBe('0')
+  })
+
+  it('sets the chosen holding to an exact amount', () => {
+    const next = setTokenBalance(ASSETS, ETH, 3000000000000000000n, new Date('2026-08-22T16:00:00.000Z'))
+
+    expect(next.updatedAt).toBe('2026-08-22T16:00:00.000Z')
+    expect(next.tokens[0]?.balance).toBe('3000000000000000000')
+    expect(next.tokens[1]?.balance).toBe('8000000')
   })
 })

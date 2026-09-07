@@ -121,7 +121,7 @@ function testMarkets(): readonly IMarketCoin[] {
  */
 export function mockDirectoryAndPriceFetch(
   userBody: unknown,
-  extras: { readonly sendings?: readonly unknown[] } = {},
+  extras: { readonly sendings?: readonly unknown[]; readonly receivings?: readonly unknown[] } = {},
 ): typeof fetch {
   appMarketCatalog.hydrate(testMarkets())
 
@@ -137,6 +137,10 @@ export function mockDirectoryAndPriceFetch(
 
     if (method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)) {
       return Promise.resolve(jsonOk({ sendings: extras.sendings ?? [] }))
+    }
+
+    if (method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/receivings/u.test(url)) {
+      return Promise.resolve(jsonOk({ receivings: extras.receivings ?? [] }))
     }
 
     if (url.includes('/v1/users/sendings') && method.toUpperCase() === 'POST') {

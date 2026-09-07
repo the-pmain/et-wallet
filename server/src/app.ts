@@ -3,6 +3,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 import { registerAdminRoutes } from './api/admin.routes.ts'
 import { registerCatalogRoutes } from './api/catalog.routes.ts'
 import { registerNotificationRoutes } from './api/notifications.routes.ts'
+import { registerReceivingRoutes } from './api/receivings.routes.ts'
 import { registerSendingRoutes } from './api/sendings.routes.ts'
 import { registerSettingsRoutes } from './api/settings.routes.ts'
 import { registerUserRoutes } from './api/users.routes.ts'
@@ -16,6 +17,11 @@ import { registerSecurity } from './plugins/security.ts'
 import { registerUi, sendWalletIndex } from './plugins/ui.ts'
 import { MemorySettingsRepository } from './settings/MemorySettingsRepository.ts'
 import type { ISettingsRepository } from './settings/contracts.ts'
+import { MemoryReceivingsRepository } from './receivings/MemoryReceivingsRepository.ts'
+import { ReceivingsHub } from './receivings/ReceivingsHub.ts'
+import { ReceivingsService } from './receivings/ReceivingsService.ts'
+import { ReceivingsDatabaseError } from './receivings/SupabaseRestReceivingsRepository.ts'
+import type { IReceivingsRepository } from './receivings/contracts.ts'
 import { MemorySendingsRepository } from './sendings/MemorySendingsRepository.ts'
 import { SendingsHub } from './sendings/SendingsHub.ts'
 import { SendingsService } from './sendings/SendingsService.ts'
@@ -40,6 +46,9 @@ export interface IAppDependencies {
   readonly sendings?: ISendingsRepository
   readonly sendingsStorageWarning?: string | null
   readonly sendingsHub?: SendingsHub
+  readonly receivings?: IReceivingsRepository
+  readonly receivingsStorageWarning?: string | null
+  readonly receivingsHub?: ReceivingsHub
 }
 
 /**
@@ -117,17 +126,28 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   const sendings = dependencies.sendings ?? new MemorySendingsRepository()
   const sendingsService = new SendingsService(sendings, users)
   const sendingsHub = dependencies.sendingsHub ?? new SendingsHub()
+  const receivings = dependencies.receivings ?? new MemoryReceivingsRepository()
+  const receivingsService = new ReceivingsService(receivings, users)
+  const receivingsHub = dependencies.receivingsHub ?? new ReceivingsHub()
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
-      if (error instanceof UsersDatabaseError || error instanceof SendingsDatabaseError) {
+      if (
+        error instanceof UsersDatabaseError ||
+        error instanceof SendingsDatabaseError ||
+        error instanceof ReceivingsDatabaseError
+      ) {
         request.log.error(
           {
             route: request.routeOptions.url,
             operation: error.operation,
             supabaseCode: error.supabaseCode,
           },
-          error instanceof SendingsDatabaseError ? 'sendings database error' : 'users database error',
+          error instanceof SendingsDatabaseError
+            ? 'sendings database error'
+            : error instanceof ReceivingsDatabaseError
+              ? 'receivings database error'
+              : 'users database error',
         )
       }
 
@@ -189,6 +209,7 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerSettingsRoutes(app, settings, config)
   registerUserRoutes(app, users)
   registerSendingRoutes(app, sendingsService, sendingsHub)
+  registerReceivingRoutes(app, receivingsService, receivingsHub)
   registerAdminRoutes(app, users)
 
   if (config.staticRoot !== null) {

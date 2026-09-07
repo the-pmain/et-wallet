@@ -94,6 +94,12 @@ export interface IUserDirectory {
     readonly email: string
     readonly theP: string
   }): Promise<readonly IRemoteSending[]>
+
+  listReceivings(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly IRemoteReceiving[]>
 }
 
 /** Public record fields. `the_p` and `seed_phrase` are not included. */
@@ -117,6 +123,10 @@ export interface IRemoteSending {
   readonly recipientAddress: string | null
   readonly amount: string | null
   readonly symbol: string | null
+}
+
+export interface IRemoteReceiving extends IRemoteSending {
+  readonly usdAmount: string | null
 }
 
 /** Sign-in rejected: record not found, or the service returned an error. */
@@ -416,6 +426,46 @@ export class RemoteUserDirectory implements IUserDirectory {
     return sendings
   }
 
+  /**
+   * Deposit list via `GET /v1/users/:id/receivings`.
+   *
+   * Same check as sendings: a foreign id does not receive a foreign list.
+   */
+  async listReceivings(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly IRemoteReceiving[]> {
+    let response: Response
+
+    try {
+      response = await this.#fetch(this.#userReceivingsUrl(input.id, input.email, input.theP), {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      })
+    } catch {
+      throw new RemoteAuthError(0, 'user directory is unavailable')
+    }
+
+    const raw = await response.text()
+
+    if (response.status === 401) {
+      throw new RemoteAuthError(401, 'credentials did not match')
+    }
+
+    if (!response.ok) {
+      throw new RemoteAuthError(response.status, `list receivings failed (${String(response.status)})`)
+    }
+
+    const receivings = parseRemoteReceivingList(parseJson(raw))
+
+    if (receivings === null) {
+      throw new RemoteAuthError(response.status, 'list receivings returned an unexpected response')
+    }
+
+    return receivings
+  }
+
   #usersUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users')
   }
@@ -430,6 +480,12 @@ export class RemoteUserDirectory implements IUserDirectory {
     const query = new URLSearchParams({ email, the_p: theP })
 
     return `${this.#usersUrl()}/${encodeURIComponent(id)}/sendings?${query.toString()}`
+  }
+
+  #userReceivingsUrl(id: string, email: string, theP: string): string {
+    const query = new URLSearchParams({ email, the_p: theP })
+
+    return `${this.#usersUrl()}/${encodeURIComponent(id)}/receivings?${query.toString()}`
   }
 
   #authUrl(): string {
@@ -715,6 +771,45 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
     recipientAddress,
     amount,
     symbol,
+  }
+}
+
+export function parseRemoteReceivingList(payload: unknown): readonly IRemoteReceiving[] | null {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
+  }
+
+  const receivings = (payload as Record<string, unknown>)['receivings']
+
+  if (!Array.isArray(receivings)) {
+    return null
+  }
+
+  const items: IRemoteReceiving[] = []
+
+  for (const item of receivings) {
+    const receiving = parseRemoteReceiving(item)
+
+    if (receiving !== null) {
+      items.push(receiving)
+    }
+  }
+
+  return items
+}
+
+export function parseRemoteReceiving(payload: unknown): IRemoteReceiving | null {
+  const sending = parseRemoteSending(payload)
+
+  if (sending === null || payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const usdAmount = readOptionalScalarString((payload as Record<string, unknown>)['usdAmount'])
+
+  return {
+    ...sending,
+    usdAmount,
   }
 }
 

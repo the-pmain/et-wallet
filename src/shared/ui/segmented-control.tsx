@@ -25,6 +25,14 @@ export interface ISegmentedOption<TValue extends string | number> {
    * the page rather than looks at it.
    */
   readonly name?: string | undefined
+
+  /**
+   * Shown in the set but not selectable.
+   *
+   * Used when a tab must stay visible so the layout does not jump,
+   * while the view behind it is not available yet.
+   */
+  readonly disabled?: boolean | undefined
 }
 
 export interface SegmentedControlProps<TValue extends string | number> {
@@ -84,6 +92,7 @@ export function SegmentedControl<TValue extends string | number>({
       >
         {options.map((option) => {
           const isSelected = option.value === value
+          const isDisabled = option.disabled === true
           const Icon = option.icon
 
           return (
@@ -92,16 +101,26 @@ export function SegmentedControl<TValue extends string | number>({
               type="button"
               aria-pressed={isSelected}
               aria-label={option.name}
+              disabled={isDisabled}
               onClick={() => {
+                if (isDisabled) {
+                  return
+                }
+
                 onChange(option.value)
               }}
               className={cn(
                 /* No borders: inside the track they would draw a
                    second grid on top of the first. */
-                'focus-ring flex min-h-11 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg px-2 text-xs font-medium transition-all',
+                'focus-ring flex min-h-11 items-center justify-center gap-1.5 truncate rounded-lg px-2 text-xs font-medium transition-all',
+                isDisabled
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'cursor-pointer',
                 isSelected
                   ? 'bg-primary/15 text-primary-emphasis shadow-surface'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : isDisabled
+                    ? 'text-muted-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {Icon === undefined ? null : <Icon className="size-4 shrink-0" />}

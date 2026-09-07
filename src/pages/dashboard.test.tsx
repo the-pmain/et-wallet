@@ -255,7 +255,9 @@ describe('Dashboard: directory cabinet', () => {
       const body =
         method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)
           ? { sendings: [] }
-          : {
+          : method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/receivings/u.test(url)
+            ? { receivings: [] }
+            : {
               id: '7',
               email: 'james@example.com',
               balance: '12.5',
@@ -386,7 +388,7 @@ describe('Dashboard: directory cabinet', () => {
     ).toBe(true)
   })
 
-  it('shows sendings from GET /v1/users/:id/sendings on the home screen after sign-in', async () => {
+  it('shows sendings and receivings on the home screen after sign-in', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     globalThis.fetch = mockDirectoryAndPriceFetch(
@@ -419,6 +421,19 @@ describe('Dashboard: directory cabinet', () => {
             symbol: 'USDT',
           },
         ],
+        receivings: [
+          {
+            id: 'r-1',
+            createdAt: '2026-08-22T16:10:00.000Z',
+            userId: '7',
+            status: 'pending',
+            failureMessage: null,
+            recipientAddress: recipient,
+            amount: '0.2',
+            symbol: 'ETH',
+            usdAmount: '502.27',
+          },
+        ],
       },
     )
 
@@ -438,6 +453,12 @@ describe('Dashboard: directory cabinet', () => {
     expect(screen.getAllByText(shortenAddress(recipient)).length).toBeGreaterThan(0)
     expect(screen.getByText('success')).toBeInTheDocument()
     expect(screen.getByText('failure')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sendings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Receivings' })).toBeInTheDocument()
+    expect(screen.getByText('0.2 ETH')).toBeInTheDocument()
+    expect(screen.getByText('pending')).toBeInTheDocument()
+    expect(screen.queryByText('No sendings yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('No receivings yet')).not.toBeInTheDocument()
     expect(screen.queryByText('No operations yet')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
     expect(
@@ -446,6 +467,14 @@ describe('Dashboard: directory cabinet', () => {
         const method = call[1]?.method ?? 'GET'
 
         return method === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)
+      }),
+    ).toBe(true)
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.some((call) => {
+        const url = String(call[0])
+        const method = call[1]?.method ?? 'GET'
+
+        return method === 'GET' && /\/v1\/users\/\d+\/receivings/u.test(url)
       }),
     ).toBe(true)
   })

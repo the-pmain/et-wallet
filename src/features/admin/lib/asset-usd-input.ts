@@ -57,6 +57,63 @@ export function tryParseUsdToMinimalUnits(
   return (usdCents * scale) / priceCents
 }
 
+/** Human transfer amount from minimal units, e.g. `0.200526`. */
+export function humanAmountFromMinimalUnits(units: bigint, decimals: number): string {
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
+    return '0'
+  }
+
+  const scale = 10n ** BigInt(decimals)
+  const whole = units / scale
+  const fraction = units % scale
+
+  if (fraction === 0n) {
+    return whole.toString()
+  }
+
+  return `${whole.toString()}.${fraction.toString().padStart(decimals, '0').replace(/0+$/u, '')}`
+}
+
+/** Human-readable USD equivalent for a crypto amount, e.g. `≈ $492.62`. */
+export function usdEquivalentFromCryptoAmount(
+  amountInput: string,
+  priceUsd: number | null,
+): string | null {
+  const trimmed = amountInput.trim()
+
+  if (trimmed === '' || !/^\d+(\.\d+)?$/u.test(trimmed) || priceUsd === null || priceUsd <= 0) {
+    return null
+  }
+
+  const amount = Number(trimmed)
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+
+  return `≈ ${formatUsdDisplay(amount * priceUsd)}`
+}
+
+/** Numeric USD string for a receiving record, e.g. `492.62`. */
+export function usdAmountFromCryptoInput(
+  amountInput: string,
+  priceUsd: number | null,
+): string | null {
+  const trimmed = amountInput.trim()
+
+  if (trimmed === '' || !/^\d+(\.\d+)?$/u.test(trimmed) || priceUsd === null || priceUsd <= 0) {
+    return null
+  }
+
+  const amount = Number(trimmed)
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+
+  return formatUsdDraft(amount * priceUsd)
+}
+
 /** Human-readable crypto equivalent for a USD draft. */
 export function cryptoEquivalentFromUsdInput(
   usdInput: string,

@@ -1653,7 +1653,7 @@ describe('Admin cabinet', () => {
         the_p: 'demo',
         recipient_address: recipient,
         amount: '1',
-        symbol: 'BTC',
+        symbol: '???',
       },
     })
 

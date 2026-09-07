@@ -5,7 +5,9 @@ import type { TxHash } from '@/core'
 import {
   readLoginCredentials,
   useDirectorySession,
+  useUserReceivings,
   useUserSendings,
+  UserReceivingsList,
   UserSendingsList,
 } from '@/features/onboarding'
 import {
@@ -66,6 +68,7 @@ interface IReplacementState {
  */
 const ACTIVITY_VIEW = {
   Sendings: 'sendings',
+  Receivings: 'receivings',
   History: 'history',
 } as const
 
@@ -78,7 +81,9 @@ export function ActivityPage() {
   const [view, setView] = useState<ActivityView>(ACTIVITY_VIEW.Sendings)
   const canSeeSendings = directory.user !== null || readLoginCredentials() !== null
   const isSendings = canSeeSendings && view === ACTIVITY_VIEW.Sendings
+  const isReceivings = canSeeSendings && view === ACTIVITY_VIEW.Receivings
   const userSendings = useUserSendings(isSendings)
+  const userReceivings = useUserReceivings(isReceivings)
 
   /* Filter state lives on the screen, not in the URL: the query
      contains a counterparty address, and the address bar is stored
@@ -176,7 +181,11 @@ export function ActivityPage() {
     )
   }
 
-  const isRefreshing = isSendings ? userSendings.isLoading : snapshot.isHistoryLoading
+  const isRefreshing = isSendings
+    ? userSendings.isLoading
+    : isReceivings
+      ? userReceivings.isLoading
+      : snapshot.isHistoryLoading
 
   return (
     <div className="flex flex-col gap-4">
@@ -193,6 +202,11 @@ export function ActivityPage() {
               return
             }
 
+            if (isReceivings) {
+              void userReceivings.refresh()
+              return
+            }
+
             void session.refreshHistory()
           }}
         >
@@ -203,12 +217,13 @@ export function ActivityPage() {
 
       {canSeeSendings ? (
         <SegmentedControl
-          className="max-w-[16rem]"
+          className="max-w-[24rem]"
           legend="View"
           value={view}
           options={[
             { value: ACTIVITY_VIEW.Sendings, label: 'Sendings' },
-            { value: ACTIVITY_VIEW.History, label: 'History' },
+            { value: ACTIVITY_VIEW.Receivings, label: 'Receivings' },
+            { value: ACTIVITY_VIEW.History, label: 'History', disabled: true },
           ]}
           onChange={setView}
         />
@@ -221,6 +236,16 @@ export function ActivityPage() {
               sendings={userSendings.sendings}
               isLoading={userSendings.isLoading}
               error={userSendings.error}
+            />
+          </CardContent>
+        </Card>
+      ) : isReceivings ? (
+        <Card>
+          <CardContent className="p-0 sm:p-0">
+            <UserReceivingsList
+              receivings={userReceivings.receivings}
+              isLoading={userReceivings.isLoading}
+              error={userReceivings.error}
             />
           </CardContent>
         </Card>

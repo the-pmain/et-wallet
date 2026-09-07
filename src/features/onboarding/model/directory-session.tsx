@@ -18,6 +18,7 @@ import {
 import {
   RemoteAuthError,
   RemoteUserDirectory,
+  type IRemoteReceiving,
   type IRemoteSending,
   type IRemoteUser,
 } from './RemoteUserDirectory'
@@ -34,6 +35,7 @@ interface IDirectorySession {
     readonly symbol: string
   }): Promise<IRemoteSending>
   listSendings(): Promise<readonly IRemoteSending[]>
+  listReceivings(): Promise<readonly IRemoteReceiving[]>
   refresh(): Promise<void>
   applyUser(user: IRemoteUser): void
   signOut(): void
@@ -139,6 +141,20 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
     })
   }, [directory])
 
+  const listReceivings = useCallback(async (): Promise<readonly IRemoteReceiving[]> => {
+    const stored = readLoginCredentials()
+
+    if (stored === null || stored.id === '') {
+      throw new RemoteAuthError(401, 'Sign in again to see receivings.')
+    }
+
+    return directory.listReceivings({
+      id: stored.id,
+      email: stored.email,
+      theP: stored.theP,
+    })
+  }, [directory])
+
   const signOut = useCallback(() => {
     clearLoginCredentials()
     setUser(null)
@@ -186,11 +202,12 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
       signIn,
       registerSending,
       listSendings,
+      listReceivings,
       refresh,
       applyUser,
       signOut,
     }),
-    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, refresh, applyUser, signOut],
+    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, listReceivings, refresh, applyUser, signOut],
   )
 
   return <DirectorySessionContext value={value}>{children}</DirectorySessionContext>

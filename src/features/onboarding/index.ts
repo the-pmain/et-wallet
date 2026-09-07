@@ -36,6 +36,7 @@ export { mapRemoteAssets, type IMappedRemoteAssets } from './lib/map-remote-asse
 export {
   RemoteUserDirectory,
   parseRemoteSending,
+  parseRemoteReceiving,
   RemoteAuthError,
   INITIAL_WALLET_VALUE,
   WALLET_CODENAME_RECEIVING_FUNDS,
@@ -46,6 +47,7 @@ export {
   type IWalletSlot,
   type IRemoteUser,
   type IRemoteSending,
+  type IRemoteReceiving,
   type RemoteSendingStatus,
   type IWalletEntry,
   type IRemoteAssetToken,
@@ -62,8 +64,10 @@ export {
 } from './model/use-displayed-assets'
 export { useRefreshRemoteAssets } from './model/use-refresh-remote-assets'
 export { useUserSendings, type IUserSendings } from './model/use-user-sendings'
-export { SendingsCard } from './ui/SendingsCard'
+export { useUserReceivings, type IUserReceivings } from './model/use-user-receivings'
+export { RecentActivityCard } from './ui/RecentActivityCard'
 export { UserSendingsList } from './ui/UserSendingsList'
+export { UserReceivingsList } from './ui/UserReceivingsList'
 export { PasswordFields } from './ui/PasswordFields'
 export { SeedPhraseConfirmation } from './ui/SeedPhraseConfirmation'
 export { SeedPhraseDisplay } from './ui/SeedPhraseDisplay'

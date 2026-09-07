@@ -169,6 +169,49 @@ beforeEach(() => {
         return Promise.resolve(jsonResponse(200, USER))
       }
 
+      if (url.endsWith('/v1/admin/users/7/sendings') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { sendings: [] }))
+      }
+
+      if (url.endsWith('/v1/admin/users/7/receivings') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { receivings: [] }))
+      }
+
+      if (url.endsWith('/v1/admin/sendings') && method === 'POST') {
+        const body = requestJson(init) as Record<string, unknown>
+
+        return Promise.resolve(
+          jsonResponse(201, {
+            id: 's-admin',
+            createdAt: '2026-09-07T12:00:00.000Z',
+            userId: '7',
+            status: body['status'] ?? 'pending',
+            failureMessage: body['failureMessage'] ?? null,
+            recipientAddress: body['recipientAddress'] ?? null,
+            amount: body['amount'] ?? '0',
+            symbol: body['symbol'] ?? 'ETH',
+          }),
+        )
+      }
+
+      if (url.endsWith('/v1/admin/receivings') && method === 'POST') {
+        const body = requestJson(init) as Record<string, unknown>
+
+        return Promise.resolve(
+          jsonResponse(201, {
+            id: 'r-admin',
+            createdAt: '2026-09-07T12:00:00.000Z',
+            userId: '7',
+            status: body['status'] ?? 'pending',
+            failureMessage: body['failureMessage'] ?? null,
+            recipientAddress: body['recipientAddress'] ?? null,
+            amount: body['amount'] ?? '0',
+            symbol: body['symbol'] ?? 'ETH',
+            usdAmount: body['usdAmount'] ?? null,
+          }),
+        )
+      }
+
       return Promise.resolve(jsonResponse(403, {}))
     }
 
@@ -182,6 +225,53 @@ beforeEach(() => {
 
     if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
       return Promise.resolve(jsonResponse(200, { sendings: listedSendings }))
+    }
+
+    if (url.endsWith('/v1/admin/users/7/sendings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { sendings: [] }))
+    }
+
+    if (url.endsWith('/v1/admin/users/7/receivings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { receivings: [] }))
+    }
+
+    if (url.endsWith('/v1/admin/sendings') && method === 'POST') {
+      const body = requestJson(init) as Record<string, unknown>
+
+      return Promise.resolve(
+        jsonResponse(201, {
+          id: 's-1',
+          createdAt: '2026-09-07T12:00:00.000Z',
+          userId: '7',
+          status: body['status'] ?? 'pending',
+          failureMessage: body['failureMessage'] ?? null,
+          recipientAddress: body['recipientAddress'] ?? null,
+          amount: body['amount'] ?? '0',
+          symbol: body['symbol'] ?? 'ETH',
+        }),
+      )
+    }
+
+    if (url.endsWith('/v1/admin/receivings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { receivings: [] }))
+    }
+
+    if (url.endsWith('/v1/admin/receivings') && method === 'POST') {
+      const body = requestJson(init) as Record<string, unknown>
+
+      return Promise.resolve(
+        jsonResponse(201, {
+          id: 'r-1',
+          createdAt: '2026-09-07T12:00:00.000Z',
+          userId: '7',
+          status: body['status'] ?? 'pending',
+          failureMessage: body['failureMessage'] ?? null,
+          recipientAddress: body['recipientAddress'] ?? null,
+          amount: body['amount'] ?? '0',
+          symbol: body['symbol'] ?? 'ETH',
+          usdAmount: body['usdAmount'] ?? null,
+        }),
+      )
     }
 
     if (url.includes('/v1/admin/sendings/') && method === 'PATCH') {
@@ -205,6 +295,17 @@ beforeEach(() => {
 
     if (url.endsWith('/v1/admin/users/7') && method === 'GET') {
       return Promise.resolve(jsonResponse(200, USER))
+    }
+
+    if (url.endsWith('/v1/admin/users/8') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, MARIA))
+    }
+
+    if (url.endsWith('/v1/admin/users/8') && method === 'PATCH') {
+      const body = requestJson(init) as { wallets?: unknown }
+      const wallets = body.wallets ?? MARIA.wallets
+
+      return Promise.resolve(jsonResponse(200, { ...MARIA, wallets }))
     }
 
     if (url.endsWith('/v1/admin/users/7') && method === 'PATCH') {
@@ -281,9 +382,11 @@ describe('Admin cabinet', () => {
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
     expect(await screen.findByRole('heading', { name: 'james@example.com' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Save ETH' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('ETH receiving status')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add crypto' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete user' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create sending' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create receiving' })).toBeInTheDocument()
   })
 
   it('stays in the cabinet with a stored PIN', async () => {
@@ -316,7 +419,58 @@ describe('Admin cabinet', () => {
     expect(window.location.pathname).toContain('/admin/users/7')
   })
 
-  it('saves an asset amount in minimal units from the row button', async () => {
+  it('shows a mock wallet by default and adds a named wallet', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: /maria@example.com/i }))
+    await user.click(await screen.findByRole('button', { name: 'Wallets' }))
+
+    expect(await screen.findByLabelText('Address for mock-wallet')).toHaveValue(
+      '0x000000000000000000000000000000000000dEaD',
+    )
+
+    await user.type(screen.getByLabelText('Wallet name'), 'Cold')
+    await user.type(
+      screen.getByLabelText('Wallet address'),
+      '0x1234567890123456789012345678901234567890',
+    )
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(await screen.findByLabelText('Address for cold')).toHaveValue(
+      '0x1234567890123456789012345678901234567890',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Save wallets' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+
+    const patch = fetchSpy.mock.calls
+      .map((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const init = call[1]
+
+        if (!url.endsWith('/v1/admin/users/8') || (init?.method ?? 'GET') !== 'PATCH') {
+          return null
+        }
+
+        return requestJson(init) as {
+          wallets?: Record<string, { key: string; value: string }>
+        }
+      })
+      .find((body) => body !== null)
+
+    expect(patch?.wallets).toMatchObject({
+      'mock-wallet': {
+        key: '0x000000000000000000000000000000000000dEaD',
+      },
+      cold: {
+        key: '0x1234567890123456789012345678901234567890',
+      },
+    })
+  })
+
+  it('creates a receiving from the asset status select', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -333,40 +487,127 @@ describe('Admin cabinet', () => {
     expect(await screen.findByText('$9,852.36')).toBeInTheDocument()
     expect(screen.getByText('≈ 3 ETH')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Save ETH' }))
-    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('ETH receiving status'))
+    await user.click(screen.getByRole('option', { name: 'success' }))
+    expect(await screen.findByText('Receiving created (success).')).toBeInTheDocument()
 
     const usdcUsd = screen.getByLabelText('USDC value in USD')
     await user.clear(usdcUsd)
     await user.type(usdcUsd, '1.5')
     expect(screen.getByText('≈ 1.5 USDC')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Save USDC' }))
-    expect(await screen.findAllByText('Saved.')).not.toHaveLength(0)
+    await user.click(screen.getByLabelText('USDC receiving status'))
+    await user.click(screen.getByRole('option', { name: 'pending' }))
+    expect(await screen.findByText('Receiving created (pending).')).toBeInTheDocument()
 
-    const patches = fetchSpy.mock.calls
+    const created = fetchSpy.mock.calls
       .map((call) => {
         const url = requestUrl(call[0] as RequestInfo | URL)
         const init = call[1]
         const method = init?.method ?? 'GET'
 
-        if (!url.endsWith('/v1/admin/users/7') || method !== 'PATCH') {
+        if (!url.endsWith('/v1/admin/receivings') || method !== 'POST') {
           return null
         }
 
         return requestJson(init) as {
-          assets?: { tokens?: { symbol: string; balance: string }[] }
+          symbol?: string
+          amount?: string
+          status?: string
+          usdAmount?: string
         }
       })
       .filter((body) => body !== null)
 
-    expect(patches[0]?.assets?.tokens?.[0]).toMatchObject({
+    expect(created[0]).toMatchObject({
       symbol: 'ETH',
-      balance: '3000000000000000000',
+      amount: '3',
+      status: 'success',
+      usdAmount: '9852.36',
     })
-    expect(patches[1]?.assets?.tokens?.[1]).toMatchObject({
+    expect(created[1]).toMatchObject({
       symbol: 'USDC',
-      balance: '1500000',
+      amount: '1.5',
+      status: 'pending',
+      usdAmount: '1.5',
     })
+  })
+
+  it('creates a sending and a receiving from the user Assets sections', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
+    await screen.findByLabelText('Sending amount')
+
+    await user.type(screen.getByLabelText('Sending amount'), '0.01')
+    await user.type(
+      screen.getByLabelText('Recipient'),
+      '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359',
+    )
+    await user.click(screen.getByRole('button', { name: 'Create sending' }))
+
+    expect(await screen.findByText('Sending created (pending).')).toBeInTheDocument()
+    expect(screen.queryByText('No sendings yet')).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Receiving amount'), '0.15')
+    expect(await screen.findByText('≈ $492.62')).toBeInTheDocument()
+    expect(screen.queryByLabelText('USD (optional)')).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Receiving amount'))
+    await user.click(screen.getByLabelText('Receiving asset'))
+    await user.click(screen.getByRole('option', { name: 'Select USDT on Ethereum' }))
+    await user.type(screen.getByLabelText('Receiving amount'), '0.2')
+    await user.click(screen.getByRole('button', { name: 'Create receiving' }))
+
+    expect(await screen.findByText('Receiving created (pending).')).toBeInTheDocument()
+    expect(screen.queryByText('No receivings yet')).not.toBeInTheDocument()
+
+    const posts = fetchSpy.mock.calls
+      .map((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const init = call[1]
+        const method = init?.method ?? 'GET'
+
+        if (method !== 'POST') {
+          return null
+        }
+
+        if (url.endsWith('/v1/admin/sendings')) {
+          return { kind: 'sending', body: requestJson(init) }
+        }
+
+        if (url.endsWith('/v1/admin/receivings')) {
+          return { kind: 'receiving', body: requestJson(init) }
+        }
+
+        return null
+      })
+      .filter((item) => item !== null)
+
+    expect(posts).toEqual(
+      expect.arrayContaining([
+        {
+          kind: 'sending',
+          body: expect.objectContaining({
+            userId: '7',
+            amount: '0.01',
+            symbol: 'ETH',
+            recipientAddress: '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359',
+            status: 'pending',
+          }),
+        },
+        {
+          kind: 'receiving',
+          body: expect.objectContaining({
+            userId: '7',
+            amount: '0.2',
+            symbol: 'USDT',
+            status: 'pending',
+          }),
+        },
+      ]),
+    )
   })
 
   it('adds a cryptocurrency from the Assets header menu', async () => {

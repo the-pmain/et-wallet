@@ -5,13 +5,24 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { ROUTE } from '@/app/router/routes'
 import {
   ONBOARDING_STATE,
+  WALLET_CODENAME_RECEIVING_FUNDS,
+  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+  findWalletByCodename,
   readLoginCredentials,
   useDirectorySession,
   useOnboarding,
   useOnboardingState,
+  type IRemoteUser,
+  type IUserWalletsMap,
 } from '@/features/onboarding'
 import { AutoLockWarning, useSecurity } from '@/features/security'
-import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
+import {
+  AccountAvatar,
+  SESSION_STATE,
+  addressLabel,
+  shortenAddress,
+  useWalletSnapshot,
+} from '@/features/wallet'
 import { useTranslation } from '@/shared/i18n'
 import { cn } from '@/shared/lib/utils'
 import { BrandMark, BrandWordmark, Button, PAGE_COLUMN, Skeleton, Toaster } from '@/shared/ui'
@@ -175,6 +186,12 @@ export function AppShell() {
               <WalletIdentity
                 account={snapshot.activeAccount}
                 ensNames={snapshot.ensNames}
+                directoryUser={directoryUser}
+                restoringEmail={
+                  directoryUser === null && directory.isRestoring
+                    ? (readLoginCredentials()?.email ?? null)
+                    : null
+                }
               />
             </div>
 
@@ -324,55 +341,133 @@ function BrandLockup({ className }: { readonly className?: string }) {
 const IDENTITY_CHIP =
   'flex h-11 w-max max-w-full min-w-0 items-center gap-2 rounded-full bg-card py-1.5 pl-1.5 pr-2.5'
 
+/**
+ * Header account chip.
+ *
+ * THE CABINET CAN BE OPEN WITHOUT A LOCAL ACCOUNT. Email sign-in
+ * restores the directory record first; on-device storage opens in a
+ * separate step and often is not there (another browser, or a password
+ * that does not match the vault). Waiting on `activeAccount` then
+ * leaves the chip as a skeleton next to a loaded balance.
+ *
+ * The directory email and receiving address fill that gap. When the
+ * local session later exposes an account, that chip replaces this one.
+ */
 function WalletIdentity({
   account,
   ensNames,
+  directoryUser,
+  restoringEmail,
 }: {
   readonly account: ReturnType<typeof useWalletSnapshot>['activeAccount']
   readonly ensNames: ReturnType<typeof useWalletSnapshot>['ensNames']
+  readonly directoryUser: IRemoteUser | null
+  readonly restoringEmail: string | null
 }) {
-  if (account === null) {
+  if (account !== null) {
+    const hasEnsName = ensNames.has(account.address.toLowerCase())
+
     return (
-      <div className={IDENTITY_CHIP} aria-hidden aria-busy>
-        <Skeleton className="size-7 shrink-0 rounded-full" />
-        <div className="flex min-w-0 flex-col items-start">
-          <Skeleton className="h-3.5 w-28" />
-          <Skeleton className="mt-0.5 h-2.5 w-20" />
-        </div>
-      </div>
+      <IdentityChip
+        address={account.address}
+        title={account.name}
+        subtitle={addressLabel(account.address, ensNames)}
+        subtitleMono={!hasEnsName}
+      />
     )
   }
 
-  /* THE SWITCH LOOKS PRESSABLE. This used to be an arrow icon and
-     plain text with no background and no hover: the arrow promised
-     a picker the look did not confirm. The link goes to settings,
-     where accounts are actually switched. */
+  const email = directoryUser?.email ?? restoringEmail
+  const address = directoryUser === null ? null : primaryWalletAddress(directoryUser.wallets)
+
+  if (email !== null || directoryUser !== null) {
+    return (
+      <IdentityChip
+        address={address}
+        title={email ?? 'Account'}
+        subtitle={address === null ? null : shortenAddress(address)}
+        subtitleMono={address !== null}
+      />
+    )
+  }
+
+  return (
+    <div className={IDENTITY_CHIP} aria-hidden aria-busy>
+      <Skeleton className="size-7 shrink-0 rounded-full" />
+      <div className="flex min-w-0 flex-col items-start">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="mt-0.5 h-2.5 w-20" />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * THE SWITCH LOOKS PRESSABLE. This used to be an arrow icon and
+ * plain text with no background and no hover: the arrow promised
+ * a picker the look did not confirm. The link goes to settings,
+ * where accounts are actually switched.
+ *
+ * ENS name instead of the address when verification confirmed it.
+ * Monospace is dropped for a name: it exists for character-by-character
+ * comparison of an address, and a name is compared as a whole.
+ */
+function IdentityChip({
+  address,
+  title,
+  subtitle,
+  subtitleMono,
+}: {
+  readonly address: string | null
+  readonly title: string
+  readonly subtitle: string | null
+  readonly subtitleMono: boolean
+}) {
+  const initial = title.trim().slice(0, 1).toUpperCase()
+
   return (
     <Link
-      to="/wallet/settings"
+      to={ROUTE.Settings}
       className={cn(IDENTITY_CHIP, 'focus-ring transition-colors hover:bg-accent')}
     >
-      <AccountAvatar address={account.address} className="size-7 shrink-0" />
+      {address === null ? (
+        <span
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary-emphasis"
+          aria-hidden
+        >
+          {initial === '' ? '?' : initial}
+        </span>
+      ) : (
+        <AccountAvatar address={address} className="size-7 shrink-0" />
+      )}
 
       <div className="flex min-w-0 flex-col items-start">
         <span className="flex max-w-full items-center gap-1 text-sm leading-none font-semibold">
-          <span className="truncate">{account.name}</span>
+          <span className="truncate">{title}</span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         </span>
-        {/* ENS name instead of the address when verification confirmed it.
-            Monospace is dropped: it exists for character-by-character
-            comparison of an address, and a name is compared as a whole. */}
-        <span
-          className={cn(
-            'mt-0.5 max-w-full truncate text-[11px] leading-none text-muted-foreground',
-            !ensNames.has(account.address.toLowerCase()) && 'font-mono',
-          )}
-        >
-          {addressLabel(account.address, ensNames)}
-        </span>
+        {subtitle === null ? null : (
+          <span
+            className={cn(
+              'mt-0.5 max-w-full truncate text-[11px] leading-none text-muted-foreground',
+              subtitleMono && 'font-mono',
+            )}
+          >
+            {subtitle}
+          </span>
+        )}
       </div>
     </Link>
   )
+}
+
+function primaryWalletAddress(wallets: IUserWalletsMap): string | null {
+  const preferred =
+    findWalletByCodename(wallets, WALLET_CODENAME_RECEIVING_FUNDS)?.key ??
+    findWalletByCodename(wallets, WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE)?.key ??
+    Object.values(wallets)[0]?.key
+
+  return preferred !== undefined && preferred !== '' ? preferred : null
 }
 
 /**

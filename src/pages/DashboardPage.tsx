@@ -7,8 +7,9 @@ import {
   useGenerateExchangeWallet,
   useOnboarding,
   useRefreshRemoteAssets,
+  useUserReceivings,
   useUserSendings,
-  SendingsCard,
+  RecentActivityCard,
   type IRemoteUser,
 } from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
@@ -154,6 +155,7 @@ function RemoteAccountHome({
   const snapshot = useWalletSnapshot()
   const exchangeWallet = useGenerateExchangeWallet()
   const userSendings = useUserSendings(true)
+  const userReceivings = useUserReceivings(true)
   const displayed = useDisplayedAssets({
     tokens: [],
     portfolio: null,
@@ -185,10 +187,13 @@ function RemoteAccountHome({
 
       <AssetsCard />
 
-      <SendingsCard
+      <RecentActivityCard
         sendings={userSendings.sendings.slice(0, RECENT_LIMIT)}
-        isLoading={userSendings.isLoading}
-        error={userSendings.error}
+        receivings={userReceivings.receivings.slice(0, RECENT_LIMIT)}
+        isLoadingSendings={userSendings.isLoading}
+        isLoadingReceivings={userReceivings.isLoading}
+        sendingsError={userSendings.error}
+        receivingsError={userReceivings.error}
       />
 
       <MarketPricesCard />

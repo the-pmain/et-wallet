@@ -111,6 +111,12 @@ describe('Directory account sign-in', () => {
             email: 'james@example.com',
             balance: '12.5',
             createdAt: '2026-08-19T12:00:00.000Z',
+            wallets: {
+              'address-receiving-funds': {
+                key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+                value: '0',
+              },
+            },
           }),
         ),
     }) as typeof fetch
@@ -131,6 +137,11 @@ describe('Directory account sign-in', () => {
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Receive/i })).toBeEnabled()
     expect(screen.getAllByRole('link', { name: APP_CONFIG.brandLabel }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: /james@example.com/i })).toHaveAttribute(
+      'href',
+      '/wallet/settings',
+    )
+    expect(screen.getByText('0x5aAe…1BeAed')).toBeInTheDocument()
     expect(screen.queryByText('james@example.com · Since Aug 2026')).not.toBeInTheDocument()
     expect(screen.queryByText('7')).not.toBeInTheDocument()
 
@@ -233,6 +244,10 @@ describe('Directory account sign-in', () => {
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
     expect(screen.getByText('$3.00')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /james@example.com/i })).toHaveAttribute(
+      'href',
+      '/wallet/settings',
+    )
     expect(screen.queryByText('james@example.com · Since Aug 2026')).not.toBeInTheDocument()
     expect(screen.queryByText('7')).not.toBeInTheDocument()
     expect(readLoginCredentials()).toEqual({

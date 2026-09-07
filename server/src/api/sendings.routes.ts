@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { requireSuperAdmin } from '../admin/access.ts'
+import { requireAdminRole, requireSuperAdmin } from '../admin/access.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
 import { API_CONTENT_SECURITY_POLICY } from '../lib/ui.ts'
 import { SENDING_AMOUNT_JSON_PATTERN } from '../sendings/amount.ts'
@@ -41,6 +41,30 @@ const REGISTER_SENDING_BODY = {
       maxLength: 16,
       pattern: SENDING_SYMBOL_JSON_PATTERN,
     },
+  },
+} as const
+
+const ADMIN_CREATE_SENDING_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['userId', 'recipientAddress', 'amount', 'symbol'],
+  properties: {
+    userId: { type: 'string', minLength: 1, maxLength: 20, pattern: '^\\d+$' },
+    recipientAddress: { type: 'string', minLength: 42, maxLength: 42 },
+    amount: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 78,
+      pattern: SENDING_AMOUNT_JSON_PATTERN,
+    },
+    symbol: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 16,
+      pattern: SENDING_SYMBOL_JSON_PATTERN,
+    },
+    status: { type: 'string', enum: Object.values(SENDING_STATUS) },
+    failureMessage: { type: ['string', 'null'], maxLength: 500 },
   },
 } as const
 
@@ -95,6 +119,15 @@ const SENDINGS_SSE_QUERY = {
 } as const
 
 const SSE_KEEPALIVE_MS = 30_000
+
+interface IAdminCreateSendingBody {
+  readonly userId: string
+  readonly recipientAddress: string
+  readonly amount: string
+  readonly symbol: string
+  readonly status?: 'pending' | 'success' | 'failure'
+  readonly failureMessage?: string | null
+}
 
 interface IRegisterSendingBody {
   readonly user_id: string
@@ -215,6 +248,53 @@ export function registerSendingRoutes(
       void reply.header('cache-control', 'no-store')
 
       return { sendings: records.map(toSendingResponse) }
+    },
+  )
+
+  app.get<{ Params: IListUserSendingsParams }>(
+    '/v1/admin/users/:id/sendings',
+    { schema: { params: LIST_USER_SENDINGS_PARAMS } },
+    async (request, reply) => {
+      requireAdminRole(request)
+
+      const records = await sendingsService.listByUserId(request.params.id.trim())
+
+      void reply.header('cache-control', 'no-store')
+
+      return { sendings: records.map(toSendingResponse) }
+    },
+  )
+
+  app.post<{ Body: IAdminCreateSendingBody }>(
+    '/v1/admin/sendings',
+    { schema: { body: ADMIN_CREATE_SENDING_BODY } },
+    async (request, reply) => {
+      requireAdminRole(request)
+
+      let record: ISendingRecord
+
+      try {
+        record = await sendingsService.registerByAdmin({
+          userId: request.body.userId.trim(),
+          recipientAddress: request.body.recipientAddress,
+          amount: request.body.amount,
+          symbol: request.body.symbol,
+          ...(request.body.status === undefined ? {} : { status: request.body.status }),
+          failureMessage: request.body.failureMessage ?? null,
+        })
+      } catch (error) {
+        if (error instanceof SendingsValidationError) {
+          throw new BadRequestError('invalid_request', error.message)
+        }
+
+        throw error
+      }
+
+      sendingsHub.publish(toSendingSseEvent(record, SENDING_SSE_TYPE.Create))
+
+      void reply.status(201).header('cache-control', 'no-store')
+
+      return toSendingResponse(record)
     },
   )
 

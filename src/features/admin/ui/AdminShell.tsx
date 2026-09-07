@@ -27,6 +27,11 @@ const TABS = [
     label: 'Sendings',
     isActive: (pathname: string) => pathname === '/admin/sendings',
   },
+  {
+    to: '/admin/receivings',
+    label: 'Receivings',
+    isActive: (pathname: string) => pathname === '/admin/receivings',
+  },
 ] as const
 
 /** Cabinet shell: header and tabs stay when opening a profile. */

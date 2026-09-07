@@ -675,7 +675,6 @@ describe('Activity: owner sendings', () => {
   })
 
   it("after sign-in immediately shows the owner's sendings", async () => {
-    const user = userEvent.setup()
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     globalThis.fetch = mockDirectoryAndPriceFetch(
@@ -729,9 +728,6 @@ describe('Activity: owner sendings', () => {
     expect(screen.getByRole('button', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Tokens' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'History' }))
-
-    expect(visibleCount()).toBe(4)
+    expect(screen.getByRole('button', { name: 'History' })).toBeDisabled()
   })
 })

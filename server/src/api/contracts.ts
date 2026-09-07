@@ -221,6 +221,29 @@ export interface ISendingSseEvent extends ISendingResponse {
   readonly type_send: SendingSseType
 }
 
+export interface IReceivingResponse {
+  readonly id: string
+  readonly createdAt: string
+  readonly userId: string | null
+  readonly status: 'pending' | 'success' | 'failure' | null
+  readonly failureMessage: string | null
+  readonly recipientAddress: string | null
+  readonly amount: string | null
+  readonly symbol: string | null
+  readonly usdAmount: string | null
+}
+
+export const RECEIVING_SSE_TYPE = {
+  Create: 'create',
+  Update: 'update',
+} as const
+
+export type ReceivingSseType = (typeof RECEIVING_SSE_TYPE)[keyof typeof RECEIVING_SSE_TYPE]
+
+export interface IReceivingSseEvent extends IReceivingResponse {
+  readonly type_receive: ReceivingSseType
+}
+
 /** Rejection response. The same shape on every route. */
 export interface IErrorResponse {
   readonly error: {

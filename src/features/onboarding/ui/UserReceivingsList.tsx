@@ -1,28 +1,23 @@
-import { Send } from 'lucide-react'
+import { ArrowDownToLine } from 'lucide-react'
 
 import { addableAssetBySymbol } from '@/features/admin/model/addable-assets'
 import { SendingStatusBadge } from '@/features/admin/ui/SendingStatusBadge'
-import { shortenAddress } from '@/features/wallet'
 import { AmountWithUnit } from '@/features/wallet/ui/AmountWithUnit'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import { Alert, AlertDescription, EmptyState, Skeleton } from '@/shared/ui'
 
-import type { IRemoteSending } from '../model/RemoteUserDirectory'
+import type { IRemoteReceiving } from '../model/RemoteUserDirectory'
 
 /**
- * Directory transfer list. View only: rows are not clickable.
- *
- * Row density matches history and the asset showcase: a large amount
- * under the address blew the card open and did not read as a list
- * entry.
+ * Directory deposit list. View only: rows are not clickable.
  */
-export function UserSendingsList({
-  sendings,
+export function UserReceivingsList({
+  receivings,
   isLoading,
   error,
   compact = false,
 }: {
-  readonly sendings: readonly IRemoteSending[]
+  readonly receivings: readonly IRemoteReceiving[]
   readonly isLoading: boolean
   readonly error: string | null
   readonly compact?: boolean
@@ -36,21 +31,21 @@ export function UserSendingsList({
   }
 
   if (isLoading) {
-    return <SendingListSkeleton compact={compact} />
+    return <ReceivingListSkeleton compact={compact} />
   }
 
-  if (sendings.length === 0) {
+  if (receivings.length === 0) {
     if (compact) {
       return (
-        <p className="px-4 py-3 text-sm text-muted-foreground sm:px-6">No sendings yet</p>
+        <p className="px-4 py-3 text-sm text-muted-foreground sm:px-6">No receivings yet</p>
       )
     }
 
     return (
       <EmptyState
-        icon={Send}
-        title="No sendings yet"
-        description="Transfers you send from this account appear here. They are only for viewing."
+        icon={ArrowDownToLine}
+        title="No receivings yet"
+        description="Deposits assigned to this account appear here. They are only for viewing."
         className="gap-2 py-6"
       />
     )
@@ -58,20 +53,19 @@ export function UserSendingsList({
 
   return (
     <ul className="divide-y divide-border">
-      {sendings.map((sending) => (
-        <SendingViewRow key={sending.id} sending={sending} />
+      {receivings.map((receiving) => (
+        <ReceivingViewRow key={receiving.id} receiving={receiving} />
       ))}
     </ul>
   )
 }
 
-function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
-  const asset = addableAssetBySymbol(sending.symbol)
-  const symbol = sending.symbol ?? asset?.token.symbol ?? '—'
-  const name = asset?.token.name ?? sending.symbol ?? 'Unknown asset'
-  const recipient = sending.recipientAddress
-  const recipientLabel = recipient === null || recipient === '' ? '—' : shortenAddress(recipient)
-  const failureMessage = sending.failureMessage?.trim() ?? ''
+function ReceivingViewRow({ receiving }: { readonly receiving: IRemoteReceiving }) {
+  const asset = addableAssetBySymbol(receiving.symbol)
+  const symbol = receiving.symbol ?? asset?.token.symbol ?? '—'
+  const name = asset?.token.name ?? receiving.symbol ?? 'Unknown asset'
+  const failureMessage = receiving.failureMessage?.trim() ?? ''
+  const usdLabel = receiving.usdAmount === null || receiving.usdAmount === '' ? null : `$${receiving.usdAmount}`
 
   return (
     <li className="flex items-start gap-3 px-4 py-3 sm:px-6">
@@ -85,14 +79,15 @@ function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5 truncate text-sm">
           <span className="font-medium">{symbol}</span>
-          <span className="truncate font-mono text-xs text-muted-foreground">{recipientLabel}</span>
+          <span className="truncate text-xs text-muted-foreground">Receiving</span>
         </span>
         <span className="flex min-w-0 items-center gap-1.5 truncate text-xs text-muted-foreground">
           <span className="truncate">
             {name}
             {asset?.chainName === undefined ? null : ` · ${asset.chainName}`}
+            {usdLabel === null ? null : ` · ${usdLabel}`}
           </span>
-          <SendingTimestamp value={sending.createdAt} />
+          <ReceivingTimestamp value={receiving.createdAt} />
         </span>
         {failureMessage === '' ? null : (
           <span className="text-xs break-words text-destructive">{failureMessage}</span>
@@ -101,11 +96,11 @@ function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
 
       <span className="flex shrink-0 flex-col items-end gap-0.5">
         <AmountWithUnit
-          amount={sending.amount === null || sending.amount === '' ? '—' : sending.amount}
+          amount={receiving.amount === null || receiving.amount === '' ? '—' : receiving.amount}
           unit={symbol === '—' ? '' : symbol}
           className="text-sm font-semibold"
         />
-        <SendingStatusBadge status={sending.status} />
+        <SendingStatusBadge status={receiving.status} />
       </span>
     </li>
   )
@@ -113,12 +108,12 @@ function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
 
 const SKELETON_COUNT = 3
 
-function SendingListSkeleton({ compact = false }: { readonly compact?: boolean }) {
+function ReceivingListSkeleton({ compact = false }: { readonly compact?: boolean }) {
   const count = compact ? 2 : SKELETON_COUNT
 
   return (
     <div className="divide-y divide-border" aria-busy aria-live="polite">
-      <span className="sr-only">Loading recent activity</span>
+      <span className="sr-only">Loading receivings</span>
       {Array.from({ length: count }, (_, index) => (
         <div key={index} className="flex h-16 items-center gap-3 px-4 sm:px-6" aria-hidden>
           <Skeleton className="size-9 shrink-0 rounded-full" />
@@ -136,7 +131,7 @@ function SendingListSkeleton({ compact = false }: { readonly compact?: boolean }
   )
 }
 
-function SendingTimestamp({ value }: { readonly value: string }) {
+function ReceivingTimestamp({ value }: { readonly value: string }) {
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
