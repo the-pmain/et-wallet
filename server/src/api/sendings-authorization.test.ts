@@ -276,6 +276,17 @@ describe('public.sendings authorization', () => {
       url: '/v1/admin/sendings',
       headers: { 'x-admin-pin': '4200' },
     })
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        userId: id,
+        recipientAddress: RECIPIENT,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
     const patched = await app.inject({
       method: 'PATCH',
       url: `/v1/admin/sendings/${sendingId}`,
@@ -290,7 +301,9 @@ describe('public.sendings authorization', () => {
     })
 
     expect(listed.statusCode).toBe(403)
+    expect(created.statusCode).toBe(403)
     expect(patched.statusCode).toBe(403)
+    expect(sendings.records).toHaveLength(1)
     expect(sendings.records[0]?.status).toBe('pending')
   })
 })

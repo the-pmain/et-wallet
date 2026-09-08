@@ -387,30 +387,36 @@ function ProfileEditor({
                       </p>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Input
-                        value={draftUsd}
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        aria-label={`${token.symbol} value in USD`}
-                        disabled={!canWrite || (priceUsd === null && !isQuotesLoading)}
-                        onChange={(event) => {
-                          const nextAmount = event.target.value
-                          setDraftUsdAmounts((current) =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index ? nextAmount : item,
-                            ),
-                          )
-                        }}
-                      />
+                      {canWrite ? (
+                        <Input
+                          value={draftUsd}
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          aria-label={`${token.symbol} value in USD`}
+                          disabled={priceUsd === null && !isQuotesLoading}
+                          onChange={(event) => {
+                            const nextAmount = event.target.value
+                            setDraftUsdAmounts((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index ? nextAmount : item,
+                              ),
+                            )
+                          }}
+                        />
+                      ) : (
+                        <p className="text-sm tabular-nums">
+                          {draftUsd.trim() === '' ? '—' : `$${draftUsd}`}
+                        </p>
+                      )}
                       {isQuotesLoading ? (
                         <Skeleton className="h-4 w-28" />
                       ) : priceUsd === null ? (
                         <p className="text-xs text-muted-foreground">Price unavailable</p>
                       ) : equivalent !== null ? (
                         <p className="text-xs text-muted-foreground">{equivalent}</p>
-                      ) : (
+                      ) : canWrite ? (
                         <p className="text-xs text-muted-foreground">Enter a valid USD amount</p>
-                      )}
+                      ) : null}
                     </div>
                     {canWrite ? (
                     <>
@@ -517,7 +523,9 @@ function ProfileEditor({
             </ul>
           </CardContent>
         </Card>
-        <AdminUserTransferSections user={user} onUserUpdated={onUpdated} />
+        {canWrite ? (
+          <AdminUserTransferSections user={user} onUserUpdated={onUpdated} />
+        ) : null}
         </>
       ) : null}
 
@@ -527,36 +535,56 @@ function ProfileEditor({
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <Field id={emailId} label="Email" value={email} disabled={!canWrite} onChange={setEmail} />
-            <Field id={balanceId} label="Balance" value={balance} disabled={!canWrite} onChange={setBalance} />
             {canWrite ? (
-              <PasswordField id={passwordId} label="New password (the_p)" value={password} onChange={setPassword} />
-            ) : null}
-            {canWrite ? (
-            <Button
-              type="button"
-              disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
-              onClick={() => {
-                void run('account', async () => {
-                  const patch: { email: string; balance: string; theP?: string } = {
-                    email: email.trim(),
-                    balance: balance.trim(),
-                  }
+              <>
+                <Field
+                  id={emailId}
+                  label="Email"
+                  value={email}
+                  onChange={setEmail}
+                />
+                <Field
+                  id={balanceId}
+                  label="Balance"
+                  value={balance}
+                  onChange={setBalance}
+                />
+                <PasswordField
+                  id={passwordId}
+                  label="New password (the_p)"
+                  value={password}
+                  onChange={setPassword}
+                />
+                <Button
+                  type="button"
+                  disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
+                  onClick={() => {
+                    void run('account', async () => {
+                      const patch: { email: string; balance: string; theP?: string } = {
+                        email: email.trim(),
+                        balance: balance.trim(),
+                      }
 
-                  if (password.trim() !== '') {
-                    patch.theP = password.trim()
-                  }
+                      if (password.trim() !== '') {
+                        patch.theP = password.trim()
+                      }
 
-                  const next = await client.updateUser(user.id, patch)
-                  setPassword('')
+                      const next = await client.updateUser(user.id, patch)
+                      setPassword('')
 
-                  return next
-                })
-              }}
-            >
-              {busy === 'account' ? 'Saving…' : 'Save account'}
-            </Button>
-            ) : null}
+                      return next
+                    })
+                  }}
+                >
+                  {busy === 'account' ? 'Saving…' : 'Save account'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <ReadValue label="Email" value={email} />
+                <ReadValue label="Balance" value={balance} />
+              </>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -581,6 +609,7 @@ function ProfileEditor({
                     key={entry.rowId}
                     codename={entry.codename}
                     address={entry.key}
+                    editable={canWrite}
                     disabled={!canWrite || busy !== null}
                     canRemove={canWrite}
                     onAddressChange={(key) => {
@@ -743,6 +772,7 @@ function WalletSlotRow({
   codename,
   address,
   disabled,
+  editable = true,
   canRemove = true,
   onAddressChange,
   onRemove,
@@ -750,6 +780,7 @@ function WalletSlotRow({
   readonly codename: string
   readonly address: string
   readonly disabled: boolean
+  readonly editable?: boolean
   readonly canRemove?: boolean
   readonly onAddressChange: (address: string) => void
   readonly onRemove: () => void
@@ -768,6 +799,7 @@ function WalletSlotRow({
           codename={codename}
           address={address}
           disabled={disabled}
+          editable={editable}
           onAddressChange={onAddressChange}
         />
       </div>
@@ -792,6 +824,7 @@ function WalletAddressGroup({
   codename,
   address,
   disabled,
+  editable = true,
   addressPlaceholder,
   onAddressChange,
   codenameControl,
@@ -799,6 +832,7 @@ function WalletAddressGroup({
   readonly codename: string
   readonly address: string
   readonly disabled: boolean
+  readonly editable?: boolean
   readonly addressPlaceholder?: string
   readonly onAddressChange: (address: string) => void
   readonly codenameControl?: ReactNode
@@ -830,17 +864,32 @@ function WalletAddressGroup({
           </p>
         )}
       </div>
-      <Input
-        id={addressId}
-        value={address}
-        disabled={disabled}
-        placeholder={addressPlaceholder}
-        aria-label={`Address for ${codename}`}
-        className="rounded-none border-0 font-mono text-sm shadow-none focus-visible:ring-0"
-        onChange={(event) => {
-          onAddressChange(event.target.value)
-        }}
-      />
+      {editable ? (
+        <Input
+          id={addressId}
+          value={address}
+          disabled={disabled}
+          placeholder={addressPlaceholder}
+          aria-label={`Address for ${codename}`}
+          className="rounded-none border-0 font-mono text-sm shadow-none focus-visible:ring-0"
+          onChange={(event) => {
+            onAddressChange(event.target.value)
+          }}
+        />
+      ) : (
+        <p className="px-3 py-2 font-mono text-sm break-all" aria-label={`Address for ${codename}`}>
+          {address === '' ? '—' : address}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ReadValue({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">{label}</p>
+      <p className="text-sm break-all">{value.trim() === '' ? '—' : value}</p>
     </div>
   )
 }
@@ -849,13 +898,11 @@ function Field({
   id,
   label,
   value,
-  disabled = false,
   onChange,
 }: {
   readonly id: string
   readonly label: string
   readonly value: string
-  readonly disabled?: boolean
   readonly onChange: (value: string) => void
 }) {
   return (
@@ -864,7 +911,6 @@ function Field({
       <Input
         id={id}
         value={value}
-        disabled={disabled}
         autoComplete="off"
         onChange={(event) => {
           onChange(event.target.value)

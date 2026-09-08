@@ -1402,6 +1402,36 @@ describe('Admin cabinet', () => {
     expect(response.statusCode).toBe(401)
   })
 
+  it('a read PIN does not create sendings or receivings', async () => {
+    const userId = await seedUser()
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    const sending = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        userId,
+        recipientAddress: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+    const receiving = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/receivings',
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        userId,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(sending.statusCode).toBe(403)
+    expect(receiving.statusCode).toBe(403)
+  })
+
   it('returns sendings with a PIN', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({

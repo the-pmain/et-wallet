@@ -24,8 +24,8 @@ import { defaultTransferAsset, TransferAssetSelect } from './TransferAssetSelect
 const ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
 
 /**
- * Create sendings and receivings for this user. Forms only — lists live
- * on the owner's Activity page.
+ * Create sendings and receivings for this user. Super Admin only —
+ * lists live on the owner's Activity page.
  */
 export function AdminUserTransferSections({
   user,

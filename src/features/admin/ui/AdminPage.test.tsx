@@ -413,10 +413,24 @@ describe('Admin cabinet', () => {
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
     expect(await screen.findByRole('heading', { name: 'james@example.com' })).toBeInTheDocument()
     expect(screen.queryByLabelText('ETH receiving status')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('ETH value in USD')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add crypto' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete user' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create sending' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create receiving' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create sending' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create receiving' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Sending amount')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Receiving amount')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.getByText('Email')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save account' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Wallets' }))
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save wallets' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
   })
 
   it('a read PIN opens the Activity tab and lists authentications', async () => {
