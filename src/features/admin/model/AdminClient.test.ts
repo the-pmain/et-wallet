@@ -42,6 +42,40 @@ describe('AdminClient', () => {
     expect(users[0]?.email).toBe('james@example.com')
   })
 
+  it('reads the login activity list', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        users: [
+          {
+            userId: '7',
+            email: 'james@example.com',
+            loginCount: 2,
+            logins: [
+              { id: 'e2', createdAt: '2026-09-08T12:04:21.000Z' },
+              { id: 'e1', createdAt: '2026-09-07T08:12:03.000Z' },
+            ],
+          },
+        ],
+      }),
+    )
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '4200',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const activity = await client.listLoginActivity()
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/v1/admin/login-events')
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ 'x-admin-pin': '4200' })
+    expect(activity[0]).toMatchObject({
+      userId: '7',
+      email: 'james@example.com',
+      loginCount: 2,
+    })
+    expect(activity[0]?.logins).toHaveLength(2)
+  })
+
   it('reads the sendings list', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
@@ -126,14 +160,12 @@ describe('AdminClient', () => {
   })
 
   it('changes a wallet value', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        jsonResponse(200, {
-          ...USER,
-          wallets: { 'address-receiving-funds': { key: KEY, value: '2500' } },
-        }),
-      )
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        ...USER,
+        wallets: { 'address-receiving-funds': { key: KEY, value: '2500' } },
+      }),
+    )
 
     const client = new AdminClient({
       baseUrl: '',

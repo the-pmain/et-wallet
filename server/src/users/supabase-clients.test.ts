@@ -145,4 +145,15 @@ describe('supabase-clients', () => {
     expect(sql).not.toMatch(/with check\s*\(\s*true\s*\)/iu)
     expect(sql).not.toMatch(/create policy/iu)
   })
+
+  it('the RLS migration does not open public.login_events with USING (true)', () => {
+    const sql = readFileSync(join(import.meta.dirname, '../../supabase/login-events.sql'), 'utf8')
+
+    expect(sql).toMatch(/enable row level security/u)
+    expect(sql).toMatch(/drop policy if exists login_events_all/u)
+    expect(sql).toMatch(/revoke all on table public\.login_events from anon, authenticated/u)
+    expect(sql).not.toMatch(/using\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/with check\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/create policy/iu)
+  })
 })

@@ -47,6 +47,8 @@ const DirectorySessionContext = createContext<IDirectorySession | null>(null)
  * Sign-in session using `email` and `the_p`.
  *
  * The sign-in form posts `POST /v1/users/auth` with email and password.
+ * A stored session is restored with `GET /v1/users/:id`, not another
+ * auth post: reload is not a new login.
  * Create writes a `POST /v1/users` row and remembers the response.
  * Sign-out clears `elmsafe.login-credentials`.
  */
@@ -173,25 +175,19 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
       return
     }
 
-    void signIn(stored.email, stored.theP)
-      .catch(() => {
-        if (cancelled) {
-          return
-        }
-
-        clearLoginCredentials()
-        setUser(null)
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setRestoring(false)
-        }
-      })
+    /* Restore is a profile refresh, not a new sign-in. `signIn`
+       posts `/v1/users/auth` and would record a login event on every
+       reload — and twice under StrictMode. */
+    void refresh().finally(() => {
+      if (!cancelled) {
+        setRestoring(false)
+      }
+    })
 
     return () => {
       cancelled = true
     }
-  }, [signIn])
+  }, [refresh])
 
   const value = useMemo(
     () => ({
@@ -207,7 +203,19 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
       applyUser,
       signOut,
     }),
-    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, listReceivings, refresh, applyUser, signOut],
+    [
+      user,
+      isRefreshing,
+      isRestoring,
+      enter,
+      signIn,
+      registerSending,
+      listSendings,
+      listReceivings,
+      refresh,
+      applyUser,
+      signOut,
+    ],
   )
 
   return <DirectorySessionContext value={value}>{children}</DirectorySessionContext>

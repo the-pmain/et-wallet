@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import { buildApp } from './app.ts'
 import { loadConfig } from './config.ts'
+import { createLoginEventsStore } from './login-events/createLoginEventsStore.ts'
 import { createReceivingsStore } from './receivings/createReceivingsStore.ts'
 import { createSendingsStore } from './sendings/createSendingsStore.ts'
 import { createUsersStore } from './users/createUsersStore.ts'
@@ -26,6 +27,7 @@ async function main(): Promise<void> {
   const usersStore = createUsersStore(config)
   const sendingsStore = await createSendingsStore(config)
   const receivingsStore = await createReceivingsStore(config)
+  const loginEventsStore = await createLoginEventsStore(config)
   const app = await buildApp({
     config,
     users: usersStore.users,
@@ -34,12 +36,14 @@ async function main(): Promise<void> {
     sendingsStorageWarning: sendingsStore.storageWarning,
     receivings: receivingsStore.receivings,
     receivingsStorageWarning: receivingsStore.storageWarning,
+    loginEvents: loginEventsStore.loginEvents,
   })
 
   app.addHook('onClose', async () => {
     await usersStore.close()
     await sendingsStore.close()
     await receivingsStore.close()
+    await loginEventsStore.close()
   })
 
   /* A signal stop closes connections instead of cutting them:

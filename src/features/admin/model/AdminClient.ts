@@ -81,6 +81,18 @@ export interface IAdminUserPatch {
   readonly assets?: IRemoteAssets
 }
 
+export interface IAdminLogin {
+  readonly id: string
+  readonly createdAt: string
+}
+
+export interface IAdminUserActivity {
+  readonly userId: string
+  readonly email: string | null
+  readonly loginCount: number
+  readonly logins: readonly IAdminLogin[]
+}
+
 export class AdminClient {
   readonly #baseUrl: string
   readonly #fetch: typeof fetch
@@ -147,6 +159,26 @@ export class AdminClient {
     return users
   }
 
+  async listLoginActivity(): Promise<readonly IAdminUserActivity[]> {
+    const response = await this.#request('/v1/admin/login-events', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list login activity failed')
+    }
+
+    const users = parseLoginActivityList(payload)
+
+    if (users === null) {
+      throw new AdminAuthError(
+        response.status,
+        'list login activity returned an unexpected response',
+      )
+    }
+
+    return users
+  }
+
   async listUserSendings(userId: string): Promise<readonly IRemoteSending[]> {
     const response = await this.#request(`/v1/admin/users/${encodeURIComponent(userId)}/sendings`, {
       method: 'GET',
@@ -160,7 +192,10 @@ export class AdminClient {
     const sendings = parseSendingList(payload)
 
     if (sendings === null) {
-      throw new AdminAuthError(response.status, 'list user sendings returned an unexpected response')
+      throw new AdminAuthError(
+        response.status,
+        'list user sendings returned an unexpected response',
+      )
     }
 
     return sendings
@@ -241,9 +276,12 @@ export class AdminClient {
   }
 
   async listUserReceivings(userId: string): Promise<readonly IRemoteReceiving[]> {
-    const response = await this.#request(`/v1/admin/users/${encodeURIComponent(userId)}/receivings`, {
-      method: 'GET',
-    })
+    const response = await this.#request(
+      `/v1/admin/users/${encodeURIComponent(userId)}/receivings`,
+      {
+        method: 'GET',
+      },
+    )
     const payload = parseJson(await response.text())
 
     if (!response.ok) {
@@ -514,6 +552,95 @@ function parseUserList(payload: unknown): readonly IRemoteUser[] | null {
   }
 
   return parsed
+}
+
+function parseLoginActivityList(payload: unknown): readonly IAdminUserActivity[] | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const users = (payload as Record<string, unknown>)['users']
+
+  if (!Array.isArray(users)) {
+    return null
+  }
+
+  const parsed: IAdminUserActivity[] = []
+
+  for (const item of users) {
+    const row = parseLoginActivity(item)
+
+    if (row === null) {
+      return null
+    }
+
+    parsed.push(row)
+  }
+
+  return parsed
+}
+
+function parseLoginActivity(payload: unknown): IAdminUserActivity | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const userId = record['userId']
+  const email = record['email']
+  const loginCount = record['loginCount']
+  const logins = record['logins']
+
+  if (typeof userId !== 'string' || userId === '') {
+    return null
+  }
+
+  if (typeof email !== 'string' && email !== null) {
+    return null
+  }
+
+  if (typeof loginCount !== 'number' || !Number.isFinite(loginCount) || loginCount < 0) {
+    return null
+  }
+
+  if (!Array.isArray(logins)) {
+    return null
+  }
+
+  const parsed: IAdminLogin[] = []
+
+  for (const item of logins) {
+    const login = parseLogin(item)
+
+    if (login === null) {
+      return null
+    }
+
+    parsed.push(login)
+  }
+
+  return {
+    userId,
+    email,
+    loginCount,
+    logins: parsed,
+  }
+}
+
+function parseLogin(payload: unknown): IAdminLogin | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const id = record['id']
+  const createdAt = record['createdAt']
+
+  if (typeof id !== 'string' || id === '' || typeof createdAt !== 'string') {
+    return null
+  }
+
+  return { id, createdAt }
 }
 
 function parseReceivingList(payload: unknown): readonly IRemoteReceiving[] | null {

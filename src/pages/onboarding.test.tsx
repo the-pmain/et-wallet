@@ -255,6 +255,22 @@ describe('Directory account sign-in', () => {
       email: 'james@example.com',
       theP: '123456',
     })
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls
+    expect(
+      calls.some(
+        ([url, init]) =>
+          (typeof url === 'string' ? url : '').includes('/v1/users/7') &&
+          (init?.method ?? 'GET') === 'GET',
+      ),
+    ).toBe(true)
+    expect(
+      calls.some(
+        ([url, init]) =>
+          (typeof url === 'string' ? url : '').endsWith('/v1/users/auth') &&
+          init?.method === 'POST',
+      ),
+    ).toBe(false)
   })
 
   it('clears stored credentials when sign-in is rejected', async () => {

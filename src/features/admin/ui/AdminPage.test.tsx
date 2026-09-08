@@ -58,6 +58,26 @@ const MARIA = {
   assets: EMPTY_REMOTE_ASSETS,
 }
 
+const LOGIN_ACTIVITY = {
+  users: [
+    {
+      userId: '7',
+      email: 'james@example.com',
+      loginCount: 2,
+      logins: [
+        { id: 'e2', createdAt: '2026-09-08T12:04:21.000Z' },
+        { id: 'e1', createdAt: '2026-09-07T08:12:03.000Z' },
+      ],
+    },
+    {
+      userId: '8',
+      email: 'maria@example.com',
+      loginCount: 0,
+      logins: [],
+    },
+  ],
+}
+
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
 let listedSendings: unknown[]
@@ -177,6 +197,10 @@ beforeEach(() => {
         return Promise.resolve(jsonResponse(200, { receivings: [] }))
       }
 
+      if (url.endsWith('/v1/admin/login-events') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, LOGIN_ACTIVITY))
+      }
+
       if (url.endsWith('/v1/admin/sendings') && method === 'POST') {
         const body = requestJson(init) as Record<string, unknown>
 
@@ -221,6 +245,10 @@ beforeEach(() => {
 
     if (url.endsWith('/v1/admin/users') && method === 'GET') {
       return Promise.resolve(jsonResponse(200, { users: [USER, MARIA] }))
+    }
+
+    if (url.endsWith('/v1/admin/login-events') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, LOGIN_ACTIVITY))
     }
 
     if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
@@ -347,6 +375,7 @@ describe('Admin cabinet', () => {
     expect(screen.getByText('Super Admin')).toBeInTheDocument()
     expect(await screen.findByText('james@example.com')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Avatar for james@example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Activity' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('9100')
@@ -375,6 +404,7 @@ describe('Admin cabinet', () => {
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
     expect(screen.getByText('Admin')).toBeInTheDocument()
     expect(screen.queryByText('Super Admin')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Activity' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Sendings' })).not.toBeInTheDocument()
     expect(
       TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings')),
@@ -387,6 +417,51 @@ describe('Admin cabinet', () => {
     expect(screen.queryByRole('button', { name: 'Delete user' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create sending' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create receiving' })).toBeInTheDocument()
+  })
+
+  it('a read PIN opens the Activity tab and lists authentications', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '4200')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Activity' }))
+
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByText('2 users · 2 authentications.')).toBeInTheDocument()
+    expect(screen.getByText('Never signed in')).toBeInTheDocument()
+    expect(screen.getByText(/id 7 · 2 authentications/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /maria@example.com/i })).toHaveAttribute(
+      'href',
+      '/admin/users/8',
+    )
+    expect(screen.getByRole('link', { name: /maria@example.com/i }).className).toMatch(
+      /hover:bg-accent/u,
+    )
+    expect(screen.getByRole('link', { name: /maria@example.com/i }).className).toMatch(
+      /text-muted-foreground/u,
+    )
+    expect(screen.getByText(/id 7 · 2 authentications/).className).toMatch(/text-foreground/u)
+    expect(
+      fetchSpy.mock.calls.some((call) =>
+        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/login-events'),
+      ),
+    ).toBe(true)
+
+    await user.click(screen.getByText(/id 7 · 2 authentications/))
+    expect(document.querySelector('time[datetime="2026-09-08T12:04:21.000Z"]')).not.toBeNull()
+    expect(document.querySelector('time[datetime="2026-09-07T08:12:03.000Z"]')).not.toBeNull()
+  })
+
+  it('a super PIN also opens the Activity tab', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Activity' }))
+
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByText('2 users · 2 authentications.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
   })
 
   it('stays in the cabinet with a stored PIN', async () => {

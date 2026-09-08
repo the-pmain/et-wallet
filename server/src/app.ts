@@ -12,6 +12,9 @@ import { CatalogService } from './catalog/CatalogService.ts'
 import { RUNTIME_MODE, type IServerConfig } from './config.ts'
 import { ApiError } from './lib/errors.ts'
 import { isApiUrl, isStaticAssetUrl } from './lib/ui.ts'
+import { MemoryLoginEventsRepository } from './login-events/MemoryLoginEventsRepository.ts'
+import { LoginEventsDatabaseError } from './login-events/SupabaseRestLoginEventsRepository.ts'
+import type { ILoginEventsRepository } from './login-events/contracts.ts'
 import { registerSecretGuard } from './plugins/secret-guard.ts'
 import { registerSecurity } from './plugins/security.ts'
 import { registerUi, sendWalletIndex } from './plugins/ui.ts'
@@ -49,6 +52,7 @@ export interface IAppDependencies {
   readonly receivings?: IReceivingsRepository
   readonly receivingsStorageWarning?: string | null
   readonly receivingsHub?: ReceivingsHub
+  readonly loginEvents?: ILoginEventsRepository
 }
 
 /**
@@ -129,13 +133,15 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   const receivings = dependencies.receivings ?? new MemoryReceivingsRepository()
   const receivingsService = new ReceivingsService(receivings, users)
   const receivingsHub = dependencies.receivingsHub ?? new ReceivingsHub()
+  const loginEvents = dependencies.loginEvents ?? new MemoryLoginEventsRepository()
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
       if (
         error instanceof UsersDatabaseError ||
         error instanceof SendingsDatabaseError ||
-        error instanceof ReceivingsDatabaseError
+        error instanceof ReceivingsDatabaseError ||
+        error instanceof LoginEventsDatabaseError
       ) {
         request.log.error(
           {
@@ -147,7 +153,9 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
             ? 'sendings database error'
             : error instanceof ReceivingsDatabaseError
               ? 'receivings database error'
-              : 'users database error',
+              : error instanceof LoginEventsDatabaseError
+                ? 'login events database error'
+                : 'users database error',
         )
       }
 
@@ -207,10 +215,10 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerNotificationRoutes(app, catalog)
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
-  registerUserRoutes(app, users)
+  registerUserRoutes(app, users, loginEvents)
   registerSendingRoutes(app, sendingsService, sendingsHub)
   registerReceivingRoutes(app, receivingsService, receivingsHub)
-  registerAdminRoutes(app, users)
+  registerAdminRoutes(app, users, loginEvents)
 
   if (config.staticRoot !== null) {
     await registerUi(app, config.staticRoot)

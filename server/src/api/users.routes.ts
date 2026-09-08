@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { BadRequestError, UnauthorizedError } from '../lib/errors.ts'
+import type { ILoginEventsRepository } from '../login-events/contracts.ts'
 import {
   createStartingAssets,
   readAssetsPayload,
@@ -29,7 +30,9 @@ import type { IUserResponse } from './contracts.ts'
  * Body may contain `assets`; the server keeps balances only, zeros
  * each token `balance`, and drops `priceUsd` / `valueUsd`. Without
  * the field — a starting showcase of one ETH.
- * `POST /v1/users/auth` — check `email` and `the_p`.
+ * `POST /v1/users/auth` — check `email` and `the_p`. A successful
+ * check also writes `public.login_events`. A failed write is logged
+ * and does not refuse the login.
  * `GET /v1/users/:id` — fresh record, same `email` and `the_p` check.
  * `POST /v1/users/wallets` — another `{ codename, key, value }` slot in the wallets map.
  * Off-schema request — 400, no login.
@@ -69,7 +72,16 @@ const WALLETS_MAP_BODY = {
 const ASSET_TOKEN_BODY = {
   type: 'object',
   additionalProperties: false,
-  required: ['chainId', 'standard', 'address', 'symbol', 'name', 'decimals', 'balance', 'isVerified'],
+  required: [
+    'chainId',
+    'standard',
+    'address',
+    'symbol',
+    'name',
+    'decimals',
+    'balance',
+    'isVerified',
+  ],
   properties: {
     chainId: { type: 'string', minLength: 1, maxLength: 16 },
     standard: { type: 'string', enum: ['native', 'ERC-20'] },
@@ -103,11 +115,7 @@ const CREATE_USER_BODY = {
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
     seed_phrase: { type: 'string', minLength: 1, maxLength: 512 },
     wallets: {
-      oneOf: [
-        WALLETS_MAP_BODY,
-        WALLET_ENTRY_BODY,
-        { type: 'array', items: WALLET_ENTRY_BODY },
-      ],
+      oneOf: [WALLETS_MAP_BODY, WALLET_ENTRY_BODY, { type: 'array', items: WALLET_ENTRY_BODY }],
     },
     assets: ASSETS_BODY,
   },
@@ -186,7 +194,11 @@ interface IAddWalletBody {
   readonly value: string
 }
 
-export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository): void {
+export function registerUserRoutes(
+  app: FastifyInstance,
+  users: IUsersRepository,
+  loginEvents: ILoginEventsRepository,
+): void {
   app.get<{ Params: IGetUserParams; Querystring: IGetUserQuery }>(
     '/v1/users/:id',
     { schema: { params: GET_USER_PARAMS, querystring: GET_USER_QUERY } },
@@ -223,6 +235,12 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
 
       if (record === null) {
         throw new UnauthorizedError('Invalid credentials.')
+      }
+
+      try {
+        await loginEvents.create({ userId: record.id })
+      } catch (error) {
+        request.log.warn({ err: error }, 'login event was not recorded')
       }
 
       void reply.header('cache-control', 'no-store')

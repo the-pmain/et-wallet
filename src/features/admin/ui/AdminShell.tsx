@@ -20,16 +20,25 @@ const TABS = [
   {
     to: '/admin',
     label: 'Users',
+    superOnly: false,
     isActive: (pathname: string) => pathname === '/admin' || pathname.startsWith('/admin/users'),
+  },
+  {
+    to: '/admin/activity',
+    label: 'Activity',
+    superOnly: false,
+    isActive: (pathname: string) => pathname === '/admin/activity',
   },
   {
     to: '/admin/sendings',
     label: 'Sendings',
+    superOnly: true,
     isActive: (pathname: string) => pathname === '/admin/sendings',
   },
   {
     to: '/admin/receivings',
     label: 'Receivings',
+    superOnly: true,
     isActive: (pathname: string) => pathname === '/admin/receivings',
   },
 ] as const
@@ -38,7 +47,7 @@ const TABS = [
 export function AdminShell({ children, role, pin, onLock }: AdminShellProps) {
   const location = useLocation()
   const isSuper = role === ADMIN_ROLE.Super
-  const tabs = isSuper ? TABS : TABS.filter((tab) => tab.label === 'Users')
+  const tabs = TABS.filter((tab) => isSuper || !tab.superOnly)
 
   const frame = (
     <div className="min-h-svh bg-background">

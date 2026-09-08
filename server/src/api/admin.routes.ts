@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify'
 import { requireAdminRole, requireSuperAdmin } from '../admin/access.ts'
 import { resolveAdminRole } from '../admin/pin.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
+import { groupLoginActivity } from '../login-events/activity.ts'
+import type { ILoginEventsRepository } from '../login-events/contracts.ts'
 import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
 import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
 import { readWalletsPayload } from '../users/wallets.ts'
@@ -77,7 +79,11 @@ interface IUserIdParams {
   readonly id: string
 }
 
-export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepository): void {
+export function registerAdminRoutes(
+  app: FastifyInstance,
+  users: IUsersRepository,
+  loginEvents: ILoginEventsRepository,
+): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
     { schema: { body: AUTH_BODY } },
@@ -102,6 +108,18 @@ export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepositor
     void reply.header('cache-control', 'no-store')
 
     return { users: records.map(toUserResponse) }
+  })
+
+  app.get('/v1/admin/login-events', async (request, reply) => {
+    /* Read PIN and super PIN both: this list is the same class of
+       directory data as GET /v1/admin/users. */
+    requireAdminRole(request)
+
+    const [records, events] = await Promise.all([users.list(), loginEvents.list()])
+
+    void reply.header('cache-control', 'no-store')
+
+    return { users: groupLoginActivity(records, events) }
   })
 
   app.get<{ Params: IUserIdParams }>('/v1/admin/users/:id', async (request, reply) => {

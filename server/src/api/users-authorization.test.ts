@@ -214,6 +214,11 @@ describe('public.users authorization', () => {
       url: '/v1/admin/users',
       headers: { 'x-admin-pin': '4200' },
     })
+    const activity = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '4200' },
+    })
     const patched = await app.inject({
       method: 'PATCH',
       url: `/v1/admin/users/${id}`,
@@ -229,6 +234,8 @@ describe('public.users authorization', () => {
     expect(auth.statusCode).toBe(200)
     expect(auth.json<{ role: string }>()).toEqual({ ok: true, role: 'admin' })
     expect(listed.statusCode).toBe(200)
+    expect(activity.statusCode).toBe(200)
+    expect(activity.json<{ users: { loginCount: number }[] }>().users[0]?.loginCount).toBe(0)
     expect(patched.statusCode).toBe(403)
     expect(removed.statusCode).toBe(403)
     expect(users.records[0]?.balance).toBe('0')

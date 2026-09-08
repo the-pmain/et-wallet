@@ -1705,4 +1705,70 @@ describe('Admin cabinet', () => {
     expect(response.statusCode).toBe(204)
     expect(users.records).toHaveLength(0)
   })
+
+  it('does not return login events without a PIN', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/admin/login-events' })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('records successful logins and lists them for admin and super admin', async () => {
+    const userId = await seedUser()
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const second = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'other' },
+    })
+    const restored = await app.inject({
+      method: 'GET',
+      url: `/v1/users/${userId}`,
+      query: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const asAdmin = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '4200' },
+    })
+    const asSuper = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(first.statusCode).toBe(200)
+    expect(second.statusCode).toBe(200)
+    expect(refused.statusCode).toBe(401)
+    expect(restored.statusCode).toBe(200)
+    expect(asAdmin.statusCode).toBe(200)
+    expect(asSuper.statusCode).toBe(200)
+
+    const activity = asAdmin.json<{
+      users: {
+        userId: string
+        email: string | null
+        loginCount: number
+        logins: { id: string; createdAt: string }[]
+      }[]
+    }>().users[0]
+
+    expect(activity).toMatchObject({
+      userId,
+      email: 'james@example.com',
+      loginCount: 2,
+    })
+    expect(activity?.logins).toHaveLength(2)
+    expect(asSuper.json()).toEqual(asAdmin.json())
+    expect(asAdmin.headers['cache-control']).toBe('no-store')
+  })
 })
