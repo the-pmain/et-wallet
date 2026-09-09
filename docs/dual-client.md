@@ -38,6 +38,9 @@ If the worktree already exists, update that branch from `et-wallet/main` and add
 
 ## Current port (2026-09-09)
 
+Cabinet directory lists are paginated (`GET /v1/admin/directory/*`), with a short TTL scan cache and joined emails. Receivings does not GET sendings. Pending toasts hydrate from Users/Activity, or from the Sendings list itself.
+
 Regular admins can **view** all sendings and receivings. Writes, Edit, and the cabinet SSE stream stay super-admin only.
 
-elm-wallet-main commits: `3f12884`, `8316df7`.
+elm-wallet-main: `af55ecb` (also `3f12884`, `8316df7`).
+adapt: `31ced7d`.
