@@ -1,14 +1,6 @@
-import { Navigate } from 'react-router'
+import { AdminSendingsList } from '@/features/admin'
 
-import { AdminSendingsList, useAdminSession } from '@/features/admin'
-
-/** Живой список переводов кабинета. Только супер-администратор. */
+/** Список переводов кабинета. Обычный admin смотрит; супер-admin правит. */
 export function AdminSendingsPage() {
-  const { canWrite } = useAdminSession()
-
-  if (!canWrite) {
-    return <Navigate to="/admin" replace />
-  }
-
   return <AdminSendingsList />
 }

@@ -14,9 +14,9 @@ import { sendingMatchesAdminQuery } from '../model/sending-query'
 import { ReceivingEditDialog } from './ReceivingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
 
-/** Cabinet deposit list. Super-admin only. */
+/** Cabinet deposit list. Regular admins view; super-admins edit. */
 export function AdminReceivingsList() {
-  const { client, lock } = useAdminSession()
+  const { client, canWrite, lock } = useAdminSession()
   const [receivings, setReceivings] = useState<readonly IRemoteReceiving[] | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -140,29 +140,35 @@ export function AdminReceivingsList() {
             <ReceivingRow
               key={receiving.id}
               receiving={receiving}
-              onEdit={() => {
-                setEditError(null)
-                setEditing(receiving)
-              }}
+              {...(canWrite
+                ? {
+                    onEdit: () => {
+                      setEditError(null)
+                      setEditing(receiving)
+                    },
+                  }
+                : {})}
             />
           ))}
         </ul>
       )}
-      <ReceivingEditDialog
-        key={editing?.id ?? 'closed'}
-        receiving={editing}
-        isBusy={isSaving}
-        error={editError}
-        onClose={() => {
-          if (!isSaving) {
-            setEditing(null)
-            setEditError(null)
-          }
-        }}
-        onSave={(id, patch) => {
-          void saveReceiving(id, patch)
-        }}
-      />
+      {canWrite ? (
+        <ReceivingEditDialog
+          key={editing?.id ?? 'closed'}
+          receiving={editing}
+          isBusy={isSaving}
+          error={editError}
+          onClose={() => {
+            if (!isSaving) {
+              setEditing(null)
+              setEditError(null)
+            }
+          }}
+          onSave={(id, patch) => {
+            void saveReceiving(id, patch)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -172,7 +178,7 @@ function ReceivingRow({
   onEdit,
 }: {
   readonly receiving: IRemoteReceiving
-  readonly onEdit: () => void
+  readonly onEdit?: () => void
 }) {
   const asset = addableAssetBySymbol(receiving.symbol)
   const symbol = receiving.symbol ?? asset?.token.symbol ?? '—'
@@ -214,10 +220,12 @@ function ReceivingRow({
       </span>
       <span className="flex shrink-0 flex-col items-end gap-2">
         <SendingStatusBadge status={receiving.status} />
-        <Button type="button" variant="outline" size="sm" onClick={onEdit}>
-          <Pencil />
-          Edit
-        </Button>
+        {onEdit === undefined ? null : (
+          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+            <Pencil />
+            Edit
+          </Button>
+        )}
       </span>
     </li>
   )

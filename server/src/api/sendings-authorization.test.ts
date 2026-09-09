@@ -267,7 +267,7 @@ describe('public.sendings authorization', () => {
     expect(response.body).not.toContain('demo')
   })
 
-  it('a read PIN does not open cabinet sendings', async () => {
+  it('a read PIN lists cabinet sendings but does not write', async () => {
     const id = await seedUser('james@example.com', 'demo')
     const sendingId = await seedSending(id, 'james@example.com', 'demo')
 
@@ -300,7 +300,8 @@ describe('public.sendings authorization', () => {
       },
     })
 
-    expect(listed.statusCode).toBe(403)
+    expect(listed.statusCode).toBe(200)
+    expect(listed.json<{ sendings: { userId: string }[] }>().sendings[0]?.userId).toBe(id)
     expect(created.statusCode).toBe(403)
     expect(patched.statusCode).toBe(403)
     expect(sendings.records).toHaveLength(1)

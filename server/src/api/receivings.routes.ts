@@ -140,8 +140,9 @@ interface IReceivingsSseQuery {
  *
  * `GET /v1/users/:id/receivings` is trusted server: identity is
  * `email`+`the_p`. `GET /v1/admin/users/:id/receivings` is any cabinet
- * PIN (read). `GET/POST/PATCH /v1/admin/receivings` are Super Admin:
- * `x-admin-pin`. The store uses the service-role client.
+ * PIN (read). `GET /v1/admin/receivings` is any cabinet PIN (read).
+ * `POST/PATCH /v1/admin/receivings` are Super Admin: `x-admin-pin`.
+ * The store uses the service-role client.
  */
 export function registerReceivingRoutes(
   app: FastifyInstance,
@@ -234,7 +235,7 @@ export function registerReceivingRoutes(
   )
 
   app.get('/v1/admin/receivings', async (request, reply) => {
-    requireSuperAdmin(request)
+    requireAdminRole(request)
 
     const records = await receivingsService.list()
 

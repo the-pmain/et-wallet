@@ -32,13 +32,13 @@ const TABS = [
   {
     to: '/admin/sendings',
     label: 'Sendings',
-    superOnly: true,
+    superOnly: false,
     isActive: (pathname: string) => pathname === '/admin/sendings',
   },
   {
     to: '/admin/receivings',
     label: 'Receivings',
-    superOnly: true,
+    superOnly: false,
     isActive: (pathname: string) => pathname === '/admin/receivings',
   },
 ] as const
