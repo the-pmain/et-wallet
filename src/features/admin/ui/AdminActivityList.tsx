@@ -1,5 +1,5 @@
 import { History } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
 import { cn } from '@/shared/lib/utils'
@@ -8,24 +8,33 @@ import { Alert, AlertDescription, EmptyState, Input, Skeleton } from '@/shared/u
 import { formatAdminTimestamp } from '../lib/format-admin-timestamp'
 import { formatLoginLocation } from '../lib/format-login-location'
 import { AdminAuthError, type IAdminLogin, type IAdminUserActivity } from '../model/AdminClient'
-import { activityMatchesAdminQuery } from '../model/activity-query'
+import { type IAdminPage } from '../model/admin-page'
 import { useAdminSession } from '../model/admin-context'
+import {
+  directoryListIsBusy,
+  useAdminDirectoryQuery,
+} from '../model/use-admin-directory-query'
+import { AdminDirectoryListPending } from './AdminDirectoryListPending'
+import { AdminListPager } from './AdminListPager'
 import { UserAvatar } from './UserAvatar'
 
 export function AdminActivityList() {
   const { client, lock } = useAdminSession()
-  const [users, setUsers] = useState<readonly IAdminUserActivity[] | null>(null)
-  const [query, setQuery] = useState('')
+  const { page, pageSize, query, search, setPage, setSearch } = useAdminDirectoryQuery()
+  const [listed, setListed] = useState<IAdminPage<IAdminUserActivity> | null>(null)
+  const [isFetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
+    setFetching(true)
     void client
-      .listLoginActivity()
-      .then((listed) => {
+      .listDirectoryActivity({ page, pageSize, q: query })
+      .then((next) => {
         if (!cancelled) {
-          setUsers(listed)
+          setListed(next)
+          setFetching(false)
         }
       })
       .catch((caught: unknown) => {
@@ -41,25 +50,16 @@ export function AdminActivityList() {
 
         setError('The activity list could not be loaded.')
       })
+      .finally(() => {
+        if (!cancelled) {
+          setFetching(false)
+        }
+      })
 
     return () => {
       cancelled = true
     }
-  }, [client, lock])
-
-  const filtered = useMemo(() => {
-    if (users === null) {
-      return []
-    }
-
-    const needle = query.trim().toLowerCase()
-
-    if (needle === '') {
-      return users
-    }
-
-    return users.filter((row) => activityMatchesAdminQuery(row, needle))
-  }, [query, users])
+  }, [client, lock, page, pageSize, query])
 
   if (error !== null) {
     return (
@@ -69,7 +69,7 @@ export function AdminActivityList() {
     )
   }
 
-  if (users === null) {
+  if (listed === null) {
     return (
       <div className="flex flex-col gap-3">
         <Skeleton className="h-10 w-full" />
@@ -79,28 +79,30 @@ export function AdminActivityList() {
     )
   }
 
-  const authentications = users.reduce((total, row) => total + row.loginCount, 0)
+  const authentications = listed.items.reduce((total, row) => total + row.loginCount, 0)
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
         <p className="text-sm text-muted-foreground">
-          {String(users.length)} {users.length === 1 ? 'user' : 'users'} · {String(authentications)}{' '}
+          {String(listed.total)} {listed.total === 1 ? 'user' : 'users'} · {String(authentications)}{' '}
           {authentications === 1 ? 'authentication' : 'authentications'}.
         </p>
       </div>
       <Input
         type="search"
-        value={query}
+        value={search}
         placeholder="Search email, user id, or location"
         aria-label="Search email, user id, or location"
         onChange={(event) => {
-          setQuery(event.target.value)
+          setSearch(event.target.value)
         }}
       />
-      {filtered.length === 0 ? (
-        users.length === 0 ? (
+      {directoryListIsBusy(search, query, isFetching) ? (
+        <AdminDirectoryListPending label="Searching activity" />
+      ) : listed.items.length === 0 ? (
+        listed.total === 0 && query.trim() === '' ? (
           <EmptyState
             icon={History}
             title="No activity yet"
@@ -110,11 +112,19 @@ export function AdminActivityList() {
           <p className="text-sm text-muted-foreground">No users match this search.</p>
         )
       ) : (
-        <ul className="divide-y rounded-xl border">
-          {filtered.map((row) => (
+        <ul className="flex flex-col gap-2">
+          {listed.items.map((row) => (
             <ActivityRow key={row.userId} row={row} />
           ))}
         </ul>
+      )}
+      {directoryListIsBusy(search, query, isFetching) ? null : (
+        <AdminListPager
+          page={listed.page}
+          pageSize={listed.pageSize}
+          total={listed.total}
+          onPageChange={setPage}
+        />
       )}
     </div>
   )
@@ -150,7 +160,7 @@ function ActivityRow({ row }: { readonly row: IAdminUserActivity }) {
       <li>
         <Link
           to={`/admin/users/${row.userId}`}
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-muted-foreground hover:bg-accent"
+          className="flex w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-muted-foreground hover:bg-accent"
         >
           {identity}
           <span className="shrink-0 text-xs">Never signed in</span>
@@ -161,7 +171,7 @@ function ActivityRow({ row }: { readonly row: IAdminUserActivity }) {
 
   return (
     <li>
-      <details className="group hover:bg-accent">
+      <details className="group rounded-xl border bg-card hover:bg-accent">
         <summary className="flex w-full cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 select-none [&::-webkit-details-marker]:hidden">
           {identity}
           <LastLogin login={row.logins[0]} />

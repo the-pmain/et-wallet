@@ -7,7 +7,7 @@ import {
   TOKEN_SYMBOLS,
   type SendingStatus,
 } from '@/features/onboarding'
-import { Button, Dialog, Input, Label, Select } from '@/shared/ui'
+import { Button, Dialog, Input, Label, Select, Textarea } from '@/shared/ui'
 
 import { formatAdminTimestamp } from '../lib/format-admin-timestamp'
 import type { IAdminReceivingPatch } from '../model/AdminClient'
@@ -21,6 +21,7 @@ import {
 
 interface ReceivingEditDialogProps {
   readonly receiving: IRemoteReceiving | null
+  readonly userEmail: string
   readonly isBusy: boolean
   readonly error: string | null
   readonly onClose: () => void
@@ -29,6 +30,7 @@ interface ReceivingEditDialogProps {
 
 export function ReceivingEditDialog({
   receiving,
+  userEmail,
   isBusy,
   error,
   onClose,
@@ -87,7 +89,7 @@ export function ReceivingEditDialog({
       {receiving === null ? null : (
         <form id={`${fieldId}-form`} className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <p className="text-sm text-muted-foreground">
-            id {receiving.id} · user {receiving.userId ?? '—'} ·{' '}
+            id {receiving.id} · user {userEmail} ·{' '}
             {formatAdminTimestamp(receiving.createdAt)}
           </p>
           {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
@@ -157,21 +159,41 @@ export function ReceivingEditDialog({
                   value: message,
                   label: message,
                 })),
-                { value: FAILURE_MESSAGE_CUSTOM, label: 'Custom' },
+                { value: FAILURE_MESSAGE_CUSTOM, label: 'Custom…' },
               ]}
               onChange={(value) => {
                 if (value === FAILURE_MESSAGE_CUSTOM) {
                   setUsesCustomMessage(true)
+                  setDraft((current) => ({
+                    ...current,
+                    failureMessage: isCustomFailureMessage(current.failureMessage)
+                      ? current.failureMessage
+                      : '',
+                  }))
                   return
                 }
 
                 setUsesCustomMessage(false)
                 setDraft((current) => ({
                   ...current,
-                  failureMessage: value === FAILURE_MESSAGE_NONE ? '' : value,
+                  failureMessage: value === FAILURE_MESSAGE_NONE ? null : value,
                 }))
               }}
             />
+            {usesCustomMessage && isFailure ? (
+              <Textarea
+                id={`${fieldId}-failure-custom`}
+                name="failureMessageCustom"
+                aria-label="Custom failure message"
+                value={draft.failureMessage ?? ''}
+                disabled={isBusy}
+                placeholder="Write the failure reason"
+                className="border-destructive/50 bg-destructive/10 text-destructive"
+                onChange={(event) => {
+                  setDraft((current) => ({ ...current, failureMessage: event.target.value }))
+                }}
+              />
+            ) : null}
           </div>
         </form>
       )}

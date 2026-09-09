@@ -1,5 +1,5 @@
 import { Pencil, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { SENDING_STATUS, type IRemoteSending } from '@/features/onboarding'
@@ -7,15 +7,11 @@ import { shortenAddress } from '@/features/wallet'
 import { Button } from '@/shared/ui'
 
 import { AdminAuthError, type IAdminSendingPatch } from '../model/AdminClient'
+import { directoryUserLabel } from '../model/admin-user-emails'
 import { useAdminSession } from '../model/admin-context'
-import {
-  MAX_VISIBLE_PENDING_TOASTS,
-  applyLivePendingEvent,
-  hydratePendingQueue,
-  sendingAmountLabel,
-} from '../model/admin-pending-toasts'
+import { useAdminPendingQueue } from '../model/admin-pending-queue'
+import { MAX_VISIBLE_PENDING_TOASTS, sendingAmountLabel } from '../model/admin-pending-toasts'
 import { formatAdminTimestampParts } from '../lib/format-admin-timestamp'
-import { useAdminSendingsLive } from '../model/admin-sendings-live'
 import { SendingEditDialog } from './SendingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
 
@@ -42,39 +38,10 @@ import { SendingStatusBadge } from './SendingStatusBadge'
  */
 export function AdminPendingSendingToasts() {
   const { client, lock } = useAdminSession()
-  const [queue, setQueue] = useState<readonly IRemoteSending[]>([])
+  const { queue, setQueue } = useAdminPendingQueue()
   const [editing, setEditing] = useState<IRemoteSending | null>(null)
   const [isSaving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    void client
-      .listSendings()
-      .then((listed) => {
-        if (!cancelled) {
-          setQueue((current) => hydratePendingQueue(current, listed))
-        }
-      })
-      .catch((caught: unknown) => {
-        if (cancelled) {
-          return
-        }
-
-        if (caught instanceof AdminAuthError && caught.status === 401) {
-          lock()
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [client, lock])
-
-  useAdminSendingsLive((event) => {
-    setQueue((current) => applyLivePendingEvent(current, event))
-  })
 
   const visible = queue.slice(0, MAX_VISIBLE_PENDING_TOASTS)
   const hiddenCount = queue.length - visible.length
@@ -125,6 +92,7 @@ export function AdminPendingSendingToasts() {
             <PendingSendingCard
               key={sending.id}
               sending={sending}
+              userEmail={directoryUserLabel(sending.userEmail, sending.userId)}
               onEdit={() => {
                 setEditError(null)
                 setEditing(sending)
@@ -149,6 +117,7 @@ export function AdminPendingSendingToasts() {
       <SendingEditDialog
         key={editing?.id ?? 'closed'}
         sending={editing}
+        userEmail={directoryUserLabel(editing?.userEmail, editing?.userId ?? null)}
         isBusy={isSaving}
         error={editError}
         onClose={() => {
@@ -167,10 +136,12 @@ export function AdminPendingSendingToasts() {
 
 function PendingSendingCard({
   sending,
+  userEmail,
   onEdit,
   onDismiss,
 }: {
   readonly sending: IRemoteSending
+  readonly userEmail: string
   readonly onEdit: () => void
   readonly onDismiss: () => void
 }) {
@@ -198,7 +169,7 @@ function PendingSendingCard({
             <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{amount}</p>
           )}
           <p className="mt-1 text-sm text-muted-foreground">
-            User {sending.userId ?? '—'}
+            User {userEmail}
             {recipient === null || recipient === '' ? null : ` · ${shortenAddress(recipient)}`}
           </p>
           {timestamp === null ? null : (

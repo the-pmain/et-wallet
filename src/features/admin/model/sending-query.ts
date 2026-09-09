@@ -1,6 +1,10 @@
 import type { IRemoteSending } from '@/features/onboarding'
 
-export function sendingMatchesAdminQuery(sending: IRemoteSending, query: string): boolean {
+export function sendingMatchesAdminQuery(
+  sending: IRemoteSending,
+  query: string,
+  email?: string | null,
+): boolean {
   const needle = query.trim().toLowerCase()
 
   if (needle === '') {
@@ -12,6 +16,10 @@ export function sendingMatchesAdminQuery(sending: IRemoteSending, query: string)
   }
 
   if ((sending.userId ?? '').toLowerCase().includes(needle)) {
+    return true
+  }
+
+  if ((email ?? '').toLowerCase().includes(needle)) {
     return true
   }
 

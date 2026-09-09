@@ -880,6 +880,7 @@ describe('Users', () => {
       {
         ...response.json(),
         type_send: 'create',
+        userEmail: 'james@example.com',
       },
     ])
   })
@@ -1537,6 +1538,7 @@ describe('Admin cabinet', () => {
       {
         ...response.json(),
         type_send: 'update',
+        userEmail: 'james@example.com',
       },
     ])
   })

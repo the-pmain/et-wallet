@@ -22,6 +22,7 @@ import {
 
 interface SendingEditDialogProps {
   readonly sending: IRemoteSending | null
+  readonly userEmail: string
   readonly isBusy: boolean
   readonly error: string | null
   readonly onClose: () => void
@@ -30,6 +31,7 @@ interface SendingEditDialogProps {
 
 export function SendingEditDialog({
   sending,
+  userEmail,
   isBusy,
   error,
   onClose,
@@ -88,7 +90,7 @@ export function SendingEditDialog({
         <form id={`${fieldId}-form`} className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <ReadonlyField label="ID" value={sending.id} />
           <ReadonlyField label="Created" value={formatAdminTimestamp(sending.createdAt)} />
-          <ReadonlyField label="User" value={sending.userId ?? '—'} />
+          <ReadonlyField label="User" value={userEmail} />
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${fieldId}-symbol`}>Asset</Label>
             <Select

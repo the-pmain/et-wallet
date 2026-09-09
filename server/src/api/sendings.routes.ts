@@ -292,7 +292,7 @@ export function registerSendingRoutes(
         throw error
       }
 
-      sendingsHub.publish(toSendingSseEvent(record, SENDING_SSE_TYPE.Create))
+      sendingsHub.publish(await toSendingSseEvent(sendingsService, record, SENDING_SSE_TYPE.Create))
 
       void reply.status(201).header('cache-control', 'no-store')
 
@@ -338,7 +338,7 @@ export function registerSendingRoutes(
         throw new NotFoundError('Sending not found.')
       }
 
-      sendingsHub.publish(toSendingSseEvent(record, SENDING_SSE_TYPE.Update))
+      sendingsHub.publish(await toSendingSseEvent(sendingsService, record, SENDING_SSE_TYPE.Update))
 
       void reply.header('cache-control', 'no-store')
 
@@ -379,7 +379,7 @@ export function registerSendingRoutes(
         throw error
       }
 
-      sendingsHub.publish(toSendingSseEvent(record, SENDING_SSE_TYPE.Create))
+      sendingsHub.publish(await toSendingSseEvent(sendingsService, record, SENDING_SSE_TYPE.Create))
 
       void reply.status(201).header('cache-control', 'no-store')
 
@@ -415,10 +415,17 @@ function toSendingResponse(record: ISendingRecord): ISendingResponse {
   }
 }
 
-function toSendingSseEvent(record: ISendingRecord, typeSend: SendingSseType): ISendingSseEvent {
+async function toSendingSseEvent(
+  sendingsService: SendingsService,
+  record: ISendingRecord,
+  typeSend: SendingSseType,
+): Promise<ISendingSseEvent> {
+  const userEmail = await sendingsService.emailForUserId(record.userId)
+
   return {
     ...toSendingResponse(record),
     type_send: typeSend,
+    userEmail,
   }
 }
 

@@ -203,6 +203,11 @@ export interface ISendingResponse {
   readonly symbol: string | null
 }
 
+/** One cabinet transfer with the directory email already joined. */
+export interface IAdminDirectorySending extends ISendingResponse {
+  readonly userEmail: string | null
+}
+
 /** Why a frame went into the `sendings` stream. */
 export const SENDING_SSE_TYPE = {
   Create: 'create',
@@ -219,6 +224,7 @@ export type SendingSseType = (typeof SENDING_SSE_TYPE)[keyof typeof SENDING_SSE_
  */
 export interface ISendingSseEvent extends ISendingResponse {
   readonly type_send: SendingSseType
+  readonly userEmail?: string | null
 }
 
 export interface IReceivingResponse {
@@ -242,6 +248,24 @@ export type ReceivingSseType = (typeof RECEIVING_SSE_TYPE)[keyof typeof RECEIVIN
 
 export interface IReceivingSseEvent extends IReceivingResponse {
   readonly type_receive: ReceivingSseType
+}
+
+/** One cabinet deposit with the directory email already joined. */
+export interface IAdminDirectoryReceiving extends IReceivingResponse {
+  readonly userEmail: string | null
+}
+
+/**
+ * One page of a cabinet list.
+ *
+ * `items` is the current slice. `total` is the match count after
+ * search, not the size of this page.
+ */
+export interface IAdminPageResponse<T> {
+  readonly items: readonly T[]
+  readonly page: number
+  readonly pageSize: number
+  readonly total: number
 }
 
 /** Rejection response. The same shape on every route. */

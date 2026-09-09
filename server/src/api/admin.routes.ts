@@ -1,14 +1,15 @@
 import type { FastifyInstance } from 'fastify'
 
 import { requireAdminRole, requireSuperAdmin } from '../admin/access.ts'
+import type { AdminDirectory } from '../admin/AdminDirectory.ts'
 import { resolveAdminRole } from '../admin/pin.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
 import { groupLoginActivity } from '../login-events/activity.ts'
 import type { ILoginEventsRepository } from '../login-events/contracts.ts'
-import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
-import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
+import { readAssetsPayload } from '../users/assets.ts'
+import type { IUpdateUserInput, IUsersRepository } from '../users/contracts.ts'
 import { readWalletsPayload } from '../users/wallets.ts'
-import type { IUserResponse } from './contracts.ts'
+import { toUserResponse } from './user-response.ts'
 
 /**
  * Admin cabinet.
@@ -83,6 +84,7 @@ export function registerAdminRoutes(
   app: FastifyInstance,
   users: IUsersRepository,
   loginEvents: ILoginEventsRepository,
+  directory?: Pick<AdminDirectory, 'invalidateUsers'>,
 ): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
@@ -154,6 +156,7 @@ export function registerAdminRoutes(
         throw new NotFoundError('User not found.')
       }
 
+      directory?.invalidateUsers()
       void reply.header('cache-control', 'no-store')
 
       return toUserResponse(record)
@@ -169,6 +172,7 @@ export function registerAdminRoutes(
       throw new NotFoundError('User not found.')
     }
 
+    directory?.invalidateUsers()
     void reply.status(204).header('cache-control', 'no-store')
   })
 }
@@ -227,15 +231,4 @@ function readPatch(body: IPatchUserBody): IUpdateUserInput | null {
   }
 
   return patch
-}
-
-function toUserResponse(record: IUserRecord): IUserResponse {
-  return {
-    id: record.id,
-    email: record.email,
-    balance: record.balance,
-    createdAt: record.createdAt.toISOString(),
-    wallets: record.wallets,
-    assets: sanitizeAssets(record.assets),
-  }
 }

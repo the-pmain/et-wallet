@@ -6,6 +6,7 @@ import { cn } from '@/shared/lib/utils'
 import { Button, PAGE_COLUMN } from '@/shared/ui'
 
 import { ADMIN_ROLE, type AdminRole } from '../model/admin-role'
+import { AdminPendingQueueProvider } from '../model/admin-pending-queue'
 import { AdminSendingsLiveProvider } from '../model/admin-sendings-live'
 import { AdminPendingSendingToasts } from './AdminPendingSendingToasts'
 
@@ -108,5 +109,9 @@ export function AdminShell({ children, role, pin, onLock }: AdminShellProps) {
     return frame
   }
 
-  return <AdminSendingsLiveProvider pin={pin}>{frame}</AdminSendingsLiveProvider>
+  return (
+    <AdminSendingsLiveProvider pin={pin}>
+      <AdminPendingQueueProvider>{frame}</AdminPendingQueueProvider>
+    </AdminSendingsLiveProvider>
+  )
 }

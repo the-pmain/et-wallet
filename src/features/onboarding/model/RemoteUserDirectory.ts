@@ -124,6 +124,7 @@ export interface IRemoteSending {
   readonly recipientAddress: string | null
   readonly amount: string | null
   readonly symbol: string | null
+  readonly userEmail?: string | null
 }
 
 export interface IRemoteReceiving extends IRemoteSending {
@@ -770,6 +771,8 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
     return null
   }
 
+  const userEmail = record['userEmail']
+
   return {
     id,
     createdAt,
@@ -780,6 +783,9 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
     recipientAddress,
     amount,
     symbol,
+    ...(userEmail === null || typeof userEmail === 'string'
+      ? { userEmail: userEmail === '' ? null : userEmail }
+      : {}),
   }
 }
 

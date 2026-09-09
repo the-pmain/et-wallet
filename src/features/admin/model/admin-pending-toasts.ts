@@ -38,7 +38,7 @@ export function applyLivePendingEvent(
 /**
  * Merge the directory list with toasts already shown.
  *
- * SSE frames can arrive before `GET /v1/admin/sendings` returns.
+ * SSE frames can arrive before the directory pending page returns.
  * Records not yet in the list stay. Records from the list that are
  * no longer pending disappear.
  */
@@ -82,6 +82,7 @@ export function sendingFromEvent(event: ISendingSseEvent): IRemoteSending {
     recipientAddress: event.recipientAddress,
     amount: event.amount,
     symbol: event.symbol,
+    ...(event.userEmail !== undefined ? { userEmail: event.userEmail } : {}),
   }
 }
 

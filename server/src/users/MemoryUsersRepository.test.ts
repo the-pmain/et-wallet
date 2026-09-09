@@ -122,6 +122,10 @@ describe('MemoryUsersRepository', () => {
     const listed = await users.list()
 
     expect(listed.map((entry) => entry.email)).toEqual(['james@example.com', 'maria@example.com'])
+    expect(await users.listIdentities()).toEqual([
+      { id: listed[0]?.id, email: 'james@example.com' },
+      { id: listed[1]?.id, email: 'maria@example.com' },
+    ])
   })
 
   it('changes balance and wallet value by id', async () => {

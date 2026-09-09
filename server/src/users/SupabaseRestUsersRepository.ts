@@ -6,6 +6,7 @@ import type {
   IAuthUserInput,
   ICreateUserInput,
   IUpdateUserInput,
+  IUserIdentity,
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
@@ -210,6 +211,25 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
     }
 
     return parseRows(raw).map((row) => toRecord(row, null))
+  }
+
+  async listIdentities(): Promise<readonly IUserIdentity[]> {
+    const endpoint = new URL(`${this.#url}/rest/v1/users`)
+    endpoint.searchParams.set('select', 'id,email')
+    endpoint.searchParams.set('order', 'created_at.desc')
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'GET',
+      headers: this.#readHeaders(),
+    })
+
+    const raw = await response.text()
+
+    if (!response.ok) {
+      throw unavailable('listIdentities', response.status, raw)
+    }
+
+    return parseRows(raw).map((row) => ({ id: String(row.id), email: row.email }))
   }
 
   async update(id: string, patch: IUpdateUserInput): Promise<IUserRecord | null> {
