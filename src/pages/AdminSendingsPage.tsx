@@ -1,14 +1,6 @@
-import { Navigate } from 'react-router'
+import { AdminSendingsList } from '@/features/admin'
 
-import { AdminSendingsList, useAdminSession } from '@/features/admin'
-
-/** Live cabinet sendings list. Super-admin only. */
+/** Cabinet sendings list. Regular admins view; super-admins edit. */
 export function AdminSendingsPage() {
-  const { canWrite } = useAdminSession()
-
-  if (!canWrite) {
-    return <Navigate to="/admin" replace />
-  }
-
   return <AdminSendingsList />
 }

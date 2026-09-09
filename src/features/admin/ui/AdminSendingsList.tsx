@@ -17,11 +17,12 @@ import { SendingStatusBadge } from './SendingStatusBadge'
 /**
  * Cabinet transfer list.
  *
- * On enter it reads `GET /v1/admin/sendings`, then listens to the
- * shell stream: a `type_send: create` frame appends a row.
+ * On enter it reads `GET /v1/admin/sendings`. Super-admin also
+ * listens to the shell stream: a `type_send: create` frame appends
+ * a row. Regular admins see the same list without Edit.
  */
 export function AdminSendingsList() {
-  const { client, lock } = useAdminSession()
+  const { client, canWrite, lock } = useAdminSession()
   const [sendings, setSendings] = useState<readonly IRemoteSending[] | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -148,29 +149,35 @@ export function AdminSendingsList() {
             <SendingRow
               key={sending.id}
               sending={sending}
-              onEdit={() => {
-                setEditError(null)
-                setEditing(sending)
-              }}
+              onEdit={
+                canWrite
+                  ? () => {
+                      setEditError(null)
+                      setEditing(sending)
+                    }
+                  : undefined
+              }
             />
           ))}
         </ul>
       )}
-      <SendingEditDialog
-        key={editing?.id ?? 'closed'}
-        sending={editing}
-        isBusy={isSaving}
-        error={editError}
-        onClose={() => {
-          if (!isSaving) {
-            setEditing(null)
-            setEditError(null)
-          }
-        }}
-        onSave={(id, patch) => {
-          void saveSending(id, patch)
-        }}
-      />
+      {canWrite ? (
+        <SendingEditDialog
+          key={editing?.id ?? 'closed'}
+          sending={editing}
+          isBusy={isSaving}
+          error={editError}
+          onClose={() => {
+            if (!isSaving) {
+              setEditing(null)
+              setEditError(null)
+            }
+          }}
+          onSave={(id, patch) => {
+            void saveSending(id, patch)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -180,7 +187,7 @@ function SendingRow({
   onEdit,
 }: {
   readonly sending: IRemoteSending
-  readonly onEdit: () => void
+  readonly onEdit?: () => void
 }) {
   const asset = addableAssetBySymbol(sending.symbol)
   const symbol = sending.symbol ?? asset?.token.symbol ?? '—'
@@ -222,10 +229,12 @@ function SendingRow({
       <span className="flex shrink-0 flex-col items-end gap-2">
         <SendingTimestamp value={sending.createdAt} />
         <SendingStatusBadge status={sending.status} />
-        <Button type="button" variant="outline" size="sm" onClick={onEdit}>
-          <Pencil />
-          Edit
-        </Button>
+        {onEdit === undefined ? null : (
+          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+            <Pencil />
+            Edit
+          </Button>
+        )}
       </span>
     </li>
   )

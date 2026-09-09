@@ -59,7 +59,7 @@ export function useAdminSendingsLive(onEvent: SendingLiveListener): void {
 
   useEffect(() => {
     if (subscribe === null) {
-      throw new Error('useAdminSendingsLive must be called inside AdminSendingsLiveProvider.')
+      return
     }
 
     return subscribe((event) => {

@@ -1402,6 +1402,24 @@ describe('Admin cabinet', () => {
     expect(response.statusCode).toBe(401)
   })
 
+  it('a read PIN lists sendings and receivings', async () => {
+    const sendings = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '4200' },
+    })
+    const receivings = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/receivings',
+      headers: { 'x-admin-pin': '4200' },
+    })
+
+    expect(sendings.statusCode).toBe(200)
+    expect(sendings.json()).toEqual({ sendings: [] })
+    expect(receivings.statusCode).toBe(200)
+    expect(receivings.json()).toEqual({ receivings: [] })
+  })
+
   it('a read PIN does not create sendings or receivings', async () => {
     const userId = await seedUser()
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'

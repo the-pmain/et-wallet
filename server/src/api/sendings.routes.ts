@@ -168,8 +168,9 @@ interface ISendingsSseQuery {
  *
  * `POST /v1/users/sendings` and `GET /v1/users/:id/sendings` are trusted
  * server: identity is `email`+`the_p`, `user_id` must match.
- * `GET /v1/admin/users/:id/sendings` is any cabinet PIN (read).
- * `GET/POST/PATCH /v1/admin/sendings` are Super Admin: `x-admin-pin`.
+ * `GET /v1/admin/users/:id/sendings` and `GET /v1/admin/sendings`
+ * are any cabinet PIN (read). `POST/PATCH /v1/admin/sendings` are
+ * Super Admin: `x-admin-pin`.
  * The store uses the service-role client. A user-scoped JWT does not
  * fit: `user_id` is `users.id`, not `auth.uid()`.
  * `GET /v1/sendings` is an in-process SSE stream; it does not read the table.
@@ -300,7 +301,7 @@ export function registerSendingRoutes(
   )
 
   app.get('/v1/admin/sendings', async (request, reply) => {
-    requireSuperAdmin(request)
+    requireAdminRole(request)
 
     const records = await sendingsService.list()
 

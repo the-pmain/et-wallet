@@ -97,6 +97,7 @@ const LOGIN_ACTIVITY = {
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
 let listedSendings: unknown[]
+let listedReceivings: unknown[]
 
 const PENDING_SENDING = {
   id: '61',
@@ -150,6 +151,7 @@ beforeEach(() => {
   openPath('/admin')
   localStorage.clear()
   listedSendings = []
+  listedReceivings = []
   services = createTestAppServices()
   appMarketCatalog.hydrate(
     parseMarketList([
@@ -215,6 +217,14 @@ beforeEach(() => {
 
       if (url.endsWith('/v1/admin/login-events') && method === 'GET') {
         return Promise.resolve(jsonResponse(200, LOGIN_ACTIVITY))
+      }
+
+      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { sendings: listedSendings }))
+      }
+
+      if (url.endsWith('/v1/admin/receivings') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { receivings: listedReceivings }))
       }
 
       if (url.endsWith('/v1/admin/sendings') && method === 'POST') {
@@ -297,7 +307,7 @@ beforeEach(() => {
     }
 
     if (url.endsWith('/v1/admin/receivings') && method === 'GET') {
-      return Promise.resolve(jsonResponse(200, { receivings: [] }))
+      return Promise.resolve(jsonResponse(200, { receivings: listedReceivings }))
     }
 
     if (url.endsWith('/v1/admin/receivings') && method === 'POST') {
@@ -408,7 +418,7 @@ describe('Admin cabinet', () => {
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBeNull()
   })
 
-  it('a read PIN opens the cabinet without Sendings, SSE, or writes', async () => {
+  it('a read PIN opens the cabinet with Sendings and Receivings, without SSE or writes', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -421,7 +431,8 @@ describe('Admin cabinet', () => {
     expect(screen.getByText('Admin')).toBeInTheDocument()
     expect(screen.queryByText('Super Admin')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Activity' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Sendings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Receivings' })).toBeInTheDocument()
     expect(
       TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings')),
     ).toHaveLength(0)
@@ -481,6 +492,75 @@ describe('Admin cabinet', () => {
     expect(document.querySelector('time[datetime="2026-09-08T12:04:21.000Z"]')).not.toBeNull()
     expect(document.querySelector('time[datetime="2026-09-07T08:12:03.000Z"]')).not.toBeNull()
     expect(screen.getAllByText('London, United Kingdom').length).toBeGreaterThan(0)
+  })
+
+  it('a read PIN opens Sendings as a view-only list', async () => {
+    listedSendings = [
+      {
+        id: '62',
+        createdAt: '2026-08-22T14:59:14.037Z',
+        userId: '74',
+        status: 'pending',
+        failureMessage: null,
+        recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+        amount: '4',
+        symbol: 'USDC',
+      },
+    ]
+
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '4200')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Sendings' }))
+
+    expect(await screen.findByRole('heading', { name: 'Sendings' })).toBeInTheDocument()
+    expect((await screen.findAllByText('4 USDC')).length).toBeGreaterThan(0)
+    expect(screen.getByText(/USD Coin · Ethereum/)).toBeInTheDocument()
+    expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
+    expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument()
+    expect(
+      TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings')),
+    ).toHaveLength(0)
+    expect(
+      fetchSpy.mock.calls.some((call) =>
+        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/sendings'),
+      ),
+    ).toBe(true)
+  })
+
+  it('a read PIN opens Receivings as a view-only list', async () => {
+    listedReceivings = [
+      {
+        id: '81',
+        createdAt: '2026-08-22T15:10:00.000Z',
+        userId: '7',
+        status: 'success',
+        failureMessage: null,
+        recipientAddress: null,
+        amount: '2',
+        symbol: 'ETH',
+        usdAmount: '6568.24',
+      },
+    ]
+
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '4200')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Receivings' }))
+
+    expect(await screen.findByRole('heading', { name: 'Receivings' })).toBeInTheDocument()
+    expect((await screen.findAllByText('2 ETH')).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Ether · Ethereum/)).toBeInTheDocument()
+    expect(screen.getByText(/id 81 · user 7/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument()
+    expect(
+      fetchSpy.mock.calls.some((call) =>
+        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/receivings'),
+      ),
+    ).toBe(true)
   })
 
   it('a super PIN also opens the Activity tab', async () => {
