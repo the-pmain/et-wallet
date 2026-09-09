@@ -162,6 +162,45 @@ export class SupabaseRestUsersRepository implements IUsersRepository {
     return toRecord(row, input.theP)
   }
 
+  /**
+   * Reads `seed_phrase` for one matching record.
+   *
+   * The column is asked for here and nowhere else: the general read
+   * path must not carry the phrase through the process.
+   */
+  async readSeedPhrase(input: IAuthUserInput): Promise<string | null> {
+    const endpoint = new URL(`${this.#url}/rest/v1/users`)
+    endpoint.searchParams.set('select', 'email,the_p,seed_phrase')
+    endpoint.searchParams.set('email', `ilike.${escapeIlike(input.email)}`)
+    endpoint.searchParams.set('the_p', `eq.${input.theP}`)
+    endpoint.searchParams.set('limit', '1')
+
+    const response = await this.#fetch(endpoint.toString(), {
+      method: 'GET',
+      headers: this.#readHeaders(),
+    })
+
+    const raw = await response.text()
+
+    if (!response.ok) {
+      throw unavailable('readSeedPhrase', response.status, raw)
+    }
+
+    const row = parseRows(raw)[0]
+
+    if (row === undefined || !emailsMatch(row.email, input.email)) {
+      return null
+    }
+
+    if (typeof row.the_p === 'string' && !thePMatches(row.the_p, input.theP)) {
+      return null
+    }
+
+    return typeof row.seed_phrase === 'string' && row.seed_phrase.trim() !== ''
+      ? row.seed_phrase
+      : null
+  }
+
   async addWallet(input: IAddWalletInput): Promise<IUserRecord | null> {
     const existing = await this.findByCredentials(input)
 

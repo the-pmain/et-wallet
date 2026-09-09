@@ -55,6 +55,20 @@ export class ForbiddenError extends ApiError {
   }
 }
 
+/**
+ * The record carries no phrase an address can be derived from.
+ *
+ * Create requires `seed_phrase`, so this is a row written before the
+ * column existed. Generating a fresh phrase instead would hand the
+ * owner an address whose key only this service ever held.
+ */
+export class SeedPhraseUnavailableError extends ApiError {
+  constructor(message: string) {
+    super(409, 'seed_phrase_unavailable', message)
+    this.name = 'SeedPhraseUnavailableError'
+  }
+}
+
 /** The record was changed by another device. */
 export class ConflictError extends ApiError {
   constructor(message: string) {

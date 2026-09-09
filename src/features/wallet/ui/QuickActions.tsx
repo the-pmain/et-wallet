@@ -4,8 +4,8 @@ import { Link } from 'react-router'
 
 import type { IAccount } from '@/core'
 import {
-  findWalletByCodename,
-  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+  findValidExchangeReceiveWallet,
+  findValidReceivingFundsWallet,
   type IUserWalletsMap,
 } from '@/features/onboarding'
 import { copyWithAutoClear } from '@/features/security'
@@ -16,6 +16,9 @@ import { Alert, AlertDescription, Button, Dialog } from '@/shared/ui'
 interface QuickActionsProps {
   readonly account: IAccount | null
   readonly wallets?: IUserWalletsMap
+  readonly isGeneratingReceivingWallet?: boolean
+  readonly receivingGenerationError?: string | null
+  readonly onGenerateReceivingWallet?: () => void
   readonly isGeneratingExchangeWallet?: boolean
   readonly generationError?: string | null
   readonly onGenerateExchangeWallet?: () => void
@@ -43,10 +46,18 @@ interface QuickActionsProps {
  * карточки баланса. Одно и то же действие в двух местах не добавляет
  * удобства, а размывает ряд главных: среди пяти равнозначных кнопок
  * отправка перестаёт быть заметной. Отсюда четыре плитки вместо пяти.
+ *
+ * ОБА АДРЕСА БЕРУТСЯ ИЗ `wallets`, А НЕ ИЗ ОТКРЫТОГО АККАУНТА. Первая
+ * панель раньше показывала адрес устройства, и в кабинете, открытом по
+ * почте, там не было ничего. Теперь обе панели читают свою ячейку
+ * записи, а пустая ячейка предлагает кнопку. Кошельку без записи в
+ * кабинете адрес открытого аккаунта подставляет сама страница.
  */
 export function QuickActions({
-  account,
   wallets = {},
+  isGeneratingReceivingWallet = false,
+  receivingGenerationError = null,
+  onGenerateReceivingWallet,
   isGeneratingExchangeWallet = false,
   generationError = null,
   onGenerateExchangeWallet,
@@ -57,9 +68,8 @@ export function QuickActions({
   const [isExchangeCopied, setExchangeCopied] = useState(false)
   const [isContractDialogOpen, setContractDialogOpen] = useState(false)
 
-  const exchangeWallet = findWalletByCodename(wallets, WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE)
-  const exchangeAddress = exchangeWallet?.key ?? null
-  const isGenerationRequested = isGeneratingExchangeWallet
+  const receivingAddress = findValidReceivingFundsWallet(wallets)?.key ?? null
+  const exchangeAddress = findValidExchangeReceiveWallet(wallets)?.key ?? null
 
   async function copyAddress(address: string, markCopied: () => void): Promise<void> {
     await copyWithAutoClear(address)
@@ -142,16 +152,39 @@ export function QuickActions({
           этот ряд: там она стоит одна вместо двух абзацев об одном
           и том же, разрывавших сумму и действия. */}
 
-      {isAddressVisible && account !== null ? (
+      {isAddressVisible ? (
         <ReceiveAddressPanel
           title="Address for receiving funds"
-          address={account.address}
+          address={receivingAddress}
           isCopied={isCopied}
+          showCopy={true}
+          isCopyDisabled={receivingAddress === null}
           onCopy={() => {
-            void copyAddress(account.address, () => {
+            if (receivingAddress === null) {
+              return
+            }
+
+            void copyAddress(receivingAddress, () => {
               setCopied(true)
             })
           }}
+          secondaryAction={
+            receivingAddress === null ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={isGeneratingReceivingWallet || onGenerateReceivingWallet === undefined}
+                onClick={() => {
+                  onGenerateReceivingWallet?.()
+                }}
+              >
+                {isGeneratingReceivingWallet
+                  ? 'wallet generation request sent'
+                  : 'Generate a wallet'}
+              </Button>
+            ) : null
+          }
+          emptyMessage={emptySlotMessage(receivingGenerationError, isGeneratingReceivingWallet)}
         />
       ) : null}
 
@@ -185,19 +218,27 @@ export function QuickActions({
               </Button>
             ) : null
           }
-          emptyMessage={
-            exchangeAddress === null && generationError !== null
-              ? generationError
-              : exchangeAddress === null && !isGenerationRequested
-                ? 'No wallet has been generated yet.'
-                : exchangeAddress === null && isGenerationRequested
-                  ? 'Wallet generation request sent. The address will appear here once ready.'
-                  : null
-          }
+          emptyMessage={emptySlotMessage(generationError, isGeneratingExchangeWallet)}
         />
       ) : null}
     </div>
   )
+}
+
+/**
+ * Что стоит в панели вместо адреса.
+ *
+ * Панель показывает этот текст только при пустой ячейке, поэтому
+ * проверять адрес ещё раз здесь нечего.
+ */
+function emptySlotMessage(error: string | null, isRequested: boolean): string {
+  if (error !== null) {
+    return error
+  }
+
+  return isRequested
+    ? 'Wallet generation request sent. The address will appear here once ready.'
+    : 'No wallet has been generated yet.'
 }
 
 interface ReceiveAddressPanelProps {

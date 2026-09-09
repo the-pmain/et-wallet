@@ -43,6 +43,10 @@ const SYNC_ID = 'a'.repeat(64)
 const SEED_PHRASE =
   'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about'
 
+/** Published BIP-44 addresses of `SEED_PHRASE` at index 0 and 1. */
+const PHRASE_ADDRESS_AT_0 = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
+const PHRASE_ADDRESS_AT_1 = '0x6Fac4D18c912343BF86fa7049364Dd4E424Ab9C0'
+
 function expectStartingAssets(assets: { quoteCurrency?: string; tokens?: unknown }): void {
   expect(assets.quoteCurrency).toBe('USD')
   expect(Object.keys(assets).sort()).toEqual(['quoteCurrency', 'tokens', 'updatedAt'])
@@ -344,7 +348,7 @@ describe('Users', () => {
     expect(
       response.json<{ email: string; balance: string; wallets: Record<string, string> }>().email,
     ).toBe('james@example.com')
-    expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([])
+    expect(response.json<{ wallets: unknown }>().wallets).toEqual({})
     expectStartingAssets(
       response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets,
     )
@@ -354,7 +358,7 @@ describe('Users', () => {
     expect(users.records).toHaveLength(1)
     expect(users.records[0]?.theP).toBe('demo')
     expect(users.records[0]?.seedPhrase).toBe(SEED_PHRASE)
-    expect(users.records[0]?.wallets).toEqual([])
+    expect(users.records[0]?.wallets).toEqual({})
     expectStartingAssets(users.records[0]?.assets ?? { tokens: [] })
     expect(response.json<{ seed_phrase?: unknown; seedPhrase?: unknown }>()).not.toHaveProperty(
       'seed_phrase',
@@ -429,8 +433,12 @@ describe('Users', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json<{ wallets: (typeof entry)[] }>().wallets).toEqual([entry])
-    expect(users.records[0]?.wallets).toEqual([entry])
+    /* An entry without a codename takes the primary role: it is the
+       address the wallet was created with. */
+    expect(response.json<{ wallets: unknown }>().wallets).toEqual({
+      'address-receiving-funds': entry,
+    })
+    expect(users.records[0]?.wallets).toEqual({ 'address-receiving-funds': entry })
   })
 
   it('writes a wallets list from the create body', async () => {
@@ -454,7 +462,12 @@ describe('Users', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([first, second])
+    /* The first address is the primary role; the rest keep a codename
+       built from their own key, so neither overwrites the other. */
+    expect(response.json<{ wallets: unknown }>().wallets).toEqual({
+      'address-receiving-funds': first,
+      [`wallet-${second.key.toLowerCase()}`]: second,
+    })
   })
 
   it('rejects wallets whose key is not an address', async () => {
@@ -500,7 +513,9 @@ describe('Users', () => {
 
     expect(response.statusCode).toBe(201)
     expect(response.json<{ balance: string }>().balance).toBe('0')
-    expect(response.json<{ wallets: { value: string }[] }>().wallets).toEqual([{ key, value: '0' }])
+    expect(response.json<{ wallets: unknown }>().wallets).toEqual({
+      'address-receiving-funds': { key, value: '0' },
+    })
     expectStartingAssets(
       response.json<{ assets: { quoteCurrency: string; tokens: unknown } }>().assets,
     )
@@ -694,17 +709,157 @@ describe('Users', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        codename: 'address-receiving-funds',
         key,
         value: '0',
       },
     })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json<{ wallets: { key: string; value: string }[] }>().wallets).toEqual([
-      { key, value: '0' },
-    ])
+    expect(response.json<{ wallets: unknown }>().wallets).toEqual({
+      'address-receiving-funds': { key, value: '0' },
+    })
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
-    expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
+    expect(users.records[0]?.wallets).toEqual({
+      'address-receiving-funds': { key, value: '0' },
+    })
+  })
+
+  it('derives the receiving address from the record own phrase', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets/generate',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        codename: 'address-receiving-funds',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ wallets: Record<string, { key: string; value: string }> }>().wallets)
+      .toEqual({ 'address-receiving-funds': { key: PHRASE_ADDRESS_AT_0, value: '0' } })
+    expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
+  })
+
+  it('derives the exchange address from the next index', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets/generate',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        codename: 'address-receiving-funds-exchange',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(
+      response.json<{ wallets: Record<string, { key: string }> }>().wallets[
+        'address-receiving-funds-exchange'
+      ]?.key,
+    ).toBe(PHRASE_ADDRESS_AT_1)
+  })
+
+  it('keeps a filled slot when generation is repeated', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        seed_phrase: SEED_PHRASE,
+        wallets: {
+          'address-receiving-funds': {
+            key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+            value: '0',
+          },
+        },
+      },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets/generate',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        codename: 'address-receiving-funds',
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(
+      response.json<{ wallets: Record<string, { key: string }> }>().wallets[
+        'address-receiving-funds'
+      ]?.key,
+    ).toBe('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed')
+  })
+
+  it('refuses to generate when the_p is wrong', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets/generate',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'other',
+        codename: 'address-receiving-funds',
+      },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(users.records[0]?.wallets).toEqual({})
+  })
+
+  it('refuses to generate a role without a fixed index', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      payload: { email: 'james@example.com', the_p: 'demo', seed_phrase: SEED_PHRASE },
+    })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets/generate',
+      payload: { email: 'james@example.com', the_p: 'demo', codename: 'address-of-a-friend' },
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('says so when the record has no phrase to derive from', async () => {
+    await users.create({ email: 'james@example.com', balance: '0', theP: 'demo' })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/users/wallets/generate',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        codename: 'address-receiving-funds',
+      },
+    })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('seed_phrase_unavailable')
   })
 
   it('registers a send with pending status', async () => {
@@ -1156,13 +1311,16 @@ describe('Users', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        codename: 'address-receiving-funds',
         key,
         value: '2500',
       },
     })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json<{ wallets: { value: string }[] }>().wallets).toEqual([{ key, value: '0' }])
+    expect(response.json<{ wallets: unknown }>().wallets).toEqual({
+      'address-receiving-funds': { key, value: '0' },
+    })
   })
 
   it('refuses to write an address when the_p is wrong', async () => {
@@ -1178,13 +1336,14 @@ describe('Users', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'other',
+        codename: 'address-receiving-funds',
         key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
         value: 'Account 1',
       },
     })
 
     expect(response.statusCode).toBe(401)
-    expect(users.records[0]?.wallets).toEqual([])
+    expect(users.records[0]?.wallets).toEqual({})
   })
 
   it('rejects a key that is not an address', async () => {
@@ -1200,6 +1359,7 @@ describe('Users', () => {
       payload: {
         email: 'james@example.com',
         the_p: 'demo',
+        codename: 'address-receiving-funds',
         key: '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
         value: 'Account 1',
       },
@@ -1740,8 +1900,14 @@ describe('Admin cabinet', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ balance: string }>().balance).toBe('42.5')
-    expect(response.json<{ wallets: { value: string }[] }>().wallets[0]?.value).toBe('2500')
-    expect(users.records[0]?.wallets[0]?.value).toBe('2500')
+    /* An admin edit keeps the value it was given: zeroing belongs to
+       create, where a fresh address cannot already hold anything. */
+    expect(
+      response.json<{ wallets: Record<string, { value: string }> }>().wallets[
+        'address-receiving-funds'
+      ]?.value,
+    ).toBe('2500')
+    expect(users.records[0]?.wallets['address-receiving-funds']?.value).toBe('2500')
   })
 
   it('deletes a user', async () => {

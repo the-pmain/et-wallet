@@ -80,6 +80,17 @@ export interface IUsersRepository {
   findByCredentials(input: IAuthUserInput): Promise<IUserRecord | null>
 
   /**
+   * `seed_phrase` of the record found by email and `the_p`.
+   *
+   * A separate read, not a field of `findByCredentials`: sign-in, the
+   * profile, and the transfer lists have no business holding the
+   * phrase. Only address derivation calls this.
+   *
+   * `null` — no match, or the row carries no phrase.
+   */
+  readSeedPhrase(input: IAuthUserInput): Promise<string | null>
+
+  /**
    * Writes an address into `wallets` of the record found by email and `the_p`.
    *
    * `null` — no match. Repeating the same key replaces the value.

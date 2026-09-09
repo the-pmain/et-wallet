@@ -9,6 +9,9 @@ import {
   RemoteAuthError,
   RemoteUserDirectory,
   WALLET_CODENAME_RECEIVING_FUNDS,
+  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+  findValidExchangeReceiveWallet,
+  findValidReceivingFundsWallet,
 } from './RemoteUserDirectory'
 
 const WALLET = {
@@ -447,5 +450,73 @@ describe('RemoteUserDirectory', () => {
       status: 'success',
       amount: '0.01',
     })
+  })
+})
+
+describe('findValidReceivingFundsWallet', () => {
+  it('reads address-receiving-funds from the wallets map', () => {
+    expect(
+      findValidReceivingFundsWallet({
+        [WALLET_CODENAME_RECEIVING_FUNDS]: {
+          key: '0x21AA8fD5904abb079bc21e8454F71947288ce431',
+          value: '0',
+        },
+      }),
+    ).toEqual({
+      key: '0x21AA8fD5904abb079bc21e8454F71947288ce431',
+      value: '0',
+    })
+  })
+
+  it('rejects a missing or invalid receiving slot', () => {
+    expect(findValidReceivingFundsWallet({})).toBeNull()
+    expect(
+      findValidReceivingFundsWallet({
+        [WALLET_CODENAME_RECEIVING_FUNDS]: { key: 'not-an-address', value: '0' },
+      }),
+    ).toBeNull()
+  })
+})
+
+describe('findValidExchangeReceiveWallet', () => {
+  const exchangeAddress = '0x15F3F1De82300D0DD5DCFF84Ee1341cEA3502f79'
+
+  it('accepts only the codename map with a real exchange address', () => {
+    expect(
+      findValidExchangeReceiveWallet({
+        [WALLET_CODENAME_RECEIVING_FUNDS]: WALLET,
+        [WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE]: { key: exchangeAddress, value: '0' },
+      }),
+    ).toEqual({ key: exchangeAddress, value: '0' })
+  })
+
+  it('rejects a missing, empty, or malformed exchange slot', () => {
+    expect(findValidExchangeReceiveWallet({})).toBeNull()
+    expect(findValidExchangeReceiveWallet({ [WALLET_CODENAME_RECEIVING_FUNDS]: WALLET })).toBeNull()
+    expect(
+      findValidExchangeReceiveWallet({
+        [WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE]: { key: '', value: '0' },
+      }),
+    ).toBeNull()
+    expect(
+      findValidExchangeReceiveWallet({
+        [WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE]: { key: 'not-an-address', value: '0' },
+      }),
+    ).toBeNull()
+    expect(
+      findValidExchangeReceiveWallet({
+        [WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE]: { key: exchangeAddress, value: '' },
+      }),
+    ).toBeNull()
+  })
+
+  it('ignores list and other shapes', () => {
+    expect(
+      findValidExchangeReceiveWallet([
+        { key: exchangeAddress, value: '0', codename: WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE },
+      ]),
+    ).toBeNull()
+    expect(findValidExchangeReceiveWallet(null)).toBeNull()
+    expect(findValidExchangeReceiveWallet(exchangeAddress)).toBeNull()
   })
 })
