@@ -172,7 +172,17 @@ export function readWalletsPayload(value: unknown): IUserWallets | null {
   return null
 }
 
-function readWalletEntry(value: unknown): { readonly codename: string; readonly key: string; readonly value: string } | null {
+/**
+ * One `{ key, value, codename? }` entry.
+ *
+ * `index` is the entry's place in a list body. Without it every
+ * codename-less entry claimed the primary role and the last address
+ * in the list overwrote all the others.
+ */
+function readWalletEntry(
+  value: unknown,
+  index = 0,
+): { readonly codename: string; readonly key: string; readonly value: string } | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return null
   }
@@ -198,7 +208,7 @@ function readWalletEntry(value: unknown): { readonly codename: string; readonly 
 
   const codename =
     rawCodename === undefined
-      ? fallbackCodenameForAddress(key, 0)
+      ? fallbackCodenameForAddress(key, index)
       : readWalletCodename(typeof rawCodename === 'string' ? rawCodename : '')
 
   if (codename === null) {
@@ -216,7 +226,7 @@ function readEntryList(value: readonly unknown[]): IUserWallets {
   let wallets = emptyWallets()
 
   for (const [index, item] of value.entries()) {
-    const entry = readWalletEntry(item)
+    const entry = readWalletEntry(item, index)
 
     if (entry === null) {
       continue
@@ -237,7 +247,7 @@ function readEntryListStrict(value: readonly unknown[]): IUserWallets | null {
   let wallets = emptyWallets()
 
   for (const [index, item] of value.entries()) {
-    const entry = readWalletEntry(item)
+    const entry = readWalletEntry(item, index)
 
     if (entry === null) {
       return null

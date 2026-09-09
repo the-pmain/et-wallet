@@ -81,6 +81,19 @@ export interface IUserDirectory {
     readonly value: string
   }): Promise<IRemoteUser>
 
+  /**
+   * Asks the service to fill a `wallets` slot itself.
+   *
+   * The address is derived from the record's own recovery phrase, so
+   * this works on a device that never held the wallet — the browser
+   * needs no unlocked vault.
+   */
+  generateWallet(input: {
+    readonly email: string
+    readonly theP: string
+    readonly codename: string
+  }): Promise<IRemoteUser>
+
   registerSending(input: {
     readonly userId: string
     readonly email: string
@@ -349,6 +362,57 @@ export class RemoteUserDirectory implements IUserDirectory {
     return user
   }
 
+  /**
+   * Fills a slot with an address the service derives for the record.
+   *
+   * Nothing here depends on the local wallet: the call carries only
+   * the sign-in and the slot name. A refusal keeps the service's own
+   * wording — it explains why the address could not be derived.
+   */
+  async generateWallet(input: {
+    readonly email: string
+    readonly theP: string
+    readonly codename: string
+  }): Promise<IRemoteUser> {
+    let response: Response
+
+    try {
+      response = await this.#fetch(this.#generateWalletUrl(), {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: input.email,
+          the_p: input.theP,
+          codename: input.codename,
+        }),
+      })
+    } catch {
+      throw new RemoteAuthError(0, 'user directory is unavailable')
+    }
+
+    const raw = await response.text()
+
+    if (response.status === 401) {
+      throw new RemoteAuthError(401, 'credentials did not match')
+    }
+
+    if (!response.ok) {
+      throw new RemoteAuthError(
+        response.status,
+        readErrorMessage(parseJson(raw)) ??
+          `generate wallet failed (${String(response.status)})`,
+      )
+    }
+
+    const user = parseRemoteUser(parseJson(raw))
+
+    if (user === null) {
+      throw new RemoteAuthError(response.status, 'generate wallet returned an unexpected response')
+    }
+
+    return user
+  }
+
   async registerSending(input: {
     readonly userId: string
     readonly email: string
@@ -506,6 +570,10 @@ export class RemoteUserDirectory implements IUserDirectory {
     return joinBase(this.#baseUrl, '/v1/users/wallets')
   }
 
+  #generateWalletUrl(): string {
+    return joinBase(this.#baseUrl, '/v1/users/wallets/generate')
+  }
+
   #sendingsUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users/sendings')
   }
@@ -525,6 +593,23 @@ function parseJson(raw: string): unknown {
   } catch {
     return null
   }
+}
+
+/** `{ error: { code, message } }` — the wording the service chose to show. */
+function readErrorMessage(payload: unknown): string | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const error = (payload as Record<string, unknown>)['error']
+
+  if (error === null || typeof error !== 'object') {
+    return null
+  }
+
+  const message = (error as Record<string, unknown>)['message']
+
+  return typeof message === 'string' && message.trim() !== '' ? message.trim() : null
 }
 
 function parseRemoteUser(payload: unknown): IRemoteUser | null {
@@ -647,6 +732,59 @@ export function findWalletByCodename(
   codename: string,
 ): IWalletSlot | null {
   return wallets[codename] ?? null
+}
+
+const WALLET_ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
+const WALLET_VALUE_MAX_LENGTH = 64
+
+/**
+ * One slot from the wallets map `{ [codename]: { key, value } }`.
+ *
+ * Lists, legacy maps, empty keys, and placeholder slots are ignored.
+ */
+export function findValidWalletSlot(wallets: unknown, codename: string): IWalletSlot | null {
+  if (wallets === null || wallets === undefined || typeof wallets !== 'object' || Array.isArray(wallets)) {
+    return null
+  }
+
+  const slot = (wallets as Record<string, unknown>)[codename]
+
+  if (slot === null || slot === undefined || typeof slot !== 'object' || Array.isArray(slot)) {
+    return null
+  }
+
+  const record = slot as Record<string, unknown>
+  const key = record['key']
+  const value = record['value']
+
+  if (typeof key !== 'string' || typeof value !== 'string') {
+    return null
+  }
+
+  const trimmedKey = key.trim()
+  const trimmedValue = value.trim()
+
+  if (!WALLET_ADDRESS_SHAPE.test(trimmedKey)) {
+    return null
+  }
+
+  if (trimmedValue === '' || trimmedValue.length > WALLET_VALUE_MAX_LENGTH) {
+    return null
+  }
+
+  return { key: trimmedKey, value: trimmedValue }
+}
+
+/** `address-receiving-funds` — the address shown on Receive. */
+export function findValidReceivingFundsWallet(wallets: unknown): IWalletSlot | null {
+  return findValidWalletSlot(wallets, WALLET_CODENAME_RECEIVING_FUNDS)
+}
+
+/**
+ * `address-receiving-funds-exchange`. Missing or invalid means generate.
+ */
+export function findValidExchangeReceiveWallet(wallets: unknown): IWalletSlot | null {
+  return findValidWalletSlot(wallets, WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE)
 }
 
 function parseAssets(value: unknown): IRemoteAssets {

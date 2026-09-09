@@ -260,6 +260,22 @@ export default tseslint.config(
     },
   },
 
+  /*
+    The two modules that touch `seed_phrase` are the exception to the
+    ban above. The column is part of the record — create refuses a
+    row without it — so the service must be able to check the phrase
+    it is given and to produce the public address of a slot for a
+    device that holds no vault. Both read BIP-39; neither signs, and
+    no private key leaves the function that derived it. The ban stays
+    for the rest of the Node layer.
+  */
+  {
+    files: ['server/src/users/seed-phrase.ts', 'server/src/users/derive-address.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+
   {
     files: ['server/src/index.ts'],
     rules: {

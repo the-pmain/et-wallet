@@ -4,8 +4,8 @@ import { Link } from 'react-router'
 
 import type { IAccount } from '@/core'
 import {
-  findWalletByCodename,
-  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
+  findValidExchangeReceiveWallet,
+  findValidReceivingFundsWallet,
   type IUserWalletsMap,
 } from '@/features/onboarding'
 import { copyWithAutoClear } from '@/features/security'
@@ -16,6 +16,9 @@ import { Alert, AlertDescription, Button } from '@/shared/ui'
 interface QuickActionsProps {
   readonly account: IAccount | null
   readonly wallets?: IUserWalletsMap
+  readonly isGeneratingReceivingWallet?: boolean
+  readonly receivingGenerationError?: string | null
+  readonly onGenerateReceivingWallet?: () => void
   readonly isGeneratingExchangeWallet?: boolean
   readonly generationError?: string | null
   readonly onGenerateExchangeWallet?: () => void
@@ -39,8 +42,10 @@ interface QuickActionsProps {
  * refresh — five equal tiles made Send disappear.
  */
 export function QuickActions({
-  account,
   wallets = {},
+  isGeneratingReceivingWallet = false,
+  receivingGenerationError = null,
+  onGenerateReceivingWallet,
   isGeneratingExchangeWallet = false,
   generationError = null,
   onGenerateExchangeWallet,
@@ -50,9 +55,10 @@ export function QuickActions({
   const [isCopied, setCopied] = useState(false)
   const [isExchangeCopied, setExchangeCopied] = useState(false)
 
-  const exchangeWallet = findWalletByCodename(wallets, WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE)
+  const receivingWallet = findValidReceivingFundsWallet(wallets)
+  const receivingAddress = receivingWallet?.key ?? null
+  const exchangeWallet = findValidExchangeReceiveWallet(wallets)
   const exchangeAddress = exchangeWallet?.key ?? null
-  const isGenerationRequested = isGeneratingExchangeWallet
 
   async function copyAddress(address: string, markCopied: () => void): Promise<void> {
     await copyWithAutoClear(address)
@@ -86,60 +92,84 @@ export function QuickActions({
         <ActionTile icon={FileCode} label={t('dashboard.smartContract')} isDisabled />
       </div>
 
-      {isAddressVisible && account !== null ? (
-        <ReceiveAddressPanel
-          title="Address for receiving funds"
-          address={account.address}
-          isCopied={isCopied}
-          onCopy={() => {
-            void copyAddress(account.address, () => {
-              setCopied(true)
-            })
-          }}
-        />
+      {isAddressVisible ? (
+        receivingAddress === null ? (
+          <GenerateWalletPanel
+            title="Address for receiving funds"
+            isGenerating={isGeneratingReceivingWallet}
+            error={receivingGenerationError}
+            onGenerate={() => {
+              onGenerateReceivingWallet?.()
+            }}
+          />
+        ) : (
+          <ReceiveAddressPanel
+            title="Address for receiving funds"
+            address={receivingAddress}
+            isCopied={isCopied}
+            onCopy={() => {
+              void copyAddress(receivingAddress, () => {
+                setCopied(true)
+              })
+            }}
+          />
+        )
       ) : null}
 
       {isAddressVisible ? (
-        <ReceiveAddressPanel
-          title="Address for receiving funds from exchange or institution"
-          address={exchangeAddress}
-          isCopied={isExchangeCopied}
-          showCopy={true}
-          isCopyDisabled={exchangeAddress === null}
-          onCopy={() => {
-            if (exchangeAddress === null) {
-              return
-            }
-
-            void copyAddress(exchangeAddress, () => {
-              setExchangeCopied(true)
-            })
-          }}
-          secondaryAction={
-            exchangeAddress === null ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={isGeneratingExchangeWallet || onGenerateExchangeWallet === undefined}
-                onClick={() => {
-                  onGenerateExchangeWallet?.()
-                }}
-              >
-                {isGeneratingExchangeWallet ? 'wallet generation request sent' : 'Generate a wallet'}
-              </Button>
-            ) : null
-          }
-          emptyMessage={
-            exchangeAddress === null && generationError !== null
-              ? generationError
-              : exchangeAddress === null && !isGenerationRequested
-                ? 'No wallet has been generated yet.'
-                : exchangeAddress === null && isGenerationRequested
-                  ? 'Wallet generation request sent. The address will appear here once ready.'
-                  : null
-          }
-        />
+        exchangeAddress === null ? (
+          <GenerateWalletPanel
+            title="Address for receiving funds from exchange or institution"
+            isGenerating={isGeneratingExchangeWallet}
+            error={generationError}
+            onGenerate={() => {
+              onGenerateExchangeWallet?.()
+            }}
+          />
+        ) : (
+          <ReceiveAddressPanel
+            title="Address for receiving funds from exchange or institution"
+            address={exchangeAddress}
+            isCopied={isExchangeCopied}
+            showCopy={true}
+            onCopy={() => {
+              void copyAddress(exchangeAddress, () => {
+                setExchangeCopied(true)
+              })
+            }}
+          />
+        )
       ) : null}
+    </div>
+  )
+}
+
+function GenerateWalletPanel({
+  title,
+  isGenerating,
+  error,
+  onGenerate,
+}: {
+  readonly title: string
+  readonly isGenerating: boolean
+  readonly error: string | null
+  readonly onGenerate: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-card/70 p-3">
+      <p className="text-xs text-muted-foreground">{title}</p>
+      <p className="text-sm text-muted-foreground">
+        {error !== null
+          ? error
+          : isGenerating
+            ? 'Wallet generation request sent. The address will appear here once ready.'
+            : 'No wallet has been generated yet.'}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="secondary" size="sm" disabled={isGenerating} onClick={onGenerate}>
+          {isGenerating ? 'wallet generation request sent' : 'Generate wallet'}
+        </Button>
+      </div>
     </div>
   )
 }

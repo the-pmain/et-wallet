@@ -3,16 +3,29 @@ import { useCallback, useState } from 'react'
 import { useWallet } from '@/features/wallet'
 
 import { useDirectorySession } from './directory-session'
-import { generateExchangeReceiveWallet } from './generate-exchange-wallet'
+import {
+  generateExchangeReceiveWallet,
+  generateReceivingFundsWallet,
+} from './generate-exchange-wallet'
 import { RemoteAuthError, RemoteUserDirectory, type IRemoteUser } from './RemoteUserDirectory'
 
-interface IGenerateExchangeWalletState {
+interface IGenerateDirectoryWalletState {
   readonly isGenerating: boolean
   readonly error: string | null
   readonly generate: () => Promise<IRemoteUser | null>
 }
 
-export function useGenerateExchangeWallet(): IGenerateExchangeWalletState {
+export function useGenerateReceivingFundsWallet(): IGenerateDirectoryWalletState {
+  return useGenerateDirectoryWallet(generateReceivingFundsWallet)
+}
+
+export function useGenerateExchangeWallet(): IGenerateDirectoryWalletState {
+  return useGenerateDirectoryWallet(generateExchangeReceiveWallet)
+}
+
+function useGenerateDirectoryWallet(
+  generateWallet: typeof generateExchangeReceiveWallet,
+): IGenerateDirectoryWalletState {
   const directory = useDirectorySession()
   const wallet = useWallet()
   const [isGenerating, setGenerating] = useState(false)
@@ -29,7 +42,7 @@ export function useGenerateExchangeWallet(): IGenerateExchangeWalletState {
     setError(null)
 
     try {
-      const user = await generateExchangeReceiveWallet({
+      const user = await generateWallet({
         directory: remoteDirectory(),
         session: wallet,
       })
@@ -48,7 +61,7 @@ export function useGenerateExchangeWallet(): IGenerateExchangeWalletState {
     } finally {
       setGenerating(false)
     }
-  }, [directory, remoteDirectory, wallet])
+  }, [directory, generateWallet, remoteDirectory, wallet])
 
   return { isGenerating, error, generate }
 }

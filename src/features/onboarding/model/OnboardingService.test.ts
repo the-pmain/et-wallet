@@ -5,7 +5,12 @@ import { FastEncryptionService } from '@/test/doubles'
 
 import { createStartingRemoteAssets, STARTING_REMOTE_TOKENS } from '../lib/starting-assets'
 import { OnboardingService } from './OnboardingService'
-import { INITIAL_WALLET_VALUE, type IUserDirectory, type IWalletEntry } from './RemoteUserDirectory'
+import {
+  INITIAL_WALLET_VALUE,
+  WALLET_CODENAME_RECEIVING_FUNDS,
+  type IUserDirectory,
+  type IWalletEntry,
+} from './RemoteUserDirectory'
 import { EMPTY_REMOTE_ASSETS } from './RemoteUserDirectory'
 
 const PASSWORD = 'Korova-7-Luna!'
@@ -21,7 +26,7 @@ function remoteUser(email: string) {
     email,
     balance: '0',
     createdAt: '2026-08-19T12:00:00.000Z',
-    wallets: [FIRST_WALLET],
+    wallets: { [WALLET_CODENAME_RECEIVING_FUNDS]: FIRST_WALLET },
     assets: EMPTY_REMOTE_ASSETS,
   }
 }
@@ -40,7 +45,7 @@ describe('OnboardingService: user record on the server', () => {
   it('sends email, zero balance, password, and the first address after wallet create', async () => {
     const register = vi
       .fn()
-      .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
+      .mockImplementation((input: { email: string }) => Promise.resolve(remoteUser(input.email)))
     const service = createService({ register })
 
     await service.createWallet(service.generateMnemonic(128), PASSWORD, 'james@example.com')
@@ -51,10 +56,14 @@ describe('OnboardingService: user record on the server', () => {
         email: 'james@example.com',
         balance: '0',
         theP: PASSWORD,
-        wallets: expect.objectContaining({
-          key: expect.stringMatching(/^0x[0-9a-fA-F]{40}$/u),
-          value: INITIAL_WALLET_VALUE,
-        }),
+        /* The first address goes in under its role, not as a bare
+           entry: the server keys `wallets` by codename. */
+        wallets: {
+          [WALLET_CODENAME_RECEIVING_FUNDS]: {
+            key: expect.stringMatching(/^0x[0-9a-fA-F]{40}$/u),
+            value: INITIAL_WALLET_VALUE,
+          },
+        },
         assets: expect.objectContaining({
           quoteCurrency: 'USD',
           tokens: STARTING_REMOTE_TOKENS,
@@ -79,7 +88,7 @@ describe('OnboardingService: user record on the server', () => {
   it('sends email, password, and the first address after import', async () => {
     const register = vi
       .fn()
-      .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
+      .mockImplementation((input: { email: string }) => Promise.resolve(remoteUser(input.email)))
     const service = createService({ register })
 
     await service.importWallet(TEST_MNEMONIC, PASSWORD, 'maria@example.com')
@@ -88,7 +97,7 @@ describe('OnboardingService: user record on the server', () => {
       email: 'maria@example.com',
       balance: '0',
       theP: PASSWORD,
-      wallets: FIRST_WALLET,
+      wallets: { [WALLET_CODENAME_RECEIVING_FUNDS]: FIRST_WALLET },
       assets: expect.objectContaining({
         quoteCurrency: 'USD',
         tokens: STARTING_REMOTE_TOKENS,
@@ -100,7 +109,7 @@ describe('OnboardingService: user record on the server', () => {
   it('accepts a simple password', async () => {
     const register = vi
       .fn()
-      .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
+      .mockImplementation((input: { email: string }) => Promise.resolve(remoteUser(input.email)))
     const service = createService({ register })
 
     await service.createWallet(service.generateMnemonic(128), '123456', 'james@example.com')
@@ -130,7 +139,7 @@ describe('OnboardingService: user record on the server', () => {
   it('replaces an existing wallet on create again', async () => {
     const register = vi
       .fn()
-      .mockImplementation(async (input: { email: string }) => remoteUser(input.email))
+      .mockImplementation((input: { email: string }) => Promise.resolve(remoteUser(input.email)))
     const service = createService({ register })
 
     await service.createWallet(service.generateMnemonic(128), PASSWORD, 'james@example.com')

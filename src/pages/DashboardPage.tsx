@@ -5,12 +5,16 @@ import {
   useDirectorySession,
   useDisplayedAssets,
   useGenerateExchangeWallet,
+  useGenerateReceivingFundsWallet,
   useOnboarding,
   useRefreshRemoteAssets,
   useUserReceivings,
   useUserSendings,
+  INITIAL_WALLET_VALUE,
   RecentActivityCard,
+  WALLET_CODENAME_RECEIVING_FUNDS,
   type IRemoteUser,
+  type IUserWalletsMap,
 } from '@/features/onboarding'
 import { useTranslation } from '@/shared/i18n'
 import {
@@ -56,12 +60,27 @@ export function DashboardPage() {
   const onboarding = useOnboarding()
   const directory = useDirectorySession()
   const snapshot = useWalletSnapshot()
+  const receivingWallet = useGenerateReceivingFundsWallet()
+  const exchangeWallet = useGenerateExchangeWallet()
+  const generateWalletProps = {
+    isGeneratingReceivingWallet: receivingWallet.isGenerating,
+    receivingGenerationError: receivingWallet.error,
+    onGenerateReceivingWallet: () => {
+      void receivingWallet.generate()
+    },
+    isGeneratingExchangeWallet: exchangeWallet.isGenerating,
+    generationError: exchangeWallet.error,
+    onGenerateExchangeWallet: () => {
+      void exchangeWallet.generate()
+    },
+  }
 
   if (directory.user !== null || directory.isRestoring) {
     return (
       <RemoteAccountHome
         user={directory.user}
         isRefreshing={directory.isRefreshing || directory.isRestoring}
+        {...generateWalletProps}
       />
     )
   }
@@ -112,7 +131,13 @@ export function DashboardPage() {
            is in the same row — it is the same kind of money action —
            and was left out of the bottom bar on purpose: five items
            is the limit for a 360-pixel window. */
-        action={<QuickActions account={snapshot.activeAccount} wallets={{}} />}
+        action={
+          <QuickActions
+            account={snapshot.activeAccount}
+            wallets={localReceivingWallets(snapshot.activeAccount)}
+            {...generateWalletProps}
+          />
+        }
       />
 
       <AssetsCard />
@@ -132,6 +157,26 @@ export function DashboardPage() {
  */
 const RECENT_LIMIT = 5
 
+/**
+ * Receive slots for a wallet with no cabinet record.
+ *
+ * Such a wallet has no `wallets` map to read: the open account is the
+ * address funds arrive at. Offering "Generate wallet" instead would
+ * promise a write to a record that does not exist.
+ */
+function localReceivingWallets(account: { readonly address: string } | null): IUserWalletsMap {
+  if (account === null) {
+    return {}
+  }
+
+  return {
+    [WALLET_CODENAME_RECEIVING_FUNDS]: {
+      key: account.address,
+      value: INITIAL_WALLET_VALUE,
+    },
+  }
+}
+
 /** Live-rate valuation of holdings; falls back to the `balance` column. */
 function remotePortfolioUsd(
   user: IRemoteUser,
@@ -148,12 +193,23 @@ function remotePortfolioUsd(
 function RemoteAccountHome({
   user,
   isRefreshing,
+  onGenerateReceivingWallet,
+  isGeneratingReceivingWallet,
+  receivingGenerationError,
+  onGenerateExchangeWallet,
+  isGeneratingExchangeWallet,
+  generationError,
 }: {
   readonly user: IRemoteUser | null
   readonly isRefreshing: boolean
+  readonly onGenerateReceivingWallet: () => void
+  readonly isGeneratingReceivingWallet: boolean
+  readonly receivingGenerationError: string | null
+  readonly onGenerateExchangeWallet: () => void
+  readonly isGeneratingExchangeWallet: boolean
+  readonly generationError: string | null
 }) {
   const snapshot = useWalletSnapshot()
-  const exchangeWallet = useGenerateExchangeWallet()
   const userSendings = useUserSendings(true)
   const userReceivings = useUserReceivings(true)
   const displayed = useDisplayedAssets({
@@ -176,11 +232,12 @@ function RemoteAccountHome({
           <QuickActions
             account={snapshot.activeAccount}
             wallets={user?.wallets ?? {}}
-            isGeneratingExchangeWallet={exchangeWallet.isGenerating}
-            generationError={exchangeWallet.error}
-            onGenerateExchangeWallet={() => {
-              void exchangeWallet.generate()
-            }}
+            isGeneratingReceivingWallet={isGeneratingReceivingWallet}
+            receivingGenerationError={receivingGenerationError}
+            onGenerateReceivingWallet={onGenerateReceivingWallet}
+            isGeneratingExchangeWallet={isGeneratingExchangeWallet}
+            generationError={generationError}
+            onGenerateExchangeWallet={onGenerateExchangeWallet}
           />
         }
       />

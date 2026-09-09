@@ -161,6 +161,13 @@ describe('Dashboard: activity', () => {
 })
 
 describe('Dashboard: quick actions', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    localStorage.clear()
+  })
+
   it('links to the send screen', async () => {
     renderApp()
     await findDashboard()
@@ -178,8 +185,39 @@ describe('Dashboard: quick actions', () => {
     expect(screen.getByText(/The native currency of the network is sent here/i)).toBeInTheDocument()
   })
 
-  it('shows the full receive address, not a shortened one', async () => {
+  it('shows the open account for receiving funds without a cabinet record', async () => {
     const user = userEvent.setup()
+
+    renderApp()
+    await findDashboard()
+
+    await user.click(screen.getByRole('button', { name: /Receive/i }))
+
+    /* No record means no `wallets` map to read: the address funds
+       arrive at is the account this device holds. */
+    expect(screen.getByText('Address for receiving funds')).toBeInTheDocument()
+    expect(screen.getByText(TEST_MNEMONIC_ADDRESSES[0] as string)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /generate wallet/iu })).toHaveLength(1)
+  })
+
+  it('shows the full receive address from wallets, not a shortened one', async () => {
+    const user = userEvent.setup()
+    const address = TEST_MNEMONIC_ADDRESSES[0] as string
+
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '0',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      wallets: {
+        'address-receiving-funds': { key: address, value: '0' },
+      },
+    })
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
 
     renderApp()
     await findDashboard()
@@ -188,7 +226,7 @@ describe('Dashboard: quick actions', () => {
 
     /* A shortened address cannot be checked character by character,
        and that check is what protects against clipboard swap. */
-    expect(screen.getByText(TEST_MNEMONIC_ADDRESSES[0] as string)).toBeInTheDocument()
+    expect(screen.getByText(address)).toBeInTheDocument()
     expect(screen.getByText(/Check the address\s+character by character/i)).toBeInTheDocument()
   })
 
@@ -386,6 +424,62 @@ describe('Dashboard: directory cabinet', () => {
         return method === 'GET' && url.includes('/v1/users/7')
       }),
     ).toBe(true)
+  })
+
+  /**
+   * The address must appear for an account signed in by email alone.
+   * Such a browser has no vault to derive from, so the request goes to
+   * the service and the answer fills the slot.
+   */
+  it('fills an empty receiving slot from the service, not from the device', async () => {
+    const user = userEvent.setup()
+    const derived = '0x9858EfFD232B4033E47d90003D41EC34EcaEda94'
+    const record = {
+      id: '7',
+      email: 'james@example.com',
+      balance: '0',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      wallets: {},
+    }
+    const base = mockDirectoryAndPriceFetch(record)
+    let generateBody: string | null = null
+
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input)
+      const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+
+      if (method.toUpperCase() === 'POST' && url.includes('/v1/users/wallets/generate')) {
+        generateBody = typeof init?.body === 'string' ? init.body : ''
+
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                ...record,
+                wallets: { 'address-receiving-funds': { key: derived, value: '0' } },
+              }),
+            ),
+        })
+      }
+
+      return base(input, init)
+    }) as unknown as typeof fetch
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+
+    await user.click(await screen.findByRole('button', { name: /Receive/i }))
+    await user.click(screen.getAllByRole('button', { name: /generate wallet/iu })[0] as HTMLElement)
+
+    expect(await screen.findByText(derived)).toBeInTheDocument()
+    expect(generateBody).toContain('address-receiving-funds')
   })
 
   it('shows sendings and receivings on the home screen after sign-in', async () => {

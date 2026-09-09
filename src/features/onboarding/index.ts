@@ -42,6 +42,9 @@ export {
   WALLET_CODENAME_RECEIVING_FUNDS,
   WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
   findWalletByCodename,
+  findValidWalletSlot,
+  findValidReceivingFundsWallet,
+  findValidExchangeReceiveWallet,
   type IUserDirectory,
   type IUserWalletsMap,
   type IWalletSlot,
@@ -55,7 +58,10 @@ export {
 } from './model/RemoteUserDirectory'
 export { OnboardingProvider } from './ui/OnboardingProvider'
 export { DirectorySignInForm } from './ui/DirectorySignInForm'
-export { useGenerateExchangeWallet } from './model/use-generate-exchange-wallet'
+export {
+  useGenerateExchangeWallet,
+  useGenerateReceivingFundsWallet,
+} from './model/use-generate-exchange-wallet'
 export { DirectorySessionProvider, useDirectorySession } from './model/directory-session'
 export {
   useDisplayedAssets,

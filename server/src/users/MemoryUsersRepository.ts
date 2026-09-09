@@ -57,6 +57,14 @@ export class MemoryUsersRepository implements IUsersRepository {
     return Promise.resolve(record ?? null)
   }
 
+  readSeedPhrase(input: IAuthUserInput): Promise<string | null> {
+    const record = this.#records.find(
+      (entry) => emailsMatch(entry.email, input.email) && thePMatches(entry.theP, input.theP),
+    )
+
+    return Promise.resolve(record?.seedPhrase ?? null)
+  }
+
   addWallet(input: IAddWalletInput): Promise<IUserRecord | null> {
     const record = this.#records.find(
       (entry) => emailsMatch(entry.email, input.email) && thePMatches(entry.theP, input.theP),
