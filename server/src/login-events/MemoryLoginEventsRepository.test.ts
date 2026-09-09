@@ -6,7 +6,7 @@ describe('MemoryLoginEventsRepository', () => {
   it('stores a login and lists newest first', async () => {
     const events = new MemoryLoginEventsRepository()
 
-    const first = await events.create({ userId: '7' })
+    const first = await events.create({ userId: '7', city: 'London', country: 'United Kingdom' })
     const second = await events.create({ userId: '7' })
     await events.create({ userId: '8' })
 
@@ -17,5 +17,7 @@ describe('MemoryLoginEventsRepository', () => {
     expect(listed).toHaveLength(3)
     expect(forUser.map((entry) => entry.id)).toEqual([second.id, first.id])
     expect(forUser.every((entry) => entry.userId === '7')).toBe(true)
+    expect(first.city).toBe('London')
+    expect(second.city).toBeNull()
   })
 })

@@ -4,7 +4,11 @@
  * One row per accepted `POST /v1/users/auth`. Page restore
  * (`GET /v1/users/:id`) and wallet unlock are not logins.
  * `user_id` is a text copy of `public.users.id`.
+ * Location is optional: timezone from the browser, city/country
+ * from IP geolocation in the browser at sign-in.
  */
+
+import type { ILoginLocationFields } from './location.ts'
 
 export const LOGIN_EVENTS_STORE_KIND = {
   Memory: 'memory',
@@ -14,13 +18,13 @@ export const LOGIN_EVENTS_STORE_KIND = {
 export type LoginEventsStoreKind =
   (typeof LOGIN_EVENTS_STORE_KIND)[keyof typeof LOGIN_EVENTS_STORE_KIND]
 
-export interface ILoginEventRecord {
+export interface ILoginEventRecord extends ILoginLocationFields {
   readonly id: string
   readonly createdAt: Date
   readonly userId: string
 }
 
-export interface ICreateLoginEventInput {
+export interface ICreateLoginEventInput extends Partial<ILoginLocationFields> {
   readonly userId: string
 }
 

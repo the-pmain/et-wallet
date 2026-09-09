@@ -1798,7 +1798,55 @@ describe('Admin cabinet', () => {
       loginCount: 2,
     })
     expect(activity?.logins).toHaveLength(2)
+    expect(activity?.logins[0]).toMatchObject({
+      city: null,
+      country: null,
+      countryCode: null,
+      region: null,
+      timeZone: null,
+    })
     expect(asSuper.json()).toEqual(asAdmin.json())
     expect(asAdmin.headers['cache-control']).toBe('no-store')
+  })
+
+  it('stores the browser location on a successful login', async () => {
+    const userId = await seedUser()
+
+    const signedIn = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        time_zone: 'Europe/London',
+        city: 'London',
+        region: 'England',
+        country: 'United Kingdom',
+        country_code: 'gb',
+      },
+    })
+    const asAdmin = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '4200' },
+    })
+
+    expect(signedIn.statusCode).toBe(200)
+    expect(
+      asAdmin.json<{
+        users: { userId: string; logins: { city: string; country: string; countryCode: string }[] }[]
+      }>().users[0],
+    ).toMatchObject({
+      userId,
+      logins: [
+        {
+          city: 'London',
+          region: 'England',
+          country: 'United Kingdom',
+          countryCode: 'GB',
+          timeZone: 'Europe/London',
+        },
+      ],
+    })
   })
 })

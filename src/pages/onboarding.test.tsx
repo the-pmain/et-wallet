@@ -165,10 +165,11 @@ describe('Directory account sign-in', () => {
           init?.method === 'POST',
       )
 
-    expect(JSON.parse(String(authCall?.[1]?.body))).toEqual({
+    expect(JSON.parse(String(authCall?.[1]?.body))).toMatchObject({
       email: 'james@example.com',
       the_p: 'demo',
     })
+    expect(typeof JSON.parse(String(authCall?.[1]?.body)).time_zone === 'string').toBe(true)
 
     expect(readLoginCredentials()).toEqual({
       id: '7',

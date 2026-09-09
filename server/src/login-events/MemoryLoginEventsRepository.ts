@@ -21,6 +21,11 @@ export class MemoryLoginEventsRepository implements ILoginEventsRepository {
       id: crypto.randomUUID(),
       createdAt: new Date(),
       userId: input.userId,
+      timeZone: input.timeZone ?? null,
+      city: input.city ?? null,
+      region: input.region ?? null,
+      country: input.country ?? null,
+      countryCode: input.countryCode ?? null,
     }
 
     this.#records.unshift(record)

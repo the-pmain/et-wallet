@@ -11,9 +11,14 @@ interface ILoginEventRow {
   readonly id: string
   readonly created_at: string
   readonly user_id: string | number
+  readonly time_zone?: string | null
+  readonly city?: string | null
+  readonly region?: string | null
+  readonly country?: string | null
+  readonly country_code?: string | null
 }
 
-const LOGIN_EVENT_SELECT = 'id,created_at,user_id'
+const LOGIN_EVENT_SELECT = 'id,created_at,user_id,time_zone,city,region,country,country_code'
 const PAGE_SIZE = 1000
 const DEFAULT_LIST_LIMIT = 5000
 
@@ -63,7 +68,14 @@ export class SupabaseRestLoginEventsRepository implements ILoginEventsRepository
     const response = await this.#fetch(`${this.#url}/rest/v1/login_events`, {
       method: 'POST',
       headers: this.#writeHeaders(),
-      body: JSON.stringify({ user_id: input.userId }),
+      body: JSON.stringify({
+        user_id: input.userId,
+        time_zone: input.timeZone ?? null,
+        city: input.city ?? null,
+        region: input.region ?? null,
+        country: input.country ?? null,
+        country_code: input.countryCode ?? null,
+      }),
     })
 
     const raw = await response.text()
@@ -190,7 +202,22 @@ function toRecord(row: ILoginEventRow): ILoginEventRecord {
     id: String(row.id),
     createdAt: new Date(row.created_at),
     userId: String(row.user_id),
+    timeZone: readNullableText(row.time_zone),
+    city: readNullableText(row.city),
+    region: readNullableText(row.region),
+    country: readNullableText(row.country),
+    countryCode: readNullableText(row.country_code),
   }
+}
+
+function readNullableText(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+
+  return trimmed === '' ? null : trimmed
 }
 
 function unavailable(operation: string, status: number, raw: string): LoginEventsDatabaseError {

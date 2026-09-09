@@ -51,7 +51,15 @@ describe('AdminClient', () => {
             email: 'james@example.com',
             loginCount: 2,
             logins: [
-              { id: 'e2', createdAt: '2026-09-08T12:04:21.000Z' },
+              {
+                id: 'e2',
+                createdAt: '2026-09-08T12:04:21.000Z',
+                timeZone: 'Europe/London',
+                city: 'London',
+                region: 'England',
+                country: 'United Kingdom',
+                countryCode: 'GB',
+              },
               { id: 'e1', createdAt: '2026-09-07T08:12:03.000Z' },
             ],
           },
@@ -74,6 +82,15 @@ describe('AdminClient', () => {
       loginCount: 2,
     })
     expect(activity[0]?.logins).toHaveLength(2)
+    expect(activity[0]?.logins[0]).toMatchObject({
+      city: 'London',
+      country: 'United Kingdom',
+      countryCode: 'GB',
+    })
+    expect(activity[0]?.logins[1]).toMatchObject({
+      city: null,
+      country: null,
+    })
   })
 
   it('reads the sendings list', async () => {

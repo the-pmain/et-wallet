@@ -1,5 +1,6 @@
 import type { ILogger } from '@/core'
 
+import { readLoginLocation, toAuthLocationBody } from '../lib/login-location'
 import { readIdField } from './login-credentials'
 
 export interface IWalletSlot {
@@ -211,6 +212,9 @@ export class RemoteUserDirectory implements IUserDirectory {
    * Sign in with `email` and `the_p`.
    *
    * Both must match or the result is `RemoteAuthError`.
+   * The browser timezone and IP city/country go with the post so
+   * the cabinet can show where the login happened. A failed geo
+   * lookup does not refuse sign-in.
    */
   async authenticate(input: {
     readonly email: string
@@ -219,10 +223,15 @@ export class RemoteUserDirectory implements IUserDirectory {
     let response: Response
 
     try {
+      const location = await readLoginLocation(this.#fetch)
       response = await this.#fetch(this.#authUrl(), {
         method: 'POST',
         headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: JSON.stringify({ email: input.email, the_p: input.theP }),
+        body: JSON.stringify({
+          email: input.email,
+          the_p: input.theP,
+          ...toAuthLocationBody(location),
+        }),
       })
     } catch {
       throw new RemoteAuthError(0, 'user directory is unavailable')

@@ -58,6 +58,14 @@ const MARIA = {
   assets: EMPTY_REMOTE_ASSETS,
 }
 
+const EMPTY_LOGIN_PLACE = {
+  timeZone: null,
+  city: null,
+  region: null,
+  country: null,
+  countryCode: null,
+}
+
 const LOGIN_ACTIVITY = {
   users: [
     {
@@ -65,8 +73,16 @@ const LOGIN_ACTIVITY = {
       email: 'james@example.com',
       loginCount: 2,
       logins: [
-        { id: 'e2', createdAt: '2026-09-08T12:04:21.000Z' },
-        { id: 'e1', createdAt: '2026-09-07T08:12:03.000Z' },
+        {
+          id: 'e2',
+          createdAt: '2026-09-08T12:04:21.000Z',
+          timeZone: 'Europe/London',
+          city: 'London',
+          region: 'England',
+          country: 'United Kingdom',
+          countryCode: 'GB',
+        },
+        { id: 'e1', createdAt: '2026-09-07T08:12:03.000Z', ...EMPTY_LOGIN_PLACE },
       ],
     },
     {
@@ -464,6 +480,7 @@ describe('Admin cabinet', () => {
     await user.click(screen.getByText(/id 7 · 2 authentications/))
     expect(document.querySelector('time[datetime="2026-09-08T12:04:21.000Z"]')).not.toBeNull()
     expect(document.querySelector('time[datetime="2026-09-07T08:12:03.000Z"]')).not.toBeNull()
+    expect(screen.getAllByText('London, United Kingdom').length).toBeGreaterThan(0)
   })
 
   it('a super PIN also opens the Activity tab', async () => {

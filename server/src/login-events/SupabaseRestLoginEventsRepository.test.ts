@@ -12,6 +12,11 @@ const CREATED_ROW = {
   id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   created_at: '2026-09-08T12:04:21.000Z',
   user_id: '7',
+  time_zone: 'Europe/London',
+  city: 'London',
+  region: 'England',
+  country: 'United Kingdom',
+  country_code: 'GB',
 }
 
 describe('SupabaseRestLoginEventsRepository', () => {
@@ -26,7 +31,14 @@ describe('SupabaseRestLoginEventsRepository', () => {
       fetch: fetchMock as unknown as typeof fetch,
     })
 
-    const record = await events.create({ userId: '7' })
+    const record = await events.create({
+      userId: '7',
+      timeZone: 'Europe/London',
+      city: 'London',
+      region: 'England',
+      country: 'United Kingdom',
+      countryCode: 'GB',
+    })
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
       'https://example.supabase.co/rest/v1/login_events',
@@ -38,10 +50,22 @@ describe('SupabaseRestLoginEventsRepository', () => {
         prefer: 'return=representation',
       }),
     })
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ user_id: '7' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      user_id: '7',
+      time_zone: 'Europe/London',
+      city: 'London',
+      region: 'England',
+      country: 'United Kingdom',
+      country_code: 'GB',
+    })
     expect(record).toMatchObject({
       id: CREATED_ROW.id,
       userId: '7',
+      city: 'London',
+      country: 'United Kingdom',
+      countryCode: 'GB',
+      region: 'England',
+      timeZone: 'Europe/London',
     })
     expect(record.createdAt.toISOString()).toBe(CREATED_ROW.created_at)
   })
@@ -62,6 +86,7 @@ describe('SupabaseRestLoginEventsRepository', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('order=created_at.desc')
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('limit=50')
     expect(listed[0]?.userId).toBe('7')
+    expect(listed[0]?.city).toBe('London')
   })
 
   it('marks a missing table so startup can fall back to memory', async () => {

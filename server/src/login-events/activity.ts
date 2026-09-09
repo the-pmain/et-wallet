@@ -5,6 +5,11 @@ import type { ILoginEventRecord } from './contracts.ts'
 export interface ILoginActivityLogin {
   readonly id: string
   readonly createdAt: string
+  readonly timeZone: string | null
+  readonly city: string | null
+  readonly region: string | null
+  readonly country: string | null
+  readonly countryCode: string | null
 }
 
 /** One directory user with the logins recorded for them. */
@@ -67,6 +72,11 @@ function toActivityRow(
     .map((event) => ({
       id: event.id,
       createdAt: event.createdAt.toISOString(),
+      timeZone: event.timeZone,
+      city: event.city,
+      region: event.region,
+      country: event.country,
+      countryCode: event.countryCode,
     }))
 
   return {

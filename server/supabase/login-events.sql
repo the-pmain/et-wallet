@@ -7,6 +7,11 @@ create table if not exists public.login_events (
   id uuid not null default gen_random_uuid(),
   created_at timestamp with time zone not null default now(),
   user_id text not null,
+  time_zone text,
+  city text,
+  region text,
+  country text,
+  country_code text,
   constraint login_events_pkey primary key (id)
 );
 

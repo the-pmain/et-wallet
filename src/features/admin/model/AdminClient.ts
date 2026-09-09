@@ -84,6 +84,11 @@ export interface IAdminUserPatch {
 export interface IAdminLogin {
   readonly id: string
   readonly createdAt: string
+  readonly timeZone: string | null
+  readonly city: string | null
+  readonly region: string | null
+  readonly country: string | null
+  readonly countryCode: string | null
 }
 
 export interface IAdminUserActivity {
@@ -640,7 +645,25 @@ function parseLogin(payload: unknown): IAdminLogin | null {
     return null
   }
 
-  return { id, createdAt }
+  return {
+    id,
+    createdAt,
+    timeZone: readNullableString(record['timeZone']),
+    city: readNullableString(record['city']),
+    region: readNullableString(record['region']),
+    country: readNullableString(record['country']),
+    countryCode: readNullableString(record['countryCode']),
+  }
+}
+
+function readNullableString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+
+  return trimmed === '' ? null : trimmed
 }
 
 function parseReceivingList(payload: unknown): readonly IRemoteReceiving[] | null {

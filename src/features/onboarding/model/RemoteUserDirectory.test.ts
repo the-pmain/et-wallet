@@ -170,12 +170,21 @@ describe('RemoteUserDirectory', () => {
   })
 
   it('signs in with email and the_p and returns the record', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse(200, {
+    const fetchMock = vi.fn().mockImplementation((url: RequestInfo | URL) => {
+      if (String(url).includes('geojs.io')) {
+        return jsonResponse(200, {
+          city: 'London',
+          region: 'England',
+          country: 'United Kingdom',
+          country_code: 'GB',
+        })
+      }
+
+      return jsonResponse(200, {
         ...USER_BODY,
         balance: '12.5',
-      }),
-    )
+      })
+    })
     const directory = new RemoteUserDirectory({
       baseUrl: 'http://127.0.0.1:8080',
       logger: new NullLogger(),
@@ -184,11 +193,20 @@ describe('RemoteUserDirectory', () => {
 
     const user = await directory.authenticate({ email: 'james@example.com', theP: 'demo' })
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users/auth')
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+    const authCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).endsWith('/v1/users/auth'),
+    )
+
+    expect(authCall?.[0]).toBe('http://127.0.0.1:8080/v1/users/auth')
+    expect(JSON.parse(String(authCall?.[1]?.body))).toMatchObject({
       email: 'james@example.com',
       the_p: 'demo',
+      city: 'London',
+      region: 'England',
+      country: 'United Kingdom',
+      country_code: 'GB',
     })
+    expect(typeof JSON.parse(String(authCall?.[1]?.body)).time_zone).toBe('string')
     expect(user).toEqual({
       id: '7',
       email: 'james@example.com',

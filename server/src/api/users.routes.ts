@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import { BadRequestError, UnauthorizedError } from '../lib/errors.ts'
 import type { ILoginEventsRepository } from '../login-events/contracts.ts'
+import { readLoginLocationFromAuth } from '../login-events/location.ts'
 import {
   createStartingAssets,
   readAssetsPayload,
@@ -31,8 +32,9 @@ import type { IUserResponse } from './contracts.ts'
  * each token `balance`, and drops `priceUsd` / `valueUsd`. Without
  * the field — a starting showcase of one ETH.
  * `POST /v1/users/auth` — check `email` and `the_p`. A successful
- * check also writes `public.login_events`. A failed write is logged
- * and does not refuse the login.
+ * check also writes `public.login_events`, including optional
+ * `time_zone` / city / country from the browser. A failed write is
+ * logged and does not refuse the login.
  * `GET /v1/users/:id` — fresh record, same `email` and `the_p` check.
  * `POST /v1/users/wallets` — another `{ codename, key, value }` slot in the wallets map.
  * Off-schema request — 400, no login.
@@ -128,6 +130,11 @@ const AUTH_USER_BODY = {
   properties: {
     email: { type: 'string', minLength: 1, maxLength: 254 },
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
+    time_zone: { type: ['string', 'null'], maxLength: 64 },
+    city: { type: ['string', 'null'], maxLength: 128 },
+    region: { type: ['string', 'null'], maxLength: 128 },
+    country: { type: ['string', 'null'], maxLength: 128 },
+    country_code: { type: ['string', 'null'], maxLength: 8 },
   },
 } as const
 
@@ -175,6 +182,11 @@ interface ICreateUserBody {
 interface IAuthUserBody {
   readonly email: string
   readonly the_p: string
+  readonly time_zone?: string | null
+  readonly city?: string | null
+  readonly region?: string | null
+  readonly country?: string | null
+  readonly country_code?: string | null
 }
 
 interface IGetUserParams {
@@ -238,7 +250,10 @@ export function registerUserRoutes(
       }
 
       try {
-        await loginEvents.create({ userId: record.id })
+        await loginEvents.create({
+          userId: record.id,
+          ...readLoginLocationFromAuth(request.body),
+        })
       } catch (error) {
         request.log.warn({ err: error }, 'login event was not recorded')
       }

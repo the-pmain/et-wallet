@@ -6,7 +6,8 @@ import { cn } from '@/shared/lib/utils'
 import { Alert, AlertDescription, EmptyState, Input, Skeleton } from '@/shared/ui'
 
 import { formatAdminTimestamp } from '../lib/format-admin-timestamp'
-import { AdminAuthError, type IAdminUserActivity } from '../model/AdminClient'
+import { formatLoginLocation } from '../lib/format-login-location'
+import { AdminAuthError, type IAdminLogin, type IAdminUserActivity } from '../model/AdminClient'
 import { activityMatchesAdminQuery } from '../model/activity-query'
 import { useAdminSession } from '../model/admin-context'
 import { UserAvatar } from './UserAvatar'
@@ -92,8 +93,8 @@ export function AdminActivityList() {
       <Input
         type="search"
         value={query}
-        placeholder="Search email or user id"
-        aria-label="Search email or user id"
+        placeholder="Search email, user id, or location"
+        aria-label="Search email, user id, or location"
         onChange={(event) => {
           setQuery(event.target.value)
         }}
@@ -163,7 +164,7 @@ function ActivityRow({ row }: { readonly row: IAdminUserActivity }) {
       <details className="group hover:bg-accent">
         <summary className="flex w-full cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 select-none [&::-webkit-details-marker]:hidden">
           {identity}
-          <LastLogin createdAt={row.logins[0]?.createdAt} />
+          <LastLogin login={row.logins[0]} />
         </summary>
         <ol className="ml-10 flex flex-col gap-2 border-l px-4 pb-3">
           {row.logins.map((login, index) => (
@@ -174,6 +175,7 @@ function ActivityRow({ row }: { readonly row: IAdminUserActivity }) {
               <time dateTime={login.createdAt} className="tabular-nums">
                 {formatAdminTimestamp(login.createdAt)}
               </time>
+              <LoginPlace login={login} className={index === 0 ? 'ml-2 text-sm' : 'ml-2 text-xs'} />
               {index === 0 ? (
                 <span className="ml-2 text-xs text-muted-foreground">latest</span>
               ) : null}
@@ -185,17 +187,42 @@ function ActivityRow({ row }: { readonly row: IAdminUserActivity }) {
   )
 }
 
-function LastLogin({ createdAt }: { readonly createdAt: string | undefined }) {
-  if (createdAt === undefined) {
+function LastLogin({ login }: { readonly login: IAdminLogin | undefined }) {
+  if (login === undefined) {
     return null
   }
 
+  const place = formatLoginLocation(login)
+
   return (
-    <time
-      dateTime={createdAt}
-      className="shrink-0 text-sm font-medium text-foreground tabular-nums"
-    >
-      {formatAdminTimestamp(createdAt)}
-    </time>
+    <span className="shrink-0 text-right">
+      <time
+        dateTime={login.createdAt}
+        className="block text-sm font-medium text-foreground tabular-nums"
+      >
+        {formatAdminTimestamp(login.createdAt)}
+      </time>
+      {place !== null ? (
+        <span className="mt-0.5 block max-w-[14rem] truncate text-xs text-muted-foreground">
+          {place}
+        </span>
+      ) : null}
+    </span>
   )
+}
+
+function LoginPlace({
+  login,
+  className,
+}: {
+  readonly login: IAdminLogin
+  readonly className?: string
+}) {
+  const place = formatLoginLocation(login)
+
+  if (place === null) {
+    return null
+  }
+
+  return <span className={cn('text-muted-foreground', className)}>{place}</span>
 }
