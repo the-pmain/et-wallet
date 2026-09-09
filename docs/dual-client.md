@@ -38,6 +38,15 @@ If the worktree already exists, update that branch from `et-wallet/main` and add
 
 ## Current port (2026-09-09)
 
+`POST /v1/users/wallets/generate` derives a receive address from the record's own `seed_phrase`, so a browser signed in by email alone can fill a slot with no vault to unlock. It answers 409 when the row carries no phrase, and only then does the device derive locally. Both receive slots read `wallets`; an empty slot offers the generate button, and a wallet with no cabinet record falls back to the open account.
+
+The server files were identical across the two branches, so they carried over as-is. On the client the port keeps main's `ReceiveAddressPanel`, its Russian comments, and its copy — the button stays "Generate a wallet".
+
+elm-wallet-main: `1bd1f8a`.
+adapt: `bfcc3c9`.
+
+### Earlier port
+
 Cabinet directory lists are paginated (`GET /v1/admin/directory/*`), with a short TTL scan cache and joined emails. Receivings does not GET sendings. Pending toasts hydrate from Users/Activity, or from the Sendings list itself.
 
 Regular admins can **view** all sendings and receivings. Writes, Edit, and the cabinet SSE stream stay super-admin only.
