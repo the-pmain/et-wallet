@@ -83,6 +83,7 @@ export function sendingFromEvent(event: ISendingSseEvent): IRemoteSending {
     recipientAddress: event.recipientAddress,
     amount: event.amount,
     symbol: event.symbol,
+    ...(event.userEmail !== undefined ? { userEmail: event.userEmail } : {}),
   }
 }
 

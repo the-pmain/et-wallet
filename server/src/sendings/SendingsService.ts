@@ -110,6 +110,16 @@ export class SendingsService {
     return await this.#sendings.list(options)
   }
 
+  async emailForUserId(userId: string | null): Promise<string | null> {
+    if (userId === null || userId === '') {
+      return null
+    }
+
+    const user = await this.#users.findById(userId)
+
+    return user?.email ?? null
+  }
+
   async listByUserId(userId: string): Promise<readonly ISendingRecord[]> {
     return await this.#sendings.listByUserId(userId.trim())
   }

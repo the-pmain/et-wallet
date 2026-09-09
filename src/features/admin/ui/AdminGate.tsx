@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet } from 'react-router'
 
 import { AdminAuthError, AdminClient } from '../model/AdminClient'
@@ -74,6 +74,15 @@ export function AdminGate() {
     }
   }, [client, pin])
 
+  const lock = useCallback(() => {
+    clearAdminPin()
+    client.clearPin()
+    setUnlocked(false)
+    setRole(null)
+    setPin(null)
+    setError(null)
+  }, [client])
+
   const session = useMemo(
     () =>
       role === null
@@ -82,16 +91,9 @@ export function AdminGate() {
             client,
             role,
             canWrite: role === ADMIN_ROLE.Super,
-            lock: () => {
-              clearAdminPin()
-              client.clearPin()
-              setUnlocked(false)
-              setRole(null)
-              setPin(null)
-              setError(null)
-            },
+            lock,
           },
-    [client, role],
+    [client, lock, role],
   )
 
   if (pin === null || !unlocked || session === null) {

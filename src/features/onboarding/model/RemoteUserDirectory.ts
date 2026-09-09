@@ -124,6 +124,7 @@ export interface IRemoteSending {
   readonly recipientAddress: string | null
   readonly amount: string | null
   readonly symbol: string | null
+  readonly userEmail?: string | null
 }
 
 export interface IRemoteReceiving extends IRemoteSending {
@@ -751,6 +752,7 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
   const recipientAddress = readOptionalScalarString(record['recipientAddress'])
   const amount = readOptionalScalarString(record['amount'])
   const symbol = readOptionalScalarString(record['symbol'])
+  const userEmail = record['userEmail']
 
   if (id === null || id === '') {
     return null
@@ -780,6 +782,9 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
     recipientAddress,
     amount,
     symbol,
+    ...(userEmail === null || typeof userEmail === 'string'
+      ? { userEmail: userEmail === '' ? null : userEmail }
+      : {}),
   }
 }
 

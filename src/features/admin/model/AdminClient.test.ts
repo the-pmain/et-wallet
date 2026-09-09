@@ -93,6 +93,82 @@ describe('AdminClient', () => {
     })
   })
 
+  it('reads a directory sendings page with the joined email', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        items: [
+          {
+            id: '62',
+            createdAt: '2026-08-22T14:59:14.037Z',
+            userId: '74',
+            userEmail: 'leo@example.com',
+            status: 'pending',
+            failureMessage: null,
+            recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+            amount: '4',
+            symbol: 'ETH',
+          },
+        ],
+        page: 1,
+        pageSize: 20,
+        total: 1,
+      }),
+    )
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '9100',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const page = await client.listDirectorySendings({ page: 1, pageSize: 20, q: 'leo@' })
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      '/v1/admin/directory/sendings?page=1&pageSize=20&q=leo%40',
+    )
+    expect(page.total).toBe(1)
+    expect(page.items[0]).toMatchObject({
+      id: '62',
+      userEmail: 'leo@example.com',
+      amount: '4',
+    })
+  })
+
+  it('shares one in-flight GET for the same directory page', async () => {
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          queueMicrotask(() => {
+            resolve(
+              jsonResponse(200, {
+                items: [],
+                page: 1,
+                pageSize: 20,
+                total: 0,
+              }),
+            )
+          })
+        }),
+    )
+    const client = new AdminClient({
+      baseUrl: '',
+      pin: '9100',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const query = { page: 1, pageSize: 20, q: '' }
+    const [first, second] = await Promise.all([
+      client.listDirectorySendings(query),
+      client.listDirectorySendings(query),
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(first.total).toBe(0)
+    expect(second.total).toBe(0)
+
+    await client.listDirectorySendings(query)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('reads the sendings list', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {

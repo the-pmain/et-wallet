@@ -1,7 +1,6 @@
 import { ArrowDownToLine, Pencil } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import type { IRemoteReceiving } from '@/features/onboarding'
 import { AmountWithUnit } from '@/features/wallet/ui/AmountWithUnit'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
 import { Alert, AlertDescription, Button, EmptyState, Input, Skeleton } from '@/shared/ui'
@@ -9,29 +8,39 @@ import { Alert, AlertDescription, Button, EmptyState, Input, Skeleton } from '@/
 import { AdminAuthError, type IAdminReceivingPatch } from '../model/AdminClient'
 import { formatStoredUsdAmount } from '../lib/asset-usd-input'
 import { addableAssetBySymbol } from '../model/addable-assets'
+import { type IAdminDirectoryReceiving, type IAdminPage } from '../model/admin-page'
+import { directoryUserLabel } from '../model/admin-user-emails'
 import { useAdminSession } from '../model/admin-context'
-import { sendingMatchesAdminQuery } from '../model/sending-query'
+import {
+  directoryListIsBusy,
+  useAdminDirectoryQuery,
+} from '../model/use-admin-directory-query'
+import { AdminDirectoryListPending } from './AdminDirectoryListPending'
+import { AdminListPager } from './AdminListPager'
 import { ReceivingEditDialog } from './ReceivingEditDialog'
 import { SendingStatusBadge } from './SendingStatusBadge'
 
 /** Cabinet deposit list. Regular admins view; super-admins edit. */
 export function AdminReceivingsList() {
   const { client, canWrite, lock } = useAdminSession()
-  const [receivings, setReceivings] = useState<readonly IRemoteReceiving[] | null>(null)
-  const [query, setQuery] = useState('')
+  const { page, pageSize, query, search, setPage, setSearch } = useAdminDirectoryQuery()
+  const [listed, setListed] = useState<IAdminPage<IAdminDirectoryReceiving> | null>(null)
+  const [isFetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [editing, setEditing] = useState<IRemoteReceiving | null>(null)
+  const [editing, setEditing] = useState<IAdminDirectoryReceiving | null>(null)
   const [isSaving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
+    setFetching(true)
     void client
-      .listReceivings()
-      .then((listed) => {
+      .listDirectoryReceivings({ page, pageSize, q: query })
+      .then((next) => {
         if (!cancelled) {
-          setReceivings(listed)
+          setListed(next)
+          setFetching(false)
         }
       })
       .catch((caught: unknown) => {
@@ -47,25 +56,16 @@ export function AdminReceivingsList() {
 
         setError('The receivings list could not be loaded.')
       })
+      .finally(() => {
+        if (!cancelled) {
+          setFetching(false)
+        }
+      })
 
     return () => {
       cancelled = true
     }
-  }, [client, lock])
-
-  const filtered = useMemo(() => {
-    if (receivings === null) {
-      return []
-    }
-
-    const needle = query.trim().toLowerCase()
-
-    if (needle === '') {
-      return receivings
-    }
-
-    return receivings.filter((receiving) => sendingMatchesAdminQuery(receiving, needle))
-  }, [query, receivings])
+  }, [client, lock, page, pageSize, query])
 
   async function saveReceiving(id: string, patch: IAdminReceivingPatch): Promise<void> {
     setSaving(true)
@@ -73,7 +73,9 @@ export function AdminReceivingsList() {
 
     try {
       const updated = await client.updateReceiving(id, patch)
-      setReceivings((current) => upsertReceiving(current ?? [], updated))
+      setListed((current) =>
+        current === null ? current : upsertDirectoryReceiving(current, updated),
+      )
       setEditing(null)
     } catch (caught: unknown) {
       if (caught instanceof AdminAuthError && caught.status === 401) {
@@ -96,7 +98,7 @@ export function AdminReceivingsList() {
     )
   }
 
-  if (receivings === null) {
+  if (listed === null) {
     return (
       <div className="flex flex-col gap-3">
         <Skeleton className="h-10 w-full" />
@@ -111,21 +113,23 @@ export function AdminReceivingsList() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Receivings</h1>
         <p className="text-sm text-muted-foreground">
-          {String(receivings.length)} {receivings.length === 1 ? 'record' : 'records'} in the
-          directory.
+          {String(listed.total)} {listed.total === 1 ? 'record' : 'records'}
+          {query.trim() === '' ? ' in the directory.' : ' match this search.'}
         </p>
       </div>
       <Input
         type="search"
-        value={query}
+        value={search}
         placeholder="Search user, amount, symbol or status"
         aria-label="Search user, amount, symbol or status"
         onChange={(event) => {
-          setQuery(event.target.value)
+          setSearch(event.target.value)
         }}
       />
-      {filtered.length === 0 ? (
-        receivings.length === 0 ? (
+      {directoryListIsBusy(search, query, isFetching) ? (
+        <AdminDirectoryListPending label="Searching receivings" />
+      ) : listed.items.length === 0 ? (
+        listed.total === 0 && query.trim() === '' ? (
           <EmptyState
             icon={ArrowDownToLine}
             title="No receivings yet"
@@ -136,7 +140,7 @@ export function AdminReceivingsList() {
         )
       ) : (
         <ul className="divide-y rounded-xl border">
-          {filtered.map((receiving) => (
+          {listed.items.map((receiving) => (
             <ReceivingRow
               key={receiving.id}
               receiving={receiving}
@@ -152,10 +156,19 @@ export function AdminReceivingsList() {
           ))}
         </ul>
       )}
+      {directoryListIsBusy(search, query, isFetching) ? null : (
+        <AdminListPager
+          page={listed.page}
+          pageSize={listed.pageSize}
+          total={listed.total}
+          onPageChange={setPage}
+        />
+      )}
       {canWrite ? (
         <ReceivingEditDialog
           key={editing?.id ?? 'closed'}
           receiving={editing}
+          userEmail={directoryUserLabel(editing?.userEmail, editing?.userId ?? null)}
           isBusy={isSaving}
           error={editError}
           onClose={() => {
@@ -177,7 +190,7 @@ function ReceivingRow({
   receiving,
   onEdit,
 }: {
-  readonly receiving: IRemoteReceiving
+  readonly receiving: IAdminDirectoryReceiving
   readonly onEdit?: () => void
 }) {
   const asset = addableAssetBySymbol(receiving.symbol)
@@ -214,7 +227,7 @@ function ReceivingRow({
             <span className="text-sm break-words text-destructive">{receiving.failureMessage}</span>
           ) : null}
           <span className="text-xs text-muted-foreground">
-            id {receiving.id} · user {receiving.userId ?? '—'}
+            id {receiving.id} · user {directoryUserLabel(receiving.userEmail, receiving.userId)}
           </span>
         </span>
       </span>
@@ -231,15 +244,49 @@ function ReceivingRow({
   )
 }
 
-function upsertReceiving(
-  current: readonly IRemoteReceiving[],
-  incoming: IRemoteReceiving,
-): readonly IRemoteReceiving[] {
-  const index = current.findIndex((item) => item.id === incoming.id)
+function upsertDirectoryReceiving(
+  current: IAdminPage<IAdminDirectoryReceiving>,
+  incoming: IAdminDirectoryReceiving | IReceivingLike,
+): IAdminPage<IAdminDirectoryReceiving> {
+  const previous = current.items.find((item) => item.id === incoming.id)
+  const next: IAdminDirectoryReceiving = {
+    id: incoming.id,
+    createdAt: incoming.createdAt,
+    userId: incoming.userId,
+    status: incoming.status,
+    failureMessage: incoming.failureMessage,
+    recipientAddress: incoming.recipientAddress,
+    amount: incoming.amount,
+    symbol: incoming.symbol,
+    usdAmount: incoming.usdAmount,
+    userEmail:
+      incoming.userEmail !== undefined ? incoming.userEmail : (previous?.userEmail ?? null),
+  }
+  const index = current.items.findIndex((item) => item.id === next.id)
 
   if (index === -1) {
-    return [incoming, ...current]
+    return {
+      ...current,
+      items: [next, ...current.items].slice(0, current.pageSize),
+      total: current.total + 1,
+    }
   }
 
-  return current.map((item, position) => (position === index ? incoming : item))
+  return {
+    ...current,
+    items: current.items.map((item, position) => (position === index ? next : item)),
+  }
+}
+
+interface IReceivingLike {
+  readonly id: string
+  readonly createdAt: string
+  readonly userId: string | null
+  readonly status: IAdminDirectoryReceiving['status']
+  readonly failureMessage: string | null
+  readonly recipientAddress: string | null
+  readonly amount: string | null
+  readonly symbol: string | null
+  readonly usdAmount: string | null
+  readonly userEmail?: string | null
 }

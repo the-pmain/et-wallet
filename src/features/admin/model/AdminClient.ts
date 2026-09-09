@@ -11,6 +11,16 @@ import {
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import type { SendingStatus } from '@/features/onboarding/model/sending-status'
 
+import {
+  adminPageSearch,
+  parseAdminDirectoryReceiving,
+  parseAdminDirectorySending,
+  parseAdminPage,
+  type IAdminDirectoryReceiving,
+  type IAdminDirectorySending,
+  type IAdminPage,
+  type IAdminPageQuery,
+} from './admin-page'
 import { parseAdminRole, type AdminRole } from './admin-role'
 
 const EMPTY_ASSETS: IRemoteAssets = {
@@ -101,6 +111,7 @@ export interface IAdminUserActivity {
 export class AdminClient {
   readonly #baseUrl: string
   readonly #fetch: typeof fetch
+  readonly #inflightGets = new Map<string, Promise<Response>>()
   #pin: string | null
 
   constructor(options: {
@@ -162,6 +173,39 @@ export class AdminClient {
     }
 
     return users
+  }
+
+  async listDirectoryUsers(query: IAdminPageQuery): Promise<IAdminPage<IRemoteUser>> {
+    return await this.#listDirectory('/v1/admin/directory/users', query, parseRemoteUser, 'users')
+  }
+
+  async listDirectoryActivity(query: IAdminPageQuery): Promise<IAdminPage<IAdminUserActivity>> {
+    return await this.#listDirectory(
+      '/v1/admin/directory/activity',
+      query,
+      parseLoginActivity,
+      'activity',
+    )
+  }
+
+  async listDirectorySendings(query: IAdminPageQuery): Promise<IAdminPage<IAdminDirectorySending>> {
+    return await this.#listDirectory(
+      '/v1/admin/directory/sendings',
+      query,
+      parseAdminDirectorySending,
+      'sendings',
+    )
+  }
+
+  async listDirectoryReceivings(
+    query: IAdminPageQuery,
+  ): Promise<IAdminPage<IAdminDirectoryReceiving>> {
+    return await this.#listDirectory(
+      '/v1/admin/directory/receivings',
+      query,
+      parseAdminDirectoryReceiving,
+      'receivings',
+    )
   }
 
   async listLoginActivity(): Promise<readonly IAdminUserActivity[]> {
@@ -464,6 +508,28 @@ export class AdminClient {
     }
   }
 
+  async #listDirectory<T>(
+    path: string,
+    query: IAdminPageQuery,
+    parseItem: (item: unknown) => T | null,
+    label: string,
+  ): Promise<IAdminPage<T>> {
+    const response = await this.#request(`${path}${adminPageSearch(query)}`, { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, `list ${label} failed`)
+    }
+
+    const page = parseAdminPage(payload, parseItem)
+
+    if (page === null) {
+      throw new AdminAuthError(response.status, `list ${label} returned an unexpected response`)
+    }
+
+    return page
+  }
+
   async #request(
     path: string,
     options: {
@@ -483,11 +549,49 @@ export class AdminClient {
       headers['content-type'] = 'application/json'
     }
 
-    try {
-      const init: RequestInit = { method: options.method, headers }
+    if (options.method === 'GET' && options.body === undefined) {
+      const key = `${path}\0${pin ?? ''}`
+      const existing = this.#inflightGets.get(key)
 
-      if (options.body !== undefined) {
-        init.body = JSON.stringify(options.body)
+      if (existing !== undefined) {
+        return await existing.then((response) => response.clone())
+      }
+
+      const pending = this.#send(path, options.method, headers, options.body)
+      this.#inflightGets.set(key, pending)
+
+      try {
+        const response = await pending
+
+        if (!response.ok) {
+          this.#inflightGets.delete(key)
+        } else {
+          globalThis.setTimeout(() => {
+            this.#inflightGets.delete(key)
+          }, 750)
+        }
+
+        return response.clone()
+      } catch (error) {
+        this.#inflightGets.delete(key)
+        throw error
+      }
+    }
+
+    return await this.#send(path, options.method, headers, options.body)
+  }
+
+  async #send(
+    path: string,
+    method: string,
+    headers: Readonly<Record<string, string>>,
+    body: unknown,
+  ): Promise<Response> {
+    try {
+      const init: RequestInit = { method, headers }
+
+      if (body !== undefined) {
+        init.body = JSON.stringify(body)
       }
 
       return await this.#fetch(joinBase(this.#baseUrl, path), init)

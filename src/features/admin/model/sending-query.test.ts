@@ -26,4 +26,9 @@ describe('sendingMatchesAdminQuery', () => {
     expect(sendingMatchesAdminQuery(SENDING, '2')).toBe(true)
     expect(sendingMatchesAdminQuery(SENDING, 'eth')).toBe(true)
   })
+
+  it('находит по email пользователя', () => {
+    expect(sendingMatchesAdminQuery(SENDING, 'james@', 'james@example.com')).toBe(true)
+    expect(sendingMatchesAdminQuery(SENDING, 'maria', 'james@example.com')).toBe(false)
+  })
 })

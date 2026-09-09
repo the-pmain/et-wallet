@@ -3,6 +3,7 @@ import type {
   IAuthUserInput,
   ICreateUserInput,
   IUpdateUserInput,
+  IUserIdentity,
   IUserRecord,
   IUsersRepository,
 } from './contracts.ts'
@@ -78,6 +79,10 @@ export class MemoryUsersRepository implements IUsersRepository {
 
   list(): Promise<readonly IUserRecord[]> {
     return Promise.resolve([...this.#records])
+  }
+
+  listIdentities(): Promise<readonly IUserIdentity[]> {
+    return Promise.resolve(this.#records.map((record) => ({ id: record.id, email: record.email })))
   }
 
   update(id: string, patch: IUpdateUserInput): Promise<IUserRecord | null> {

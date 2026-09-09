@@ -297,6 +297,36 @@ describe('SupabaseRestUsersRepository', () => {
     expect(listed[0]?.email).toBe('james@example.com')
   })
 
+  it('lists identities without wallets or assets', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify([
+            {
+              id: 7,
+              email: 'james@example.com',
+            },
+          ]),
+        ),
+    })
+
+    const users = new SupabaseRestUsersRepository({
+      supabaseUrl: 'https://example.supabase.co',
+      serviceRoleKey: 'service-role',
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const listed = await users.listIdentities()
+    const requested = String(fetchMock.mock.calls[0]?.[0])
+
+    expect(requested).toContain('/rest/v1/users')
+    expect(requested).toContain('select=id%2Cemail')
+    expect(requested).not.toContain('wallets')
+    expect(requested).not.toContain('assets')
+    expect(listed).toEqual([{ id: '7', email: 'james@example.com' }])
+  })
+
   it('changes wallets by id', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
     const fetchMock = vi

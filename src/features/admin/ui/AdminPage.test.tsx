@@ -11,6 +11,9 @@ import { AppProviders } from '@/app/providers'
 import { AppRouter } from '@/app/router'
 
 import { ADMIN_PIN_STORAGE_KEY } from '@/features/admin'
+import { activityMatchesAdminQuery } from '@/features/admin/model/activity-query'
+import { userMatchesAdminQuery } from '@/features/admin/model/admin-query'
+import { sendingMatchesAdminQuery } from '@/features/admin/model/sending-query'
 
 const KEY = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -139,6 +142,116 @@ function requestJson(init?: RequestInit): unknown {
   return JSON.parse(raw) as unknown
 }
 
+function requestPath(url: string): string {
+  try {
+    return new URL(url, 'http://admin.local').pathname
+  } catch {
+    return url.split('?')[0] ?? url
+  }
+}
+
+const DIRECTORY_EMAILS: Readonly<Record<string, string>> = {
+  '7': 'james@example.com',
+  '8': 'maria@example.com',
+  '74': 'leo@example.com',
+}
+
+function withUserEmail(record: Record<string, unknown>): Record<string, unknown> {
+  const userId = String(record['userId'] ?? '')
+
+  return {
+    ...record,
+    userEmail: DIRECTORY_EMAILS[userId] ?? null,
+  }
+}
+
+function directoryPage<T>(
+  items: readonly T[],
+  url: string,
+  matches: (item: T, query: string) => boolean,
+): { items: T[]; page: number; pageSize: number; total: number } {
+  const parsed = new URL(url, 'http://admin.local')
+  const page = Number(parsed.searchParams.get('page') ?? '1')
+  const pageSize = Number(parsed.searchParams.get('pageSize') ?? '20')
+  const query = parsed.searchParams.get('q') ?? ''
+  const filtered = query.trim() === '' ? [...items] : items.filter((item) => matches(item, query))
+  const start = (page - 1) * pageSize
+
+  return {
+    items: filtered.slice(start, start + pageSize),
+    page,
+    pageSize,
+    total: filtered.length,
+  }
+}
+
+function directorySendingsResponse(url: string, sendings: unknown[]): Response {
+  const parsed = new URL(url, 'http://admin.local')
+  const status = parsed.searchParams.get('status')
+  const source =
+    status === 'pending'
+      ? sendings.filter((item) => (item as { status?: string }).status === 'pending')
+      : sendings
+
+  return jsonResponse(
+    200,
+    directoryPage(
+      source.map((item) => withUserEmail(item as Record<string, unknown>)),
+      url,
+      (item, query) =>
+        sendingMatchesAdminQuery(
+          item as unknown as Parameters<typeof sendingMatchesAdminQuery>[0],
+          query,
+          typeof item['userEmail'] === 'string' ? item['userEmail'] : null,
+        ),
+    ),
+  )
+}
+
+function serveDirectoryGet(url: string): Response | null {
+  const path = requestPath(url)
+
+  if (path === '/v1/admin/directory/users') {
+    return jsonResponse(
+      200,
+      directoryPage([USER, MARIA], url, (user, query) =>
+        userMatchesAdminQuery(user as never, query),
+      ),
+    )
+  }
+
+  if (path === '/v1/admin/directory/activity') {
+    return jsonResponse(
+      200,
+      directoryPage(LOGIN_ACTIVITY.users, url, (row, query) =>
+        activityMatchesAdminQuery(row, query),
+      ),
+    )
+  }
+
+  if (path === '/v1/admin/directory/sendings') {
+    return directorySendingsResponse(url, listedSendings)
+  }
+
+  if (path === '/v1/admin/directory/receivings') {
+    return jsonResponse(
+      200,
+      directoryPage(
+        listedReceivings.map((item) => withUserEmail(item as Record<string, unknown>)),
+        url,
+        (item, query) =>
+          sendingMatchesAdminQuery(
+            item as unknown as Parameters<typeof sendingMatchesAdminQuery>[0],
+            query,
+            typeof item['userEmail'] === 'string' ? item['userEmail'] : null,
+          ),
+      ),
+    )
+  }
+
+  return null
+}
+
 function renderAdmin() {
   return render(
     <AppProviders services={services}>
@@ -196,6 +309,14 @@ beforeEach(() => {
       }
 
       return Promise.resolve(jsonResponse(401, {}))
+    }
+
+    if (method === 'GET') {
+      const directory = serveDirectoryGet(url)
+
+      if (directory !== null) {
+        return Promise.resolve(directory)
+      }
     }
 
     if (pin === '4200') {
@@ -484,7 +605,9 @@ describe('Admin cabinet', () => {
     expect(screen.getByText(/id 7 · 2 authentications/).className).toMatch(/text-foreground/u)
     expect(
       fetchSpy.mock.calls.some((call) =>
-        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/login-events'),
+        requestPath(requestUrl(call[0] as RequestInfo | URL)).endsWith(
+          '/v1/admin/directory/activity',
+        ),
       ),
     ).toBe(true)
 
@@ -518,14 +641,16 @@ describe('Admin cabinet', () => {
     expect((await screen.findAllByText('4 USDC')).length).toBeGreaterThan(0)
     expect(screen.getByText(/USD Coin · Ethereum/)).toBeInTheDocument()
     expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
-    expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
+    expect(screen.getByText(/id 62 · user leo@example.com/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument()
     expect(
       TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings')),
     ).toHaveLength(0)
     expect(
       fetchSpy.mock.calls.some((call) =>
-        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/sendings'),
+        requestPath(requestUrl(call[0] as RequestInfo | URL)).endsWith(
+          '/v1/admin/directory/sendings',
+        ),
       ),
     ).toBe(true)
   })
@@ -554,11 +679,13 @@ describe('Admin cabinet', () => {
     expect(await screen.findByRole('heading', { name: 'Receivings' })).toBeInTheDocument()
     expect((await screen.findAllByText('2 ETH')).length).toBeGreaterThan(0)
     expect(screen.getByText(/Ether · Ethereum/)).toBeInTheDocument()
-    expect(screen.getByText(/id 81 · user 7/)).toBeInTheDocument()
+    expect(screen.getByText(/id 81 · user james@example.com/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument()
     expect(
       fetchSpy.mock.calls.some((call) =>
-        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/receivings'),
+        requestPath(requestUrl(call[0] as RequestInfo | URL)).endsWith(
+          '/v1/admin/directory/receivings',
+        ),
       ),
     ).toBe(true)
   })
@@ -852,8 +979,10 @@ describe('Admin cabinet', () => {
       '5aaeb605',
     )
 
-    expect(screen.getByText('james@example.com')).toBeInTheDocument()
-    expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('james@example.com')).toBeInTheDocument()
+      expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
+    })
   })
 
   it('opens the Sendings tab, the SSE stream, and appends a create frame', async () => {
@@ -870,7 +999,9 @@ describe('Admin cabinet', () => {
     expect(screen.getByText('No sendings yet')).toBeInTheDocument()
     expect(
       fetchSpy.mock.calls.some((call) =>
-        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/sendings'),
+        requestPath(requestUrl(call[0] as RequestInfo | URL)).endsWith(
+          '/v1/admin/directory/sendings',
+        ),
       ),
     ).toBe(true)
 
@@ -949,20 +1080,21 @@ describe('Admin cabinet', () => {
     expect(screen.getByText(/rejected/)).toBeInTheDocument()
   })
 
-  it('renders records from GET /v1/admin/sendings', async () => {
+  it('renders records from GET /v1/admin/directory/sendings', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
       const method = init?.method ?? 'GET'
 
-      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+      if (requestPath(url) === '/v1/admin/directory/sendings' && method === 'GET') {
         return Promise.resolve(
           jsonResponse(200, {
-            sendings: [
+            items: [
               {
                 id: '62',
                 createdAt: '2026-08-22T14:59:14.037Z',
                 userId: '74',
+                userEmail: 'leo@example.com',
                 status: 'pending',
                 failureMessage: null,
                 recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
@@ -970,6 +1102,9 @@ describe('Admin cabinet', () => {
                 symbol: 'USDC',
               },
             ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
           }),
         )
       }
@@ -986,7 +1121,7 @@ describe('Admin cabinet', () => {
     expect((await screen.findAllByText('4 USDC')).length).toBeGreaterThan(0)
     expect(screen.getByText(/USD Coin · Ethereum/)).toBeInTheDocument()
     expect(screen.getByText('0x6B175474E89094C44Da98b954EedeAC495271d0F')).toBeInTheDocument()
-    expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
+    expect(screen.getByText(/id 62 · user leo@example.com/)).toBeInTheDocument()
   })
 
   it('saves a sending edit via PATCH and sends status with failureMessage', async () => {
@@ -995,14 +1130,15 @@ describe('Admin cabinet', () => {
       const url = requestUrl(input)
       const method = init?.method ?? 'GET'
 
-      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+      if (requestPath(url) === '/v1/admin/directory/sendings' && method === 'GET') {
         return Promise.resolve(
           jsonResponse(200, {
-            sendings: [
+            items: [
               {
                 id: '62',
                 createdAt: '2026-08-22T14:59:14.037Z',
                 userId: '74',
+                userEmail: 'leo@example.com',
                 status: 'pending',
                 failureMessage: null,
                 recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
@@ -1010,6 +1146,9 @@ describe('Admin cabinet', () => {
                 symbol: 'ETH',
               },
             ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
           }),
         )
       }
@@ -1077,14 +1216,15 @@ describe('Admin cabinet', () => {
       const url = requestUrl(input)
       const method = init?.method ?? 'GET'
 
-      if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
+      if (requestPath(url) === '/v1/admin/directory/sendings' && method === 'GET') {
         return Promise.resolve(
           jsonResponse(200, {
-            sendings: [
+            items: [
               {
                 id: '62',
                 createdAt: '2026-08-22T14:59:14.037Z',
                 userId: '74',
+                userEmail: 'leo@example.com',
                 status: 'pending',
                 failureMessage: null,
                 recipientAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
@@ -1092,6 +1232,9 @@ describe('Admin cabinet', () => {
                 symbol: 'ETH',
               },
             ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
           }),
         )
       }

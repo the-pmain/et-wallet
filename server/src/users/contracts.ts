@@ -22,6 +22,12 @@ export interface IUserRecord {
   readonly seedPhrase: string | null
 }
 
+/** Directory join fields. No wallets or assets. */
+export interface IUserIdentity {
+  readonly id: string
+  readonly email: string | null
+}
+
 export interface ICreateUserInput {
   readonly email: string | null
   readonly balance: string | null
@@ -61,6 +67,9 @@ export interface IUsersRepository {
 
   /** Every record. For the admin cabinet. */
   list(): Promise<readonly IUserRecord[]>
+
+  /** `id` and `email` only. Transfer lists must not pull wallets. */
+  listIdentities(): Promise<readonly IUserIdentity[]>
 
   /**
    * Finds the record whose `email` and `the_p` both match.

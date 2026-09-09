@@ -1,6 +1,8 @@
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify'
 
+import { AdminDirectory } from './admin/AdminDirectory.ts'
 import { registerAdminRoutes } from './api/admin.routes.ts'
+import { registerDirectoryRoutes } from './api/directory.routes.ts'
 import { registerCatalogRoutes } from './api/catalog.routes.ts'
 import { registerNotificationRoutes } from './api/notifications.routes.ts'
 import { registerReceivingRoutes } from './api/receivings.routes.ts'
@@ -215,10 +217,20 @@ export async function buildApp(dependencies: IAppDependencies): Promise<FastifyI
   registerNotificationRoutes(app, catalog)
   registerVersionRoutes(app, catalog)
   registerSettingsRoutes(app, settings, config)
+  const directory = new AdminDirectory({
+    users,
+    sendings: sendingsService,
+    receivings: receivingsService,
+    loginEvents,
+    sendingsHub,
+    receivingsHub,
+  })
+
   registerUserRoutes(app, users, loginEvents)
   registerSendingRoutes(app, sendingsService, sendingsHub)
   registerReceivingRoutes(app, receivingsService, receivingsHub)
-  registerAdminRoutes(app, users, loginEvents)
+  registerAdminRoutes(app, users, loginEvents, directory)
+  registerDirectoryRoutes(app, directory)
 
   if (config.staticRoot !== null) {
     await registerUi(app, config.staticRoot)
