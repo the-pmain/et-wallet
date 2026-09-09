@@ -149,14 +149,14 @@ export function AdminSendingsList() {
             <SendingRow
               key={sending.id}
               sending={sending}
-              onEdit={
-                canWrite
-                  ? () => {
+              {...(canWrite
+                ? {
+                    onEdit: () => {
                       setEditError(null)
                       setEditing(sending)
-                    }
-                  : undefined
-              }
+                    },
+                  }
+                : {})}
             />
           ))}
         </ul>

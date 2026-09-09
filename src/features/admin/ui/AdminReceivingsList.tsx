@@ -140,14 +140,14 @@ export function AdminReceivingsList() {
             <ReceivingRow
               key={receiving.id}
               receiving={receiving}
-              onEdit={
-                canWrite
-                  ? () => {
+              {...(canWrite
+                ? {
+                    onEdit: () => {
                       setEditError(null)
                       setEditing(receiving)
-                    }
-                  : undefined
-              }
+                    },
+                  }
+                : {})}
             />
           ))}
         </ul>
