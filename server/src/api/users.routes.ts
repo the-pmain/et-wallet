@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 
 import { BadRequestError, UnauthorizedError } from '../lib/errors.ts'
+import type { ILoginEventsRepository } from '../login-events/contracts.ts'
+import { readLoginLocationFromAuth } from '../login-events/location.ts'
 import {
   createStartingAssets,
   readAssetsPayload,
@@ -20,24 +22,27 @@ import {
 import type { IUserResponse } from './contracts.ts'
 
 /**
- * Пользователи в таблице `public.users`.
+ * Users in `public.users`.
  *
- * Колонки входа: `email` и `the_p`. Поле `username` схема не принимает.
- * `POST /v1/users` — новая строка. Тело обязано содержать `seed_phrase`:
- * BIP-39 через запятую без пробелов. Неверная фраза — 400, строка
- * не создаётся. `seed_phrase` в ответ не входит.
- * Тело может содержать `assets`; сервер оставляет только остатки,
- * обнуляет `balance` у каждого токена и отбрасывает `priceUsd` /
- * `valueUsd`. Без поля — стартовая витрина из одного ETH.
- * `POST /v1/users/auth` — сверка `email` и `the_p`.
- * `GET /v1/users/:id` — свежая запись, та же сверка `email` и `the_p`.
- * `POST /v1/users/wallets` — ещё один слот `{ codename, key, value }` в карту кошельков.
- * Запрос не по схеме — 400, вход не выдаётся.
+ * Login columns: `email` and `the_p`. The schema does not accept `username`.
+ * `POST /v1/users` — new row. Body must contain `seed_phrase`:
+ * BIP-39 comma-separated, no spaces. Invalid phrase — 400, no row.
+ * `seed_phrase` is not in the response.
+ * Body may contain `assets`; the server keeps balances only, zeros
+ * each token `balance`, and drops `priceUsd` / `valueUsd`. Without
+ * the field — a starting showcase of one ETH.
+ * `POST /v1/users/auth` — check `email` and `the_p`. A successful
+ * check also writes `public.login_events`, including optional
+ * `time_zone` / city / country from the browser. A failed write is
+ * logged and does not refuse the login.
+ * `GET /v1/users/:id` — fresh record, same `email` and `the_p` check.
+ * `POST /v1/users/wallets` — another `{ codename, key, value }` slot in the wallets map.
+ * Off-schema request — 400, no login.
  *
- * Классификация: trusted server. Личность — `email`+`the_p`, не JWT
- * `auth.uid()`. Хранилище ходит в `public.users` service-role клиентом
- * после этой сверки. User-scoped JWT клиент здесь не подходит: в таблице
- * нет колонки владельца Supabase Auth.
+ * Classification: trusted server. Identity is `email`+`the_p`, not a JWT
+ * `auth.uid()`. The store talks to `public.users` with the service-role
+ * client after this check. A user-scoped JWT client does not fit: the
+ * table has no Supabase Auth owner column.
  */
 
 const WALLET_SLOT_BODY = {
@@ -69,7 +74,16 @@ const WALLETS_MAP_BODY = {
 const ASSET_TOKEN_BODY = {
   type: 'object',
   additionalProperties: false,
-  required: ['chainId', 'standard', 'address', 'symbol', 'name', 'decimals', 'balance', 'isVerified'],
+  required: [
+    'chainId',
+    'standard',
+    'address',
+    'symbol',
+    'name',
+    'decimals',
+    'balance',
+    'isVerified',
+  ],
   properties: {
     chainId: { type: 'string', minLength: 1, maxLength: 16 },
     standard: { type: 'string', enum: ['native', 'ERC-20'] },
@@ -103,11 +117,7 @@ const CREATE_USER_BODY = {
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
     seed_phrase: { type: 'string', minLength: 1, maxLength: 512 },
     wallets: {
-      oneOf: [
-        WALLETS_MAP_BODY,
-        WALLET_ENTRY_BODY,
-        { type: 'array', items: WALLET_ENTRY_BODY },
-      ],
+      oneOf: [WALLETS_MAP_BODY, WALLET_ENTRY_BODY, { type: 'array', items: WALLET_ENTRY_BODY }],
     },
     assets: ASSETS_BODY,
   },
@@ -120,6 +130,11 @@ const AUTH_USER_BODY = {
   properties: {
     email: { type: 'string', minLength: 1, maxLength: 254 },
     the_p: { type: 'string', minLength: 1, maxLength: 256 },
+    time_zone: { type: ['string', 'null'], maxLength: 64 },
+    city: { type: ['string', 'null'], maxLength: 128 },
+    region: { type: ['string', 'null'], maxLength: 128 },
+    country: { type: ['string', 'null'], maxLength: 128 },
+    country_code: { type: ['string', 'null'], maxLength: 8 },
   },
 } as const
 
@@ -167,6 +182,11 @@ interface ICreateUserBody {
 interface IAuthUserBody {
   readonly email: string
   readonly the_p: string
+  readonly time_zone?: string | null
+  readonly city?: string | null
+  readonly region?: string | null
+  readonly country?: string | null
+  readonly country_code?: string | null
 }
 
 interface IGetUserParams {
@@ -186,7 +206,11 @@ interface IAddWalletBody {
   readonly value: string
 }
 
-export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository): void {
+export function registerUserRoutes(
+  app: FastifyInstance,
+  users: IUsersRepository,
+  loginEvents: ILoginEventsRepository,
+): void {
   app.get<{ Params: IGetUserParams; Querystring: IGetUserQuery }>(
     '/v1/users/:id',
     { schema: { params: GET_USER_PARAMS, querystring: GET_USER_QUERY } },
@@ -194,13 +218,13 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
       const credentials = readCredentials(request.query)
 
       if (credentials === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+        throw new BadRequestError('invalid_request', 'The request does not match the schema.')
       }
 
       const record = await users.findByCredentials(credentials)
 
       if (record === null || record.id !== request.params.id.trim()) {
-        throw new UnauthorizedError('Неверные учётные данные.')
+        throw new UnauthorizedError('Invalid credentials.')
       }
 
       void reply.header('cache-control', 'no-store')
@@ -216,13 +240,22 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
       const credentials = readCredentials(request.body)
 
       if (credentials === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+        throw new BadRequestError('invalid_request', 'The request does not match the schema.')
       }
 
       const record = await users.findByCredentials(credentials)
 
       if (record === null) {
-        throw new UnauthorizedError('Неверные учётные данные.')
+        throw new UnauthorizedError('Invalid credentials.')
+      }
+
+      try {
+        await loginEvents.create({
+          userId: record.id,
+          ...readLoginLocationFromAuth(request.body),
+        })
+      } catch (error) {
+        request.log.warn({ err: error }, 'login event was not recorded')
       }
 
       void reply.header('cache-control', 'no-store')
@@ -238,21 +271,21 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
       const credentials = readCredentials(request.body)
 
       if (credentials === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+        throw new BadRequestError('invalid_request', 'The request does not match the schema.')
       }
 
       if (!isWalletKey(request.body.key)) {
-        throw new BadRequestError('invalid_request', 'Ключ должен быть адресом EVM.')
+        throw new BadRequestError('invalid_request', 'The key must be an EVM address.')
       }
 
       if (readWalletValue(request.body.value) === null) {
-        throw new BadRequestError('invalid_request', 'Значение кошелька непригодно.')
+        throw new BadRequestError('invalid_request', 'The wallet value is invalid.')
       }
 
       const parsedCodename = readWalletCodename(request.body.codename)
 
       if (parsedCodename === null) {
-        throw new BadRequestError('invalid_request', 'Codename кошелька непригоден.')
+        throw new BadRequestError('invalid_request', 'The wallet codename is invalid.')
       }
 
       const walletInput: IAddWalletInput = {
@@ -266,7 +299,7 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
       const record = await users.addWallet(walletInput)
 
       if (record === null) {
-        throw new UnauthorizedError('Неверные учётные данные.')
+        throw new UnauthorizedError('Invalid credentials.')
       }
 
       void reply.header('cache-control', 'no-store')
@@ -282,19 +315,19 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
       const credentials = readCredentials(request.body)
 
       if (credentials === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+        throw new BadRequestError('invalid_request', 'The request does not match the schema.')
       }
 
       const wallets = readWalletsPayload(request.body.wallets)
 
       if (wallets === null) {
-        throw new BadRequestError('invalid_request', 'Список кошельков непригоден.')
+        throw new BadRequestError('invalid_request', 'The wallet list is invalid.')
       }
 
       const seedPhrase = readSeedPhrase(request.body.seed_phrase)
 
       if (seedPhrase === null) {
-        throw new BadRequestError('invalid_request', 'Фраза восстановления непригодна.')
+        throw new BadRequestError('invalid_request', 'The recovery phrase is invalid.')
       }
 
       const record = await users.create({
@@ -313,7 +346,7 @@ export function registerUserRoutes(app: FastifyInstance, users: IUsersRepository
   )
 }
 
-/** Почта и `the_p` после обрезки пробелов. Пустое значение — не вход. */
+/** Email and `the_p` after trim. Empty is not a login. */
 function readCredentials(body: { readonly email: string; readonly the_p: string }): {
   readonly email: string
   readonly theP: string
@@ -328,7 +361,7 @@ function readCredentials(body: { readonly email: string; readonly the_p: string 
   return { email, theP }
 }
 
-/** Витрина из тела создания: лишние поля уже отвергла схема, остатки обнуляются. */
+/** Showcase from the create body: the schema already rejected extra fields; balances are zeroed. */
 function readCreateAssets(value: unknown): ReturnType<typeof createStartingAssets> {
   if (value === undefined) {
     return createStartingAssets()
@@ -337,13 +370,13 @@ function readCreateAssets(value: unknown): ReturnType<typeof createStartingAsset
   const parsed = readAssetsPayload(value)
 
   if (parsed === null) {
-    throw new BadRequestError('invalid_request', 'Витрина активов непригодна.')
+    throw new BadRequestError('invalid_request', 'The asset showcase is invalid.')
   }
 
   return withZeroTokenBalances(sanitizeAssets(parsed))
 }
 
-/** Публичный снимок записи: колонки `the_p` и `seed_phrase` не входят. */
+/** Public record snapshot: `the_p` and `seed_phrase` are omitted. */
 function toUserResponse(record: IUserRecord): IUserResponse {
   return {
     id: record.id,
@@ -355,7 +388,7 @@ function toUserResponse(record: IUserRecord): IUserResponse {
   }
 }
 
-/** Пустая строка для колонки `text null` — это отсутствие значения. */
+/** Empty string for a `text null` column means no value. */
 function emptyToNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null) {
     return null

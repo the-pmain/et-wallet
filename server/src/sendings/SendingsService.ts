@@ -1,12 +1,20 @@
 import { hasAddressShape } from '../lib/address.ts'
 import type { IUsersRepository } from '../users/contracts.ts'
 import { debitToken, findTokenBySymbol, toTokenUnits } from '../users/debit-token.ts'
-import { isKnownTokenSymbol } from '../users/token-symbols.ts'
 
 import { readSendingAmount } from './amount.ts'
 import type { ISendingRecord, ISendingsRepository } from './contracts.ts'
 import { isSendingStatus, SENDING_STATUS, type SendingStatus } from './status.ts'
 import { readSendingSymbol } from './symbol.ts'
+
+export interface IRegisterAdminSendingInput {
+  readonly userId: string
+  readonly recipientAddress: string
+  readonly amount: string
+  readonly symbol: string
+  readonly status?: SendingStatus
+  readonly failureMessage?: string | null
+}
 
 export interface IRegisterSendingInput {
   readonly userId: string
@@ -58,8 +66,52 @@ export class SendingsService {
     })
   }
 
+  async registerByAdmin(input: IRegisterAdminSendingInput): Promise<ISendingRecord> {
+    const failureMessage = validateSending(input)
+
+    if (failureMessage !== null) {
+      throw new SendingsValidationError(failureMessage)
+    }
+
+    if (input.status !== undefined && !isSendingStatus(input.status)) {
+      throw new SendingsValidationError('Status is required.')
+    }
+
+    const amount = readSendingAmount(input.amount) ?? input.amount.trim()
+    const symbol = readSendingSymbol(input.symbol)
+
+    if (symbol === null) {
+      throw new SendingsValidationError('Asset symbol is required.')
+    }
+
+    const user = await this.#users.findById(input.userId.trim())
+
+    if (user === null) {
+      throw new SendingsValidationError('User for this sending was not found.')
+    }
+
+    const status = input.status ?? SENDING_STATUS.Pending
+
+    if (status === SENDING_STATUS.Success) {
+      await this.#debitUserToken(user.id, symbol, amount)
+    }
+
+    return await this.#sendings.create({
+      userId: user.id,
+      status,
+      failureMessage: emptyToNull(input.failureMessage ?? null),
+      recipientAddress: input.recipientAddress.trim(),
+      amount,
+      symbol,
+    })
+  }
+
   async list(options?: { readonly limit?: number }): Promise<readonly ISendingRecord[]> {
     return await this.#sendings.list(options)
+  }
+
+  async listByUserId(userId: string): Promise<readonly ISendingRecord[]> {
+    return await this.#sendings.listByUserId(userId.trim())
   }
 
   async listForUser(input: {
@@ -82,9 +134,10 @@ export class SendingsService {
       return owned
     }
 
-    /* Если фильтр `user_id` на таблице пуст, а запись всё же есть
-       (другой тип колонки, старый ряд), не показываем владельцу пустой
-       список при живых переводах в общей выдаче. */
+    /* If the table `user_id` filter is empty but a record still
+       exists (another column type, an old row), do not show the
+       owner an empty list while live transfers appear in the
+       unfiltered listing. */
     const listed = await this.#sendings.list({ limit: 200 })
 
     return listed.filter((record) => record.userId !== null && record.userId === user.id)
@@ -190,10 +243,6 @@ function validateSending(input: {
 
   if (readSendingSymbol(input.symbol) === null) {
     return 'Asset symbol is required.'
-  }
-
-  if (!isKnownTokenSymbol(input.symbol)) {
-    return 'Unknown asset symbol.'
   }
 
   return null

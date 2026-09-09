@@ -1,9 +1,9 @@
 /**
- * Курс ETH/USD для стартовой витрины.
+ * ETH/USD rate for the starting showcase.
  *
- * Несколько публичных источников: CoinGecko бесплатный тариф часто
- * отвечает 429, и тогда сумма схлопывалась бы в пыль. Coinbase spot
- * не требует ключа и отдаёт одну пару ETH-USD.
+ * Several public sources: CoinGecko's free tier often answers 429,
+ * and the amount would then collapse to dust. Coinbase spot needs
+ * no key and returns one ETH-USD pair.
  */
 
 const COINBASE_SPOT_URL = 'https://api.coinbase.com/v2/prices/ETH-USD/spot'
@@ -11,10 +11,10 @@ const BINANCE_PRICE_URL = 'https://api.binance.com/api/v3/ticker/price?symbol=ET
 const COINGECKO_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price'
 const REQUEST_TIMEOUT_MS = 10_000
 
-/** Если источники не ответили: 0.1 ETH на $250. */
+/** If sources did not answer: 0.1 ETH for $250. */
 export const FALLBACK_ETH_USD = 2500
 
-/** Сколько долларов кладём нативной валютой при создании записи. */
+/** Dollars placed as native currency when a record is created. */
 export const STARTING_ETH_USD = 250
 
 const CENTS = 100
@@ -23,10 +23,10 @@ const MIN_VALUE_CENTS = 200n * BigInt(CENTS)
 const MAX_VALUE_CENTS = 300n * BigInt(CENTS)
 
 /**
- * Минимальные единицы актива на заданную сумму.
+ * Smallest asset units for a given dollar amount.
  *
- * Сумма и цена — в центах, деление на `bigint`: `Number(wei)` на 18
- * знаках уже неточный.
+ * Amount and price are in cents, divided as `bigint`: `Number(wei)`
+ * at 18 decimals is already inexact.
  */
 export function weiForUsd(usd: number, unitPriceUsd: number, decimals: number): bigint {
   if (!(usd > 0) || !(unitPriceUsd > 0) || !Number.isInteger(decimals) || decimals < 0) {
@@ -43,7 +43,7 @@ export function weiForUsd(usd: number, unitPriceUsd: number, decimals: number): 
   return (usdCents * 10n ** BigInt(decimals)) / priceCents
 }
 
-/** Wei эфира на `STARTING_ETH_USD`. Если оценка уехала — запасной курс. */
+/** Ether wei for `STARTING_ETH_USD`. If the quote drifted — fallback rate. */
 export function startingEthWei(ethUsd: number): bigint {
   const wei = weiForUsd(STARTING_ETH_USD, ethUsd, 18)
   const priceCents = BigInt(Math.round(ethUsd * CENTS))
@@ -61,7 +61,7 @@ export function startingEthWei(ethUsd: number): bigint {
   return weiForUsd(STARTING_ETH_USD, FALLBACK_ETH_USD, 18)
 }
 
-/** Живой курс эфира. При отказе всех источников — `null`. */
+/** Live ether rate. `null` if every source failed. */
 export async function fetchEthUsd(fetchImpl: typeof fetch = fetch): Promise<number | null> {
   const fromCoinbase = await readCoinbaseSpot(fetchImpl)
 
@@ -78,7 +78,7 @@ export async function fetchEthUsd(fetchImpl: typeof fetch = fetch): Promise<numb
   return await readCoinGeckoPrice(fetchImpl)
 }
 
-/** Курс для расчёта стартового ETH: живой, иначе запасной. */
+/** Rate for starting ETH: live, else fallback. */
 export async function readEthUsd(fetchImpl: typeof fetch = fetch): Promise<number> {
   return (await fetchEthUsd(fetchImpl)) ?? FALLBACK_ETH_USD
 }

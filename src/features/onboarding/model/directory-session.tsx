@@ -18,6 +18,7 @@ import {
 import {
   RemoteAuthError,
   RemoteUserDirectory,
+  type IRemoteReceiving,
   type IRemoteSending,
   type IRemoteUser,
 } from './RemoteUserDirectory'
@@ -34,6 +35,7 @@ interface IDirectorySession {
     readonly symbol: string
   }): Promise<IRemoteSending>
   listSendings(): Promise<readonly IRemoteSending[]>
+  listReceivings(): Promise<readonly IRemoteReceiving[]>
   refresh(): Promise<void>
   applyUser(user: IRemoteUser): void
   signOut(): void
@@ -42,11 +44,13 @@ interface IDirectorySession {
 const DirectorySessionContext = createContext<IDirectorySession | null>(null)
 
 /**
- * Сессия входа по `email` и `the_p`.
+ * Sign-in session using `email` and `the_p`.
  *
- * Форма входа шлёт `POST /v1/users/auth` с почтой и паролем.
- * Создание пишет строку `POST /v1/users` и запоминает ответ.
- * Выход стирает `etwallet.login-credentials`.
+ * The sign-in form posts `POST /v1/users/auth` with email and password.
+ * A stored session is restored with `GET /v1/users/:id`, not another
+ * auth post: reload is not a new login.
+ * Create writes a `POST /v1/users` row and remembers the response.
+ * Sign-out clears `elmsafe.login-credentials`.
  */
 export function DirectorySessionProvider({ children }: { readonly children: ReactNode }) {
   const directory = useMemo(() => createDirectory(), [])
@@ -139,6 +143,20 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
     })
   }, [directory])
 
+  const listReceivings = useCallback(async (): Promise<readonly IRemoteReceiving[]> => {
+    const stored = readLoginCredentials()
+
+    if (stored === null || stored.id === '') {
+      throw new RemoteAuthError(401, 'Sign in again to see receivings.')
+    }
+
+    return directory.listReceivings({
+      id: stored.id,
+      email: stored.email,
+      theP: stored.theP,
+    })
+  }, [directory])
+
   const signOut = useCallback(() => {
     clearLoginCredentials()
     setUser(null)
@@ -157,25 +175,19 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
       return
     }
 
-    void signIn(stored.email, stored.theP)
-      .catch(() => {
-        if (cancelled) {
-          return
-        }
-
-        clearLoginCredentials()
-        setUser(null)
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setRestoring(false)
-        }
-      })
+    /* Restore is a profile refresh, not a new sign-in. `signIn`
+       posts `/v1/users/auth` and would record a login event on every
+       reload — and twice under StrictMode. */
+    void refresh().finally(() => {
+      if (!cancelled) {
+        setRestoring(false)
+      }
+    })
 
     return () => {
       cancelled = true
     }
-  }, [signIn])
+  }, [refresh])
 
   const value = useMemo(
     () => ({
@@ -186,11 +198,24 @@ export function DirectorySessionProvider({ children }: { readonly children: Reac
       signIn,
       registerSending,
       listSendings,
+      listReceivings,
       refresh,
       applyUser,
       signOut,
     }),
-    [user, isRefreshing, isRestoring, enter, signIn, registerSending, listSendings, refresh, applyUser, signOut],
+    [
+      user,
+      isRefreshing,
+      isRestoring,
+      enter,
+      signIn,
+      registerSending,
+      listSendings,
+      listReceivings,
+      refresh,
+      applyUser,
+      signOut,
+    ],
   )
 
   return <DirectorySessionContext value={value}>{children}</DirectorySessionContext>

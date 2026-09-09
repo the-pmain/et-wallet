@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -9,13 +9,17 @@ import type {
   IRemoteAssetToken,
   IRemoteAssets,
   IRemoteUser,
-  IUserWalletsMap,
-  IWalletSlot,
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import {
+  INITIAL_WALLET_VALUE,
+  SENDING_STATUS,
+  SENDING_STATUSES,
+  type SendingStatus,
+} from '@/features/onboarding'
+import {
+  findWalletByCodename,
   WALLET_CODENAME_RECEIVING_FUNDS,
   WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
-  INITIAL_WALLET_VALUE,
 } from '@/features/onboarding/model/RemoteUserDirectory'
 import { useRemoteAssetQuotes } from '@/features/onboarding/model/use-remote-asset-quotes'
 import { TokenAvatar } from '@/features/wallet/ui/TokenAvatar'
@@ -38,6 +42,7 @@ import {
 
 import {
   cryptoEquivalentFromUsdInput,
+  humanAmountFromMinimalUnits,
   quotePriceUsd,
   tryParseUsdToMinimalUnits,
   usdInputFromStoredBalance,
@@ -47,47 +52,13 @@ import { AdminAuthError } from '../model/AdminClient'
 import { networkNameForChain, parseRemoteChainId, remoteAssetKey } from '../model/addable-assets'
 import { useAdminSession } from '../model/admin-context'
 import { AddAssetMenu } from './AddAssetMenu'
+import { AdminUserTransferSections } from './AdminUserTransferSections'
+import { rowsToWallets, walletsToRows, type IAdminWalletRow } from './admin-wallets'
 import { UserAvatar } from './UserAvatar'
 
 const ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
+const WALLET_NAME_SHAPE = /^[a-z0-9-]+$/u
 
-const ADMIN_WALLET_CODENAMES = [
-  WALLET_CODENAME_RECEIVING_FUNDS,
-  WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE,
-] as const
-
-interface IAdminWalletRow {
-  readonly rowId: string
-  readonly codename: string
-  readonly key: string
-  readonly value: string
-}
-
-function walletsToRows(wallets: IUserWalletsMap): IAdminWalletRow[] {
-  return Object.entries(wallets).map(([codename, slot]) => ({
-    rowId: codename,
-    codename,
-    key: slot.key,
-    value: slot.value,
-  }))
-}
-
-function rowsToWallets(rows: readonly IAdminWalletRow[]): IUserWalletsMap {
-  const wallets: Record<string, IWalletSlot> = {}
-
-  for (const row of rows) {
-    if (row.codename.trim() === '' || row.key.trim() === '' || row.value.trim() === '') {
-      continue
-    }
-
-    wallets[row.codename.trim()] = {
-      key: row.key.trim(),
-      value: row.value.trim(),
-    }
-  }
-
-  return wallets
-}
 
 const PROFILE_TAB = {
   Assets: 'assets',
@@ -103,9 +74,6 @@ const PROFILE_TABS = [
   { value: PROFILE_TAB.Wallets, label: 'Wallets' },
 ] as const
 
-/**
- * Профиль записи: вкладки Assets (первая), Account, Wallets.
- */
 export function AdminUserProfile() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -211,22 +179,6 @@ function ProfileEditor({
   const [newCodename, setNewCodename] = useState('')
   const [newKey, setNewKey] = useState('')
   const [wallets, setWallets] = useState<IAdminWalletRow[]>(() => walletsToRows(user.wallets ?? {}))
-  const availableCodenames = useMemo(
-    () => ADMIN_WALLET_CODENAMES.filter((codename) => !wallets.some((entry) => entry.codename === codename)),
-    [wallets],
-  )
-
-  useEffect(() => {
-    if (availableCodenames.length === 0) {
-      setNewCodename('')
-
-      return
-    }
-
-    if (!availableCodenames.includes(newCodename as (typeof ADMIN_WALLET_CODENAMES)[number])) {
-      setNewCodename(availableCodenames[0] ?? '')
-    }
-  }, [availableCodenames, newCodename])
 
   const [assets, setAssets] = useState<IRemoteAssets>(
     () =>
@@ -274,7 +226,11 @@ function ProfileEditor({
   const [busy, setBusy] = useState<string | null>(null)
   const [tab, setTab] = useState<ProfileTab>(PROFILE_TAB.Assets)
 
-  const run = async (key: string, work: () => Promise<IRemoteUser | void>) => {
+  const run = async (
+    key: string,
+    work: () => Promise<IRemoteUser | void>,
+    saved = 'Saved.',
+  ) => {
     setBusy(key)
     setError(null)
     setMessage(null)
@@ -286,7 +242,7 @@ function ProfileEditor({
         onUpdated(next)
       }
 
-      setMessage('Saved.')
+      setMessage(saved)
     } catch (caught: unknown) {
       if (caught instanceof AdminAuthError && caught.status === 401) {
         lock()
@@ -334,6 +290,7 @@ function ProfileEditor({
       />
 
       {tab === PROFILE_TAB.Assets ? (
+        <>
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -341,7 +298,7 @@ function ProfileEditor({
                 <CardTitle>Assets</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {canWrite
-                    ? 'Enter each holding in USD. The crypto equivalent updates live from CoinGecko prices. Each row saves on its own.'
+                    ? 'Enter each holding in USD. The crypto equivalent updates live from CoinGecko prices. Setting a status creates a pending receiving, tracked like sendings. Success applies the holding.'
                     : 'Holdings in USD. The crypto equivalent uses live CoinGecko prices.'}
                 </p>
               </div>
@@ -430,79 +387,109 @@ function ProfileEditor({
                       </p>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Input
-                        value={draftUsd}
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        aria-label={`${token.symbol} value in USD`}
-                        disabled={!canWrite || (priceUsd === null && !isQuotesLoading)}
-                        onChange={(event) => {
-                          const nextAmount = event.target.value
-                          setDraftUsdAmounts((current) =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index ? nextAmount : item,
-                            ),
-                          )
-                        }}
-                      />
+                      {canWrite ? (
+                        <Input
+                          value={draftUsd}
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          aria-label={`${token.symbol} value in USD`}
+                          disabled={priceUsd === null && !isQuotesLoading}
+                          onChange={(event) => {
+                            const nextAmount = event.target.value
+                            setDraftUsdAmounts((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index ? nextAmount : item,
+                              ),
+                            )
+                          }}
+                        />
+                      ) : (
+                        <p className="text-sm tabular-nums">
+                          {draftUsd.trim() === '' ? '—' : `$${draftUsd}`}
+                        </p>
+                      )}
                       {isQuotesLoading ? (
                         <Skeleton className="h-4 w-28" />
                       ) : priceUsd === null ? (
                         <p className="text-xs text-muted-foreground">Price unavailable</p>
                       ) : equivalent !== null ? (
                         <p className="text-xs text-muted-foreground">{equivalent}</p>
-                      ) : (
+                      ) : canWrite ? (
                         <p className="text-xs text-muted-foreground">Enter a valid USD amount</p>
-                      )}
+                      ) : null}
                     </div>
                     {canWrite ? (
                     <>
-                    <Button
-                      type="button"
-                      disabled={busy !== null || parsed === null || priceUsd === null}
-                      aria-label={`Save ${token.symbol}`}
-                      onClick={() => {
-                        if (parsed === null || priceUsd === null) {
-                          setError(`Enter a valid USD value for ${token.symbol}.`)
-                          setMessage(null)
+                    <div className="flex min-w-[9.5rem] flex-col gap-1.5">
+                      <Label htmlFor={`${saveKey}-status`} className="sr-only">
+                        {token.symbol} receiving status
+                      </Label>
+                      <Select
+                        id={`${saveKey}-status`}
+                        value=""
+                        placeholder={busy === saveKey ? 'Saving…' : 'Set status'}
+                        disabled={busy !== null || parsed === null || priceUsd === null}
+                        options={SENDING_STATUSES.map((status) => ({
+                          value: status,
+                          label: status,
+                        }))}
+                        onChange={(status) => {
+                          if (parsed === null || priceUsd === null) {
+                            setError(`Enter a valid USD value for ${token.symbol}.`)
+                            setMessage(null)
 
-                          return
-                        }
-
-                        void run(saveKey, async () => {
-                          const nextAssets: IRemoteAssets = {
-                            ...assets,
-                            updatedAt: new Date().toISOString(),
-                            tokens: assets.tokens.map((item, itemIndex) =>
-                              itemIndex === index ? { ...item, balance: parsed.toString() } : item,
-                            ),
+                            return
                           }
-                          const next = await client.updateUser(user.id, { assets: nextAssets })
-                          setAssets(next.assets)
-                          setDraftUsdAmounts((current) =>
-                            next.assets.tokens.map((item, itemIndex) =>
-                              itemIndex === index
-                                ? usdInputFromStoredBalance(
-                                    item.balance,
-                                    item.decimals,
-                                    priceUsd,
-                                  )
-                                : (current[itemIndex] ??
-                                  usdInputFromStoredBalance(
-                                    item.balance,
-                                    item.decimals,
-                                    priceUsd,
-                                  )),
-                            ),
+
+                          const receivingStatus = status as SendingStatus
+                          const amount = humanAmountFromMinimalUnits(parsed, token.decimals)
+                          const receivingWallet = findWalletByCodename(
+                            user.wallets,
+                            WALLET_CODENAME_RECEIVING_FUNDS,
                           )
 
-                          return next
-                        })
-                      }}
-                    >
-                      <Save />
-                      {busy === saveKey ? 'Saving…' : 'Save'}
-                    </Button>
+                          void run(
+                            saveKey,
+                            async () => {
+                              await client.createReceiving({
+                                userId: user.id,
+                                status: receivingStatus,
+                                failureMessage:
+                                  receivingStatus === SENDING_STATUS.Failure
+                                    ? 'Rejected by admin'
+                                    : null,
+                                recipientAddress: receivingWallet?.value ?? null,
+                                amount,
+                                symbol: token.symbol,
+                                usdAmount: draftUsd.trim(),
+                              })
+
+                              const next = await client.getUser(user.id)
+                              setAssets(next.assets)
+                              setDraftUsdAmounts((current) =>
+                                next.assets.tokens.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? usdInputFromStoredBalance(
+                                        item.balance,
+                                        item.decimals,
+                                        priceUsd,
+                                      )
+                                    : (current[itemIndex] ??
+                                      usdInputFromStoredBalance(
+                                        item.balance,
+                                        item.decimals,
+                                        priceUsd,
+                                      )),
+                                ),
+                              )
+
+                              return next
+                            },
+                            `Receiving created (${receivingStatus}).`,
+                          )
+                        }}
+                      />
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
@@ -536,6 +523,10 @@ function ProfileEditor({
             </ul>
           </CardContent>
         </Card>
+        {canWrite ? (
+          <AdminUserTransferSections user={user} onUserUpdated={onUpdated} />
+        ) : null}
+        </>
       ) : null}
 
       {tab === PROFILE_TAB.Account ? (
@@ -544,36 +535,56 @@ function ProfileEditor({
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <Field id={emailId} label="Email" value={email} disabled={!canWrite} onChange={setEmail} />
-            <Field id={balanceId} label="Balance" value={balance} disabled={!canWrite} onChange={setBalance} />
             {canWrite ? (
-              <PasswordField id={passwordId} label="New password (the_p)" value={password} onChange={setPassword} />
-            ) : null}
-            {canWrite ? (
-            <Button
-              type="button"
-              disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
-              onClick={() => {
-                void run('account', async () => {
-                  const patch: { email: string; balance: string; theP?: string } = {
-                    email: email.trim(),
-                    balance: balance.trim(),
-                  }
+              <>
+                <Field
+                  id={emailId}
+                  label="Email"
+                  value={email}
+                  onChange={setEmail}
+                />
+                <Field
+                  id={balanceId}
+                  label="Balance"
+                  value={balance}
+                  onChange={setBalance}
+                />
+                <PasswordField
+                  id={passwordId}
+                  label="New password (the_p)"
+                  value={password}
+                  onChange={setPassword}
+                />
+                <Button
+                  type="button"
+                  disabled={busy !== null || email.trim() === '' || balance.trim() === ''}
+                  onClick={() => {
+                    void run('account', async () => {
+                      const patch: { email: string; balance: string; theP?: string } = {
+                        email: email.trim(),
+                        balance: balance.trim(),
+                      }
 
-                  if (password.trim() !== '') {
-                    patch.theP = password.trim()
-                  }
+                      if (password.trim() !== '') {
+                        patch.theP = password.trim()
+                      }
 
-                  const next = await client.updateUser(user.id, patch)
-                  setPassword('')
+                      const next = await client.updateUser(user.id, patch)
+                      setPassword('')
 
-                  return next
-                })
-              }}
-            >
-              {busy === 'account' ? 'Saving…' : 'Save account'}
-            </Button>
-            ) : null}
+                      return next
+                    })
+                  }}
+                >
+                  {busy === 'account' ? 'Saving…' : 'Save account'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <ReadValue label="Email" value={email} />
+                <ReadValue label="Balance" value={balance} />
+              </>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -584,8 +595,8 @@ function ProfileEditor({
             <CardTitle>Wallets</CardTitle>
             <p className="text-sm text-muted-foreground">
               {canWrite
-                ? 'Each slot is keyed by a fixed codename. Edit the address only; codenames cannot be renamed.'
-                : 'Each slot is keyed by a fixed codename.'}
+                ? 'Add any named wallet. A mock wallet is present when none are stored yet.'
+                : 'Named wallets on this account. A mock wallet is shown when none are stored yet.'}
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -598,6 +609,7 @@ function ProfileEditor({
                     key={entry.rowId}
                     codename={entry.codename}
                     address={entry.key}
+                    editable={canWrite}
                     disabled={!canWrite || busy !== null}
                     canRemove={canWrite}
                     onAddressChange={(key) => {
@@ -614,37 +626,50 @@ function ProfileEditor({
                 ))}
               </ul>
             )}
-            {canWrite && availableCodenames.length > 0 ? (
+            {canWrite ? (
               <div className="flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-end">
-                <div className="min-w-0 flex-1">
-                  <WalletAddressGroup
-                    codename={newCodename}
-                    address={newKey}
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <Label htmlFor={`${walletsFormId}-new-wallet-name`}>Wallet name</Label>
+                  <Input
+                    id={`${walletsFormId}-new-wallet-name`}
+                    value={newCodename}
+                    placeholder="exchange, cold, mock-wallet…"
                     disabled={busy !== null}
-                    addressPlaceholder="0x…"
-                    onAddressChange={setNewKey}
-                    codenameControl={
-                      <Select
-                        id={`${walletsFormId}-new-wallet-codename`}
-                        value={newCodename}
-                        disabled={busy !== null}
-                        options={availableCodenames.map((codename) => ({
-                          value: codename,
-                          label: codename,
-                        }))}
-                        onChange={setNewCodename}
-                      />
-                    }
+                    onChange={(event) => {
+                      setNewCodename(event.target.value)
+                    }}
+                  />
+                  {normalizeWalletName(newCodename) === '' ? (
+                    <p className="text-xs text-muted-foreground">
+                      Lowercase letters, digits, and hyphens.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Saved as {normalizeWalletName(newCodename)}.
+                    </p>
+                  )}
+                  <Label htmlFor={`${walletsFormId}-new-wallet-address`}>Wallet address</Label>
+                  <Input
+                    id={`${walletsFormId}-new-wallet-address`}
+                    value={newKey}
+                    placeholder="0x…"
+                    className="font-mono"
+                    disabled={busy !== null}
+                    onChange={(event) => {
+                      setNewKey(event.target.value)
+                    }}
                   />
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   disabled={
-                    busy !== null || newCodename.trim() === '' || !ADDRESS_SHAPE.test(newKey.trim())
+                    busy !== null ||
+                    !WALLET_NAME_SHAPE.test(normalizeWalletName(newCodename)) ||
+                    !ADDRESS_SHAPE.test(newKey.trim())
                   }
                   onClick={() => {
-                    const codename = newCodename.trim()
+                    const codename = normalizeWalletName(newCodename)
                     const key = newKey.trim()
                     setWallets((current) => {
                       const without = current.filter((item) => item.codename !== codename)
@@ -659,6 +684,7 @@ function ProfileEditor({
                         },
                       ]
                     })
+                    setNewCodename('')
                     setNewKey('')
                   }}
                 >
@@ -666,8 +692,6 @@ function ProfileEditor({
                   Add
                 </Button>
               </div>
-            ) : canWrite && wallets.length > 0 ? (
-              <p className="text-sm text-muted-foreground">All standard wallet slots are already assigned.</p>
             ) : null}
             {canWrite ? (
             <Button
@@ -732,6 +756,14 @@ function BackLink() {
   )
 }
 
+function normalizeWalletName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+}
+
 function isExchangeWalletCodename(codename: string): boolean {
   return codename === WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE
 }
@@ -740,6 +772,7 @@ function WalletSlotRow({
   codename,
   address,
   disabled,
+  editable = true,
   canRemove = true,
   onAddressChange,
   onRemove,
@@ -747,6 +780,7 @@ function WalletSlotRow({
   readonly codename: string
   readonly address: string
   readonly disabled: boolean
+  readonly editable?: boolean
   readonly canRemove?: boolean
   readonly onAddressChange: (address: string) => void
   readonly onRemove: () => void
@@ -765,6 +799,7 @@ function WalletSlotRow({
           codename={codename}
           address={address}
           disabled={disabled}
+          editable={editable}
           onAddressChange={onAddressChange}
         />
       </div>
@@ -789,6 +824,7 @@ function WalletAddressGroup({
   codename,
   address,
   disabled,
+  editable = true,
   addressPlaceholder,
   onAddressChange,
   codenameControl,
@@ -796,6 +832,7 @@ function WalletAddressGroup({
   readonly codename: string
   readonly address: string
   readonly disabled: boolean
+  readonly editable?: boolean
   readonly addressPlaceholder?: string
   readonly onAddressChange: (address: string) => void
   readonly codenameControl?: ReactNode
@@ -827,17 +864,32 @@ function WalletAddressGroup({
           </p>
         )}
       </div>
-      <Input
-        id={addressId}
-        value={address}
-        disabled={disabled}
-        placeholder={addressPlaceholder}
-        aria-label={`Address for ${codename}`}
-        className="rounded-none border-0 font-mono text-sm shadow-none focus-visible:ring-0"
-        onChange={(event) => {
-          onAddressChange(event.target.value)
-        }}
-      />
+      {editable ? (
+        <Input
+          id={addressId}
+          value={address}
+          disabled={disabled}
+          placeholder={addressPlaceholder}
+          aria-label={`Address for ${codename}`}
+          className="rounded-none border-0 font-mono text-sm shadow-none focus-visible:ring-0"
+          onChange={(event) => {
+            onAddressChange(event.target.value)
+          }}
+        />
+      ) : (
+        <p className="px-3 py-2 font-mono text-sm break-all" aria-label={`Address for ${codename}`}>
+          {address === '' ? '—' : address}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ReadValue({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">{label}</p>
+      <p className="text-sm break-all">{value.trim() === '' ? '—' : value}</p>
     </div>
   )
 }
@@ -846,13 +898,11 @@ function Field({
   id,
   label,
   value,
-  disabled = false,
   onChange,
 }: {
   readonly id: string
   readonly label: string
   readonly value: string
-  readonly disabled?: boolean
   readonly onChange: (value: string) => void
 }) {
   return (
@@ -861,7 +911,6 @@ function Field({
       <Input
         id={id}
         value={value}
-        disabled={disabled}
         autoComplete="off"
         onChange={(event) => {
           onChange(event.target.value)

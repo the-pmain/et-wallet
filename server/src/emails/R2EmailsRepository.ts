@@ -29,10 +29,10 @@ interface IStoredEmail {
 }
 
 /**
- * Журнал писем в Cloudflare R2.
+ * Mail journal in Cloudflare R2.
  *
- * Cloudflare Email Sending не отдаёт inbox API. R2 держит отправленные
- * и входящие как JSON, чтобы кабинет переживал перезапуск процесса.
+ * Cloudflare Email Sending has no inbox API. R2 holds sent and inbound
+ * mail as JSON so the cabinet survives a process restart.
  */
 export class R2EmailsRepository implements IEmailsRepository {
   readonly #endpoint: URL

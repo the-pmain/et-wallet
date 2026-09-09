@@ -1,6 +1,6 @@
 {
-  /* Не отдельный пакет: только указатель на корневой tsconfig.server.json,
-     чтобы служба типов находила файлы в server/src. */
+  /* Not a separate package: only a pointer at the root
+     tsconfig.server.json so the type service finds files in server/src. */
   "extends": "../tsconfig.server.json",
   "include": ["src"]
 }

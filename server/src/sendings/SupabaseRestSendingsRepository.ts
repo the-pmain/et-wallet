@@ -30,12 +30,12 @@ const SENDING_SELECT =
   'id,created_at,user_id,status,failure_message,recipient_address,amount,asset_symbol'
 
 /**
- * Переводы через Supabase REST (`/rest/v1/sendings`).
+ * Transfers via Supabase REST (`/rest/v1/sendings`).
  *
- * Колонки: id, created_at, status, failure_message, recipient_address,
- * amount, user_id, asset_symbol. Владелец — `user_id` (текст `users.id`),
- * не `auth.uid()`. Ключ — service-role: он обходит RLS. Вызовы идут
- * только после сверки в Node (`email`/`the_p` или PIN).
+ * Columns: id, created_at, status, failure_message, recipient_address,
+ * amount, user_id, asset_symbol. Owner is `user_id` (text `users.id`),
+ * not `auth.uid()`. Key is service-role: it bypasses RLS. Calls run
+ * only after the Node check (`email`/`the_p` or PIN).
  */
 export class SendingsDatabaseError extends ServiceUnavailableError {
   readonly operation: string
@@ -48,7 +48,7 @@ export class SendingsDatabaseError extends ServiceUnavailableError {
     supabaseCode: string | null,
     flags: { readonly isBrokenIdFk?: boolean; readonly isMissingTable?: boolean } = {},
   ) {
-    super('База данных недоступна.')
+    super('Database is unavailable.')
     this.name = 'SendingsDatabaseError'
     this.operation = operation
     this.supabaseCode = supabaseCode
@@ -353,7 +353,7 @@ function readSupabaseCode(status: number, raw: string): string | null {
       }
     }
   } catch {
-    /* Тело не JSON — в ответ клиенту оно не попадает. */
+    /* Body is not JSON — it does not reach the client response. */
   }
 
   return String(status)

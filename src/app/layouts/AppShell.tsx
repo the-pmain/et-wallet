@@ -130,13 +130,7 @@ export function AppShell() {
           {snapshot.activeAccount === null ? (
             directoryUser === null ? (
               directory.isRestoring ? (
-                <div className="flex min-w-0 items-center gap-2.5" aria-hidden>
-                  <Skeleton className="size-9 shrink-0 rounded-full" />
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <Skeleton className="h-4 w-28" />
-                    <Skeleton className="h-3 w-36" />
-                  </div>
-                </div>
+                <RestoringIdentity />
               ) : null
             ) : (
               <DirectoryIdentity user={directoryUser} />
@@ -359,6 +353,46 @@ function DirectoryIdentity({ user }: { readonly user: IRemoteUser }) {
         {details.length > 0 ? (
           <span className="truncate text-xs text-muted-foreground">{details.join(' · ')}</span>
         ) : null}
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * Header identity while the cabinet record is still loading.
+ *
+ * EMAIL SIGN-IN RESTORES THE RECORD BEFORE THE DEVICE SESSION. The
+ * email address is known at once, from the stored login, so the header
+ * carries it instead of standing as a grey placeholder next to an
+ * already loaded balance. With no stored login there is nothing to
+ * show and the placeholder remains.
+ */
+function RestoringIdentity() {
+  const stored = readLoginCredentials()
+
+  if (stored === null) {
+    return (
+      <div className="flex min-w-0 items-center gap-2.5" aria-hidden>
+        <Skeleton className="size-9 shrink-0 rounded-full" />
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-36" />
+        </div>
+      </div>
+    )
+  }
+
+  const name = displayNameFromEmail(stored.email)
+
+  return (
+    <Link
+      to={ROUTE.Settings}
+      className="focus-ring -ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent"
+    >
+      <AccountAvatar address={stored.email} label={name} />
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold">{name}</span>
+        <span className="truncate text-xs text-muted-foreground">{stored.email}</span>
       </div>
     </Link>
   )

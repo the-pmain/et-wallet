@@ -3,22 +3,24 @@ import type { FastifyInstance } from 'fastify'
 import { requireAdminRole, requireSuperAdmin } from '../admin/access.ts'
 import { resolveAdminRole } from '../admin/pin.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
+import { groupLoginActivity } from '../login-events/activity.ts'
+import type { ILoginEventsRepository } from '../login-events/contracts.ts'
 import { readAssetsPayload, sanitizeAssets } from '../users/assets.ts'
 import type { IUpdateUserInput, IUserRecord, IUsersRepository } from '../users/contracts.ts'
 import { readWalletsPayload } from '../users/wallets.ts'
 import type { IUserResponse } from './contracts.ts'
 
 /**
- * Кабинет администратора.
+ * Admin cabinet.
  *
- * PIN кабинета берётся из `ADMIN_PIN` (чтение) и `SUPER_ADMIN_PIN`
- * (запись) в окружении. Клиент предъявляет его в `POST /v1/admin/auth`
- * и затем в заголовке `x-admin-pin`. Колонка `the_p` в ответах не
- * участвует: её можно только заменить.
+ * Cabinet PIN comes from `ADMIN_PIN` (read) and `SUPER_ADMIN_PIN`
+ * (write) in the environment. The client presents it in
+ * `POST /v1/admin/auth` and then in `x-admin-pin`. Column `the_p`
+ * is not in responses: it can only be replaced.
  *
- * Маршруты `/v1/admin/users` — trusted admin: PIN сверяется на сервере,
- * затем service-role клиент читает `public.users`. Поле `role` в теле
- * не является доказательством прав.
+ * `/v1/admin/users` routes are trusted admin: the PIN is checked on
+ * the server, then the service-role client reads `public.users`.
+ * A `role` field in the body is not proof of rights.
  */
 
 const PIN_MAX = 16
@@ -77,7 +79,11 @@ interface IUserIdParams {
   readonly id: string
 }
 
-export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepository): void {
+export function registerAdminRoutes(
+  app: FastifyInstance,
+  users: IUsersRepository,
+  loginEvents: ILoginEventsRepository,
+): void {
   app.post<{ Body: IAuthBody }>(
     '/v1/admin/auth',
     { schema: { body: AUTH_BODY } },
@@ -85,7 +91,7 @@ export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepositor
       const role = resolveAdminRole(request.body.pin.trim())
 
       if (role === null) {
-        throw new UnauthorizedError('Неверные учётные данные.')
+        throw new UnauthorizedError('Invalid credentials.')
       }
 
       void reply.header('cache-control', 'no-store')
@@ -104,13 +110,25 @@ export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepositor
     return { users: records.map(toUserResponse) }
   })
 
+  app.get('/v1/admin/login-events', async (request, reply) => {
+    /* Read PIN and super PIN both: this list is the same class of
+       directory data as GET /v1/admin/users. */
+    requireAdminRole(request)
+
+    const [records, events] = await Promise.all([users.list(), loginEvents.list()])
+
+    void reply.header('cache-control', 'no-store')
+
+    return { users: groupLoginActivity(records, events) }
+  })
+
   app.get<{ Params: IUserIdParams }>('/v1/admin/users/:id', async (request, reply) => {
     requireAdminRole(request)
 
     const record = await users.findById(request.params.id)
 
     if (record === null) {
-      throw new NotFoundError('Пользователь не найден.')
+      throw new NotFoundError('User not found.')
     }
 
     void reply.header('cache-control', 'no-store')
@@ -127,13 +145,13 @@ export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepositor
       const patch = readPatch(request.body)
 
       if (patch === null) {
-        throw new BadRequestError('invalid_request', 'Запрос не соответствует схеме.')
+        throw new BadRequestError('invalid_request', 'The request does not match the schema.')
       }
 
       const record = await users.update(request.params.id, patch)
 
       if (record === null) {
-        throw new NotFoundError('Пользователь не найден.')
+        throw new NotFoundError('User not found.')
       }
 
       void reply.header('cache-control', 'no-store')
@@ -148,7 +166,7 @@ export function registerAdminRoutes(app: FastifyInstance, users: IUsersRepositor
     const removed = await users.remove(request.params.id)
 
     if (!removed) {
-      throw new NotFoundError('Пользователь не найден.')
+      throw new NotFoundError('User not found.')
     }
 
     void reply.status(204).header('cache-control', 'no-store')

@@ -1,9 +1,9 @@
 /**
- * Проверка адреса для поля From/To.
+ * Address check for From/To.
  *
- * Это не полная проверка RFC 5322: она отвергает пустое значение,
- * пробелы и отсутствие точки в домене. Дальше Cloudflare сам
- * отвергнет адрес, с которого домен не подключён к Email Sending.
+ * This is not a full RFC 5322 check: it rejects empty, spaces, and a
+ * domain with no dot. Cloudflare then rejects an address whose domain
+ * is not connected to Email Sending.
  */
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u
@@ -19,7 +19,6 @@ export function isEmailAddress(value: string): boolean {
   return EMAIL_SHAPE.test(trimmed)
 }
 
-/** Домен адреса, в нижнем регистре. */
 export function emailDomain(value: string): string | null {
   const trimmed = value.trim()
 
@@ -33,9 +32,9 @@ export function emailDomain(value: string): string | null {
 }
 
 /**
- * Базовые ящики «От кого» на домене Email Sending.
+ * Default From mailboxes on the Email Sending domain.
  *
- * Cloudflare принимает любой local-part на подключённом домене.
+ * Cloudflare accepts any local-part on a connected domain.
  */
 export const BASIC_FROM_LOCAL_PARTS = [
   'support',

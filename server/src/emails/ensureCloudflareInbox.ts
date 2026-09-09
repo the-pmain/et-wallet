@@ -54,7 +54,7 @@ export interface ICloudflareInbox {
 }
 
 /**
- * KV + Worker + catch-all, чтобы входящая почта @zone попадала в ящик.
+ * KV + Worker + catch-all so inbound mail @zone lands in the inbox.
  */
 export async function ensureCloudflareInbox(options: {
   readonly accountId: string

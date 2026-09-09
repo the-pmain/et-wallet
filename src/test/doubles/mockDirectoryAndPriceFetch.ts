@@ -114,14 +114,14 @@ function testMarkets(): readonly IMarketCoin[] {
 }
 
 /**
- * `fetch` для экранов справочника: запись пользователя и курсы.
+ * `fetch` for directory screens: the user record and rates.
  *
- * Каталог рынка заполняется сразу: тесты не ждут сеть и не поднимают
- * второй запрос к CoinGecko.
+ * The market catalog is filled immediately: tests do not wait on
+ * the network and do not raise a second CoinGecko request.
  */
 export function mockDirectoryAndPriceFetch(
   userBody: unknown,
-  extras: { readonly sendings?: readonly unknown[] } = {},
+  extras: { readonly sendings?: readonly unknown[]; readonly receivings?: readonly unknown[] } = {},
 ): typeof fetch {
   appMarketCatalog.hydrate(testMarkets())
 
@@ -137,6 +137,10 @@ export function mockDirectoryAndPriceFetch(
 
     if (method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)) {
       return Promise.resolve(jsonOk({ sendings: extras.sendings ?? [] }))
+    }
+
+    if (method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/receivings/u.test(url)) {
+      return Promise.resolve(jsonOk({ receivings: extras.receivings ?? [] }))
     }
 
     if (url.includes('/v1/users/sendings') && method.toUpperCase() === 'POST') {

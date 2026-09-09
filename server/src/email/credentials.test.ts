@@ -3,21 +3,21 @@ import { describe, expect, it } from 'vitest'
 import { cloudflareAuthHeaders, isCloudflareGlobalApiKey } from './credentials.ts'
 
 describe('isCloudflareGlobalApiKey', () => {
-  it('ставит Bearer для API-токена', () => {
+  it('sets Bearer for an API token', () => {
     expect(cloudflareAuthHeaders('cfat_abcdefghijklmnopqrstuvwxyz0123456789ABCD', null)).toEqual({
       Authorization: 'Bearer cfat_abcdefghijklmnopqrstuvwxyz0123456789ABCD',
     })
   })
 
-  it('узнаёт префикс cfk_', () => {
+  it('recognizes the cfk_ prefix', () => {
     expect(isCloudflareGlobalApiKey('cfk_abcdefghijklmnopqrstuvwxyz0123456789ABCD')).toBe(true)
   })
 
-  it('узнаёт старый hex-ключ', () => {
+  it('recognizes a legacy hex key', () => {
     expect(isCloudflareGlobalApiKey('a'.repeat(37))).toBe(true)
   })
 
-  it('не принимает токены Bearer', () => {
+  it('does not accept Bearer tokens', () => {
     expect(isCloudflareGlobalApiKey('cfut_abcdefghijklmnopqrstuvwxyz0123456789ABCD')).toBe(false)
     expect(isCloudflareGlobalApiKey('cfat_abcdefghijklmnopqrstuvwxyz0123456789ABCD')).toBe(false)
     expect(isCloudflareGlobalApiKey('Sn3lZJTBX6kkg7OdcBUAxOO963GEIyGQqnFTOFYY')).toBe(false)

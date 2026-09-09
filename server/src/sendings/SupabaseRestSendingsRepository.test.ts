@@ -200,7 +200,7 @@ describe('SupabaseRestSendingsRepository', () => {
     await expect(failure).rejects.toBeInstanceOf(SendingsDatabaseError)
     await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableError)
     await expect(failure).rejects.toMatchObject({
-      message: 'База данных недоступна.',
+      message: 'Database is unavailable.',
       operation: 'create',
       isBrokenIdFk: false,
     })

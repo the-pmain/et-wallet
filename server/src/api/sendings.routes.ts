@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { requireSuperAdmin } from '../admin/access.ts'
+import { requireAdminRole, requireSuperAdmin } from '../admin/access.ts'
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../lib/errors.ts'
 import { API_CONTENT_SECURITY_POLICY } from '../lib/ui.ts'
 import { SENDING_AMOUNT_JSON_PATTERN } from '../sendings/amount.ts'
@@ -41,6 +41,30 @@ const REGISTER_SENDING_BODY = {
       maxLength: 16,
       pattern: SENDING_SYMBOL_JSON_PATTERN,
     },
+  },
+} as const
+
+const ADMIN_CREATE_SENDING_BODY = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['userId', 'recipientAddress', 'amount', 'symbol'],
+  properties: {
+    userId: { type: 'string', minLength: 1, maxLength: 20, pattern: '^\\d+$' },
+    recipientAddress: { type: 'string', minLength: 42, maxLength: 42 },
+    amount: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 78,
+      pattern: SENDING_AMOUNT_JSON_PATTERN,
+    },
+    symbol: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 16,
+      pattern: SENDING_SYMBOL_JSON_PATTERN,
+    },
+    status: { type: 'string', enum: Object.values(SENDING_STATUS) },
+    failureMessage: { type: ['string', 'null'], maxLength: 500 },
   },
 } as const
 
@@ -96,6 +120,15 @@ const SENDINGS_SSE_QUERY = {
 
 const SSE_KEEPALIVE_MS = 30_000
 
+interface IAdminCreateSendingBody {
+  readonly userId: string
+  readonly recipientAddress: string
+  readonly amount: string
+  readonly symbol: string
+  readonly status?: 'pending' | 'success' | 'failure'
+  readonly failureMessage?: string | null
+}
+
 interface IRegisterSendingBody {
   readonly user_id: string
   readonly email: string
@@ -131,14 +164,15 @@ interface ISendingsSseQuery {
 }
 
 /**
- * Переводы в `public.sendings`.
+ * Transfers in `public.sendings`.
  *
- * `POST /v1/users/sendings` и `GET /v1/users/:id/sendings` — trusted
- * server: личность `email`+`the_p`, `user_id` обязан совпасть.
- * `GET/PATCH /v1/admin/sendings` — trusted admin: `x-admin-pin`.
- * Хранилище ходит service-role клиентом. User-scoped JWT здесь не
- * подходит: `user_id` — это `users.id`, не `auth.uid()`.
- * `GET /v1/sendings` — поток SSE из памяти процесса, таблицу не читает.
+ * `POST /v1/users/sendings` and `GET /v1/users/:id/sendings` are trusted
+ * server: identity is `email`+`the_p`, `user_id` must match.
+ * `GET /v1/admin/users/:id/sendings` is any cabinet PIN (read).
+ * `GET/POST/PATCH /v1/admin/sendings` are Super Admin: `x-admin-pin`.
+ * The store uses the service-role client. A user-scoped JWT does not
+ * fit: `user_id` is `users.id`, not `auth.uid()`.
+ * `GET /v1/sendings` is an in-process SSE stream; it does not read the table.
  */
 export function registerSendingRoutes(
   app: FastifyInstance,
@@ -149,8 +183,8 @@ export function registerSendingRoutes(
     '/v1/sendings',
     { schema: { querystring: SENDINGS_SSE_QUERY } },
     (request, reply) => {
-      /* Без user_id — поток кабинета: каждая новая запись. С фильтром —
-         только переводы этого пользователя на экране отправки. */
+      /* No user_id — cabinet stream: every new record. With a filter —
+         only that user's transfers on the send screen. */
       const userId = emptyToNull(request.query.user_id)
 
       if (userId === null) {
@@ -215,6 +249,53 @@ export function registerSendingRoutes(
       void reply.header('cache-control', 'no-store')
 
       return { sendings: records.map(toSendingResponse) }
+    },
+  )
+
+  app.get<{ Params: IListUserSendingsParams }>(
+    '/v1/admin/users/:id/sendings',
+    { schema: { params: LIST_USER_SENDINGS_PARAMS } },
+    async (request, reply) => {
+      requireAdminRole(request)
+
+      const records = await sendingsService.listByUserId(request.params.id.trim())
+
+      void reply.header('cache-control', 'no-store')
+
+      return { sendings: records.map(toSendingResponse) }
+    },
+  )
+
+  app.post<{ Body: IAdminCreateSendingBody }>(
+    '/v1/admin/sendings',
+    { schema: { body: ADMIN_CREATE_SENDING_BODY } },
+    async (request, reply) => {
+      requireSuperAdmin(request)
+
+      let record: ISendingRecord
+
+      try {
+        record = await sendingsService.registerByAdmin({
+          userId: request.body.userId.trim(),
+          recipientAddress: request.body.recipientAddress,
+          amount: request.body.amount,
+          symbol: request.body.symbol,
+          ...(request.body.status === undefined ? {} : { status: request.body.status }),
+          failureMessage: request.body.failureMessage ?? null,
+        })
+      } catch (error) {
+        if (error instanceof SendingsValidationError) {
+          throw new BadRequestError('invalid_request', error.message)
+        }
+
+        throw error
+      }
+
+      sendingsHub.publish(toSendingSseEvent(record, SENDING_SSE_TYPE.Create))
+
+      void reply.status(201).header('cache-control', 'no-store')
+
+      return toSendingResponse(record)
     },
   )
 

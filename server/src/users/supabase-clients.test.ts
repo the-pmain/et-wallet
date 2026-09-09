@@ -20,13 +20,13 @@ const USER_OPTIONS = {
 }
 
 describe('supabase-clients', () => {
-  it('берёт publishable, иначе anon, и не подставляет service-role', () => {
+  it('takes publishable, else anon, and does not substitute service-role', () => {
     expect(readSupabasePublishableKey('publishable', 'anon')).toBe('publishable')
     expect(readSupabasePublishableKey(null, 'anon')).toBe('anon')
     expect(readSupabasePublishableKey(null, null)).toBeNull()
   })
 
-  it('без Authorization и с просроченным токеном даёт 401', async () => {
+  it('without Authorization and with an expired token returns 401', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
@@ -56,7 +56,7 @@ describe('supabase-clients', () => {
     )
   })
 
-  it('принимает действующий JWT и не возвращает лишние поля Auth', async () => {
+  it('accepts a valid JWT and does not return extra Auth fields', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
@@ -80,7 +80,7 @@ describe('supabase-clients', () => {
     })
   })
 
-  it('не кладёт service-role в user-scoped заголовки', () => {
+  it('does not put service-role into user-scoped headers', () => {
     const client = createSupabaseUserClient('Bearer user-jwt', USER_OPTIONS)
 
     expect(client.kind).toBe('user')
@@ -89,7 +89,7 @@ describe('supabase-clients', () => {
     expect(JSON.stringify(client.headers)).not.toContain('service-role')
   })
 
-  it('admin-клиент использует service-role и помечает обход RLS', () => {
+  it('the admin client uses service-role and marks the RLS bypass', () => {
     const client = createSupabaseAdminClient({
       supabaseUrl: 'https://example.supabase.co',
       serviceRoleKey: 'service-role-key',
@@ -100,14 +100,14 @@ describe('supabase-clients', () => {
     expect(client.headers['authorization']).toBe('Bearer service-role-key')
   })
 
-  it('принимает только Bearer', () => {
+  it('accepts Bearer only', () => {
     expect(readBearerAuthorization(undefined)).toBeNull()
     expect(readBearerAuthorization('Bearer')).toBeNull()
     expect(readBearerAuthorization('Bearer user-jwt')).toBe('Bearer user-jwt')
     expect(() => requireBearerAuthorization(undefined)).toThrow(UnauthorizedError)
   })
 
-  it('не держит service-role ключ в исходниках кошелька и примере env', () => {
+  it('does not keep a service-role key in wallet source or the env example', () => {
     const frontend = readFileSync(
       join(import.meta.dirname, '../../../src/features/onboarding/model/RemoteUserDirectory.ts'),
       'utf8',
@@ -124,7 +124,7 @@ describe('supabase-clients', () => {
     expect(envExample).not.toMatch(/VITE_SUPABASE_SERVICE_ROLE_KEY/u)
   })
 
-  it('миграция RLS не открывает public.sendings политикой USING (true)', () => {
+  it('the RLS migration does not open public.sendings with USING (true)', () => {
     const sql = readFileSync(join(import.meta.dirname, '../../supabase/sendings-rls.sql'), 'utf8')
 
     expect(sql).toMatch(/enable row level security/u)
@@ -135,12 +135,23 @@ describe('supabase-clients', () => {
     expect(sql).not.toMatch(/create policy/iu)
   })
 
-  it('миграция RLS не открывает public.users политикой USING (true)', () => {
+  it('the RLS migration does not open public.users with USING (true)', () => {
     const sql = readFileSync(join(import.meta.dirname, '../../supabase/users-rls.sql'), 'utf8')
 
     expect(sql).toMatch(/enable row level security/u)
     expect(sql).toMatch(/drop policy if exists users_all/u)
     expect(sql).toMatch(/revoke all on table public\.users from anon, authenticated/u)
+    expect(sql).not.toMatch(/using\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/with check\s*\(\s*true\s*\)/iu)
+    expect(sql).not.toMatch(/create policy/iu)
+  })
+
+  it('the RLS migration does not open public.login_events with USING (true)', () => {
+    const sql = readFileSync(join(import.meta.dirname, '../../supabase/login-events.sql'), 'utf8')
+
+    expect(sql).toMatch(/enable row level security/u)
+    expect(sql).toMatch(/drop policy if exists login_events_all/u)
+    expect(sql).toMatch(/revoke all on table public\.login_events from anon, authenticated/u)
     expect(sql).not.toMatch(/using\s*\(\s*true\s*\)/iu)
     expect(sql).not.toMatch(/with check\s*\(\s*true\s*\)/iu)
     expect(sql).not.toMatch(/create policy/iu)

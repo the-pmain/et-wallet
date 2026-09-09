@@ -13,7 +13,7 @@ const WALLET_MAP = (key: string, value: string) => ({
 })
 
 describe('SupabaseRestUsersRepository', () => {
-  it('пишет в /rest/v1/users', async () => {
+  it('writes to /rest/v1/users', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
@@ -64,7 +64,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(record.email).toBe('james@example.com')
   })
 
-  it('передаёт заданный список wallets при создании', async () => {
+  it('passes the given wallets list on create', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -101,7 +101,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(record.wallets).toEqual(WALLET_MAP(key, '0'))
   })
 
-  it('ищет запись по почте и the_p', async () => {
+  it('looks up a record by email and the_p', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
@@ -134,7 +134,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(record?.balance).toBe('12.5')
   })
 
-  it('пишет адрес через PATCH в wallets', async () => {
+  it('writes an address via PATCH into wallets', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
     const fetchMock = vi
       .fn()
@@ -194,7 +194,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(record?.wallets).toEqual(WALLET_MAP(key, '0'))
   })
 
-  it('ищет запись по id без колонки the_p', async () => {
+  it('looks up a record by id without column the_p', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
@@ -228,7 +228,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(record?.theP).toBeNull()
   })
 
-  it('возвращает null, если совпадения нет', async () => {
+  it('returns null when there is no match', async () => {
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
       serviceRoleKey: 'service-role',
@@ -243,7 +243,7 @@ describe('SupabaseRestUsersRepository', () => {
     ).resolves.toBeNull()
   })
 
-  it('пробрасывает отказ Supabase', async () => {
+  it('forwards a Supabase refusal', async () => {
     const users = new SupabaseRestUsersRepository({
       supabaseUrl: 'https://example.supabase.co',
       serviceRoleKey: 'service-role',
@@ -259,12 +259,12 @@ describe('SupabaseRestUsersRepository', () => {
     await expect(failure).rejects.toBeInstanceOf(UsersDatabaseError)
     await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableError)
     await expect(failure).rejects.toMatchObject({
-      message: 'База данных недоступна.',
+      message: 'Database is unavailable.',
       operation: 'create',
     })
   })
 
-  it('читает все записи без колонки the_p', async () => {
+  it('reads every record without column the_p', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
@@ -297,7 +297,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(listed[0]?.email).toBe('james@example.com')
   })
 
-  it('меняет wallets по id', async () => {
+  it('changes wallets by id', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
     const fetchMock = vi
       .fn()
@@ -347,7 +347,7 @@ describe('SupabaseRestUsersRepository', () => {
     expect(record?.wallets).toEqual(WALLET_MAP(key, '2500'))
   })
 
-  it('удаляет запись по id', async () => {
+  it('deletes a record by id', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({

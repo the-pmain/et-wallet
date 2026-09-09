@@ -14,13 +14,13 @@ function record(id: string, createdAt: string, from = 'a@example.com', to = 'b@e
 }
 
 describe('paginateMailbox', () => {
-  it('ставит предел по умолчанию', () => {
+  it('applies the default limit', () => {
     expect(parseMailboxLimit(undefined)).toBe(MAILBOX_PAGE_DEFAULT)
     expect(parseMailboxLimit('3')).toBe(3)
     expect(parseMailboxLimit(1000)).toBe(100)
   })
 
-  it('режет список курсором', () => {
+  it('slices the list by cursor', () => {
     const records = [
       record('3', '2026-08-27T12:00:00.000Z'),
       record('2', '2026-08-27T11:00:00.000Z'),
@@ -42,14 +42,14 @@ describe('paginateMailbox', () => {
     expect(second.nextCursor).toBeNull()
   })
 
-  it('кодирует курсор туда и обратно', () => {
+  it('encodes a cursor both ways', () => {
     const createdAt = new Date('2026-08-27T12:00:00.000Z')
     const encoded = encodeMailboxCursor(createdAt, 'msg-1')
 
     expect(decodeMailboxCursor(encoded)).toEqual({ createdAt, id: 'msg-1' })
   })
 
-  it('отбирает письма собеседника', () => {
+  it('filters mail of a counterpart', () => {
     expect(
       matchesMailboxPeer(
         { from: 'User@Example.com', to: 'support@etwalletx.com' },

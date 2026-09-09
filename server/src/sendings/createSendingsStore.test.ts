@@ -36,13 +36,13 @@ describe('createSendingsStore', () => {
     vi.unstubAllGlobals()
   })
 
-  it('без ключей держит переводы в памяти', async () => {
+  it('without keys keeps transfers in memory', async () => {
     const store = await createSendingsStore(BASE)
 
     expect(store.kind).toBe(SENDINGS_STORE_KIND.Memory)
   })
 
-  it('при URL и service-role пишет в Supabase REST', async () => {
+  it('with URL and service-role writes to Supabase REST', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve('[]'),
@@ -65,7 +65,7 @@ describe('createSendingsStore', () => {
     })
   })
 
-  it('отказывается стартовать Supabase без service-role ключа', async () => {
+  it('refuses to start Supabase without a service-role key', async () => {
     await expect(
       createSendingsStore({
         ...BASE,

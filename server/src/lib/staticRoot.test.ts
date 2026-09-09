@@ -7,11 +7,11 @@ import { describe, expect, it } from 'vitest'
 import { resolveStaticRoot } from './staticRoot.ts'
 
 describe('resolveStaticRoot', () => {
-  it('без настроек и без поиска возвращает null', () => {
+  it('without config and without search returns null', () => {
     expect(resolveStaticRoot({ configured: null, searchDefaults: false })).toBeNull()
   })
 
-  it('принимает каталог с index.html', () => {
+  it('accepts a directory with index.html', () => {
     const root = mkdtempSync(join(tmpdir(), 'wallet-static-'))
 
     writeFileSync(join(root, 'index.html'), '<html></html>')
@@ -19,7 +19,7 @@ describe('resolveStaticRoot', () => {
     expect(resolveStaticRoot({ configured: root, searchDefaults: false })).toBe(root)
   })
 
-  it('отвергает каталог без index.html', () => {
+  it('rejects a directory without index.html', () => {
     const root = mkdtempSync(join(tmpdir(), 'wallet-static-empty-'))
 
     mkdirSync(join(root, 'assets'))

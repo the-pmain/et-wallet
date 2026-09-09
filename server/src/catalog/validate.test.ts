@@ -34,230 +34,230 @@ const TOKEN: ITokenEntry = {
   symbol: 'USDC',
   name: 'USD Coin',
   decimals: 6,
-  provenance: ['Список токенов', 'Сверка с контрактом'],
+  provenance: ['Token list', 'Checked against the contract'],
   verifiedAt: '2026-07-31',
 }
 
 const NOTIFICATION: INotificationEntry = {
   id: 'test',
   severity: NOTIFICATION_SEVERITY.Info,
-  title: 'Заголовок',
-  body: 'Текст уведомления без ссылок.',
+  title: 'Title',
+  body: 'Notification text without links.',
   publishedAt: '2026-07-31T00:00:00.000Z',
   expiresAt: null,
 }
 
 const KNOWN = new Set([1n])
 
-describe('Проверка каталога сетей', () => {
-  it('принимает корректный каталог', () => {
+describe('Network catalog validation', () => {
+  it('accepts a valid catalog', () => {
     expect(validateNetworks([NETWORK])).toEqual(new Set([1n]))
   })
 
-  it('отвергает пустой каталог', () => {
-    expect(() => validateNetworks([])).toThrow(/пуст/u)
+  it('rejects an empty catalog', () => {
+    expect(() => validateNetworks([])).toThrow(/empty/u)
   })
 
-  it('отвергает повторяющийся идентификатор сети', () => {
-    /* Две сети с одним идентификатором неразличимы для кошелька:
-       он выберет любую и обратится не туда. */
-    expect(() => validateNetworks([NETWORK, { ...NETWORK, name: 'Другая' }])).toThrow(/дважды/u)
+  it('rejects a duplicate network id', () => {
+    /* Two networks with one id are indistinguishable to the wallet:
+       it will pick either and talk to the wrong one. */
+    expect(() => validateNetworks([NETWORK, { ...NETWORK, name: 'Other' }])).toThrow(/twice/u)
   })
 
-  it('отвергает обозреватель по незашифрованному протоколу', () => {
+  it('rejects an explorer over a cleartext protocol', () => {
     expect(() =>
       validateNetworks([{ ...NETWORK, blockExplorerUrls: ['http://etherscan.io'] }]),
-    ).toThrow(/только https/u)
+    ).toThrow(/only https/u)
   })
 
-  it('отвергает недопустимое число знаков валюты', () => {
+  it('rejects an invalid currency decimal count', () => {
     expect(() =>
       validateNetworks([
         { ...NETWORK, nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 99 } },
       ]),
-    ).toThrow(/число знаков/u)
+    ).toThrow(/decimal count/u)
   })
 })
 
-describe('Проверка каталога RPC', () => {
-  it('принимает корректный каталог', () => {
+describe('RPC catalog validation', () => {
+  it('accepts a valid catalog', () => {
     expect(() => {
       validateRpcEndpoints([RPC], KNOWN)
     }).not.toThrow()
   })
 
-  it('отвергает адрес неизвестной сети', () => {
+  it('rejects an address of an unknown network', () => {
     expect(() => {
       validateRpcEndpoints([{ ...RPC, chainId: 999n }], KNOWN)
-    }).toThrow(/отсутствует в каталоге сетей/u)
+    }).toThrow(/missing from the network catalog/u)
   })
 
-  it('отвергает незашифрованный адрес', () => {
-    /* Ответ узла по http подменяется по дороге: баланс, nonce
-       и стоимость газа приходят от того, кто вклинился. */
+  it('rejects a cleartext URL', () => {
+    /* An http node response is swapped in transit: balance, nonce
+       and gas price come from whoever intercepted. */
     expect(() => {
       validateRpcEndpoints([{ ...RPC, url: 'http://node.example.com' }], KNOWN)
-    }).toThrow(/только https/u)
+    }).toThrow(/only https/u)
   })
 
-  it('отвергает сеть без единого узла', () => {
-    /* Переключение на такую сеть дало бы неработающий кошелёк:
-       обратиться будет некуда. */
+  it('rejects a network with no node', () => {
+    /* Switching to such a network would yield a dead wallet:
+       there is nowhere to send requests. */
     expect(() => {
       validateRpcEndpoints([], KNOWN)
-    }).toThrow(/не имеет ни одного RPC/u)
+    }).toThrow(/has no RPC/u)
   })
 
-  it('отвергает повторяющийся адрес в одной сети', () => {
+  it('rejects a duplicate address on the same network', () => {
     expect(() => {
       validateRpcEndpoints([RPC, RPC], KNOWN)
-    }).toThrow(/повторяется/u)
+    }).toThrow(/repeated/u)
   })
 })
 
-describe('Проверка каталога токенов', () => {
-  it('принимает корректную запись', () => {
+describe('Token catalog validation', () => {
+  it('accepts a valid record', () => {
     expect(() => {
       validateTokens([TOKEN], KNOWN)
     }).not.toThrow()
   })
 
-  it('отвергает адрес без контрольной суммы EIP-55', () => {
-    /* Контрольная сумма ловит опечатку в адресе при загрузке — до того,
-       как ошибочный адрес разойдётся по кошелькам пользователей. */
+  it('rejects an address without an EIP-55 checksum', () => {
+    /* The checksum catches an address typo on load — before a wrong
+       address reaches users' wallets. */
     expect(() => {
       validateTokens([{ ...TOKEN, address: TOKEN.address.toLowerCase() }], KNOWN)
-    }).toThrow(/контрольной суммы/u)
+    }).toThrow(/checksum/u)
   })
 
-  it('отвергает адрес с испорченным символом', () => {
+  it('rejects an address with a corrupted character', () => {
     const broken = `${TOKEN.address.slice(0, -1)}9`
 
     expect(() => {
       validateTokens([{ ...TOKEN, address: broken }], KNOWN)
-    }).toThrow(/контрольной суммы/u)
+    }).toThrow(/checksum/u)
   })
 
-  it('отвергает запись без указания источника', () => {
-    /* Рекомендация без основания — это чужое доверие, выданное за своё. */
+  it('rejects a record with no source', () => {
+    /* A recommendation with no basis is someone else's trust passed off as ours. */
     expect(() => {
       validateTokens([{ ...TOKEN, provenance: [] }], KNOWN)
-    }).toThrow(/источник/u)
+    }).toThrow(/source/u)
   })
 
-  it('отвергает повторяющийся адрес в одной сети', () => {
+  it('rejects a duplicate address on the same network', () => {
     expect(() => {
       validateTokens([TOKEN, { ...TOKEN, symbol: 'FAKE' }], KNOWN)
-    }).toThrow(/повторяется/u)
+    }).toThrow(/repeated/u)
   })
 
-  it('отвергает токен неизвестной сети', () => {
+  it('rejects a token of an unknown network', () => {
     expect(() => {
       validateTokens([{ ...TOKEN, chainId: 999n }], KNOWN)
-    }).toThrow(/отсутствует в каталоге сетей/u)
+    }).toThrow(/missing from the network catalog/u)
   })
 })
 
-describe('Проверка каталога уведомлений', () => {
-  it('принимает корректную запись', () => {
+describe('Notification catalog validation', () => {
+  it('accepts a valid record', () => {
     expect(() => {
       validateNotifications([NOTIFICATION])
     }).not.toThrow()
   })
 
-  it('отвергает ссылку в тексте', () => {
-    /* Сообщение сервиса внутри кошелька неотличимо для человека
-       от сообщения самого кошелька, и ссылка в нём ведёт куда угодно. */
+  it('rejects a link in the body', () => {
+    /* A service message inside the wallet is indistinguishable from
+       a wallet message, and a link in it goes anywhere. */
     expect(() => {
-      validateNotifications([{ ...NOTIFICATION, body: 'Перейдите на https://example.com' }])
-    }).toThrow(/ссылку/u)
+      validateNotifications([{ ...NOTIFICATION, body: 'Go to https://example.com' }])
+    }).toThrow(/link/u)
   })
 
-  it('отвергает адрес без схемы', () => {
+  it('rejects an address without a scheme', () => {
     expect(() => {
-      validateNotifications([{ ...NOTIFICATION, body: 'Откройте wallet-support.xyz прямо сейчас' }])
-    }).toThrow(/ссылку/u)
+      validateNotifications([{ ...NOTIFICATION, body: 'Open wallet-support.xyz right now' }])
+    }).toThrow(/link/u)
   })
 
-  it('отвергает ссылку в заголовке', () => {
+  it('rejects a link in the title', () => {
     expect(() => {
       validateNotifications([{ ...NOTIFICATION, title: 'www.example.org' }])
-    }).toThrow(/ссылку/u)
+    }).toThrow(/link/u)
   })
 
-  it('отвергает повторяющийся идентификатор', () => {
+  it('rejects a duplicate id', () => {
     expect(() => {
       validateNotifications([NOTIFICATION, NOTIFICATION])
-    }).toThrow(/повторяется/u)
+    }).toThrow(/repeated/u)
   })
 
-  it('отвергает срок, истекающий раньше публикации', () => {
+  it('rejects an expiry before publish', () => {
     expect(() => {
       validateNotifications([{ ...NOTIFICATION, expiresAt: '2020-01-01T00:00:00.000Z' }])
-    }).toThrow(/раньше публикации/u)
+    }).toThrow(/earlier than publication/u)
   })
 
-  it('отвергает слишком длинный текст', () => {
-    /* Длинное сообщение сервиса вытесняет с экрана собственные
-       предупреждения кошелька. */
+  it('rejects text that is too long', () => {
+    /* A long service message pushes the wallet's own warnings off
+       the screen. */
     expect(() => {
-      validateNotifications([{ ...NOTIFICATION, body: 'а'.repeat(501) }])
-    }).toThrow(/превышает предел/u)
+      validateNotifications([{ ...NOTIFICATION, body: 'a'.repeat(501) }])
+    }).toThrow(/exceeds the limit/u)
   })
 })
 
-describe('Проверка сведений о выпусках', () => {
-  it('принимает корректные сведения', () => {
+describe('Release info validation', () => {
+  it('accepts valid info', () => {
     expect(() => {
       validateReleases({ latest: '1.2.3', minSupported: '1.0.0', advisory: null })
     }).not.toThrow()
   })
 
-  it('отвергает минимальную версию выше последней', () => {
-    /* При таком каталоге неподдерживаемыми окажутся все, включая
-       свежие установки. */
+  it('rejects a minimum version above latest', () => {
+    /* With such a catalog everyone would be unsupported, including
+       fresh installs. */
     expect(() => {
       validateReleases({ latest: '1.0.0', minSupported: '2.0.0', advisory: null })
-    }).toThrow(/выше последней/u)
+    }).toThrow(/above the latest/u)
   })
 
-  it('отвергает ссылку в пояснении', () => {
-    /* «Скачайте обновление отсюда» — готовый способ увести пользователя
-       на поддельный установщик. */
+  it('rejects a link in the advisory', () => {
+    /* "Download the update from here" is a ready way to send the user
+       to a fake installer. */
     expect(() => {
       validateReleases({
         latest: '1.0.0',
         minSupported: '1.0.0',
-        advisory: 'Обновитесь: https://example.com/download',
+        advisory: 'Update: https://example.com/download',
       })
-    }).toThrow(/ссылку/u)
+    }).toThrow(/link/u)
   })
 
-  it('отвергает версию с предвыпускной меткой', () => {
+  it('rejects a version with a pre-release tag', () => {
     expect(() => {
       validateReleases({ latest: '1.0.0-beta', minSupported: '1.0.0', advisory: null })
     }).toThrow(/latest/u)
   })
 })
 
-describe('Каталог из репозитория', () => {
-  it('проходит собственную проверку', () => {
-    /* Сервис с испорченным каталогом обязан не подняться. Этот тест
-       ловит ошибку раньше развёртывания. */
+describe('Repository catalog', () => {
+  it('passes its own validation', () => {
+    /* A service with a corrupt catalog must not start. This test
+       catches the error before deploy. */
     expect(() => new CatalogService(REPOSITORY_CATALOG)).not.toThrow()
   })
 
-  it('содержит записи токенов с двумя источниками подтверждения', () => {
+  it('contains token records with two confirmation sources', () => {
     for (const token of REPOSITORY_CATALOG.tokens) {
       expect(
         token.provenance.length,
-        `${token.symbol} в сети ${token.chainId.toString()}`,
+        `${token.symbol} on network ${token.chainId.toString()}`,
       ).toBeGreaterThanOrEqual(2)
     }
   })
 
-  it('не рекомендует ни одного узла, требующего ключа', () => {
-    /* Ключ, розданный всем пользователям, перестаёт быть ключом. */
+  it('recommends no node that requires a key', () => {
+    /* A key given to every user stops being a key. */
     for (const endpoint of REPOSITORY_CATALOG.rpcEndpoints) {
       expect(endpoint.isPublic, endpoint.url).toBe(true)
     }

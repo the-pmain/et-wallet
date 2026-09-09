@@ -7,35 +7,35 @@ import { RUNTIME_MODE, type IServerConfig } from '../config.ts'
 import { API_CONTENT_SECURITY_POLICY, isApiUrl } from '../lib/ui.ts'
 
 /**
- * Совпадает с `ROBOTS_TAG_VALUE` в `build/security-headers-plugin.ts`
- * и с метатегом в `index.html`. JSON API тоже не должен попадать
- * в индекс: ответ без HTML метатега не несёт.
+ * Matches `ROBOTS_TAG_VALUE` in `build/security-headers-plugin.ts`
+ * and the meta tag in `index.html`. The JSON API must not be indexed
+ * either: a response without HTML carries no meta tag.
  */
 const ROBOTS_TAG_VALUE = 'noindex, nofollow, noarchive, nosnippet, noimageindex'
 
 /**
- * Защитная обвязка.
+ * Security wrapping.
  *
- * ЗАГОЛОВКИ. JSON (`/v1`) не должен исполняться как страница:
- * `Content-Security-Policy` для этих ответов запрещает всё.
- * Страница кошелька, если она раздаётся с того же процесса, получает
- * отдельную политику в `plugins/ui.ts` — иначе бандл не запустится.
+ * HEADERS. JSON (`/v1`) must not execute as a page:
+ * `Content-Security-Policy` for those responses forbids everything.
+ * The wallet page, if served from the same process, gets a separate
+ * policy in `plugins/ui.ts` — otherwise the bundle will not start.
  *
- * ОГРАНИЧЕНИЕ ЧАСТОТЫ. Справочный сервис без ограничения ложится
- * от одного скрипта. Статика кошелька в лимит не входит: иначе
- * загрузка бандла сожгла бы квоту API.
+ * RATE LIMIT. A reference service with no limit falls over from one
+ * script. Wallet static files are outside the limit: otherwise loading
+ * the bundle would burn the API quota.
  *
- * CORS. Для чтения каталога это не защита — данные и так публичны, —
- * а ограничение поверхности. Существенно другое: сервис не пользуется
- * cookie и заголовком авторизации, поэтому браузер не подставляет
- * к запросу никаких неявных полномочий, и подделка запроса
- * со стороннего сайта ничего не даёт.
+ * CORS. For catalog reads this is not protection — the data is public
+ * anyway — it is surface reduction. The important part: the service
+ * uses neither cookies nor an authorization header, so the browser
+ * attaches no implicit credentials, and a forged request from a
+ * third-party site gains nothing.
  */
 export async function registerSecurity(app: FastifyInstance, config: IServerConfig): Promise<void> {
   await app.register(helmet, {
     contentSecurityPolicy: false,
-    /* По умолчанию `SAMEORIGIN`, то есть встраивание с того же источника
-       разрешено. Ни JSON, ни кошелёк не должны показываться в рамке. */
+    /* Default is `SAMEORIGIN`, so same-origin framing is allowed.
+       Neither JSON nor the wallet should appear in a frame. */
     xFrameOptions: { action: 'deny' },
     crossOriginResourcePolicy: false,
   })
@@ -54,13 +54,13 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
       config.allowedOrigins.length === 0 && config.mode !== RUNTIME_MODE.Production
         ? true
         : [...config.allowedOrigins],
-    /* PATCH нужен кабинету администратора: смена баланса и `wallets`
-       идёт методом частичного обновления, а не полной заменой записи. */
+    /* PATCH is required by the admin cabinet: balance and `wallets`
+       updates are partial, not a full record replace. */
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Accept', 'Content-Type', 'x-admin-pin'],
-    /* Полномочия не передаются: ни cookie, ни заголовка авторизации
-       сервис не использует. Разрешить их значило бы дать браузеру
-       подставлять к запросам то, о чём пользователь не знает. */
+    /* Credentials are not sent: the service uses neither cookies nor
+       an authorization header. Allowing them would let the browser
+       attach something the user does not know about. */
     credentials: false,
     maxAge: 600,
   })
@@ -69,12 +69,12 @@ export async function registerSecurity(app: FastifyInstance, config: IServerConf
     max: config.rateLimit.max,
     timeWindow: config.rateLimit.windowMs,
     allowList: (request) => !isApiUrl(request.url),
-    /* Ответ об ограничении не рассказывает, кто и сколько потратил:
-       это сведения о других пользователях того же адреса. */
+    /* The rate-limit response does not say who spent how much:
+       that is information about other users on the same address. */
     errorResponseBuilder: () => ({
       error: {
         code: 'rate_limited',
-        message: 'Слишком много запросов. Повторите позже.',
+        message: 'Too many requests. Try again later.',
       },
     }),
   })

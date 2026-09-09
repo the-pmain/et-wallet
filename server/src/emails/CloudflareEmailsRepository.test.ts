@@ -15,7 +15,7 @@ describe('CloudflareEmailsRepository', () => {
     vi.unstubAllGlobals()
   })
 
-  it('собирает отправленные и входящие из GraphQL Cloudflare', async () => {
+  it('collects sent and inbound from Cloudflare GraphQL', async () => {
     const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const url = String(input)
 
@@ -91,7 +91,7 @@ describe('CloudflareEmailsRepository', () => {
     })
   })
 
-  it('не пишет в Supabase: create остаётся поверх списка Cloudflare', async () => {
+  it('does not write to Supabase: create stays on top of the Cloudflare list', async () => {
     const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       if (String(input).includes('/graphql')) {
         return jsonResponse(200, {
@@ -131,7 +131,7 @@ describe('CloudflareEmailsRepository', () => {
     })
   })
 
-  it('не роняет список, если GraphQL Cloudflare отвечает ошибкой', async () => {
+  it('does not drop the list when Cloudflare GraphQL errors', async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse(200, { errors: [{ message: 'authz' }] }),
     )

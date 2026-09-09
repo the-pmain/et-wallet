@@ -7,7 +7,7 @@ afterEach(() => {
 })
 
 describe('fetchFiatRates', () => {
-  it('читает EUR и GBP к доллару', async () => {
+  it('reads EUR and GBP against the dollar', async () => {
     const fetchImpl = vi.fn((url: string) => {
       expect(url).toContain('frankfurter')
 
@@ -22,7 +22,7 @@ describe('fetchFiatRates', () => {
     await expect(fetchFiatRates(fetchImpl)).resolves.toEqual({ EUR: 0.9, GBP: 0.8 })
   })
 
-  it('переходит ко второму источнику, если первый отказал', async () => {
+  it('falls to the second source when the first fails', async () => {
     let calls = 0
     const fetchImpl = vi.fn(() => {
       calls += 1

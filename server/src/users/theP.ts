@@ -1,11 +1,11 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 
 /**
- * Сверяет предъявленное значение с колонкой `the_p`.
+ * Checks the presented value against column `the_p`.
  *
- * Сравнение идёт по SHA-256, а не по сырым строкам разной длины:
- * `timingSafeEqual` иначе отказывается работать, а ранний `return`
- * по длине выдаёт, сколько символов совпало.
+ * Comparison is over SHA-256, not raw strings of different lengths:
+ * `timingSafeEqual` otherwise refuses to run, and an early `return`
+ * on length would leak how many characters matched.
  */
 export function thePMatches(stored: string | null | undefined, candidate: string): boolean {
   if (stored === null || stored === undefined) {

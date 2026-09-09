@@ -16,14 +16,14 @@ const ADDRESS_LOWER = ADDRESS.toLowerCase()
 const SLOT = { key: ADDRESS, value: '0' }
 
 describe('wallets', () => {
-  it('пустой ввод даёт пустую карту', () => {
+  it('empty input yields an empty map', () => {
     expect(parseWallets(null)).toEqual({})
     expect(parseWallets(undefined)).toEqual({})
     expect(parseWallets([])).toEqual({})
     expect(emptyWallets()).toEqual({})
   })
 
-  it('принимает карту по codename и список записей', () => {
+  it('accepts a map by codename and a list of records', () => {
     expect(
       parseWallets({
         [WALLET_CODENAME_RECEIVING_FUNDS]: SLOT,
@@ -37,7 +37,7 @@ describe('wallets', () => {
     })
   })
 
-  it('читает прежнюю карту адресов', () => {
+  it('reads the legacy address map', () => {
     expect(
       parseWallets({
         [ADDRESS]: '0',
@@ -49,7 +49,7 @@ describe('wallets', () => {
     })
   })
 
-  it('заменяет слот с тем же codename', () => {
+  it('replaces the slot with the same codename', () => {
     const first = mergeWallet({}, WALLET_CODENAME_RECEIVING_FUNDS, ADDRESS_LOWER, '0')
     const second = mergeWallet(first, WALLET_CODENAME_RECEIVING_FUNDS, ADDRESS, '1')
 
@@ -57,7 +57,7 @@ describe('wallets', () => {
     expect(second).toEqual({ [WALLET_CODENAME_RECEIVING_FUNDS]: { key: ADDRESS, value: '1' } })
   })
 
-  it('добавляет exchange-слот отдельно от основного', () => {
+  it('adds an exchange slot apart from the primary', () => {
     const exchangeAddress = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
     const wallets = mergeWallet(
       { [WALLET_CODENAME_RECEIVING_FUNDS]: SLOT },
@@ -72,13 +72,13 @@ describe('wallets', () => {
     })
   })
 
-  it('отвергает пустое и слишком длинное значение', () => {
+  it('rejects an empty and an overly long value', () => {
     expect(readWalletValue('  ')).toBeNull()
     expect(readWalletValue('a'.repeat(65))).toBeNull()
     expect(readWalletValue(' 0 ')).toBe('0')
   })
 
-  it('принимает карту и список из тела запроса', () => {
+  it('accepts a map and a list from the request body', () => {
     expect(readWalletsPayload(undefined)).toEqual({})
     expect(
       readWalletsPayload({
@@ -94,7 +94,7 @@ describe('wallets', () => {
     expect(readWalletsPayload({ [ADDRESS]: '0' })).toBeNull()
   })
 
-  it('обнуляет значения карты', () => {
+  it('zeros map values', () => {
     expect(withZeroBalances({ [WALLET_CODENAME_RECEIVING_FUNDS]: { key: ADDRESS, value: '2500' } })).toEqual({
       [WALLET_CODENAME_RECEIVING_FUNDS]: SLOT,
     })

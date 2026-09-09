@@ -3,48 +3,46 @@ import { NOTIFICATION_SEVERITY } from '../api/contracts.ts'
 import type { INotificationEntry } from './types.ts'
 
 /**
- * Каталог системных уведомлений.
+ * System-notification catalog.
  *
- * ЭТО САМЫЙ ОПАСНЫЙ МАРШРУТ СЕРВИСА. Текст, пришедший с сервера
- * и показанный внутри кошелька, выглядит для пользователя как сообщение
- * самого кошелька. Любой, кто получит право писать сюда, получит право
- * обращаться к владельцам средств от имени их кошелька.
+ * THIS IS THE SERVICE'S MOST DANGEROUS ROUTE. Server text shown inside
+ * the wallet looks to the user like a message from the wallet itself.
+ * Anyone who can write here can address fund owners in their wallet's
+ * name.
  *
- * Ограничения, встроенные в проверку каталога, а не оставленные
- * на усмотрение редактора:
+ * Limits are built into catalog validation, not left to the editor:
  *
- * - только текст: ни разметки, ни ссылок, ни адресов — проверка
- *   отклоняет запись, в которой встречается что-либо похожее на адрес
- *   в сети;
- * - ограниченная длина: длинный текст вытесняет собственные
- *   предупреждения кошелька с экрана;
- * - никаких просьб о действиях с секретами — правило редакционное,
- *   и поэтому клиент обязан рядом с любым таким сообщением держать
- *   постоянное напоминание: кошелёк никогда не спрашивает seed-фразу.
+ * - text only: no markup, no links, no addresses — validation rejects
+ *   a record that looks like an on-chain address;
+ * - bounded length: a long text pushes the wallet's own warnings off
+ *   the screen;
+ * - no requests to act on secrets — an editorial rule, so the client
+ *   must keep a standing reminder next to any such message: the wallet
+ *   never asks for the seed phrase.
  *
- * Уведомления хранятся в репозитории по той же причине, что и остальные
- * каталоги: изменение обязано проходить через ревью и историю правок.
+ * Notifications live in the repository for the same reason as the
+ * other catalogs: a change must go through review and history.
  */
 export const NOTIFICATIONS: readonly INotificationEntry[] = [
   {
     id: 'private-rpc-recommendation',
     severity: NOTIFICATION_SEVERITY.Info,
-    title: 'Публичные узлы видят ваши запросы',
+    title: 'Public nodes can see your requests',
     body:
-      'Кошелёк по умолчанию обращается к общедоступным RPC-узлам. Их операторы видят ваш ' +
-      'IP-адрес и все проверяемые адреса, чего достаточно, чтобы связать личность с портфелем. ' +
-      'Собственный узел указывается в настройках.',
+      'By default the wallet talks to public RPC nodes. Their operators see your ' +
+      'IP address and every address you look up, which is enough to tie a person to a portfolio. ' +
+      'Set your own node in Settings.',
     publishedAt: '2026-07-31T00:00:00.000Z',
     expiresAt: null,
   },
   {
     id: 'seed-phrase-never-requested',
     severity: NOTIFICATION_SEVERITY.Warning,
-    title: 'Seed-фразу не спрашивает никто',
+    title: 'Nobody asks for the seed phrase',
     body:
-      'Ни поддержка кошелька, ни один сайт, ни это уведомление никогда не попросят ' +
-      'вас ввести seed-фразу или приватный ключ куда-либо, кроме окна самого кошелька. ' +
-      'Любая такая просьба — попытка хищения средств.',
+      'Wallet support, any website, and this notice will never ask you to enter a seed ' +
+      'phrase or a private key anywhere except the wallet itself. ' +
+      'Any such request is an attempt to steal funds.',
     publishedAt: '2026-07-31T00:00:00.000Z',
     expiresAt: null,
   },

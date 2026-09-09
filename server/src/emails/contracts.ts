@@ -1,8 +1,8 @@
 /**
- * Журнал писем менеджера.
+ * Mail-manager journal.
  *
- * Список берётся из Cloudflare (GraphQL activity log + KV для тел).
- * Локальная память — только запасной вариант без ключей.
+ * The list comes from Cloudflare (GraphQL activity log + KV for bodies).
+ * In-process memory is only a fallback when keys are missing.
  */
 
 export const EMAILS_STORE_KIND = {

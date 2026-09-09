@@ -1,13 +1,13 @@
 import type { INativeCurrency, NotificationSeverity } from '../api/contracts.ts'
 
 /**
- * Запись каталога сетей.
+ * Network-catalog record.
  *
- * ХРАНИТСЯ В РЕПОЗИТОРИИ, А НЕ В БАЗЕ ДАННЫХ. Каталог определяет, какие
- * адреса контрактов кошелёк покажет как рекомендованные, — то есть
- * куда пользователь отправит деньги. Изменение такого значения обязано
- * проходить через ревью и историю правок, а не через `UPDATE` в базе,
- * доступный любому, кто получил доступ к серверу.
+ * STORED IN THE REPOSITORY, NOT IN A DATABASE. The catalog decides
+ * which contract addresses the wallet shows as recommended — that is,
+ * where the user will send money. Changing such a value must go
+ * through review and history, not an `UPDATE` in a database that
+ * anyone with server access can run.
  */
 export interface INetworkEntry {
   readonly chainId: bigint
@@ -18,7 +18,6 @@ export interface INetworkEntry {
   readonly supportsEip1559: boolean
 }
 
-/** Запись каталога RPC-адресов. */
 export interface IRpcEntry {
   readonly chainId: bigint
   readonly url: string
@@ -26,7 +25,6 @@ export interface IRpcEntry {
   readonly isPublic: boolean
 }
 
-/** Запись каталога токенов. */
 export interface ITokenEntry {
   readonly chainId: bigint
   readonly address: string
@@ -34,14 +32,13 @@ export interface ITokenEntry {
   readonly name: string
   readonly decimals: number
 
-  /** Источники, по которым адрес подтверждён. Пустой список недопустим. */
+  /** Sources that confirm the address. An empty list is not allowed. */
   readonly provenance: readonly string[]
 
-  /** Дата последней сверки с контрактом в сети, ISO 8601. */
+  /** Last on-chain contract check, ISO 8601. */
   readonly verifiedAt: string
 }
 
-/** Запись каталога уведомлений. */
 export interface INotificationEntry {
   readonly id: string
   readonly severity: NotificationSeverity
@@ -51,7 +48,6 @@ export interface INotificationEntry {
   readonly expiresAt: string | null
 }
 
-/** Сведения о выпусках приложения. */
 export interface IReleaseCatalog {
   readonly latest: string
   readonly minSupported: string

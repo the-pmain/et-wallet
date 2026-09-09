@@ -6,10 +6,11 @@ import { sanitizeAssets } from './assets.ts'
 const ETHEREUM_CHAIN_ID = '1'
 
 /**
- * Позиция в `tokens` по тикеру.
+ * A `tokens` holding by ticker.
  *
- * Один тикер бывает в нескольких сетях. Для списания берём Ethereum,
- * затем первую найденную — иначе списывать не с чего.
+ * One ticker can exist on several networks. For debit we take
+ * Ethereum, then the first match — otherwise there is nothing to
+ * debit.
  */
 export function findTokenBySymbol(
   tokens: readonly IAssetToken[],
@@ -27,10 +28,11 @@ export function findTokenBySymbol(
 }
 
 /**
- * Человеческую сумму перевода в минимальные единицы токена.
+ * Human transfer amount in the token's smallest units.
  *
- * Счёт на строках, без `number`: иначе 0.1 на 18 знаках поедет.
- * Дробь длиннее `decimals` — отказ, не округление.
+ * Arithmetic is on strings, not `number`: otherwise 0.1 at 18
+ * decimals drifts. A fraction longer than `decimals` is a refusal,
+ * not rounding.
  */
 export function toTokenUnits(amount: string, decimals: number): bigint | null {
   const normalized = readSendingAmount(amount)
@@ -55,7 +57,7 @@ export function subtractTokenBalance(balance: string, debit: bigint): string {
   return next.toString()
 }
 
-/** Списывает `debit` с выбранной позиции и обновляет `updatedAt`. */
+/** Debits `debit` from the chosen holding and updates `updatedAt`. */
 export function debitToken(
   assets: IUserAssets,
   token: IAssetToken,
@@ -69,6 +71,24 @@ export function debitToken(
       sameToken(item, token)
         ? { ...item, balance: subtractTokenBalance(item.balance, debit) }
         : item,
+    ),
+  })
+}
+
+/** Sets the chosen holding to `units` and updates `updatedAt`. */
+export function setTokenBalance(
+  assets: IUserAssets,
+  token: IAssetToken,
+  units: bigint,
+  now: Date = new Date(),
+): IUserAssets {
+  const next = units < 0n ? 0n : units
+
+  return sanitizeAssets({
+    quoteCurrency: assets.quoteCurrency,
+    updatedAt: now.toISOString(),
+    tokens: assets.tokens.map((item) =>
+      sameToken(item, token) ? { ...item, balance: next.toString() } : item,
     ),
   })
 }

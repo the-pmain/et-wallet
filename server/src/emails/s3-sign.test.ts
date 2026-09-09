@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { signedS3Headers } from './s3-sign.ts'
 
 describe('signedS3Headers', () => {
-  it('подписывает запрос стабильно при фиксированном времени', () => {
+  it('signs a request stably at a fixed time', () => {
     const first = signedS3Headers({
       method: 'GET',
       url: new URL('https://example.r2.cloudflarestorage.com/mailbox?list-type=2&prefix=mailbox/'),

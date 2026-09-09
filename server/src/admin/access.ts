@@ -18,13 +18,13 @@ export function requireAdminRole(request: FastifyRequest): AdminRole {
   const pin = presentedAdminPin(request)
 
   if (pin === null) {
-    throw new UnauthorizedError('Неверные учётные данные.')
+    throw new UnauthorizedError('Invalid credentials.')
   }
 
   const role = resolveAdminRole(pin)
 
   if (role === null) {
-    throw new UnauthorizedError('Неверные учётные данные.')
+    throw new UnauthorizedError('Invalid credentials.')
   }
 
   return role
@@ -32,6 +32,6 @@ export function requireAdminRole(request: FastifyRequest): AdminRole {
 
 export function requireSuperAdmin(request: FastifyRequest): void {
   if (requireAdminRole(request) !== ADMIN_ROLE.Super) {
-    throw new ForbiddenError('Недостаточно прав.')
+    throw new ForbiddenError('Insufficient permissions.')
   }
 }

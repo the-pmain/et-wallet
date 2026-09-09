@@ -2,19 +2,17 @@ import { ConflictError } from '../lib/errors.ts'
 
 import type { ISettingsRecord, ISettingsRepository } from './contracts.ts'
 
-/** Настройки хранилища в памяти. */
 export interface IMemorySettingsOptions {
-  /** Через сколько миллисекунд запись без обращений исчезает. */
+  /** Milliseconds after which an untouched record disappears. */
   readonly ttlMs: number
 
-  /** Наибольшее число записей. Достигнув предела, хранилище отказывает. */
+  /** Max records. At the limit the store refuses writes. */
   readonly maxRecords: number
 
-  /** Источник времени. Внедряется, чтобы срок жизни проверялся тестом. */
+  /** Clock. Injected so TTL is tested, not observed. */
   readonly now: () => Date
 }
 
-/** Значения по умолчанию: тридцать суток и сто тысяч записей. */
 const DEFAULT_OPTIONS: IMemorySettingsOptions = {
   ttlMs: 30 * 24 * 60 * 60 * 1000,
   maxRecords: 100_000,
@@ -22,19 +20,19 @@ const DEFAULT_OPTIONS: IMemorySettingsOptions = {
 }
 
 /**
- * Хранилище настроек в памяти процесса.
+ * In-process settings store.
  *
- * ЭТО НЕ ПОСТОЯННОЕ ХРАНИЛИЩЕ, И ЭТО ОСОЗНАННО. Перезапуск сервиса
- * стирает записи. Допустимо ровно потому, что синхронизация — зеркало:
- * настройки живут на устройстве, а сервис лишь помогает перенести их
- * на второе. Пользователь, потерявший запись здесь, ничего не теряет.
+ * THIS IS NOT DURABLE STORAGE, ON PURPOSE. A restart wipes records.
+ * That is acceptable because sync is a mirror: settings live on the
+ * device, and the service only helps copy them to a second one. A
+ * user who loses a record here loses nothing.
  *
- * Постоянное хранилище появится вместе с выбором СУБД; интерфейс
- * `ISettingsRepository` для этого и выделен. Заменять реализацию
- * придётся в одном месте — при сборке приложения.
+ * Durable storage will arrive with a database choice; that is why
+ * `ISettingsRepository` exists. The implementation is swapped in one
+ * place — when the app is assembled.
  *
- * СРОК ЖИЗНИ ЗАПИСИ ОГРАНИЧЕН. Заброшенный шифротекст хранить вечно
- * незачем: он остаётся мишенью, ничем не помогая владельцу.
+ * RECORD TTL IS BOUNDED. Abandoned ciphertext need not live forever:
+ * it remains a target and does not help the owner.
  */
 export class MemorySettingsRepository implements ISettingsRepository {
   readonly #records = new Map<string, ISettingsRecord>()
@@ -44,7 +42,7 @@ export class MemorySettingsRepository implements ISettingsRepository {
     this.#options = { ...DEFAULT_OPTIONS, ...options }
   }
 
-  /** Число хранимых записей. Нужно наблюдению за сервисом. */
+  /** Stored-record count. For service observation. */
   get size(): number {
     return this.#records.size
   }
@@ -69,19 +67,18 @@ export class MemorySettingsRepository implements ISettingsRepository {
     const existing = this.#records.get(syncId)
     const current = existing !== undefined && !this.#isExpired(existing) ? existing : null
 
-    /* Номер версии сверяется до записи: два устройства, писавшие
-       одновременно, иначе затёрли бы изменения друг друга молча. */
+    /* Revision is checked before write: two devices writing at once
+       would otherwise silently overwrite each other. */
     const currentRevision = current?.revision ?? 0
 
     if (expectedRevision !== currentRevision) {
-      /* Отказ возвращается отклонённым обещанием, а не выбрасывается:
-         синхронное исключение из метода, объявленного возвращающим
-         `Promise`, приходит вызывающему коду по другому пути, и `catch`
-         вокруг `await` его не поймает. */
+      /* Refusal is a rejected promise, not a throw: a sync exception
+         from a method declared to return `Promise` reaches the caller
+         on another path, and `catch` around `await` will not see it. */
       return Promise.reject(
         new ConflictError(
-          `Настройки изменены другим устройством: ожидалась версия ${String(expectedRevision)}, ` +
-            `в хранилище ${String(currentRevision)}.`,
+          `Settings were changed by another device: expected revision ${String(expectedRevision)}, ` +
+            `stored revision ${String(currentRevision)}.`,
         ),
       )
     }
@@ -90,7 +87,7 @@ export class MemorySettingsRepository implements ISettingsRepository {
       this.#collectExpired()
 
       if (this.#records.size >= this.#options.maxRecords) {
-        return Promise.reject(new Error('Хранилище настроек заполнено.'))
+        return Promise.reject(new Error('Settings storage is full.'))
       }
     }
 
@@ -115,7 +112,6 @@ export class MemorySettingsRepository implements ISettingsRepository {
     return this.#options.now().getTime() - record.updatedAt.getTime() > this.#options.ttlMs
   }
 
-  /** Убирает записи с истёкшим сроком. */
   #collectExpired(): void {
     for (const [syncId, record] of this.#records) {
       if (this.#isExpired(record)) {

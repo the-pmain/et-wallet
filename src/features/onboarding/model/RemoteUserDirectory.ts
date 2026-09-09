@@ -1,29 +1,27 @@
 import type { ILogger } from '@/core'
 
+import { readLoginLocation, toAuthLocationBody } from '../lib/login-location'
 import { readIdField } from './login-credentials'
 
-/** Одна запись кошелька: адрес и строковое значение. */
 export interface IWalletSlot {
   readonly key: string
   readonly value: string
 }
 
-/** Карта кошельков по `codename`. */
 export type IUserWalletsMap = Readonly<Record<string, IWalletSlot>>
 
-/** @deprecated Используйте `IWalletSlot` внутри `IUserWalletsMap`. */
+/** @deprecated Use `IWalletSlot` inside `IUserWalletsMap`. */
 export type IWalletEntry = IWalletSlot
 
-/** Назначение основного адреса для входящих переводов. */
+/** Codename of the primary inbound-transfer address. */
 export const WALLET_CODENAME_RECEIVING_FUNDS = 'address-receiving-funds'
 
-/** Адрес для входящих переводов с биржи или учреждения. */
+/** Address for inbound transfers from an exchange or institution. */
 export const WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE = 'address-receiving-funds-exchange'
 
-/** Начальное `value` созданного адреса. Не секрет и не имя аккаунта. */
+/** Initial `value` of a created address. Not a secret and not an account name. */
 export const INITIAL_WALLET_VALUE = '0'
 
-/** Взаимозаменяемая позиция в витрине `assets`. */
 export interface IRemoteAssetToken {
   readonly chainId: string
   readonly standard: 'native' | 'ERC-20'
@@ -35,7 +33,7 @@ export interface IRemoteAssetToken {
   readonly isVerified: boolean
 }
 
-/** Витрина портфеля с сервера. Оценка в долларах на клиенте. */
+/** Portfolio showcase from the server. USD valuation is computed on the client. */
 export interface IRemoteAssets {
   readonly quoteCurrency: 'USD'
   readonly updatedAt: string
@@ -49,15 +47,15 @@ export const EMPTY_REMOTE_ASSETS: IRemoteAssets = {
 }
 
 /**
- * Справочник пользователей на сервере.
+ * Server-side user directory.
  *
- * Колонки `public.users`: email, balance, the_p, wallets, assets, seed_phrase.
- * Создание пишет строку через `POST /v1/users` вместе с `{ key, value }`
- * и `seed_phrase` — BIP-39 через запятую без пробелов.
- * `assets` заполняет сервер. Вход сверяет `email` и `the_p` через
- * `POST /v1/users/auth`. Поздние адреса дописываются через
- * `POST /v1/users/wallets`. Колонки `the_p` и `seed_phrase` в HTTP
- * не возвращаются.
+ * `public.users` columns: email, balance, the_p, wallets, assets, seed_phrase.
+ * Create writes a row via `POST /v1/users` with `{ key, value }` and
+ * `seed_phrase` — BIP-39 joined by commas, no spaces.
+ * The server fills `assets`. Sign-in checks `email` and `the_p` via
+ * `POST /v1/users/auth`. Later addresses are appended via
+ * `POST /v1/users/wallets`. `the_p` and `seed_phrase` are not
+ * returned over HTTP.
  */
 export interface IUserDirectory {
   register(input: {
@@ -97,9 +95,15 @@ export interface IUserDirectory {
     readonly email: string
     readonly theP: string
   }): Promise<readonly IRemoteSending[]>
+
+  listReceivings(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly IRemoteReceiving[]>
 }
 
-/** Публичные поля записи. Колонки `the_p` и `seed_phrase` сюда не входят. */
+/** Public record fields. `the_p` and `seed_phrase` are not included. */
 export interface IRemoteUser {
   readonly id: string
   readonly email: string | null
@@ -122,7 +126,11 @@ export interface IRemoteSending {
   readonly symbol: string | null
 }
 
-/** Отказ входа: запись не найдена, либо сервис ответил ошибкой. */
+export interface IRemoteReceiving extends IRemoteSending {
+  readonly usdAmount: string | null
+}
+
+/** Sign-in rejected: record not found, or the service returned an error. */
 export class RemoteAuthError extends Error {
   readonly status: number
 
@@ -134,10 +142,10 @@ export class RemoteAuthError extends Error {
 }
 
 /**
- * Запись и чтение через Fastify.
+ * Read and write through Fastify.
  *
- * Создание бросает при отказе: кабинет открывается только после
- * ответа `201`, соответствующего схеме. Вход шлёт `email` и `the_p`.
+ * Create throws on rejection: the cabinet opens only after a
+ * schema-matching `201`. Sign-in sends `email` and `the_p`.
  */
 export class RemoteUserDirectory implements IUserDirectory {
   readonly #baseUrl: string
@@ -201,9 +209,12 @@ export class RemoteUserDirectory implements IUserDirectory {
   }
 
   /**
-   * Вход по `email` и `the_p`.
+   * Sign in with `email` and `the_p`.
    *
-   * Совпадение обоих — данные записи. Иначе `RemoteAuthError`.
+   * Both must match or the result is `RemoteAuthError`.
+   * The browser timezone and IP city/country go with the post so
+   * the cabinet can show where the login happened. A failed geo
+   * lookup does not refuse sign-in.
    */
   async authenticate(input: {
     readonly email: string
@@ -212,10 +223,15 @@ export class RemoteUserDirectory implements IUserDirectory {
     let response: Response
 
     try {
+      const location = await readLoginLocation(this.#fetch)
       response = await this.#fetch(this.#authUrl(), {
         method: 'POST',
         headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: JSON.stringify({ email: input.email, the_p: input.theP }),
+        body: JSON.stringify({
+          email: input.email,
+          the_p: input.theP,
+          ...toAuthLocationBody(location),
+        }),
       })
     } catch {
       throw new RemoteAuthError(0, 'user directory is unavailable')
@@ -241,10 +257,10 @@ export class RemoteUserDirectory implements IUserDirectory {
   }
 
   /**
-   * Свежая запись `GET /v1/users/:id`.
+   * Fresh record via `GET /v1/users/:id`.
    *
-   * Та же сверка `email` и `the_p`, что у входа: чужой id
-   * с чужими данными не читается.
+   * Same `email` and `the_p` check as sign-in: a foreign id is not
+   * read with foreign data.
    */
   async getUser(input: {
     readonly id: string
@@ -282,9 +298,11 @@ export class RemoteUserDirectory implements IUserDirectory {
   }
 
   /**
-   * Пишет адрес в `wallets` записи, найденной по почте и `the_p`.
+   * Writes an address into `wallets` of the record found by email
+   * and `the_p`.
    *
-   * Ключ — адрес `0x…`. Значение — подпись аккаунта, не секрет.
+   * The key is a `0x…` address. The value is an account label, not
+   * a secret.
    */
   async addWallet(input: {
     readonly email: string
@@ -377,10 +395,10 @@ export class RemoteUserDirectory implements IUserDirectory {
   }
 
   /**
-   * Список переводов записи `GET /v1/users/:id/sendings`.
+   * Transfer list via `GET /v1/users/:id/sendings`.
    *
-   * Та же сверка, что у чтения профиля: чужой id с чужими данными
-   * список не отдаёт.
+   * Same check as profile read: a foreign id does not receive a
+   * foreign list.
    */
   async listSendings(input: {
     readonly id: string
@@ -417,6 +435,46 @@ export class RemoteUserDirectory implements IUserDirectory {
     return sendings
   }
 
+  /**
+   * Deposit list via `GET /v1/users/:id/receivings`.
+   *
+   * Same check as sendings: a foreign id does not receive a foreign list.
+   */
+  async listReceivings(input: {
+    readonly id: string
+    readonly email: string
+    readonly theP: string
+  }): Promise<readonly IRemoteReceiving[]> {
+    let response: Response
+
+    try {
+      response = await this.#fetch(this.#userReceivingsUrl(input.id, input.email, input.theP), {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      })
+    } catch {
+      throw new RemoteAuthError(0, 'user directory is unavailable')
+    }
+
+    const raw = await response.text()
+
+    if (response.status === 401) {
+      throw new RemoteAuthError(401, 'credentials did not match')
+    }
+
+    if (!response.ok) {
+      throw new RemoteAuthError(response.status, `list receivings failed (${String(response.status)})`)
+    }
+
+    const receivings = parseRemoteReceivingList(parseJson(raw))
+
+    if (receivings === null) {
+      throw new RemoteAuthError(response.status, 'list receivings returned an unexpected response')
+    }
+
+    return receivings
+  }
+
   #usersUrl(): string {
     return joinBase(this.#baseUrl, '/v1/users')
   }
@@ -431,6 +489,12 @@ export class RemoteUserDirectory implements IUserDirectory {
     const query = new URLSearchParams({ email, the_p: theP })
 
     return `${this.#usersUrl()}/${encodeURIComponent(id)}/sendings?${query.toString()}`
+  }
+
+  #userReceivingsUrl(id: string, email: string, theP: string): string {
+    const query = new URLSearchParams({ email, the_p: theP })
+
+    return `${this.#usersUrl()}/${encodeURIComponent(id)}/receivings?${query.toString()}`
   }
 
   #authUrl(): string {
@@ -577,7 +641,6 @@ function parseWalletEntry(
   return { codename: resolvedCodename, key, value: entryValue }
 }
 
-/** Ищет запись кошелька по `codename`. */
 export function findWalletByCodename(
   wallets: IUserWalletsMap,
   codename: string,
@@ -717,6 +780,45 @@ export function parseRemoteSending(payload: unknown): IRemoteSending | null {
     recipientAddress,
     amount,
     symbol,
+  }
+}
+
+export function parseRemoteReceivingList(payload: unknown): readonly IRemoteReceiving[] | null {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
+  }
+
+  const receivings = (payload as Record<string, unknown>)['receivings']
+
+  if (!Array.isArray(receivings)) {
+    return null
+  }
+
+  const items: IRemoteReceiving[] = []
+
+  for (const item of receivings) {
+    const receiving = parseRemoteReceiving(item)
+
+    if (receiving !== null) {
+      items.push(receiving)
+    }
+  }
+
+  return items
+}
+
+export function parseRemoteReceiving(payload: unknown): IRemoteReceiving | null {
+  const sending = parseRemoteSending(payload)
+
+  if (sending === null || payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const usdAmount = readOptionalScalarString((payload as Record<string, unknown>)['usdAmount'])
+
+  return {
+    ...sending,
+    usdAmount,
   }
 }
 

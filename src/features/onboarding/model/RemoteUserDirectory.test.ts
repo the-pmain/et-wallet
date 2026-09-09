@@ -52,7 +52,7 @@ function jsonResponse(status: number, body: unknown) {
 }
 
 describe('RemoteUserDirectory', () => {
-  it('шлёт POST на заданный адрес и возвращает созданную запись', async () => {
+  it('posts to the given URL and returns the created record', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, USER_BODY))
     const directory = new RemoteUserDirectory({
       baseUrl: 'http://127.0.0.1:8080',
@@ -77,7 +77,7 @@ describe('RemoteUserDirectory', () => {
     expect(user).toEqual(USER_BODY)
   })
 
-  it('выбрасывает priceUsd и valueUsd из витрины записи', async () => {
+  it('strips priceUsd and valueUsd from the record showcase', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(201, {
         ...USER_BODY,
@@ -128,7 +128,7 @@ describe('RemoteUserDirectory', () => {
     expect(user.assets.tokens[0]).not.toHaveProperty('valueUsd')
   })
 
-  it('в разработке ходит на тот же origin через /v1/users', async () => {
+  it('in development hits the same origin at /v1/users', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, USER_BODY))
     const directory = new RemoteUserDirectory({
       baseUrl: '',
@@ -141,7 +141,7 @@ describe('RemoteUserDirectory', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/v1/users')
   })
 
-  it('бросает, если справочник недоступен', async () => {
+  it('throws when the directory is unavailable', async () => {
     const directory = new RemoteUserDirectory({
       baseUrl: '',
       logger: new NullLogger(),
@@ -153,7 +153,7 @@ describe('RemoteUserDirectory', () => {
     ).rejects.toBeInstanceOf(RemoteAuthError)
   })
 
-  it('бросает, если запись отвергнута', async () => {
+  it('throws when the record is rejected', async () => {
     const directory = new RemoteUserDirectory({
       baseUrl: '',
       logger: new NullLogger(),
@@ -169,13 +169,22 @@ describe('RemoteUserDirectory', () => {
     ).rejects.toMatchObject({ name: 'RemoteAuthError', status: 400 })
   })
 
-  it('входит по почте и the_p и возвращает данные записи', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse(200, {
+  it('signs in with email and the_p and returns the record', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: RequestInfo | URL) => {
+      if (String(url).includes('geojs.io')) {
+        return jsonResponse(200, {
+          city: 'London',
+          region: 'England',
+          country: 'United Kingdom',
+          country_code: 'GB',
+        })
+      }
+
+      return jsonResponse(200, {
         ...USER_BODY,
         balance: '12.5',
-      }),
-    )
+      })
+    })
     const directory = new RemoteUserDirectory({
       baseUrl: 'http://127.0.0.1:8080',
       logger: new NullLogger(),
@@ -184,11 +193,20 @@ describe('RemoteUserDirectory', () => {
 
     const user = await directory.authenticate({ email: 'james@example.com', theP: 'demo' })
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:8080/v1/users/auth')
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+    const authCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).endsWith('/v1/users/auth'),
+    )
+
+    expect(authCall?.[0]).toBe('http://127.0.0.1:8080/v1/users/auth')
+    expect(JSON.parse(String(authCall?.[1]?.body))).toMatchObject({
       email: 'james@example.com',
       the_p: 'demo',
+      city: 'London',
+      region: 'England',
+      country: 'United Kingdom',
+      country_code: 'GB',
     })
+    expect(typeof JSON.parse(String(authCall?.[1]?.body)).time_zone).toBe('string')
     expect(user).toEqual({
       id: '7',
       email: 'james@example.com',
@@ -199,7 +217,7 @@ describe('RemoteUserDirectory', () => {
     })
   })
 
-  it('принимает id числом из ответа auth', async () => {
+  it('accepts a numeric id from the auth response', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ...USER_BODY, id: 70 }))
     const directory = new RemoteUserDirectory({
       baseUrl: 'http://127.0.0.1:8080',
@@ -212,7 +230,7 @@ describe('RemoteUserDirectory', () => {
     expect(user.id).toBe('70')
   })
 
-  it('читает свежую запись через GET /v1/users/:id', async () => {
+  it('reads a fresh record via GET /v1/users/:id', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         ...USER_BODY,
@@ -253,7 +271,7 @@ describe('RemoteUserDirectory', () => {
     expect(user.assets.tokens[0]?.balance).toBe('832117000000000000')
   })
 
-  it('читает sendings через GET /v1/users/:id/sendings', async () => {
+  it('reads sendings via GET /v1/users/:id/sendings', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         sendings: [
@@ -300,7 +318,7 @@ describe('RemoteUserDirectory', () => {
     ])
   })
 
-  it('принимает числовые id и amount и пропускает битые строки списка', async () => {
+  it('accepts numeric id and amount and skips broken list rows', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         sendings: [
@@ -344,7 +362,7 @@ describe('RemoteUserDirectory', () => {
     ])
   })
 
-  it('пишет адрес через POST /v1/users/wallets', async () => {
+  it('writes an address via POST /v1/users/wallets', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, USER_BODY))
     const directory = new RemoteUserDirectory({
       baseUrl: 'http://127.0.0.1:8080',
@@ -371,7 +389,7 @@ describe('RemoteUserDirectory', () => {
     expect(user.wallets).toEqual(WALLETS)
   })
 
-  it('бросает RemoteAuthError, если the_p не совпала', async () => {
+  it('throws RemoteAuthError when the_p does not match', async () => {
     const directory = new RemoteUserDirectory({
       baseUrl: '',
       logger: new NullLogger(),
@@ -387,7 +405,7 @@ describe('RemoteUserDirectory', () => {
     ).rejects.toBeInstanceOf(RemoteAuthError)
   })
 
-  it('шлёт user_id из сессии в POST /v1/users/sendings', async () => {
+  it('sends the session user_id in POST /v1/users/sendings', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(201, {
         id: '12',

@@ -7,9 +7,9 @@ import {
 } from './contracts.ts'
 
 /**
- * Журнал писем в памяти процесса.
+ * In-process mail journal.
  *
- * Для тестов и локального мока без таблицы Supabase.
+ * For tests and a local mock without a Supabase table.
  */
 export class MemoryEmailsRepository implements IEmailsRepository {
   readonly #records: IEmailRecord[] = []

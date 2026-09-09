@@ -8,7 +8,7 @@ function xmlList(keys: readonly string[]): string {
 }
 
 describe('R2EmailsRepository', () => {
-  it('пишет письмо и читает журнал', async () => {
+  it('writes a message and reads the journal', async () => {
     const objects = new Map<string, string>()
     const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       const url = String(input)
@@ -65,7 +65,7 @@ describe('R2EmailsRepository', () => {
     })
   })
 
-  it('создаёт бакет, если список вернул 404', async () => {
+  it('creates the bucket when the list returns 404', async () => {
     const fetchMock = vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       const url = String(input)
       const method = init?.method ?? 'GET'

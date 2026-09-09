@@ -5,7 +5,7 @@ import { emptyAssets } from './assets.ts'
 import { WALLET_CODENAME_RECEIVING_FUNDS } from './wallets.ts'
 
 describe('MemoryUsersRepository', () => {
-  it('записывает почту, баланс и the_p', async () => {
+  it('writes email, balance and the_p', async () => {
     const users = new MemoryUsersRepository()
 
     const record = await users.create({
@@ -23,7 +23,7 @@ describe('MemoryUsersRepository', () => {
     expect(users.records).toHaveLength(1)
   })
 
-  it('принимает wallets при создании', async () => {
+  it('accepts wallets on create', async () => {
     const users = new MemoryUsersRepository()
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -41,7 +41,7 @@ describe('MemoryUsersRepository', () => {
     })
   })
 
-  it('принимает seed_phrase при создании', async () => {
+  it('accepts seed_phrase on create', async () => {
     const users = new MemoryUsersRepository()
     const seedPhrase =
       'abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about'
@@ -56,7 +56,7 @@ describe('MemoryUsersRepository', () => {
     expect(record.seedPhrase).toBe(seedPhrase)
   })
 
-  it('находит запись по id', async () => {
+  it('finds a record by id', async () => {
     const users = new MemoryUsersRepository()
 
     await users.create({ email: 'james@example.com', balance: '10', theP: 'demo' })
@@ -66,7 +66,7 @@ describe('MemoryUsersRepository', () => {
     expect(await users.findById('99')).toBeNull()
   })
 
-  it('находит запись только при совпадении почты и the_p', async () => {
+  it('finds a record only when email and the_p match', async () => {
     const users = new MemoryUsersRepository()
 
     await users.create({ email: 'james@example.com', balance: '10', theP: 'demo' })
@@ -82,7 +82,7 @@ describe('MemoryUsersRepository', () => {
     ).toBeNull()
   })
 
-  it('добавляет адрес в wallets найденной записи', async () => {
+  it('adds an address to wallets of the found record', async () => {
     const users = new MemoryUsersRepository()
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -113,7 +113,7 @@ describe('MemoryUsersRepository', () => {
     ).toBeNull()
   })
 
-  it('отдаёт все записи списком', async () => {
+  it('returns every record as a list', async () => {
     const users = new MemoryUsersRepository()
 
     await users.create({ email: 'james@example.com', balance: '1', theP: 'a' })
@@ -124,7 +124,7 @@ describe('MemoryUsersRepository', () => {
     expect(listed.map((entry) => entry.email)).toEqual(['james@example.com', 'maria@example.com'])
   })
 
-  it('меняет баланс и значение кошелька по id', async () => {
+  it('changes balance and wallet value by id', async () => {
     const users = new MemoryUsersRepository()
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -152,7 +152,7 @@ describe('MemoryUsersRepository', () => {
     expect(await users.update('99', { balance: '1' })).toBeNull()
   })
 
-  it('удаляет запись по id', async () => {
+  it('deletes a record by id', async () => {
     const users = new MemoryUsersRepository()
 
     await users.create({ email: 'james@example.com', balance: '0', theP: 'demo' })

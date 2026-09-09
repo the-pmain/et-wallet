@@ -1,17 +1,16 @@
 /**
- * Пользователи в таблице `public.users`.
+ * Users in `public.users`.
  *
- * Поля: id, created_at, email, balance, the_p, wallets, assets, seed_phrase.
- * Создание пишет строку. Вход читает её по почте и `the_p`.
- * `wallets` — jsonb-список `{ key, value }`: ключ — `0x…`, значение — строка.
- * `assets` — jsonb-витрина портфеля: список токенов, как в криптокошельке.
- * `seed_phrase` — BIP-39 через запятую без пробелов. В HTTP-ответ не входит.
+ * Fields: id, created_at, email, balance, the_p, wallets, assets, seed_phrase.
+ * Create writes a row. Login reads it by email and `the_p`.
+ * `wallets` is a jsonb list `{ key, value }`: key is `0x…`, value is a string.
+ * `assets` is a jsonb portfolio showcase: a token list, as in a crypto wallet.
+ * `seed_phrase` is BIP-39 comma-separated, no spaces. Not in the HTTP response.
  */
 
 import type { IUserAssets } from './assets.ts'
 import type { IUserWallets } from './wallets.ts'
 
-/** Запись, как её отдаёт хранилище. */
 export interface IUserRecord {
   readonly id: string
   readonly createdAt: Date
@@ -23,7 +22,6 @@ export interface IUserRecord {
   readonly seedPhrase: string | null
 }
 
-/** Поля, которые клиент может задать при создании. */
 export interface ICreateUserInput {
   readonly email: string | null
   readonly balance: string | null
@@ -33,13 +31,12 @@ export interface ICreateUserInput {
   readonly seedPhrase?: string | null
 }
 
-/** Поля входа. Оба обязательны. */
+/** Login fields. Both required. */
 export interface IAuthUserInput {
   readonly email: string
   readonly theP: string
 }
 
-/** Добавление адреса в карту `wallets`. */
 export interface IAddWalletInput {
   readonly email: string
   readonly theP: string
@@ -48,7 +45,7 @@ export interface IAddWalletInput {
   readonly value: string
 }
 
-/** Частичное обновление записи администратором. Непереданные поля не трогаются. */
+/** Partial admin update. Omitted fields are left untouched. */
 export interface IUpdateUserInput {
   readonly email?: string | null
   readonly balance?: string | null
@@ -57,39 +54,36 @@ export interface IUpdateUserInput {
   readonly assets?: IUserAssets
 }
 
-/** Хранилище пользователей. */
 export interface IUsersRepository {
   create(input: ICreateUserInput): Promise<IUserRecord>
 
-  /** Ищет запись по первичному ключу. `null` — строки нет. */
   findById(id: string): Promise<IUserRecord | null>
 
-  /** Все записи. Для кабинета администратора. */
+  /** Every record. For the admin cabinet. */
   list(): Promise<readonly IUserRecord[]>
 
   /**
-   * Ищет запись, у которой совпали и `email`, и `the_p`.
+   * Finds the record whose `email` and `the_p` both match.
    *
-   * `null` — совпадения нет. Сообщение наружу одно: неверные данные.
-   * Колонка `the_p` из HTTP не уходит.
+   * `null` — no match. One outbound message: bad credentials.
+   * Column `the_p` does not leave over HTTP.
    */
   findByCredentials(input: IAuthUserInput): Promise<IUserRecord | null>
 
   /**
-   * Пишет адрес в `wallets` записи, найденной по почте и `the_p`.
+   * Writes an address into `wallets` of the record found by email and `the_p`.
    *
-   * `null` — совпадения нет. Повтор того же ключа заменяет значение.
+   * `null` — no match. Repeating the same key replaces the value.
    */
   addWallet(input: IAddWalletInput): Promise<IUserRecord | null>
 
   /**
-   * Меняет поля записи по id.
+   * Patches record fields by id.
    *
-   * `null` — строки нет. `the_p` в ответ по-прежнему не входит.
+   * `null` — no row. `the_p` is still omitted from the response.
    */
   update(id: string, patch: IUpdateUserInput): Promise<IUserRecord | null>
 
-  /** Удаляет запись. `false` — строки не было. */
   remove(id: string): Promise<boolean>
 }
 
@@ -100,7 +94,7 @@ export const USERS_STORE_KIND = {
 
 export type UsersStoreKind = (typeof USERS_STORE_KIND)[keyof typeof USERS_STORE_KIND]
 
-/** Освобождает соединения, если они были открыты. */
+/** Closes connections if any were opened. */
 export interface IUsersStore {
   readonly users: IUsersRepository
   readonly kind: UsersStoreKind

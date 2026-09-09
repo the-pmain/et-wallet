@@ -81,41 +81,41 @@ afterEach(async () => {
   await app.close()
 })
 
-describe('Каталог сетей', () => {
-  it('отдаёт список сетей', async () => {
+describe('Network catalog', () => {
+  it('returns the network list', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ networks: unknown[] }>().networks.length).toBeGreaterThan(0)
   })
 
-  it('передаёт идентификатор сети строкой', async () => {
-    /* `JSON.parse` молча теряет точность на больших числах, а сеть,
-       отличающаяся от настоящей, — это подпись для другой цепи. */
+  it('sends the network id as a string', async () => {
+    /* `JSON.parse` silently loses precision on large numbers, and a
+       network that differs from the real one is a signature for another chain. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
     const [first] = response.json<{ networks: { chainId: unknown }[] }>().networks
 
     expect(typeof first?.chainId).toBe('string')
   })
 
-  it('разрешает кэширование каталога', async () => {
+  it('allows catalog caching', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
 
     expect(response.headers['cache-control']).toContain('max-age=300')
   })
 })
 
-describe('Рекомендуемые RPC', () => {
-  it('отдаёт узлы известной сети', async () => {
+describe('Recommended RPC', () => {
+  it('returns nodes for a known network', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks/1/rpc' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ endpoints: unknown[] }>().endpoints.length).toBeGreaterThan(0)
   })
 
-  it('называет оператора каждого узла', async () => {
-    /* «Работает» и «работает через стороннего оператора, видящего все
-       ваши адреса» — разные утверждения. */
+  it('names the operator of each node', async () => {
+    /* "It works" and "it works through a third-party operator who sees
+       all your addresses" are different claims. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks/1/rpc' })
 
     for (const endpoint of response.json<{ endpoints: { operator: string }[] }>().endpoints) {
@@ -123,38 +123,38 @@ describe('Рекомендуемые RPC', () => {
     }
   })
 
-  it('отвечает отказом для неизвестной сети', async () => {
-    /* Пустой список для несуществующей сети читался бы как «узлов нет». */
+  it('rejects an unknown network', async () => {
+    /* An empty list for a missing network would read as "there are no nodes". */
     const response = await app.inject({ method: 'GET', url: '/v1/networks/999999/rpc' })
 
     expect(response.statusCode).toBe(404)
   })
 
-  it('отвергает нечисловой идентификатор сети', async () => {
+  it('rejects a non-numeric network id', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks/abc/rpc' })
 
     expect(response.statusCode).toBe(400)
   })
 
-  it('отвергает идентификатор с ведущими нулями', async () => {
-    /* Два написания одной сети дали бы два разных ключа кэша
-       у посредников и расхождение ответов. */
+  it('rejects an id with leading zeros', async () => {
+    /* Two spellings of one network would give two cache keys at
+       intermediaries and diverging responses. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks/001/rpc' })
 
     expect(response.statusCode).toBe(400)
   })
 })
 
-describe('Рекомендуемые токены', () => {
-  it('отдаёт токены известной сети', async () => {
+describe('Recommended tokens', () => {
+  it('returns tokens for a known network', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks/1/tokens' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ tokens: unknown[] }>().tokens.length).toBeGreaterThan(0)
   })
 
-  it('сообщает происхождение каждой записи', async () => {
-    /* Признак «проверено» непроверяем, происхождение — проверяемо. */
+  it('reports the provenance of each record', async () => {
+    /* A "verified" flag is not checkable; origin is. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks/1/tokens' })
 
     for (const token of response.json<{ tokens: { provenance: string[] }[] }>().tokens) {
@@ -162,33 +162,33 @@ describe('Рекомендуемые токены', () => {
     }
   })
 
-  it('отдаёт пустой список для сети без подтверждённых рекомендаций', async () => {
-    /* Сеть известна, но её токены не сверялись двумя источниками.
-       Это не то же самое, что несуществующая сеть. */
+  it('returns an empty list for a network with no confirmed recommendations', async () => {
+    /* The network is known, but its tokens were not checked against
+       two sources. That is not the same as a missing network. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks/56/tokens' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ tokens: unknown[] }>().tokens).toEqual([])
   })
 
-  it('отвечает отказом для неизвестной сети', async () => {
+  it('rejects an unknown network', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/networks/999999/tokens' })
 
     expect(response.statusCode).toBe(404)
   })
 })
 
-describe('Системные уведомления', () => {
-  it('отдаёт действующие уведомления', async () => {
+describe('System notifications', () => {
+  it('returns active notifications', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/notifications' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ notifications: unknown[] }>().notifications.length).toBeGreaterThan(0)
   })
 
-  it('не содержит ссылок ни в одном сообщении', async () => {
-    /* Текст отсюда показывается внутри кошелька и неотличим для человека
-       от сообщения самого приложения. */
+  it('contains no links in any message', async () => {
+    /* Text from here is shown inside the wallet and is indistinguishable
+       from a message of the app itself. */
     const response = await app.inject({ method: 'GET', url: '/v1/notifications' })
 
     for (const item of response.json<{ notifications: { title: string; body: string }[] }>()
@@ -198,25 +198,25 @@ describe('Системные уведомления', () => {
   })
 })
 
-describe('Проверка версии', () => {
-  it('сообщает последнюю и минимально поддерживаемую версии', async () => {
+describe('Version check', () => {
+  it('reports the latest and minimum supported versions', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/app/version' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ latest: string }>().latest).toMatch(/^\d+\.\d+\.\d+$/u)
   })
 
-  it('не сообщает адрес загрузки', async () => {
-    /* «Скачайте обновление отсюда» — готовый способ увести пользователя
-       на поддельный установщик. */
+  it('does not report a download URL', async () => {
+    /* "Download the update from here" is a ready way to send the user
+       to a fake installer. */
     const response = await app.inject({ method: 'GET', url: '/v1/app/version' })
 
     expect(response.body).not.toMatch(/https?:\/\//u)
   })
 
-  it('оставляет признаки неизвестными, если версия клиента не сообщена', async () => {
-    /* «Не знаем» нельзя подменять ни на «всё в порядке», ни на «пора
-       обновляться». */
+  it('leaves flags unknown when the client version is unreported', async () => {
+    /* "We do not know" must not become "all is well" or "time to
+       update". */
     const response = await app.inject({ method: 'GET', url: '/v1/app/version' })
     const body = response.json<{ isSupported: unknown; isOutdated: unknown }>()
 
@@ -224,7 +224,7 @@ describe('Проверка версии', () => {
     expect(body.isOutdated).toBeNull()
   })
 
-  it('признаёт устаревшей версию ниже последней', async () => {
+  it('marks a version below latest as outdated', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/app/version?version=0.0.1' })
     const body = response.json<{ isOutdated: boolean; isSupported: boolean }>()
 
@@ -232,21 +232,21 @@ describe('Проверка версии', () => {
     expect(body.isSupported).toBe(false)
   })
 
-  it('отвергает версию с предвыпускной меткой', async () => {
+  it('rejects a version with a pre-release tag', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/app/version?version=1.0.0-beta' })
 
     expect(response.statusCode).toBe(400)
   })
 })
 
-describe('Синхронизация настроек', () => {
-  it('сообщает об отсутствии записи', async () => {
+describe('Settings sync', () => {
+  it('reports a missing record', async () => {
     const response = await app.inject({ method: 'GET', url: `/v1/settings/${SYNC_ID}` })
 
     expect(response.statusCode).toBe(404)
   })
 
-  it('сохраняет и возвращает шифротекст без изменений', async () => {
+  it('stores and returns ciphertext unchanged', async () => {
     const written = await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -260,8 +260,8 @@ describe('Синхронизация настроек', () => {
     expect(read.json<{ ciphertext: string }>().ciphertext).toBe('c2VjcmV0')
   })
 
-  it('запрещает кэширование настроек', async () => {
-    /* Это данные конкретного пользователя, пусть и зашифрованные. */
+  it('forbids settings caching', async () => {
+    /* These are one user's data, even if encrypted. */
     await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -273,7 +273,7 @@ describe('Синхронизация настроек', () => {
     expect(read.headers['cache-control']).toBe('no-store')
   })
 
-  it('отвергает запись с устаревшим номером версии', async () => {
+  it('rejects a write with a stale revision', async () => {
     await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -289,27 +289,26 @@ describe('Синхронизация настроек', () => {
     expect(conflict.statusCode).toBe(409)
   })
 
-  it('отвергает короткий идентификатор синхронизации', async () => {
-    /* Идентификатор — ключ-предъявитель: он обязан быть случайным
-       и длинным, а не удобным. */
+  it('rejects a short sync id', async () => {
+    /* The id is a bearer key: it must be random and long, not convenient. */
     const response = await app.inject({ method: 'GET', url: '/v1/settings/abc' })
 
     expect(response.statusCode).toBe(400)
   })
 
-  it('отвергает неизвестное поле в теле запроса', async () => {
-    /* Клиент с ошибкой не должен иметь возможности незаметно передать
-       сервису то, чего тот принимать не должен. */
+  it('rejects an unknown field in the request body', async () => {
+    /* A buggy client must not be able to silently pass the service
+       something it must not accept. */
     const response = await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
-      payload: { ciphertext: 'YQ==', revision: 0, mnemonic: 'нечто' },
+      payload: { ciphertext: 'YQ==', revision: 0, mnemonic: 'something' },
     })
 
     expect(response.statusCode).toBe(400)
   })
 
-  it('удаляет запись', async () => {
+  it('deletes the record', async () => {
     await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -324,17 +323,17 @@ describe('Синхронизация настроек', () => {
     )
   })
 
-  it('удаление отсутствующей записи не считается ошибкой', async () => {
-    /* Иначе ответ сообщал бы, существует ли запись, тому, кто подбирает
-       идентификатор. */
+  it('deleting a missing record is not an error', async () => {
+    /* Otherwise the response would tell someone guessing the id
+       whether a record exists. */
     const response = await app.inject({ method: 'DELETE', url: `/v1/settings/${SYNC_ID}` })
 
     expect(response.statusCode).toBe(204)
   })
 })
 
-describe('Пользователи', () => {
-  it('записывает почту, баланс и the_p', async () => {
+describe('Users', () => {
+  it('writes email, balance and the_p', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -363,7 +362,7 @@ describe('Пользователи', () => {
     expect(response.json<{ seedPhrase?: unknown }>()).not.toHaveProperty('seedPhrase')
   })
 
-  it('принимает assets из тела, обнуляет остатки и не хранит цену', async () => {
+  it('accepts assets from the body, zeros balances and does not store price', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -389,7 +388,7 @@ describe('Пользователи', () => {
     expectStartingAssets(users.records[0]?.assets ?? { tokens: [] })
   })
 
-  it('отвергает priceUsd и valueUsd в теле создания', async () => {
+  it('rejects priceUsd and valueUsd in the create body', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -415,7 +414,7 @@ describe('Пользователи', () => {
     expect(users.records).toHaveLength(0)
   })
 
-  it('пишет wallets из тела создания', async () => {
+  it('writes wallets from the create body', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
     const entry = { key, value: '0' }
     const response = await app.inject({
@@ -434,7 +433,7 @@ describe('Пользователи', () => {
     expect(users.records[0]?.wallets).toEqual([entry])
   })
 
-  it('пишет список wallets из тела создания', async () => {
+  it('writes a wallets list from the create body', async () => {
     const first = {
       key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
       value: '0',
@@ -458,7 +457,7 @@ describe('Пользователи', () => {
     expect(response.json<{ wallets: unknown[] }>().wallets).toEqual([first, second])
   })
 
-  it('отвергает wallets с ключом, который не является адресом', async () => {
+  it('rejects wallets whose key is not an address', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -474,7 +473,7 @@ describe('Пользователи', () => {
     expect(users.records).toHaveLength(0)
   })
 
-  it('подставляет нулевой баланс, если его не передали', async () => {
+  it('fills a zero balance when none was sent', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -485,7 +484,7 @@ describe('Пользователи', () => {
     expect(response.json<{ balance: string }>().balance).toBe('0')
   })
 
-  it('на создании обнуляет баланс и значения кошельков', async () => {
+  it('on create zeros the balance and wallet values', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
     const response = await app.inject({
       method: 'POST',
@@ -507,7 +506,7 @@ describe('Пользователи', () => {
     )
   })
 
-  it('запрещает кэширование ответа', async () => {
+  it('forbids response caching', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -517,9 +516,9 @@ describe('Пользователи', () => {
     expect(response.headers['cache-control']).toBe('no-store')
   })
 
-  it('принимает email длиной до 254 символов', async () => {
-    /* Без подряд идущих шестнадцатеричных символов: охранник входящих
-       данных принимает их за приватный ключ. */
+  it('accepts an email up to 254 characters', async () => {
+    /* No consecutive hex characters: the inbound-data guard would
+       take them for a private key. */
     const email = `${'q'.repeat(64)}@${'z'.repeat(176)}.io`
 
     expect(email.length).toBeLessThanOrEqual(254)
@@ -534,7 +533,7 @@ describe('Пользователи', () => {
     expect(response.json<{ email: string }>().email).toBe(email)
   })
 
-  it('отвергает создание с полем username вместо email', async () => {
+  it('rejects create with username instead of email', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -545,7 +544,7 @@ describe('Пользователи', () => {
     expect(response.json<{ error: { code: string } }>().error.code).toBe('invalid_request')
   })
 
-  it('отвергает создание без seed_phrase', async () => {
+  it('rejects create without seed_phrase', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -556,7 +555,7 @@ describe('Пользователи', () => {
     expect(users.records).toHaveLength(0)
   })
 
-  it('отвергает пробельную seed-фразу', async () => {
+  it('rejects a space-separated seed phrase', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -572,7 +571,7 @@ describe('Пользователи', () => {
     expect(users.records).toHaveLength(0)
   })
 
-  it('отвергает seed_phrase с неверной контрольной суммой', async () => {
+  it('rejects seed_phrase with a bad checksum', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -588,7 +587,7 @@ describe('Пользователи', () => {
     expect(users.records).toHaveLength(0)
   })
 
-  it('впускает при совпадении почты и the_p', async () => {
+  it('lets in when email and the_p match', async () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -614,7 +613,7 @@ describe('Пользователи', () => {
     expect(response.body).not.toContain('demo')
   })
 
-  it('отдаёт свежие assets по GET /v1/users/:id', async () => {
+  it('returns fresh assets on GET /v1/users/:id', async () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -661,7 +660,7 @@ describe('Пользователи', () => {
     expect(response.json<{ the_p?: unknown }>()).not.toHaveProperty('the_p')
   })
 
-  it('не отдаёт GET /v1/users/:id без сверки почты и the_p', async () => {
+  it('does not serve GET /v1/users/:id without email and the_p', async () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -680,7 +679,7 @@ describe('Пользователи', () => {
     expect(wrong.statusCode).toBe(401)
   })
 
-  it('пишет созданный адрес в wallets', async () => {
+  it('writes the created address into wallets', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
     await app.inject({
@@ -708,7 +707,7 @@ describe('Пользователи', () => {
     expect(users.records[0]?.wallets).toEqual([{ key, value: '0' }])
   })
 
-  it('регистрирует отправку со статусом pending', async () => {
+  it('registers a send with pending status', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     const created = await app.inject({
@@ -745,7 +744,7 @@ describe('Пользователи', () => {
     expect(sendings.records[0]?.symbol).toBe('ETH')
   })
 
-  it('отдаёт sendings владельца по GET /v1/users/:id/sendings', async () => {
+  it('returns the owner sendings on GET /v1/users/:id/sendings', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     const created = await app.inject({
@@ -805,7 +804,7 @@ describe('Пользователи', () => {
     ])
   })
 
-  it('не отдаёт GET /v1/users/:id/sendings без сверки почты и the_p', async () => {
+  it('does not serve GET /v1/users/:id/sendings without email and the_p', async () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -824,7 +823,7 @@ describe('Пользователи', () => {
     expect(wrong.statusCode).toBe(401)
   })
 
-  it('отвергает создание без symbol', async () => {
+  it('rejects create without symbol', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
@@ -849,7 +848,7 @@ describe('Пользователи', () => {
     expect(sendings.records).toHaveLength(0)
   })
 
-  it('после успешного создания шлёт кадр sendings с type_send create', async () => {
+  it('after a successful create sends a sendings frame with type_send create', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const received: unknown[] = []
 
@@ -885,7 +884,7 @@ describe('Пользователи', () => {
     ])
   })
 
-  it('не шлёт кадр, если создание отклонено', async () => {
+  it('does not send a frame when create is rejected', async () => {
     const received: unknown[] = []
 
     const created = await app.inject({
@@ -914,7 +913,7 @@ describe('Пользователи', () => {
     expect(received).toEqual([])
   })
 
-  it('GET /v1/sendings держит поток и отдаёт кадр после создания', async () => {
+  it('GET /v1/sendings holds the stream and yields a frame after create', async () => {
     const address = await app.listen({ host: '127.0.0.1', port: 0 })
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
@@ -984,7 +983,7 @@ describe('Пользователи', () => {
     expect(body).toContain(recipient)
   })
 
-  it('GET /v1/sendings без user_id отдаёт кадр любой новой записи', async () => {
+  it('GET /v1/sendings without user_id yields a frame for any new record', async () => {
     const address = await app.listen({ host: '127.0.0.1', port: 0 })
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
@@ -1054,7 +1053,7 @@ describe('Пользователи', () => {
     expect(body).toContain(recipient)
   })
 
-  it('GET /v1/sendings без user_id не открывает поток по PIN чтения', async () => {
+  it('GET /v1/sendings without user_id does not open the stream on a read PIN', async () => {
     const address = await app.listen({ host: '127.0.0.1', port: 0 })
     const denied = await fetch(`${address}/v1/sendings`, {
       headers: { Accept: 'text/event-stream' },
@@ -1067,7 +1066,7 @@ describe('Пользователи', () => {
     expect(reader.status).toBe(403)
   })
 
-  it('отвергает отправку, если user_id не совпал с записью', async () => {
+  it('rejects a send when user_id does not match the record', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     await app.inject({
@@ -1093,7 +1092,7 @@ describe('Пользователи', () => {
     expect(sendings.records).toHaveLength(0)
   })
 
-  it('записывает failure при неверном адресе получателя', async () => {
+  it('writes failure for a bad recipient address', async () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -1116,7 +1115,7 @@ describe('Пользователи', () => {
     expect(response.statusCode).toBe(400)
   })
 
-  it('отвергает amount с тикером — в колонке только число', async () => {
+  it('rejects amount with a ticker — the column is a number only', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 
     await app.inject({
@@ -1141,7 +1140,7 @@ describe('Пользователи', () => {
     expect(response.statusCode).toBe(400)
   })
 
-  it('новый адрес в wallets всегда стартует с нуля', async () => {
+  it('a new address in wallets always starts at zero', async () => {
     const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
     await app.inject({
@@ -1165,7 +1164,7 @@ describe('Пользователи', () => {
     expect(response.json<{ wallets: { value: string }[] }>().wallets).toEqual([{ key, value: '0' }])
   })
 
-  it('отказывает в записи адреса при неверной the_p', async () => {
+  it('refuses to write an address when the_p is wrong', async () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -1187,7 +1186,7 @@ describe('Пользователи', () => {
     expect(users.records[0]?.wallets).toEqual([])
   })
 
-  it('отвергает ключ, который не является адресом', async () => {
+  it('rejects a key that is not an address', async () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -1208,7 +1207,7 @@ describe('Пользователи', () => {
     expect(response.statusCode).toBe(400)
   })
 
-  it('отказывает, если the_p не совпала', async () => {
+  it('refuses when the_p does not match', async () => {
     await app.inject({
       method: 'POST',
       url: '/v1/users',
@@ -1226,8 +1225,8 @@ describe('Пользователи', () => {
   })
 })
 
-describe('Охранник входящих данных', () => {
-  it('отвергает тело, содержащее приватный ключ', async () => {
+describe('Inbound-data guard', () => {
+  it('rejects a body that contains a private key', async () => {
     const response = await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -1238,7 +1237,7 @@ describe('Охранник входящих данных', () => {
     expect(response.json<{ error: { code: string } }>().error.code).toBe('secret_material_rejected')
   })
 
-  it('отвергает тело, содержащее мнемоническую фразу', async () => {
+  it('rejects a body that contains a mnemonic', async () => {
     const response = await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -1252,7 +1251,7 @@ describe('Охранник входящих данных', () => {
     expect(response.json<{ error: { code: string } }>().error.code).toBe('secret_material_rejected')
   })
 
-  it('не сохраняет отвергнутое тело', async () => {
+  it('does not store a rejected body', async () => {
     await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -1262,7 +1261,7 @@ describe('Охранник входящих данных', () => {
     expect(await settings.get(SYNC_ID)).toBeNull()
   })
 
-  it('пропускает обычный шифротекст', async () => {
+  it('lets ordinary ciphertext through', async () => {
     const response = await app.inject({
       method: 'PUT',
       url: `/v1/settings/${SYNC_ID}`,
@@ -1273,23 +1272,23 @@ describe('Охранник входящих данных', () => {
   })
 })
 
-describe('Общее поведение сервиса', () => {
-  it('отвечает на проверку живости', async () => {
+describe('Service-wide behavior', () => {
+  it('answers the liveness check', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/health' })
 
     expect(response.statusCode).toBe(200)
   })
 
-  it('отвечает отказом на несуществующий маршрут', async () => {
-    const response = await app.inject({ method: 'GET', url: '/v1/нет-такого' })
+  it('rejects a missing route', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/no-such-route' })
 
     expect(response.statusCode).toBe(404)
     expect(response.json<{ error: { code: string } }>().error.code).toBe('not_found')
   })
 
-  it('не принимает запись через POST', async () => {
-    /* Список разрешённых методов ограничен: маршрута, принимающего
-       произвольные данные, у сервиса нет. */
+  it('does not accept a write via POST', async () => {
+    /* The allowed-methods list is limited: the service has no route
+       that accepts arbitrary data. */
     const response = await app.inject({
       method: 'POST',
       url: `/v1/settings/${SYNC_ID}`,
@@ -1299,18 +1298,18 @@ describe('Общее поведение сервиса', () => {
     expect(response.statusCode).toBe(404)
   })
 
-  it('запрещает встраивание в рамку откуда бы то ни было', async () => {
-    /* Умолчание `SAMEORIGIN` разрешает встраивание с того же источника.
-       Сервису нечего показывать в рамке ни при каких условиях. */
+  it('forbids framing from anywhere', async () => {
+    /* Default `SAMEORIGIN` allows same-origin framing. The service
+       has nothing to show in a frame under any condition. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
 
     expect(response.headers['x-frame-options']).toBe('DENY')
   })
 
-  it('не разрешает исполнение сценариев политикой безопасности', async () => {
-    /* Директивы helmet по умолчанию рассчитаны на сайт и разрешают
-       `script-src 'self'` вместе с `'unsafe-inline'` для стилей.
-       Сервису, отдающему JSON, не нужно ничего из этого. */
+  it('does not allow script execution via the security policy', async () => {
+    /* Helmet defaults are for a site and allow `script-src 'self'`
+       plus `'unsafe-inline'` for styles. A JSON service needs none
+       of that. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
     const policy = String(response.headers['content-security-policy'])
 
@@ -1319,17 +1318,17 @@ describe('Общее поведение сервиса', () => {
     expect(policy).not.toContain('unsafe-inline')
   })
 
-  it('запрещает угадывание типа содержимого', async () => {
-    /* Ответ JSON, истолкованный браузером как HTML, — известный путь
-       к исполнению чужого кода. */
+  it('forbids content-type sniffing', async () => {
+    /* A JSON response the browser treats as HTML is a known path
+       to running foreign code. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
 
     expect(response.headers['x-content-type-options']).toBe('nosniff')
   })
 
-  it('запрещает индексирование ответов API', async () => {
-    /* JSON не несёт метатега robots. Без заголовка каталог сетей
-       мог бы попасть в индекс по прямой ссылке. */
+  it('forbids indexing of API responses', async () => {
+    /* JSON carries no robots meta tag. Without the header the
+       network catalog could be indexed via a direct link. */
     const response = await app.inject({ method: 'GET', url: '/v1/networks' })
 
     expect(response.headers['x-robots-tag']).toBe(
@@ -1337,7 +1336,7 @@ describe('Общее поведение сервиса', () => {
     )
   })
 
-  it('разрешает CORS-предзапрос PATCH с кабинета на Vite', async () => {
+  it('allows a PATCH CORS preflight from the cabinet to Vite', async () => {
     const response = await app.inject({
       method: 'OPTIONS',
       url: '/v1/admin/users/51',
@@ -1356,7 +1355,7 @@ describe('Общее поведение сервиса', () => {
   })
 })
 
-describe('Кабинет администратора', () => {
+describe('Admin cabinet', () => {
   const key = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
   async function seedUser(): Promise<string> {
@@ -1374,7 +1373,7 @@ describe('Кабинет администратора', () => {
     return response.json<{ id: string }>().id
   }
 
-  it('принимает PIN из окружения и отвергает другой', async () => {
+  it('accepts the environment PIN and rejects another', async () => {
     const ok = await app.inject({
       method: 'POST',
       url: '/v1/admin/auth',
@@ -1391,19 +1390,49 @@ describe('Кабинет администратора', () => {
     expect(denied.statusCode).toBe(401)
   })
 
-  it('не отдаёт список без PIN', async () => {
+  it('does not return the list without a PIN', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/admin/users' })
 
     expect(response.statusCode).toBe(401)
   })
 
-  it('не отдаёт sendings без PIN', async () => {
+  it('does not return sendings without a PIN', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/admin/sendings' })
 
     expect(response.statusCode).toBe(401)
   })
 
-  it('отдаёт sendings по PIN', async () => {
+  it('a read PIN does not create sendings or receivings', async () => {
+    const userId = await seedUser()
+    const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
+
+    const sending = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        userId,
+        recipientAddress: recipient,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+    const receiving = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/receivings',
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        userId,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
+    })
+
+    expect(sending.statusCode).toBe(403)
+    expect(receiving.statusCode).toBe(403)
+  })
+
+  it('returns sendings with a PIN', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
@@ -1440,7 +1469,7 @@ describe('Кабинет администратора', () => {
     })
   })
 
-  it('PATCH /v1/admin/sendings/:id пишет поля и шлёт кадр type_send update', async () => {
+  it('PATCH /v1/admin/sendings/:id writes fields and sends a type_send update frame', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
@@ -1494,7 +1523,7 @@ describe('Кабинет администратора', () => {
     ])
   })
 
-  it('PATCH success списывает amount из users.assets.tokens и не повторяет списание', async () => {
+  it('PATCH success debits amount from users.assets.tokens and does not debit twice', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
@@ -1574,7 +1603,7 @@ describe('Кабинет администратора', () => {
     expect(users.records[0]?.assets.tokens[0]?.balance).toBe('31000000000000000')
   })
 
-  it('PATCH failure не списывает tokens', async () => {
+  it('PATCH failure does not debit tokens', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
@@ -1636,7 +1665,7 @@ describe('Кабинет администратора', () => {
     expect(users.records[0]?.assets.tokens[0]?.balance).toBe('41000000000000000')
   })
 
-  it('отвергает неизвестный symbol перевода', async () => {
+  it('rejects an unknown transfer symbol', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
     const created = await app.inject({
       method: 'POST',
@@ -1654,14 +1683,14 @@ describe('Кабинет администратора', () => {
         the_p: 'demo',
         recipient_address: recipient,
         amount: '1',
-        symbol: 'BTC',
+        symbol: '???',
       },
     })
 
     expect(response.statusCode).toBe(400)
   })
 
-  it('отдаёт всех пользователей по PIN', async () => {
+  it('returns every user with a PIN', async () => {
     await seedUser()
 
     const response = await app.inject({
@@ -1677,7 +1706,7 @@ describe('Кабинет администратора', () => {
     expect(response.json<{ users: { the_p?: unknown }[] }>().users[0]).not.toHaveProperty('the_p')
   })
 
-  it('меняет значение кошелька и баланс', async () => {
+  it('changes the wallet value and balance', async () => {
     const id = await seedUser()
     const response = await app.inject({
       method: 'PATCH',
@@ -1695,7 +1724,7 @@ describe('Кабинет администратора', () => {
     expect(users.records[0]?.wallets[0]?.value).toBe('2500')
   })
 
-  it('удаляет пользователя', async () => {
+  it('deletes a user', async () => {
     const id = await seedUser()
     const response = await app.inject({
       method: 'DELETE',
@@ -1705,5 +1734,119 @@ describe('Кабинет администратора', () => {
 
     expect(response.statusCode).toBe(204)
     expect(users.records).toHaveLength(0)
+  })
+
+  it('does not return login events without a PIN', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/admin/login-events' })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('records successful logins and lists them for admin and super admin', async () => {
+    const userId = await seedUser()
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const second = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: { email: 'james@example.com', the_p: 'other' },
+    })
+    const restored = await app.inject({
+      method: 'GET',
+      url: `/v1/users/${userId}`,
+      query: { email: 'james@example.com', the_p: 'demo' },
+    })
+    const asAdmin = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '4200' },
+    })
+    const asSuper = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '9100' },
+    })
+
+    expect(first.statusCode).toBe(200)
+    expect(second.statusCode).toBe(200)
+    expect(refused.statusCode).toBe(401)
+    expect(restored.statusCode).toBe(200)
+    expect(asAdmin.statusCode).toBe(200)
+    expect(asSuper.statusCode).toBe(200)
+
+    const activity = asAdmin.json<{
+      users: {
+        userId: string
+        email: string | null
+        loginCount: number
+        logins: { id: string; createdAt: string }[]
+      }[]
+    }>().users[0]
+
+    expect(activity).toMatchObject({
+      userId,
+      email: 'james@example.com',
+      loginCount: 2,
+    })
+    expect(activity?.logins).toHaveLength(2)
+    expect(activity?.logins[0]).toMatchObject({
+      city: null,
+      country: null,
+      countryCode: null,
+      region: null,
+      timeZone: null,
+    })
+    expect(asSuper.json()).toEqual(asAdmin.json())
+    expect(asAdmin.headers['cache-control']).toBe('no-store')
+  })
+
+  it('stores the browser location on a successful login', async () => {
+    const userId = await seedUser()
+
+    const signedIn = await app.inject({
+      method: 'POST',
+      url: '/v1/users/auth',
+      payload: {
+        email: 'james@example.com',
+        the_p: 'demo',
+        time_zone: 'Europe/London',
+        city: 'London',
+        region: 'England',
+        country: 'United Kingdom',
+        country_code: 'gb',
+      },
+    })
+    const asAdmin = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/login-events',
+      headers: { 'x-admin-pin': '4200' },
+    })
+
+    expect(signedIn.statusCode).toBe(200)
+    expect(
+      asAdmin.json<{
+        users: { userId: string; logins: { city: string; country: string; countryCode: string }[] }[]
+      }>().users[0],
+    ).toMatchObject({
+      userId,
+      logins: [
+        {
+          city: 'London',
+          region: 'England',
+          country: 'United Kingdom',
+          countryCode: 'GB',
+          timeZone: 'Europe/London',
+        },
+      ],
+    })
   })
 })

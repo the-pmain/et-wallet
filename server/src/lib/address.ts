@@ -2,36 +2,36 @@ import { keccak_256 } from '@noble/hashes/sha3.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 
 /**
- * Проверка адреса EVM и его контрольной суммы EIP-55.
+ * EVM address check and EIP-55 checksum.
  *
- * ЗАЧЕМ ЭТО НУЖНО СЕРВИСУ, КОТОРЫЙ АДРЕСА ТОЛЬКО РАЗДАЁТ. Каталог
- * составляется людьми, а шестнадцатеричный адрес непроверяем при чтении:
- * ошибка в одном символе даёт другой контракт. Контрольная сумма EIP-55
- * ловит такую опечатку при загрузке каталога — то есть до того, как
- * ошибочный адрес разойдётся по кошелькам пользователей.
+ * WHY A SERVICE THAT ONLY SERVES ADDRESSES NEEDS THIS. The catalog is
+ * written by people, and a hex address is unchecked when you read it:
+ * one wrong character is a different contract. EIP-55 catches that
+ * typo when the catalog loads — before a wrong address reaches users'
+ * wallets.
  *
- * Реализация опирается на keccak-256 из проверенной библиотеки;
- * собственных криптографических примитивов здесь нет.
+ * Implementation uses keccak-256 from a reviewed library; there are
+ * no homemade crypto primitives here.
  */
 
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u
 
-/** Соответствует ли строка виду адреса EVM. */
+/** Whether the string looks like an EVM address. */
 export function hasAddressShape(value: string): boolean {
   return ADDRESS_PATTERN.test(value)
 }
 
 /**
- * Приводит адрес к записи с контрольной суммой EIP-55.
+ * Formats an address with an EIP-55 checksum.
  *
- * Регистр букв кодирует хэш адреса: каждая буква поднимается в верхний
- * регистр, если соответствующий полубайт хэша не меньше восьми.
+ * Letter case encodes the address hash: each letter is uppercased if
+ * the matching hash nibble is at least eight.
  *
- * @throws Error если строка не имеет вида адреса.
+ * @throws Error if the string is not address-shaped.
  */
 export function toChecksumAddress(value: string): string {
   if (!hasAddressShape(value)) {
-    throw new Error(`Строка не является адресом EVM: ${value}`)
+    throw new Error(`The string is not an EVM address: ${value}`)
   }
 
   const body = value.slice(2).toLowerCase()
@@ -50,11 +50,10 @@ export function toChecksumAddress(value: string): string {
 }
 
 /**
- * Записан ли адрес с верной контрольной суммой EIP-55.
+ * Whether the address carries a valid EIP-55 checksum.
  *
- * Адрес целиком в нижнем либо целиком в верхнем регистре контрольной
- * суммы не несёт и проверку не проходит: в каталоге такая запись
- * означала бы, что адрес никем не сверялся.
+ * An address that is all-lowercase or all-uppercase has no checksum
+ * and fails: in the catalog that would mean nobody checked the address.
  */
 export function hasValidChecksum(value: string): boolean {
   return hasAddressShape(value) && toChecksumAddress(value) === value

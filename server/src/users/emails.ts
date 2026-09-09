@@ -1,9 +1,9 @@
 /**
- * Сверяет адрес с колонкой `email`.
+ * Checks an address against column `email`.
  *
- * Регистр и крайние пробелы не различают входы: `James@Mail.com`
- * и `james@mail.com` — одна запись. Пустое значение ни с чем
- * не совпадает — войти без почты нельзя.
+ * Case and edge spaces do not split logins: `James@Mail.com` and
+ * `james@mail.com` are one record. Empty matches nothing — login
+ * without email is impossible.
  */
 export function emailsMatch(stored: string | null | undefined, candidate: string): boolean {
   if (stored === null || stored === undefined) {

@@ -8,10 +8,10 @@ export const ADMIN_ROLE = {
 export type AdminRole = (typeof ADMIN_ROLE)[keyof typeof ADMIN_ROLE]
 
 /**
- * PIN кабинета (`/admin`).
+ * Cabinet PIN (`/admin`).
  *
- * `ADMIN_PIN` — чтение. `SUPER_ADMIN_PIN` — полное право.
- * Значений в исходниках нет: сверка только с окружением.
+ * `ADMIN_PIN` — read. `SUPER_ADMIN_PIN` — full write.
+ * No values in source: check against the environment only.
  */
 export function resolveAdminRole(value: string): AdminRole | null {
   const presented = value.trim()
@@ -36,7 +36,7 @@ export function resolveAdminRole(value: string): AdminRole | null {
   return null
 }
 
-/** Любая принятая роль кабинета. */
+/** Any accepted cabinet role. */
 export function pinMatches(value: string): boolean {
   return resolveAdminRole(value) !== null
 }

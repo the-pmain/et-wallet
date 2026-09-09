@@ -5,7 +5,9 @@ import type { TxHash } from '@/core'
 import {
   readLoginCredentials,
   useDirectorySession,
+  useUserReceivings,
   useUserSendings,
+  UserReceivingsList,
   UserSendingsList,
 } from '@/features/onboarding'
 import {
@@ -34,17 +36,16 @@ import {
 } from '@/shared/ui'
 
 /**
- * Состояние замены зависшей транзакции.
+ * State of a stuck-transaction replacement.
  *
- * ПОДГОТОВКА И ОТПРАВКА РАЗДЕЛЕНЫ. Между ними стоит подтверждение
- * пользователя, и объект, который он увидел, обязан дойти до подписи
- * без пересчёта.
+ * PREPARE AND SEND ARE SEPARATE. User confirmation sits between them,
+ * and the object they saw must reach signing without a recalculation.
  */
 interface IReplacementState {
   readonly hash: TxHash
   readonly kind: ReplacementKind
 
-  /** `null`, пока замена готовится либо подготовить её не удалось. */
+  /** `null` while the replacement is preparing or failed to prepare. */
   readonly prepared: IPreparedTransfer | null
 
   readonly error: string | null
@@ -52,21 +53,22 @@ interface IReplacementState {
 }
 
 /**
- * История переводов активного аккаунта.
+ * Transfer history of the active account.
  *
- * ОГРАНИЧЕНИЯ ИСТОЧНИКА ПОКАЗЫВАЮТСЯ ЯВНО И НЕ ЗАВИСЯТ ОТ ОТБОРА.
- * Разбор журналов узла не видит переводов нативной валюты — они не
- * порождают событий — и охватывает лишь недавнее окно блоков. Показать
- * такую выборку без оговорки значит утверждать, что других операций
- * не было; для владельца средств это равнозначно сообщению о пропаже.
+ * SOURCE LIMITS ARE SHOWN EXPLICITLY AND DO NOT DEPEND ON THE FILTER.
+ * Log scanning cannot see native-currency transfers — they emit no
+ * events — and covers only a recent window of blocks. Showing that
+ * sample without a caveat claims that no other operations exist; for
+ * the owner that reads as a report of missing funds.
  *
- * ОТБОР ПРИМЕНЯЕТСЯ К УЖЕ ПОЛУЧЕННЫМ ЗАПИСЯМ. Он ничего не запрашивает
- * заново и не может расширить выдачу источника. Поэтому пустой результат
- * отбора и пустая история описываются разными словами: первое означает
- * «под условия ничего не подошло», второе — «источник ничего не вернул».
+ * THE FILTER APPLIES TO RECORDS ALREADY FETCHED. It does not query
+ * again and cannot widen the source. An empty filter result and an
+ * empty history are therefore different sentences: the first means
+ * "nothing matched", the second "the source returned nothing".
  */
 const ACTIVITY_VIEW = {
   Sendings: 'sendings',
+  Receivings: 'receivings',
   History: 'history',
 } as const
 
@@ -79,18 +81,20 @@ export function ActivityPage() {
   const [view, setView] = useState<ActivityView>(ACTIVITY_VIEW.Sendings)
   const canSeeSendings = directory.user !== null || readLoginCredentials() !== null
   const isSendings = canSeeSendings && view === ACTIVITY_VIEW.Sendings
+  const isReceivings = canSeeSendings && view === ACTIVITY_VIEW.Receivings
   const userSendings = useUserSendings(isSendings)
+  const userReceivings = useUserReceivings(isReceivings)
 
-  /* Условия отбора живут в состоянии экрана, а не в адресной строке:
-     запрос содержит адрес контрагента, а адресная строка сохраняется
-     в истории браузера и доступна расширениям. */
+  /* Filter state lives on the screen, not in the URL: the query
+     contains a counterparty address, and the address bar is stored
+     in browser history and visible to extensions. */
   const [filter, setFilter] = useState<ITransferFilter>(EMPTY_TRANSFER_FILTER)
   const network = snapshot.activeNetwork
   const [replacement, setReplacement] = useState<IReplacementState | null>(null)
 
-  /* Номер запроса отсекает ответ на отменённую подготовку: пользователь
-     мог закрыть карточку или выбрать другую транзакцию, пока узел считал
-     комиссию, и опоздавший ответ показал бы чужие данные. */
+  /* The request id drops a reply to a cancelled prepare: the user may
+     have closed the card or picked another tx while the node priced
+     gas, and a late reply would show someone else's data. */
   const requestId = useRef(0)
 
   const startReplacement = useCallback(
@@ -127,8 +131,8 @@ export function ActivityPage() {
   )
 
   const closeReplacement = useCallback(() => {
-    /* Счётчик сдвигается и здесь: иначе ответ уже начатой подготовки
-       открыл бы карточку заново поверх закрытой. */
+    /* Bump the counter here too: otherwise a reply to a prepare that
+       already started would reopen the card over a closed one. */
     requestId.current += 1
     setReplacement(null)
   }, [])
@@ -177,12 +181,16 @@ export function ActivityPage() {
     )
   }
 
-  const isRefreshing = isSendings ? userSendings.isLoading : snapshot.isHistoryLoading
+  const isRefreshing = isSendings
+    ? userSendings.isLoading
+    : isReceivings
+      ? userReceivings.isLoading
+      : snapshot.isHistoryLoading
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Activity</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
 
         <Button
           variant="ghost"
@@ -191,6 +199,11 @@ export function ActivityPage() {
           onClick={() => {
             if (isSendings) {
               void userSendings.refresh()
+              return
+            }
+
+            if (isReceivings) {
+              void userReceivings.refresh()
               return
             }
 
@@ -204,12 +217,13 @@ export function ActivityPage() {
 
       {canSeeSendings ? (
         <SegmentedControl
-          className="max-w-[16rem]"
+          className="max-w-[24rem]"
           legend="View"
           value={view}
           options={[
             { value: ACTIVITY_VIEW.Sendings, label: 'Sendings' },
-            { value: ACTIVITY_VIEW.History, label: 'History' },
+            { value: ACTIVITY_VIEW.Receivings, label: 'Receivings' },
+            { value: ACTIVITY_VIEW.History, label: 'History', disabled: true },
           ]}
           onChange={setView}
         />
@@ -222,6 +236,16 @@ export function ActivityPage() {
               sendings={userSendings.sendings}
               isLoading={userSendings.isLoading}
               error={userSendings.error}
+            />
+          </CardContent>
+        </Card>
+      ) : isReceivings ? (
+        <Card>
+          <CardContent className="p-0 sm:p-0">
+            <UserReceivingsList
+              receivings={userReceivings.receivings}
+              isLoading={userReceivings.isLoading}
+              error={userReceivings.error}
             />
           </CardContent>
         </Card>
@@ -262,14 +286,14 @@ function ActivityHistory({
   return (
     <>
 
-      {/* СООБЩЕНИЕ НЕ ОБЕЩАЕТ, ЧТО «СКОРО ПРОЙДЁТ».
-          Прежний текст звучал как рассказ о сбое, после которого стоит
-          повторить попытку. Измерение живых узлов показало другое:
-          бесплатные публичные узлы отказывают в выборке журналов
-          постоянно — кто требует платного архивного доступа, кто режет
-          диапазон до пятидесяти блоков, кто просит учётную запись.
-          Владелец, ждущий, что «само наладится», прождёт вечно, поэтому
-          названы обе настоящие развязки и сказано, что дело не в сбое. */}
+      {/* THE MESSAGE DOES NOT PROMISE THAT "IT WILL PASS SOON".
+          The old text read as a glitch you should retry. Measuring
+          live nodes showed otherwise: free public nodes refuse log
+          scans constantly — some demand paid archive access, some
+          cut the range to fifty blocks, some ask for an account.
+          An owner waiting for it to "just work" would wait forever,
+          so both real outcomes are named and it is said this is not
+          a glitch. */}
       {limits?.sourceUnavailable === true ? (
         <Alert variant="danger">
           <AlertDescription>
@@ -360,15 +384,16 @@ function ActivityHistory({
 }
 
 /**
- * Шаг замены зависшей транзакции.
+ * Replacement step for a stuck transaction.
  *
- * ЗАНИМАЕТ ЭКРАН ЦЕЛИКОМ, а не всплывает над списком: подтверждение
- * подписи — не фоновое действие, и внимание в этот момент делить не с чем.
+ * TAKES THE WHOLE SCREEN, it does not float over the list: signing
+ * confirmation is not a background action, and attention has nothing
+ * else to share with at that moment.
  *
- * ОТКАЗ ПОДГОТОВКИ ПОКАЗЫВАЕТСЯ ДОСЛОВНО. «Ускорить не удалось» без
- * причины не даёт понять, что делать: у отказа три разных исхода —
- * подождать, обновить приложение либо не делать ничего, потому что
- * перевод уже прошёл.
+ * A PREPARE FAILURE IS SHOWN VERBATIM. "Speed-up failed" with no
+ * reason leaves the user with no next step: a failure has three
+ * different outcomes — wait, update the app, or do nothing because
+ * the transfer already landed.
  */
 function ReplacementScreen({
   state,
@@ -386,7 +411,7 @@ function ReplacementScreen({
   if (state.prepared === null) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-semibold">
+        <h1 className="text-2xl font-semibold tracking-tight">
           {isCancel ? 'Cancelling a transaction' : 'Speeding up a transaction'}
         </h1>
 

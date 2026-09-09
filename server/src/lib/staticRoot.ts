@@ -3,13 +3,13 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Корень раздачи интерфейса.
+ * UI static root.
  *
- * Каталог обязан содержать `index.html`. Без него сервис остаётся
- * JSON-only: отсутствие сборки кошелька не должно ронять API.
+ * The directory must contain `index.html`. Without it the service
+ * stays JSON-only: a missing wallet build must not take down the API.
  *
- * `searchDefaults: false` в тестах: иначе локальный `dist` менял бы
- * ответы `GET /` и ломал бы проверки, которые ждут JSON 404.
+ * `searchDefaults: false` in tests: otherwise a local `dist` would
+ * change `GET /` responses and break checks that expect JSON 404.
  */
 export function resolveStaticRoot(options: {
   readonly configured: string | null
@@ -38,7 +38,7 @@ export function resolveStaticRoot(options: {
   }
 
   if (options.configured !== null) {
-    throw new Error(`STATIC_ROOT не содержит index.html: ${options.configured}`)
+    throw new Error(`STATIC_ROOT does not contain index.html: ${options.configured}`)
   }
 
   return null

@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { emailDomain, isEmailAddress, sendingFromAddresses } from './address.ts'
 
 describe('isEmailAddress', () => {
-  it('принимает обычный адрес', () => {
+  it('accepts an ordinary address', () => {
     expect(isEmailAddress('custom123@etwalletx.com')).toBe(true)
     expect(isEmailAddress('  james@example.com  ')).toBe(true)
   })
 
-  it('отвергает пустое и без домена', () => {
+  it('rejects empty and missing-domain values', () => {
     expect(isEmailAddress('')).toBe(false)
     expect(isEmailAddress('james')).toBe(false)
     expect(isEmailAddress('james@localhost')).toBe(false)
@@ -17,7 +17,7 @@ describe('isEmailAddress', () => {
 })
 
 describe('emailDomain', () => {
-  it('достаёт домен', () => {
+  it('extracts the domain', () => {
     expect(emailDomain('support@etwalletx.com')).toBe('etwalletx.com')
     expect(emailDomain('  Custom123@ETWALLETX.COM  ')).toBe('etwalletx.com')
     expect(emailDomain('not-an-email')).toBeNull()
@@ -25,7 +25,7 @@ describe('emailDomain', () => {
 })
 
 describe('sendingFromAddresses', () => {
-  it('собирает support, hello и остальные на домене MAIL_FROM', () => {
+  it('builds support, hello and the rest on the MAIL_FROM domain', () => {
     expect(sendingFromAddresses('support@etwalletx.com')).toEqual([
       'support@etwalletx.com',
       'hello@etwalletx.com',
@@ -37,11 +37,11 @@ describe('sendingFromAddresses', () => {
     ])
   })
 
-  it('ставит MAIL_FROM первым, если его нет в базовом списке', () => {
+  it('puts MAIL_FROM first when it is not in the base list', () => {
     expect(sendingFromAddresses('office@etwalletx.com')[0]).toBe('office@etwalletx.com')
   })
 
-  it('без адреса возвращает пустой список', () => {
+  it('without an address returns an empty list', () => {
     expect(sendingFromAddresses(null)).toEqual([])
   })
 })

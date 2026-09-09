@@ -32,8 +32,8 @@ query Mailbox($zoneTag: string!, $start: Time!, $end: Time!) {
 }`
 
 /**
- * Список писем из Cloudflare: отправка и входящие из activity log,
- * тела — из KV, если Worker их туда положил.
+ * Mail list from Cloudflare: sent and inbound from the activity log,
+ * bodies from KV if the Worker put them there.
  */
 export class CloudflareEmailsRepository implements IEmailsRepository {
   readonly #accountId: string

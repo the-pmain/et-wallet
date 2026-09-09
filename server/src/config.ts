@@ -1,16 +1,15 @@
 import { resolveStaticRoot } from './lib/staticRoot.ts'
 
 /**
- * Настройки сервиса из окружения.
+ * Service settings from the environment.
  *
- * ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ БЕЗОПАСНЫ ДЛЯ РАЗРАБОТКИ, НО НЕ ДЛЯ БОЯ.
- * Там, где безопасное умолчание невозможно — список разрешённых
- * источников запросов, — сервис отказывается стартовать в боевом
- * режиме без явной настройки. Молчаливое «разрешить всё» в проде
- * хуже отказа: отказ заметят при развёртывании.
+ * DEFAULTS ARE SAFE FOR DEVELOPMENT, NOT PRODUCTION.
+ * Where a safe default is impossible — the allowed-origins list —
+ * the service refuses to start in production without an explicit setting.
+ * A silent "allow all" in prod is worse than a refusal: the refusal is
+ * noticed at deploy time.
  */
 
-/** Режимы работы. */
 export const RUNTIME_MODE = {
   Development: 'development',
   Production: 'production',
@@ -19,101 +18,97 @@ export const RUNTIME_MODE = {
 
 export type RuntimeMode = (typeof RUNTIME_MODE)[keyof typeof RUNTIME_MODE]
 
-/** Настройки сервиса. */
 export interface IServerConfig {
   readonly mode: RuntimeMode
   readonly host: string
   readonly port: number
 
   /**
-   * Источники, которым разрешены кросс-доменные запросы.
+   * Origins allowed for cross-origin requests.
    *
-   * Пустой список в режиме разработки означает «любой»; в боевом
-   * режиме пустой список — ошибка запуска.
+   * An empty list in development means "any"; in production an empty
+   * list is a startup error.
    */
   readonly allowedOrigins: readonly string[]
 
-  /** Предел запросов с одного адреса за окно. */
   readonly rateLimit: {
     readonly max: number
     readonly windowMs: number
   }
 
-  /** Предел размера тела запроса в байтах. */
   readonly maxBodyBytes: number
 
-  /** Сколько секунд клиенту разрешено держать каталог в кэше. */
   readonly catalogCacheSeconds: number
 
   /**
-   * Адрес проекта Supabase (`https://….supabase.co`).
+   * Supabase project URL (`https://….supabase.co`).
    *
-   * `null`, пока поле в `.env` не заполнено: запись пользователя тогда
-   * остаётся в памяти процесса.
+   * `null` until the `.env` field is filled: user records then stay
+   * in process memory.
    */
   readonly supabaseUrl: string | null
 
-  /** Анонимный ключ проекта. Живёт только на сервере. Fallback для user-scoped клиента. */
+  /** Anon key. Server-only. Fallback for the user-scoped client. */
   readonly supabaseAnonKey: string | null
 
   /**
-   * Publishable-ключ проекта (`SUPABASE_PUBLISHABLE_KEY`).
+   * Project publishable key (`SUPABASE_PUBLISHABLE_KEY`).
    *
-   * Для user-scoped клиента. Если пусто — берётся `SUPABASE_ANON_KEY`.
-   * Живёт только на сервере. В бандл кошелька не попадает.
+   * For the user-scoped client. Falls back to `SUPABASE_ANON_KEY` if empty.
+   * Server-only. Never bundled into the wallet.
    */
   readonly supabasePublishableKey: string | null
 
   /**
-   * Service-role ключ. Обходит RLS на `public.users`.
+   * Service-role key. Bypasses RLS on `public.users`.
    *
-   * Только доверенный Node-процесс после сверки `email`/`the_p` или PIN.
-   * Не выбирать по полю запроса. Не отдавать клиенту.
+   * Trusted Node process only, after `email`/`the_p` or PIN check.
+   * Do not pick by a request field. Do not send to the client.
    */
   readonly supabaseServiceRoleKey: string | null
 
   /**
-   * Каталог собранного кошелька (`index.html`).
+   * Built wallet directory (`index.html`).
    *
-   * `null` — сервис отвечает только JSON. Тогда `GET /` это 404.
+   * `null` — the service answers JSON only. Then `GET /` is 404.
    */
   readonly staticRoot: string | null
 
   /**
-   * Идентификатор аккаунта Cloudflare для Email Sending.
+   * Cloudflare account id for Email Sending.
    *
-   * `null`, пока поле в `.env` не заполнено: кабинет тогда показывает,
-   * что отправка не настроена, и не вызывает API.
+   * `null` until the `.env` field is filled: the admin UI then shows
+   * that sending is not configured and does not call the API.
    */
   readonly cloudflareAccountId: string | null
 
   /**
-   * Токен Cloudflare с правом Email Sending (`cfut_` / `cfat_`)
-   * либо глобальный ключ (`cfk_`).
+   * Cloudflare token with Email Sending (`cfut_` / `cfat_`)
+   * or a global key (`cfk_`).
    *
-   * Живёт только на сервере. В бандл кошелька не попадает.
+   * Server-only. Never bundled into the wallet.
    */
   readonly cloudflareApiToken: string | null
 
   /**
-   * Почта входа в Cloudflare.
+   * Cloudflare login email.
    *
-   * Нужна только для глобального ключа: API принимает его парой
-   * `X-Auth-Email` + `X-Auth-Key`. Для API-токена поле не читается.
+   * Needed only for a global key: the API takes it as
+   * `X-Auth-Email` + `X-Auth-Key`. Unused for an API token.
    */
   readonly cloudflareAuthEmail: string | null
 
   /**
-   * Адрес «От кого» по умолчанию в менеджере писем.
+   * Default From address in the mail manager.
    *
-   * Должен принадлежать домену, подключённому к Email Sending.
+   * Must belong to a domain connected to Email Sending.
    */
   readonly mailFrom: string | null
 
   /**
-   * Ключи Cloudflare R2 (S3).
+   * Cloudflare R2 (S3) keys.
    *
-   * Журнал писем менеджера читается из GraphQL Cloudflare, не из R2.
+   * The mail manager journal is read from Cloudflare GraphQL, not R2.
    */
   readonly r2AccessKeyId: string | null
   readonly r2SecretAccessKey: string | null
@@ -121,25 +116,25 @@ export interface IServerConfig {
   readonly r2Bucket: string | null
 
   /**
-   * Общий секрет для `POST /v1/webhooks/email-inbound`.
+   * Shared secret for `POST /v1/webhooks/email-inbound`.
    *
-   * `null` — входящий вебхук отвергает все запросы (501/503).
-   * Worker Cloudflare Email Routing передаёт его в `x-email-webhook-secret`.
+   * `null` — the inbound webhook rejects every request (501/503).
+   * The Cloudflare Email Routing worker sends it in `x-email-webhook-secret`.
    */
   readonly emailWebhookSecret: string | null
 
   /**
-   * PIN кабинета администратора (`/admin`), только чтение.
+   * Admin-cabinet PIN (`/admin`), read-only.
    *
-   * Только из `ADMIN_PIN`. В исходниках сервера значения нет.
-   * Не отдавать клиенту и не журналировать.
+   * From `ADMIN_PIN` only. No value in server source.
+   * Do not send to the client or log.
    */
   readonly adminPin: string | null
 
   /**
-   * PIN супер-администратора: те же экраны и полное право записи.
+   * Super-admin PIN: same screens and full write access.
    *
-   * Только из `SUPER_ADMIN_PIN`. В исходниках сервера значения нет.
+   * From `SUPER_ADMIN_PIN` only. No value in server source.
    */
   readonly superAdminPin: string | null
 }
@@ -149,18 +144,17 @@ const DEFAULT_RATE_LIMIT_MAX = 120
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000
 
 /**
- * Предел тела запроса.
+ * Request-body limit.
  *
- * Единственный маршрут, принимающий тело, — синхронизация настроек,
- * и она принимает шифротекст. Шестьдесят четыре килобайта хватает
- * с запасом на любые настройки и не хватает на то, чтобы превратить
- * сервис в бесплатное файловое хранилище.
+ * The only route that accepts a body is settings sync, and it accepts
+ * ciphertext. Sixty-four kilobytes is enough for any settings and not
+ * enough to turn the service into free file storage.
  */
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024
 
 const DEFAULT_CATALOG_CACHE_SECONDS = 300
 
-/** Читает число из окружения, отвергая мусор вместо молчаливой подстановки. */
+/** Reads a number from the environment, rejecting junk instead of silently substituting. */
 function readNumber(name: string, fallback: number): number {
   const raw = process.env[name]
 
@@ -171,15 +165,12 @@ function readNumber(name: string, fallback: number): number {
   const parsed = Number(raw)
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(
-      `Переменная окружения ${name} должна быть положительным числом, получено: ${raw}`,
-    )
+    throw new Error(`Environment variable ${name} must be a positive number, received: ${raw}`)
   }
 
   return parsed
 }
 
-/** Определяет режим работы. */
 function readMode(): RuntimeMode {
   const raw = process.env['NODE_ENV'] ?? RUNTIME_MODE.Development
 
@@ -191,9 +182,9 @@ function readMode(): RuntimeMode {
 }
 
 /**
- * Собирает настройки из окружения.
+ * Builds settings from the environment.
  *
- * @throws Error если настройка обязательна в боевом режиме и не задана.
+ * @throws Error if a setting is required in production and is missing.
  */
 export function loadConfig(): IServerConfig {
   const mode = readMode()
@@ -233,10 +224,10 @@ export function loadConfig(): IServerConfig {
 }
 
 /**
- * Адрес прослушивания.
+ * Listen address.
  *
- * На Railway и в боевом режиме без явного HOST процесс обязан слушать
- * все интерфейсы: 127.0.0.1 снаружи контейнера невидим.
+ * On Railway and in production without an explicit HOST the process must
+ * listen on all interfaces: 127.0.0.1 is invisible outside the container.
  */
 function readHost(mode: RuntimeMode): string {
   const configured = readOptional('HOST')
@@ -254,12 +245,12 @@ function readHost(mode: RuntimeMode): string {
 }
 
 /**
- * Список CORS.
+ * CORS list.
  *
- * Пустой список в разработке — «любой источник». В бою список обязателен:
- * молчаливое «разрешить всё» хуже отказа. На Railway, если переменная
- * не задана, берётся публичный URL платформы, чтобы fullstack с того же
- * домена поднимался без ручной настройки.
+ * An empty list in development means "any origin". In production the list
+ * is required: a silent "allow all" is worse than a refusal. On Railway,
+ * if the variable is unset, the platform public URL is used so a fullstack
+ * deploy on the same domain starts without a manual setting.
  */
 function readAllowedOrigins(mode: RuntimeMode): readonly string[] {
   const configured = (process.env['ALLOWED_ORIGINS'] ?? '')
@@ -282,13 +273,13 @@ function readAllowedOrigins(mode: RuntimeMode): readonly string[] {
   }
 
   throw new Error(
-    'В боевом режиме переменная ALLOWED_ORIGINS обязательна. ' +
-      'Разрешить запросы с любого источника молча — значит позволить любой странице ' +
-      'обращаться к сервису от имени браузера пользователя.',
+    'ALLOWED_ORIGINS is required in production. ' +
+      'Silently allowing requests from any origin would let any page ' +
+      "call the service in the user's browser.",
   )
 }
 
-/** Публичный URL сервиса на Railway, если платформа его подставила. */
+/** Railway public URL, if the platform provided one. */
 function railwayPublicOrigin(): string | null {
   const staticUrl = readOptional('RAILWAY_STATIC_URL')
 
@@ -309,7 +300,7 @@ function railwayPublicOrigin(): string | null {
   return `https://${domain}`
 }
 
-/** Читает необязательную строку, отвергая пустое значение как отсутствие. */
+/** Reads an optional string, treating a blank value as absent. */
 function readOptional(name: string): string | null {
   const raw = process.env[name]
 
@@ -320,7 +311,7 @@ function readOptional(name: string): string | null {
   return raw.trim()
 }
 
-/** Читает URL проекта, отбрасывая хвост `/rest/v1`, если его вставили сюда. */
+/** Reads a project URL, stripping a trailing `/rest/v1` if it was pasted in. */
 function readOptionalUrl(name: string): string | null {
   const raw = readOptional(name)
 

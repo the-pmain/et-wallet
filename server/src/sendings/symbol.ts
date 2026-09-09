@@ -2,8 +2,8 @@
 export const SENDING_SYMBOL_JSON_PATTERN = '^[A-Za-z0-9]{1,16}$'
 
 /**
- * Читает тикер актива. Пустая строка и посторонние знаки — отказ.
- * Регистр приводится к верхнему: `eth` и `ETH` — одна колонка.
+ * Reads an asset ticker. Empty and foreign characters are a refusal.
+ * Case is folded to upper: `eth` and `ETH` are one column.
  */
 export function readSendingSymbol(value: string): string | null {
   const trimmed = value.trim()

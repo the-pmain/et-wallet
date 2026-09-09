@@ -157,10 +157,16 @@ describe('Вход в экран аккаунта', () => {
           init?.method === 'POST',
       )
 
-    expect(JSON.parse(String(authCall?.[1]?.body))).toEqual({
+    const authBody = JSON.parse(String(authCall?.[1]?.body)) as Record<string, unknown>
+
+    expect(authBody).toMatchObject({
       email: 'james@example.com',
       the_p: 'demo',
     })
+
+    /* The browser time zone rides along with sign-in: the admin
+       Activity tab reads the login location from it. */
+    expect(typeof authBody['time_zone']).toBe('string')
 
     expect(readLoginCredentials()).toEqual({
       id: '7',
@@ -244,6 +250,25 @@ describe('Вход в экран аккаунта', () => {
       email: 'james@example.com',
       theP: '123456',
     })
+
+    /* Restoring a session reads the record and does not sign in again:
+       a repeated `POST /v1/users/auth` would count as a fresh login on
+       the admin Activity tab every time a tab is reloaded. */
+    const calls = vi.mocked(globalThis.fetch).mock.calls
+    expect(
+      calls.some(
+        ([url, init]) =>
+          (typeof url === 'string' ? url : '').includes('/v1/users/7') &&
+          (init?.method ?? 'GET') === 'GET',
+      ),
+    ).toBe(true)
+    expect(
+      calls.some(
+        ([url, init]) =>
+          (typeof url === 'string' ? url : '').endsWith('/v1/users/auth') &&
+          init?.method === 'POST',
+      ),
+    ).toBe(false)
   })
 
   it('при отказе входа стирает сохранённые учётные данные', async () => {

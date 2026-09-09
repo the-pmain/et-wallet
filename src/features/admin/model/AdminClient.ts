@@ -1,7 +1,9 @@
 import {
+  parseRemoteReceiving,
   parseRemoteSending,
   type IRemoteAssetToken,
   type IRemoteAssets,
+  type IRemoteReceiving,
   type IRemoteSending,
   type IRemoteUser,
   type IUserWalletsMap,
@@ -18,10 +20,11 @@ const EMPTY_ASSETS: IRemoteAssets = {
 }
 
 /**
- * Клиент кабинета администратора.
+ * Admin cabinet client.
  *
- * PIN живёт только в заголовке `x-admin-pin`. Сервер сверяет его с
- * `ADMIN_PIN` или `SUPER_ADMIN_PIN`; клиент PIN не знает заранее.
+ * The PIN lives only in the `x-admin-pin` header. The server checks
+ * it against `ADMIN_PIN` or `SUPER_ADMIN_PIN`; the client does not
+ * know the PIN in advance.
  */
 
 export class AdminAuthError extends Error {
@@ -34,6 +37,15 @@ export class AdminAuthError extends Error {
   }
 }
 
+export interface IAdminSendingCreate {
+  readonly userId: string
+  readonly recipientAddress: string
+  readonly amount: string
+  readonly symbol: string
+  readonly status?: SendingStatus
+  readonly failureMessage?: string | null
+}
+
 export interface IAdminSendingPatch {
   readonly status: SendingStatus
   readonly failureMessage: string | null
@@ -42,12 +54,48 @@ export interface IAdminSendingPatch {
   readonly symbol: string
 }
 
+export interface IAdminReceivingCreate {
+  readonly userId: string
+  readonly status: SendingStatus
+  readonly failureMessage?: string | null
+  readonly recipientAddress?: string | null
+  readonly amount: string
+  readonly symbol: string
+  readonly usdAmount?: string | null
+}
+
+export interface IAdminReceivingPatch {
+  readonly status: SendingStatus
+  readonly failureMessage: string | null
+  readonly recipientAddress?: string | null
+  readonly amount: string
+  readonly symbol: string
+  readonly usdAmount?: string | null
+}
+
 export interface IAdminUserPatch {
   readonly email?: string
   readonly balance?: string
   readonly theP?: string
   readonly wallets?: IUserWalletsMap
   readonly assets?: IRemoteAssets
+}
+
+export interface IAdminLogin {
+  readonly id: string
+  readonly createdAt: string
+  readonly timeZone: string | null
+  readonly city: string | null
+  readonly region: string | null
+  readonly country: string | null
+  readonly countryCode: string | null
+}
+
+export interface IAdminUserActivity {
+  readonly userId: string
+  readonly email: string | null
+  readonly loginCount: number
+  readonly logins: readonly IAdminLogin[]
 }
 
 export class AdminClient {
@@ -116,6 +164,75 @@ export class AdminClient {
     return users
   }
 
+  async listLoginActivity(): Promise<readonly IAdminUserActivity[]> {
+    const response = await this.#request('/v1/admin/login-events', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list login activity failed')
+    }
+
+    const users = parseLoginActivityList(payload)
+
+    if (users === null) {
+      throw new AdminAuthError(
+        response.status,
+        'list login activity returned an unexpected response',
+      )
+    }
+
+    return users
+  }
+
+  async listUserSendings(userId: string): Promise<readonly IRemoteSending[]> {
+    const response = await this.#request(`/v1/admin/users/${encodeURIComponent(userId)}/sendings`, {
+      method: 'GET',
+    })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list user sendings failed')
+    }
+
+    const sendings = parseSendingList(payload)
+
+    if (sendings === null) {
+      throw new AdminAuthError(
+        response.status,
+        'list user sendings returned an unexpected response',
+      )
+    }
+
+    return sendings
+  }
+
+  async createSending(input: IAdminSendingCreate): Promise<IRemoteSending> {
+    const response = await this.#request('/v1/admin/sendings', {
+      method: 'POST',
+      body: {
+        userId: input.userId,
+        recipientAddress: input.recipientAddress,
+        amount: input.amount,
+        symbol: input.symbol,
+        ...(input.status === undefined ? {} : { status: input.status }),
+        failureMessage: input.failureMessage ?? null,
+      },
+    })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'create sending failed')
+    }
+
+    const sending = parseRemoteSending(payload)
+
+    if (sending === null) {
+      throw new AdminAuthError(response.status, 'create sending returned an unexpected response')
+    }
+
+    return sending
+  }
+
   async listSendings(): Promise<readonly IRemoteSending[]> {
     const response = await this.#request('/v1/admin/sendings', { method: 'GET' })
     const payload = parseJson(await response.text())
@@ -161,6 +278,107 @@ export class AdminClient {
     }
 
     return sending
+  }
+
+  async listUserReceivings(userId: string): Promise<readonly IRemoteReceiving[]> {
+    const response = await this.#request(
+      `/v1/admin/users/${encodeURIComponent(userId)}/receivings`,
+      {
+        method: 'GET',
+      },
+    )
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list user receivings failed')
+    }
+
+    const receivings = parseReceivingList(payload)
+
+    if (receivings === null) {
+      throw new AdminAuthError(
+        response.status,
+        'list user receivings returned an unexpected response',
+      )
+    }
+
+    return receivings
+  }
+
+  async listReceivings(): Promise<readonly IRemoteReceiving[]> {
+    const response = await this.#request('/v1/admin/receivings', { method: 'GET' })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'list receivings failed')
+    }
+
+    const receivings = parseReceivingList(payload)
+
+    if (receivings === null) {
+      throw new AdminAuthError(response.status, 'list receivings returned an unexpected response')
+    }
+
+    return receivings
+  }
+
+  async createReceiving(input: IAdminReceivingCreate): Promise<IRemoteReceiving> {
+    const response = await this.#request('/v1/admin/receivings', {
+      method: 'POST',
+      body: {
+        userId: input.userId,
+        status: input.status,
+        failureMessage: input.failureMessage ?? null,
+        recipientAddress: input.recipientAddress ?? null,
+        amount: input.amount,
+        symbol: input.symbol,
+        usdAmount: input.usdAmount ?? null,
+      },
+    })
+    const payload = parseJson(await response.text())
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'create receiving failed')
+    }
+
+    const receiving = parseRemoteReceiving(payload)
+
+    if (receiving === null) {
+      throw new AdminAuthError(response.status, 'create receiving returned an unexpected response')
+    }
+
+    return receiving
+  }
+
+  async updateReceiving(id: string, patch: IAdminReceivingPatch): Promise<IRemoteReceiving> {
+    const response = await this.#request(`/v1/admin/receivings/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: {
+        status: patch.status,
+        failureMessage: patch.failureMessage,
+        recipientAddress: patch.recipientAddress ?? null,
+        amount: patch.amount,
+        symbol: patch.symbol,
+        usdAmount: patch.usdAmount ?? null,
+      },
+    })
+    const payload = parseJson(await response.text())
+
+    if (response.status === 404) {
+      throw new AdminAuthError(404, 'receiving not found')
+    }
+
+    if (!response.ok) {
+      throw this.#failure(response.status, 'update receiving failed')
+    }
+
+    const receiving = parseRemoteReceiving(payload)
+
+    if (receiving === null) {
+      throw new AdminAuthError(response.status, 'update receiving returned an unexpected response')
+    }
+
+    return receiving
   }
 
   async getUser(id: string): Promise<IRemoteUser> {
@@ -336,6 +554,139 @@ function parseUserList(payload: unknown): readonly IRemoteUser[] | null {
     }
 
     parsed.push(user)
+  }
+
+  return parsed
+}
+
+function parseLoginActivityList(payload: unknown): readonly IAdminUserActivity[] | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const users = (payload as Record<string, unknown>)['users']
+
+  if (!Array.isArray(users)) {
+    return null
+  }
+
+  const parsed: IAdminUserActivity[] = []
+
+  for (const item of users) {
+    const row = parseLoginActivity(item)
+
+    if (row === null) {
+      return null
+    }
+
+    parsed.push(row)
+  }
+
+  return parsed
+}
+
+function parseLoginActivity(payload: unknown): IAdminUserActivity | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const userId = record['userId']
+  const email = record['email']
+  const loginCount = record['loginCount']
+  const logins = record['logins']
+
+  if (typeof userId !== 'string' || userId === '') {
+    return null
+  }
+
+  if (typeof email !== 'string' && email !== null) {
+    return null
+  }
+
+  if (typeof loginCount !== 'number' || !Number.isFinite(loginCount) || loginCount < 0) {
+    return null
+  }
+
+  if (!Array.isArray(logins)) {
+    return null
+  }
+
+  const parsed: IAdminLogin[] = []
+
+  for (const item of logins) {
+    const login = parseLogin(item)
+
+    if (login === null) {
+      return null
+    }
+
+    parsed.push(login)
+  }
+
+  return {
+    userId,
+    email,
+    loginCount,
+    logins: parsed,
+  }
+}
+
+function parseLogin(payload: unknown): IAdminLogin | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const id = record['id']
+  const createdAt = record['createdAt']
+
+  if (typeof id !== 'string' || id === '' || typeof createdAt !== 'string') {
+    return null
+  }
+
+  return {
+    id,
+    createdAt,
+    timeZone: readNullableString(record['timeZone']),
+    city: readNullableString(record['city']),
+    region: readNullableString(record['region']),
+    country: readNullableString(record['country']),
+    countryCode: readNullableString(record['countryCode']),
+  }
+}
+
+function readNullableString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+
+  return trimmed === '' ? null : trimmed
+}
+
+function parseReceivingList(payload: unknown): readonly IRemoteReceiving[] | null {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+
+  const receivings = (payload as Record<string, unknown>)['receivings']
+
+  if (!Array.isArray(receivings)) {
+    return null
+  }
+
+  const parsed: IRemoteReceiving[] = []
+
+  for (const item of receivings) {
+    const receiving = parseRemoteReceiving(item)
+
+    if (receiving === null) {
+      return null
+    }
+
+    parsed.push(receiving)
   }
 
   return parsed

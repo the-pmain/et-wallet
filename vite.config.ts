@@ -61,7 +61,7 @@ export default defineConfig({
         configure(proxy) {
           proxy.on('proxyRes', (proxyRes, req) => {
             const path = (req.url ?? '').split('?')[0]
-            if (path === '/v1/sendings') {
+            if (path === '/v1/sendings' || path === '/v1/receivings') {
               proxyRes.headers['cache-control'] = 'no-store, no-transform'
               proxyRes.headers['x-accel-buffering'] = 'no'
             }

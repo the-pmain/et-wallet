@@ -1,11 +1,11 @@
 /**
- * Различает ключ Cloudflare и токен.
+ * Distinguishes a Cloudflare key from a token.
  *
- * С апреля 2026 глобальный ключ начинается с `cfk_`, токены — с
- * `cfut_` / `cfat_`. Email Sending принимает глобальный ключ только
- * как пару `X-Auth-Email` + `X-Auth-Key`. Тот же секрет в
- * `Authorization: Bearer` Cloudflare отвергает как
- * «Authentication error» — до проверки права на отправку.
+ * From April 2026 a global key starts with `cfk_`, tokens with
+ * `cfut_` / `cfat_`. Email Sending accepts a global key only as
+ * `X-Auth-Email` + `X-Auth-Key`. The same secret in
+ * `Authorization: Bearer` is rejected by Cloudflare as
+ * "Authentication error" — before send permission is checked.
  */
 
 const GLOBAL_KEY_PREFIX = 'cfk_'
@@ -15,7 +15,6 @@ export function isCloudflareGlobalApiKey(secret: string): boolean {
   return secret.startsWith(GLOBAL_KEY_PREFIX) || LEGACY_GLOBAL_KEY.test(secret)
 }
 
-/** Заголовки аутентификации Cloudflare REST / GraphQL. */
 export function cloudflareAuthHeaders(
   secret: string,
   authEmail: string | null,

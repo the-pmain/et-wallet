@@ -58,6 +58,42 @@ const MARIA = {
   assets: EMPTY_REMOTE_ASSETS,
 }
 
+const EMPTY_LOGIN_PLACE = {
+  timeZone: null,
+  city: null,
+  region: null,
+  country: null,
+  countryCode: null,
+}
+
+const LOGIN_ACTIVITY = {
+  users: [
+    {
+      userId: '7',
+      email: 'james@example.com',
+      loginCount: 2,
+      logins: [
+        {
+          id: 'e2',
+          createdAt: '2026-09-08T12:04:21.000Z',
+          timeZone: 'Europe/London',
+          city: 'London',
+          region: 'England',
+          country: 'United Kingdom',
+          countryCode: 'GB',
+        },
+        { id: 'e1', createdAt: '2026-09-07T08:12:03.000Z', ...EMPTY_LOGIN_PLACE },
+      ],
+    },
+    {
+      userId: '8',
+      email: 'maria@example.com',
+      loginCount: 0,
+      logins: [],
+    },
+  ],
+}
+
 let services: ITestAppServices
 let fetchSpy: MockInstance<typeof fetch>
 let listedSendings: unknown[]
@@ -169,6 +205,53 @@ beforeEach(() => {
         return Promise.resolve(jsonResponse(200, USER))
       }
 
+      if (url.endsWith('/v1/admin/users/7/sendings') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { sendings: [] }))
+      }
+
+      if (url.endsWith('/v1/admin/users/7/receivings') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { receivings: [] }))
+      }
+
+      if (url.endsWith('/v1/admin/login-events') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, LOGIN_ACTIVITY))
+      }
+
+      if (url.endsWith('/v1/admin/sendings') && method === 'POST') {
+        const body = requestJson(init) as Record<string, unknown>
+
+        return Promise.resolve(
+          jsonResponse(201, {
+            id: 's-admin',
+            createdAt: '2026-09-07T12:00:00.000Z',
+            userId: '7',
+            status: body['status'] ?? 'pending',
+            failureMessage: body['failureMessage'] ?? null,
+            recipientAddress: body['recipientAddress'] ?? null,
+            amount: body['amount'] ?? '0',
+            symbol: body['symbol'] ?? 'ETH',
+          }),
+        )
+      }
+
+      if (url.endsWith('/v1/admin/receivings') && method === 'POST') {
+        const body = requestJson(init) as Record<string, unknown>
+
+        return Promise.resolve(
+          jsonResponse(201, {
+            id: 'r-admin',
+            createdAt: '2026-09-07T12:00:00.000Z',
+            userId: '7',
+            status: body['status'] ?? 'pending',
+            failureMessage: body['failureMessage'] ?? null,
+            recipientAddress: body['recipientAddress'] ?? null,
+            amount: body['amount'] ?? '0',
+            symbol: body['symbol'] ?? 'ETH',
+            usdAmount: body['usdAmount'] ?? null,
+          }),
+        )
+      }
+
       return Promise.resolve(jsonResponse(403, {}))
     }
 
@@ -180,8 +263,59 @@ beforeEach(() => {
       return Promise.resolve(jsonResponse(200, { users: [USER, MARIA] }))
     }
 
+    if (url.endsWith('/v1/admin/login-events') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, LOGIN_ACTIVITY))
+    }
+
     if (url.endsWith('/v1/admin/sendings') && method === 'GET') {
       return Promise.resolve(jsonResponse(200, { sendings: listedSendings }))
+    }
+
+    if (url.endsWith('/v1/admin/users/7/sendings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { sendings: [] }))
+    }
+
+    if (url.endsWith('/v1/admin/users/7/receivings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { receivings: [] }))
+    }
+
+    if (url.endsWith('/v1/admin/sendings') && method === 'POST') {
+      const body = requestJson(init) as Record<string, unknown>
+
+      return Promise.resolve(
+        jsonResponse(201, {
+          id: 's-1',
+          createdAt: '2026-09-07T12:00:00.000Z',
+          userId: '7',
+          status: body['status'] ?? 'pending',
+          failureMessage: body['failureMessage'] ?? null,
+          recipientAddress: body['recipientAddress'] ?? null,
+          amount: body['amount'] ?? '0',
+          symbol: body['symbol'] ?? 'ETH',
+        }),
+      )
+    }
+
+    if (url.endsWith('/v1/admin/receivings') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, { receivings: [] }))
+    }
+
+    if (url.endsWith('/v1/admin/receivings') && method === 'POST') {
+      const body = requestJson(init) as Record<string, unknown>
+
+      return Promise.resolve(
+        jsonResponse(201, {
+          id: 'r-1',
+          createdAt: '2026-09-07T12:00:00.000Z',
+          userId: '7',
+          status: body['status'] ?? 'pending',
+          failureMessage: body['failureMessage'] ?? null,
+          recipientAddress: body['recipientAddress'] ?? null,
+          amount: body['amount'] ?? '0',
+          symbol: body['symbol'] ?? 'ETH',
+          usdAmount: body['usdAmount'] ?? null,
+        }),
+      )
     }
 
     if (url.includes('/v1/admin/sendings/') && method === 'PATCH') {
@@ -207,6 +341,17 @@ beforeEach(() => {
       return Promise.resolve(jsonResponse(200, USER))
     }
 
+    if (url.endsWith('/v1/admin/users/8') && method === 'GET') {
+      return Promise.resolve(jsonResponse(200, MARIA))
+    }
+
+    if (url.endsWith('/v1/admin/users/8') && method === 'PATCH') {
+      const body = requestJson(init) as { wallets?: unknown }
+      const wallets = body.wallets ?? MARIA.wallets
+
+      return Promise.resolve(jsonResponse(200, { ...MARIA, wallets }))
+    }
+
     if (url.endsWith('/v1/admin/users/7') && method === 'PATCH') {
       const body = requestJson(init) as {
         wallets?: { key: string; value: string }[]
@@ -228,8 +373,8 @@ afterEach(() => {
   window.location.hash = ''
 })
 
-describe('Кабинет администратора', () => {
-  it('спрашивает PIN и пускает при верном значении', async () => {
+describe('Admin cabinet', () => {
+  it('asks for a PIN and admits the correct value', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -246,12 +391,13 @@ describe('Кабинет администратора', () => {
     expect(screen.getByText('Super Admin')).toBeInTheDocument()
     expect(await screen.findByText('james@example.com')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Avatar for james@example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Activity' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBe('9100')
   })
 
-  it('не пускает с неверным PIN', async () => {
+  it('does not admit a wrong PIN', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -262,7 +408,7 @@ describe('Кабинет администратора', () => {
     expect(localStorage.getItem(ADMIN_PIN_STORAGE_KEY)).toBeNull()
   })
 
-  it('PIN чтения открывает кабинет без Sendings, SSE и записи', async () => {
+  it('a read PIN opens the cabinet without Sendings, SSE, or writes', async () => {
     const user = userEvent.setup()
     renderAdmin()
 
@@ -274,6 +420,7 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
     expect(screen.getByText('Admin')).toBeInTheDocument()
     expect(screen.queryByText('Super Admin')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Activity' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Sendings' })).not.toBeInTheDocument()
     expect(
       TestEventSource.instances.filter((source) => source.url.includes('/v1/sendings')),
@@ -281,12 +428,74 @@ describe('Кабинет администратора', () => {
 
     await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
     expect(await screen.findByRole('heading', { name: 'james@example.com' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Save ETH' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('ETH receiving status')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('ETH value in USD')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add crypto' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete user' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create sending' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create receiving' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Sending amount')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Receiving amount')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.getByText('Email')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save account' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Wallets' }))
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save wallets' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
   })
 
-  it('остаётся в кабинете по сохранённому PIN', async () => {
+  it('a read PIN opens the Activity tab and lists authentications', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '4200')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Activity' }))
+
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByText('2 users · 2 authentications.')).toBeInTheDocument()
+    expect(screen.getByText('Never signed in')).toBeInTheDocument()
+    expect(screen.getByText(/id 7 · 2 authentications/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /maria@example.com/i })).toHaveAttribute(
+      'href',
+      '/admin/users/8',
+    )
+    expect(screen.getByRole('link', { name: /maria@example.com/i }).className).toMatch(
+      /hover:bg-accent/u,
+    )
+    expect(screen.getByRole('link', { name: /maria@example.com/i }).className).toMatch(
+      /text-muted-foreground/u,
+    )
+    expect(screen.getByText(/id 7 · 2 authentications/).className).toMatch(/text-foreground/u)
+    expect(
+      fetchSpy.mock.calls.some((call) =>
+        requestUrl(call[0] as RequestInfo | URL).endsWith('/v1/admin/login-events'),
+      ),
+    ).toBe(true)
+
+    await user.click(screen.getByText(/id 7 · 2 authentications/))
+    expect(document.querySelector('time[datetime="2026-09-08T12:04:21.000Z"]')).not.toBeNull()
+    expect(document.querySelector('time[datetime="2026-09-07T08:12:03.000Z"]')).not.toBeNull()
+    expect(screen.getAllByText('London, United Kingdom').length).toBeGreaterThan(0)
+  })
+
+  it('a super PIN also opens the Activity tab', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: 'Activity' }))
+
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByText('2 users · 2 authentications.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sendings' })).toBeInTheDocument()
+  })
+
+  it('stays in the cabinet with a stored PIN', async () => {
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
@@ -294,7 +503,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
   })
 
-  it('открывает профиль и меняет адрес кошелька', async () => {
+  it('opens a profile and changes a wallet address', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -316,7 +525,58 @@ describe('Кабинет администратора', () => {
     expect(window.location.pathname).toContain('/admin/users/7')
   })
 
-  it('сохраняет сумму актива в минимальных единицах с кнопки строки', async () => {
+  it('shows a mock wallet by default and adds a named wallet', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: /maria@example.com/i }))
+    await user.click(await screen.findByRole('button', { name: 'Wallets' }))
+
+    expect(await screen.findByLabelText('Address for mock-wallet')).toHaveValue(
+      '0x000000000000000000000000000000000000dEaD',
+    )
+
+    await user.type(screen.getByLabelText('Wallet name'), 'Cold')
+    await user.type(
+      screen.getByLabelText('Wallet address'),
+      '0x1234567890123456789012345678901234567890',
+    )
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(await screen.findByLabelText('Address for cold')).toHaveValue(
+      '0x1234567890123456789012345678901234567890',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Save wallets' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+
+    const patch = fetchSpy.mock.calls
+      .map((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const init = call[1]
+
+        if (!url.endsWith('/v1/admin/users/8') || (init?.method ?? 'GET') !== 'PATCH') {
+          return null
+        }
+
+        return requestJson(init) as {
+          wallets?: Record<string, { key: string; value: string }>
+        }
+      })
+      .find((body) => body !== null)
+
+    expect(patch?.wallets).toMatchObject({
+      'mock-wallet': {
+        key: '0x000000000000000000000000000000000000dEaD',
+      },
+      cold: {
+        key: '0x1234567890123456789012345678901234567890',
+      },
+    })
+  })
+
+  it('creates a receiving from the asset status select', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -333,43 +593,130 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByText('$9,852.36')).toBeInTheDocument()
     expect(screen.getByText('≈ 3 ETH')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Save ETH' }))
-    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('ETH receiving status'))
+    await user.click(screen.getByRole('option', { name: 'success' }))
+    expect(await screen.findByText('Receiving created (success).')).toBeInTheDocument()
 
     const usdcUsd = screen.getByLabelText('USDC value in USD')
     await user.clear(usdcUsd)
     await user.type(usdcUsd, '1.5')
     expect(screen.getByText('≈ 1.5 USDC')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Save USDC' }))
-    expect(await screen.findAllByText('Saved.')).not.toHaveLength(0)
+    await user.click(screen.getByLabelText('USDC receiving status'))
+    await user.click(screen.getByRole('option', { name: 'pending' }))
+    expect(await screen.findByText('Receiving created (pending).')).toBeInTheDocument()
 
-    const patches = fetchSpy.mock.calls
+    const created = fetchSpy.mock.calls
       .map((call) => {
         const url = requestUrl(call[0] as RequestInfo | URL)
         const init = call[1]
         const method = init?.method ?? 'GET'
 
-        if (!url.endsWith('/v1/admin/users/7') || method !== 'PATCH') {
+        if (!url.endsWith('/v1/admin/receivings') || method !== 'POST') {
           return null
         }
 
         return requestJson(init) as {
-          assets?: { tokens?: { symbol: string; balance: string }[] }
+          symbol?: string
+          amount?: string
+          status?: string
+          usdAmount?: string
         }
       })
       .filter((body) => body !== null)
 
-    expect(patches[0]?.assets?.tokens?.[0]).toMatchObject({
+    expect(created[0]).toMatchObject({
       symbol: 'ETH',
-      balance: '3000000000000000000',
+      amount: '3',
+      status: 'success',
+      usdAmount: '9852.36',
     })
-    expect(patches[1]?.assets?.tokens?.[1]).toMatchObject({
+    expect(created[1]).toMatchObject({
       symbol: 'USDC',
-      balance: '1500000',
+      amount: '1.5',
+      status: 'pending',
+      usdAmount: '1.5',
     })
   })
 
-  it('добавляет криптовалюту из меню в шапке Assets', async () => {
+  it('creates a sending and a receiving from the user Assets sections', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
+    renderAdmin()
+
+    await user.click(await screen.findByRole('link', { name: /james@example.com/i }))
+    await screen.findByLabelText('Sending amount')
+
+    await user.type(screen.getByLabelText('Sending amount'), '0.01')
+    await user.type(
+      screen.getByLabelText('Recipient'),
+      '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359',
+    )
+    await user.click(screen.getByRole('button', { name: 'Create sending' }))
+
+    expect(await screen.findByText('Sending created (pending).')).toBeInTheDocument()
+    expect(screen.queryByText('No sendings yet')).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Receiving amount'), '0.15')
+    expect(await screen.findByText('≈ $492.62')).toBeInTheDocument()
+    expect(screen.queryByLabelText('USD (optional)')).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Receiving amount'))
+    await user.click(screen.getByLabelText('Receiving asset'))
+    await user.click(screen.getByRole('option', { name: 'Select USDT on Ethereum' }))
+    await user.type(screen.getByLabelText('Receiving amount'), '0.2')
+    await user.click(screen.getByRole('button', { name: 'Create receiving' }))
+
+    expect(await screen.findByText('Receiving created (pending).')).toBeInTheDocument()
+    expect(screen.queryByText('No receivings yet')).not.toBeInTheDocument()
+
+    const posts = fetchSpy.mock.calls
+      .map((call) => {
+        const url = requestUrl(call[0] as RequestInfo | URL)
+        const init = call[1]
+        const method = init?.method ?? 'GET'
+
+        if (method !== 'POST') {
+          return null
+        }
+
+        if (url.endsWith('/v1/admin/sendings')) {
+          return { kind: 'sending', body: requestJson(init) }
+        }
+
+        if (url.endsWith('/v1/admin/receivings')) {
+          return { kind: 'receiving', body: requestJson(init) }
+        }
+
+        return null
+      })
+      .filter((item) => item !== null)
+
+    expect(posts).toEqual(
+      expect.arrayContaining([
+        {
+          kind: 'sending',
+          body: expect.objectContaining({
+            userId: '7',
+            amount: '0.01',
+            symbol: 'ETH',
+            recipientAddress: '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359',
+            status: 'pending',
+          }),
+        },
+        {
+          kind: 'receiving',
+          body: expect.objectContaining({
+            userId: '7',
+            amount: '0.2',
+            symbol: 'USDT',
+            status: 'pending',
+          }),
+        },
+      ]),
+    )
+  })
+
+  it('adds a cryptocurrency from the Assets header menu', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -412,7 +759,7 @@ describe('Кабинет администратора', () => {
     )
   })
 
-  it('ищет пользователя по адресу кошелька', async () => {
+  it('finds a user by wallet address', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -429,7 +776,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByText('maria@example.com')).not.toBeInTheDocument()
   })
 
-  it('открывает вкладку Sendings, поток SSE и добавляет кадр create', async () => {
+  it('opens the Sendings tab, the SSE stream, and appends a create frame', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -478,7 +825,7 @@ describe('Кабинет администратора', () => {
     expect(document.querySelector('time[datetime="2026-08-22T14:44:10.949Z"]')).not.toBeNull()
   })
 
-  it('окрашивает статусы pending, success и failure', async () => {
+  it('colors pending, success, and failure statuses', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -522,7 +869,7 @@ describe('Кабинет администратора', () => {
     expect(screen.getByText(/rejected/)).toBeInTheDocument()
   })
 
-  it('рисует записи из GET /v1/admin/sendings', async () => {
+  it('renders records from GET /v1/admin/sendings', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
@@ -562,7 +909,7 @@ describe('Кабинет администратора', () => {
     expect(screen.getByText(/id 62 · user 74/)).toBeInTheDocument()
   })
 
-  it('сохраняет правку sending через PATCH и шлёт status с failureMessage', async () => {
+  it('saves a sending edit via PATCH and sends status with failureMessage', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
@@ -644,7 +991,7 @@ describe('Кабинет администратора', () => {
     })
   })
 
-  it('даёт написать свою причину отказа через Custom', async () => {
+  it('lets the admin write a custom rejection reason via Custom', async () => {
     const previous = fetchSpy.getMockImplementation()
     fetchSpy.mockImplementation((input, init) => {
       const url = requestUrl(input)
@@ -705,7 +1052,7 @@ describe('Кабинет администратора', () => {
     })
   })
 
-  it('на любой вкладке кабинета показывает тост новой pending-отправки', async () => {
+  it('shows a toast for a new pending send on any cabinet tab', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -733,7 +1080,7 @@ describe('Кабинет администратора', () => {
     expect(await screen.findByRole('heading', { name: 'Edit sending' })).toBeInTheDocument()
   })
 
-  it('сразу показывает pending-отправки, которые уже есть в справочнике', async () => {
+  it('immediately shows pending sends already in the directory', async () => {
     listedSendings = [PENDING_SENDING]
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
@@ -744,7 +1091,7 @@ describe('Кабинет администратора', () => {
     expect(screen.getByRole('button', { name: 'Handle pending sending 2 ETH' })).toBeInTheDocument()
   })
 
-  it('сворачивает очередь длиннее трёх карточек в ссылку на список', async () => {
+  it('collapses a queue longer than three cards into a list link', async () => {
     listedSendings = [1, 2, 3, 4].map((index) => ({
       ...PENDING_SENDING,
       id: String(60 + index),
@@ -762,7 +1109,7 @@ describe('Кабинет администратора', () => {
     )
   })
 
-  it('не показывает тост для отправки, которая сразу не pending', async () => {
+  it('does not toast a send that is not pending from the start', async () => {
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()
 
@@ -787,7 +1134,7 @@ describe('Кабинет администратора', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('тост pending-отправки можно закрыть, не открывая правку', async () => {
+  it('a pending-send toast can be dismissed without opening the edit', async () => {
     const user = userEvent.setup()
     localStorage.setItem(ADMIN_PIN_STORAGE_KEY, '9100')
     renderAdmin()

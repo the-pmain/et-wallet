@@ -1,48 +1,45 @@
 import type { ITokenEntry } from './types.ts'
 
 /**
- * Каталог рекомендуемых токенов.
+ * Recommended-token catalog.
  *
- * КАК СЮДА ПОПАДАЕТ ЗАПИСЬ. Адрес обязан подтвердиться двумя
- * независимыми источниками:
+ * HOW A RECORD GETS IN. The address must be confirmed by two
+ * independent sources:
  *
- * 1. опубликованным списком токенов (Uniswap Labs Default, версия 22.6.0);
- * 2. живым контрактом в сети: `symbol()`, `name()` и `decimals()`
- *    запрашиваются у узла и сверяются со списком.
+ * 1. a published token list (Uniswap Labs Default, version 22.6.0);
+ * 2. the live on-chain contract: `symbol()`, `name()` and `decimals()`
+ *    are asked of a node and checked against the list.
  *
- * РАСХОЖДЕНИЕ ИСТОЧНИКОВ — ПОВОД ИСКЛЮЧИТЬ ЗАПИСЬ, А НЕ ВЫБРАТЬ ОДИН
- * ИЗ ВАРИАНТОВ. Так из каталога выпал USDT в сети Polygon
- * (`0xc2132D05D31c914a87C6611C10748AEb04B58e8F`): список называет его
- * `USDT` / «Tether USD», а контракт при сверке ответил `USDT0`. Пока
- * причина расхождения не выяснена, рекомендовать этот адрес нельзя.
+ * A SOURCE MISMATCH DROPS THE RECORD; IT DOES NOT PICK ONE VARIANT.
+ * That is why Polygon USDT
+ * (`0xc2132D05D31c914a87C6611C10748AEb04B58e8F`) left the catalog:
+ * the list calls it `USDT` / "Tether USD", the contract answered
+ * `USDT0`. Until the mismatch is explained, the address cannot be
+ * recommended.
  *
- * ПОЧЕМУ АДРЕСА НЕ ВПИСЫВАЮТСЯ ПО ПАМЯТИ. Шестнадцатеричный адрес
- * непроверяем при чтении кода: ошибка в одном символе даёт другой
- * контракт, а рекомендованный кошельком адрес — это адрес, на который
- * пользователь отправит деньги. Перевод в блокчейне необратим.
+ * WHY ADDRESSES ARE NOT TYPED FROM MEMORY. A hex address is unchecked
+ * when you read the code: one wrong character is a different contract,
+ * and an address the wallet recommends is where the user will send
+ * money. An on-chain transfer is irreversible.
  *
- * ПОЛЕ `provenance` ОТДАЁТСЯ КЛИЕНТУ. Признак «проверено» непроверяем,
- * происхождение — проверяемо. Пользователь вправе видеть, на чём
- * основана рекомендация, и решить сам, достаточно ли этого.
+ * `provenance` IS SENT TO THE CLIENT. A "verified" flag is not
+ * checkable; origin is. The user is entitled to see what the
+ * recommendation rests on and decide whether that is enough.
  *
- * СЕТИ BNB Chain И Avalanche ЗАПИСЕЙ НЕ ИМЕЮТ: они не покрыты
- * использованным списком, а сверять их по одному источнику — значит
- * не сверять вовсе. Пустой список для этих сетей означает «нет
- * подтверждённых рекомендаций», а не «токенов нет».
+ * BNB Chain AND Avalanche HAVE NO RECORDS: they are not covered by
+ * the list we used, and checking them against one source is not
+ * checking at all. An empty list for those networks means "no
+ * confirmed recommendations", not "there are no tokens".
  */
 
-/** Использованный список токенов и его версия. */
 const TOKEN_LIST_SOURCE = 'Uniswap Labs Default 22.6.0'
 
-/** Сверка с контрактами в сети. */
-const ON_CHAIN_SOURCE = 'Сверка symbol/name/decimals с контрактом'
+const ON_CHAIN_SOURCE = 'Checked symbol/name/decimals against the contract'
 
-/** Дата сверки с контрактами. */
 const VERIFIED_AT = '2026-07-31'
 
 const PROVENANCE = [TOKEN_LIST_SOURCE, ON_CHAIN_SOURCE]
 
-/** Собирает запись каталога, подставляя общие для всех записей поля. */
 function token(
   chainId: bigint,
   address: string,

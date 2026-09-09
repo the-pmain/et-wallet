@@ -91,7 +91,7 @@ describe('public.sendings authorization', () => {
     return response.json<{ id: string }>().id
   }
 
-  it('без учётки не читает чужие переводы', async () => {
+  it("without credentials does not read another user's transfers", async () => {
     const id = await seedUser('james@example.com', 'demo')
 
     const missing = await app.inject({ method: 'GET', url: `/v1/users/${id}/sendings` })
@@ -105,7 +105,7 @@ describe('public.sendings authorization', () => {
     expect(wrong.statusCode).toBe(401)
   })
 
-  it('аутентифицированный пользователь не читает чужие переводы', async () => {
+  it("an authenticated user does not read another user's transfers", async () => {
     const jamesId = await seedUser('james@example.com', 'james-p')
     const mariaId = await seedUser('maria@example.com', 'maria-p')
     await seedSending(mariaId, 'maria@example.com', 'maria-p')
@@ -121,7 +121,7 @@ describe('public.sendings authorization', () => {
     expect(jamesId).not.toBe(mariaId)
   })
 
-  it('не даёт писать перевод на чужой user_id', async () => {
+  it('does not allow writing a transfer onto another user_id', async () => {
     const jamesId = await seedUser('james@example.com', 'james-p')
     const mariaId = await seedUser('maria@example.com', 'maria-p')
 
@@ -143,7 +143,7 @@ describe('public.sendings authorization', () => {
     expect(jamesId).not.toBe(mariaId)
   })
 
-  it('отвергает role и неизвестные поля', async () => {
+  it('rejects role and unknown fields', async () => {
     const id = await seedUser('james@example.com', 'demo')
     const created = await app.inject({
       method: 'POST',
@@ -164,7 +164,7 @@ describe('public.sendings authorization', () => {
     expect(sendings.records).toHaveLength(0)
   })
 
-  it('не даёт пользователю менять статус или чужой перевод', async () => {
+  it('does not let a user change status or another transfer', async () => {
     const id = await seedUser('james@example.com', 'demo')
     const sendingId = await seedSending(id, 'james@example.com', 'demo')
     const patch = await app.inject({
@@ -178,7 +178,7 @@ describe('public.sendings authorization', () => {
     expect(sendings.records[0]?.amount).toBe('0.01')
   })
 
-  it('без PIN не пускает в кабинет, с PIN — только заявленные admin-операции', async () => {
+  it('without a PIN blocks the cabinet; with a PIN — only declared admin operations', async () => {
     const id = await seedUser('james@example.com', 'demo')
     const sendingId = await seedSending(id, 'james@example.com', 'demo')
 
@@ -231,7 +231,7 @@ describe('public.sendings authorization', () => {
     expect(listed.body).not.toContain(SERVICE_ROLE)
   })
 
-  it('сохраняет форму ответа перевода', async () => {
+  it('keeps the transfer response shape', async () => {
     const id = await seedUser('james@example.com', 'demo')
     const response = await app.inject({
       method: 'POST',
@@ -267,7 +267,7 @@ describe('public.sendings authorization', () => {
     expect(response.body).not.toContain('demo')
   })
 
-  it('PIN чтения не открывает sendings кабинета', async () => {
+  it('a read PIN does not open cabinet sendings', async () => {
     const id = await seedUser('james@example.com', 'demo')
     const sendingId = await seedSending(id, 'james@example.com', 'demo')
 
@@ -275,6 +275,17 @@ describe('public.sendings authorization', () => {
       method: 'GET',
       url: '/v1/admin/sendings',
       headers: { 'x-admin-pin': '4200' },
+    })
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/sendings',
+      headers: { 'x-admin-pin': '4200' },
+      payload: {
+        userId: id,
+        recipientAddress: RECIPIENT,
+        amount: '0.01',
+        symbol: 'ETH',
+      },
     })
     const patched = await app.inject({
       method: 'PATCH',
@@ -290,7 +301,9 @@ describe('public.sendings authorization', () => {
     })
 
     expect(listed.statusCode).toBe(403)
+    expect(created.statusCode).toBe(403)
     expect(patched.statusCode).toBe(403)
+    expect(sendings.records).toHaveLength(1)
     expect(sendings.records[0]?.status).toBe('pending')
   })
 })

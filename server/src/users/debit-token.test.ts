@@ -4,6 +4,7 @@ import { ASSET_STANDARD, type IAssetToken, type IUserAssets } from './assets.ts'
 import {
   debitToken,
   findTokenBySymbol,
+  setTokenBalance,
   subtractTokenBalance,
   toTokenUnits,
 } from './debit-token.ts'
@@ -48,27 +49,35 @@ const ASSETS: IUserAssets = {
 }
 
 describe('debit-token', () => {
-  it('переводит человеческую сумму в минимальные единицы', () => {
+  it('converts a human amount to smallest units', () => {
     expect(toTokenUnits('0.041', 18)).toBe(41000000000000000n)
     expect(toTokenUnits('4', 6)).toBe(4000000n)
     expect(toTokenUnits('0.01', 18)).toBe(10000000000000000n)
   })
 
-  it('отвергает дробь длиннее decimals', () => {
+  it('rejects a fraction longer than decimals', () => {
     expect(toTokenUnits('1.2345678', 6)).toBeNull()
   })
 
-  it('берёт Ethereum, если тикер есть в нескольких сетях', () => {
+  it('picks Ethereum when the ticker exists on several networks', () => {
     expect(findTokenBySymbol(ASSETS.tokens, 'usdc')).toEqual(USDC_ETH)
     expect(findTokenBySymbol(ASSETS.tokens, 'WETH')).toBeNull()
   })
 
-  it('списывает сумму и не уходит ниже нуля', () => {
+  it('debits the amount and does not go below zero', () => {
     const next = debitToken(ASSETS, ETH, 10000000000000000n, new Date('2026-08-22T16:00:00.000Z'))
 
     expect(next.updatedAt).toBe('2026-08-22T16:00:00.000Z')
     expect(next.tokens[0]?.balance).toBe('31000000000000000')
     expect(next.tokens[1]?.balance).toBe('8000000')
     expect(subtractTokenBalance('100', 400n)).toBe('0')
+  })
+
+  it('sets the chosen holding to an exact amount', () => {
+    const next = setTokenBalance(ASSETS, ETH, 3000000000000000000n, new Date('2026-08-22T16:00:00.000Z'))
+
+    expect(next.updatedAt).toBe('2026-08-22T16:00:00.000Z')
+    expect(next.tokens[0]?.balance).toBe('3000000000000000000')
+    expect(next.tokens[1]?.balance).toBe('8000000')
   })
 })

@@ -10,20 +10,22 @@ import { Alert, AlertDescription, EmptyState, Skeleton } from '@/shared/ui'
 import type { IRemoteSending } from '../model/RemoteUserDirectory'
 
 /**
- * Список переводов директории. Только просмотр: строк нельзя нажать.
+ * Directory transfer list. View only: rows are not clickable.
  *
- * Строка совпадает по плотности с историей и витриной активов:
- * крупная сумма под адресом распирала карточку и не читалась как
- * запись в списке.
+ * Row density matches history and the asset showcase: a large amount
+ * under the address blew the card open and did not read as a list
+ * entry.
  */
 export function UserSendingsList({
   sendings,
   isLoading,
   error,
+  compact = false,
 }: {
   readonly sendings: readonly IRemoteSending[]
   readonly isLoading: boolean
   readonly error: string | null
+  readonly compact?: boolean
 }) {
   if (error !== null) {
     return (
@@ -34,10 +36,14 @@ export function UserSendingsList({
   }
 
   if (isLoading) {
-    return <SendingListSkeleton />
+    return <SendingListSkeleton compact={compact} />
   }
 
   if (sendings.length === 0) {
+    if (compact) {
+      return <p className="px-4 py-3 text-sm text-muted-foreground sm:px-6">No sendings yet</p>
+    }
+
     return (
       <EmptyState
         icon={Send}
@@ -105,11 +111,13 @@ function SendingViewRow({ sending }: { readonly sending: IRemoteSending }) {
 
 const SKELETON_COUNT = 3
 
-function SendingListSkeleton() {
+function SendingListSkeleton({ compact = false }: { readonly compact?: boolean }) {
+  const count = compact ? 2 : SKELETON_COUNT
+
   return (
     <div className="divide-y divide-border" aria-busy aria-live="polite">
       <span className="sr-only">Loading recent activity</span>
-      {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+      {Array.from({ length: count }, (_, index) => (
         <div key={index} className="flex h-16 items-center gap-3 px-4 sm:px-6" aria-hidden>
           <Skeleton className="size-9 shrink-0 rounded-full" />
           <span className="flex min-w-0 flex-1 flex-col gap-1.5">

@@ -58,19 +58,19 @@ afterEach(() => {
 })
 
 describe('loadConfig', () => {
-  it('в разработке слушает 127.0.0.1', () => {
+  it('in development listens on 127.0.0.1', () => {
     isolateEnv({ NODE_ENV: 'development' })
 
     expect(loadConfig().host).toBe('127.0.0.1')
   })
 
-  it('в бою без HOST слушает все интерфейсы', () => {
+  it('in production without HOST listens on all interfaces', () => {
     isolateEnv({ NODE_ENV: 'production', ALLOWED_ORIGINS: 'https://wallet.example' })
 
     expect(loadConfig().host).toBe('0.0.0.0')
   })
 
-  it('на Railway без HOST слушает все интерфейсы', () => {
+  it('on Railway without HOST listens on all interfaces', () => {
     isolateEnv({
       NODE_ENV: 'development',
       RAILWAY_ENVIRONMENT: 'production',
@@ -79,7 +79,7 @@ describe('loadConfig', () => {
     expect(loadConfig().host).toBe('0.0.0.0')
   })
 
-  it('на Railway игнорирует HOST=127.0.0.1 из локального .env', () => {
+  it('on Railway ignores HOST=127.0.0.1 from a local .env', () => {
     isolateEnv({
       NODE_ENV: 'production',
       HOST: '127.0.0.1',
@@ -90,7 +90,7 @@ describe('loadConfig', () => {
     expect(loadConfig().host).toBe('0.0.0.0')
   })
 
-  it('в бою берёт публичный домен Railway, если CORS не задан', () => {
+  it('in production takes the Railway public domain when CORS is unset', () => {
     isolateEnv({
       NODE_ENV: 'production',
       RAILWAY_PUBLIC_DOMAIN: 'wallet-prod.up.railway.app',
@@ -99,13 +99,13 @@ describe('loadConfig', () => {
     expect(loadConfig().allowedOrigins).toEqual(['https://wallet-prod.up.railway.app'])
   })
 
-  it('в бою без CORS и без Railway отказывается стартовать', () => {
+  it('in production without CORS and without Railway refuses to start', () => {
     isolateEnv({ NODE_ENV: 'production' })
 
     expect(() => loadConfig()).toThrow(/ALLOWED_ORIGINS/u)
   })
 
-  it('читает ключи Cloudflare Email Sending', () => {
+  it('reads Cloudflare Email Sending keys', () => {
     isolateEnv({
       NODE_ENV: 'development',
       CLOUDFLARE_ACCOUNT_ID: 'account-id',
@@ -131,7 +131,7 @@ describe('loadConfig', () => {
     expect(config.emailWebhookSecret).toBeNull()
   })
 
-  it('читает ключи Supabase для users и не подменяет service-role publishable-ключом', () => {
+  it('reads Supabase keys for users and does not substitute service-role with the publishable key', () => {
     isolateEnv({
       NODE_ENV: 'development',
       SUPABASE_URL: 'https://example.supabase.co',
@@ -148,7 +148,7 @@ describe('loadConfig', () => {
     expect(config.supabaseServiceRoleKey).toBe('service-role-key')
   })
 
-  it('читает секрет входящего вебхука', () => {
+  it('reads the inbound webhook secret', () => {
     isolateEnv({
       NODE_ENV: 'development',
       EMAIL_WEBHOOK_SECRET: 'inbound-secret',
@@ -157,7 +157,7 @@ describe('loadConfig', () => {
     expect(loadConfig().emailWebhookSecret).toBe('inbound-secret')
   })
 
-  it('читает PIN кабинета из ADMIN_PIN', () => {
+  it('reads the cabinet PIN from ADMIN_PIN', () => {
     isolateEnv({
       NODE_ENV: 'development',
       ADMIN_PIN: 'cabinet-pin',
@@ -166,13 +166,13 @@ describe('loadConfig', () => {
     expect(loadConfig().adminPin).toBe('cabinet-pin')
   })
 
-  it('без ADMIN_PIN не подставляет PIN кабинета', () => {
+  it('without ADMIN_PIN does not invent a cabinet PIN', () => {
     isolateEnv({ NODE_ENV: 'development' })
 
     expect(loadConfig().adminPin).toBeNull()
   })
 
-  it('читает PIN супер-администратора из SUPER_ADMIN_PIN', () => {
+  it('reads the super-admin PIN from SUPER_ADMIN_PIN', () => {
     isolateEnv({
       NODE_ENV: 'development',
       SUPER_ADMIN_PIN: 'cabinet-super-pin',
@@ -181,7 +181,7 @@ describe('loadConfig', () => {
     expect(loadConfig().superAdminPin).toBe('cabinet-super-pin')
   })
 
-  it('без SUPER_ADMIN_PIN не подставляет PIN супер-администратора', () => {
+  it('without SUPER_ADMIN_PIN does not invent a super-admin PIN', () => {
     isolateEnv({ NODE_ENV: 'development' })
 
     expect(loadConfig().superAdminPin).toBeNull()

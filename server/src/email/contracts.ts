@@ -1,11 +1,10 @@
 /**
- * Отправка писем через Cloudflare Email Sending.
+ * Mail sending via Cloudflare Email Sending.
  *
- * Секреты живут только на сервере. Клиент кабинета передаёт адреса
- * и текст; токен Cloudflare в браузер не попадает.
+ * Secrets live only on the server. The cabinet client sends addresses
+ * and text; the Cloudflare token never reaches the browser.
  */
 
-/** Письмо, которое кабинет просит отправить. */
 export interface IEmailMessage {
   readonly to: string
   readonly from: string
@@ -14,7 +13,7 @@ export interface IEmailMessage {
   readonly text: string
 }
 
-/** Итог доставки, который Cloudflare вернул без служебных полей. */
+/** Delivery result Cloudflare returned without internal fields. */
 export interface IEmailSendResult {
   readonly messageId: string | null
   readonly delivered: readonly string[]
@@ -22,7 +21,7 @@ export interface IEmailSendResult {
   readonly permanentBounces: readonly string[]
 }
 
-/** Служба отправки. Тест подставляет свою реализацию без сети. */
+/** Send service. A test supplies its own implementation without a network. */
 export interface IEmailService {
   readonly isConfigured: boolean
   send(message: IEmailMessage): Promise<IEmailSendResult>
