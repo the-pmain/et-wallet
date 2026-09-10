@@ -36,7 +36,14 @@ git worktree add -b adapt/elm-wallet-main ../elm-safe-adapt-main et-wallet/main
 
 If the worktree already exists, update that branch from `et-wallet/main` and add the new port on top.
 
-## Current port (2026-09-09)
+## Current port (2026-09-10)
+
+The exchange receive panel follows only `address-receiving-funds-exchange` in `wallets` (map or list). A missing or malformed field always offers Generate wallet / Generate a wallet and never reads the open account.
+
+elm-wallet-main: `cff7f59`.
+adapt: `0727bf5`.
+
+### Earlier port (2026-09-09)
 
 `POST /v1/users/wallets/generate` derives a receive address from the record's own `seed_phrase`, so a browser signed in by email alone can fill a slot with no vault to unlock. It answers 409 when the row carries no phrase, and only then does the device derive locally. Both receive slots read `wallets`; an empty slot offers the generate button, and a wallet with no cabinet record falls back to the open account.
 
