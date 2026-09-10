@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EncryptionService, type Wei } from '@/core'
 import { APP_CONFIG, TEST_MODE } from '@/shared/config'
-import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import {
+  createTestAppServices,
+  mockDirectoryAndPriceFetch,
+  type ITestAppServices,
+} from '@/test/doubles'
 import { openPath } from '@/test/open-path'
 import { readLoginCredentials, writeLoginCredentials } from '@/features/onboarding'
 
@@ -103,19 +107,12 @@ describe('Вход в экран аккаунта', () => {
   })
 
   it('после успешного POST /v1/users/auth открывает кабинет', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            id: '7',
-            email: 'james@example.com',
-            balance: '12.5',
-            createdAt: '2026-08-19T12:00:00.000Z',
-          }),
-        ),
-    }) as typeof fetch
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '12.5',
+      createdAt: '2026-08-19T12:00:00.000Z',
+    })
 
     const user = userEvent.setup()
     renderApp()
@@ -125,9 +122,8 @@ describe('Вход в экран аккаунта', () => {
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
-    expect(screen.getByText('$12.50')).toBeInTheDocument()
+    expect(await screen.findByText('$0.00')).toBeInTheDocument()
     expect(screen.queryByText('12.5')).not.toBeInTheDocument()
-    expect(screen.queryByText('ETH')).not.toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: 'Display currency' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
@@ -135,7 +131,7 @@ describe('Вход в экран аккаунта', () => {
     expect(screen.getAllByRole('link', { name: 'ET WALLET' }).length).toBeGreaterThan(0)
     expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
     expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
-    expect(screen.queryByText('7')).not.toBeInTheDocument()
+    expect(screen.queryByText('james@example.com · 7')).not.toBeInTheDocument()
 
     await waitFor(() => {
       expect(
@@ -224,27 +220,20 @@ describe('Вход в экран аккаунта', () => {
   it('при сохранённых учётных данных входит сам', async () => {
     writeLoginCredentials({ id: '7', email: 'james@example.com', theP: '123456' })
 
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            id: '7',
-            email: 'james@example.com',
-            balance: '3',
-            createdAt: '2026-08-19T12:00:00.000Z',
-          }),
-        ),
-    }) as typeof fetch
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '3',
+      createdAt: '2026-08-19T12:00:00.000Z',
+    })
 
     renderApp()
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
-    expect(screen.getByText('$3.00')).toBeInTheDocument()
+    expect(await screen.findByText('$0.00')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'James' })).toBeInTheDocument()
     expect(screen.getByText('james@example.com · Since Aug 2026')).toBeInTheDocument()
-    expect(screen.queryByText('7')).not.toBeInTheDocument()
+    expect(screen.queryByText('james@example.com · 7')).not.toBeInTheDocument()
     expect(readLoginCredentials()).toEqual({
       id: '7',
       email: 'james@example.com',

@@ -3,7 +3,6 @@ import { Link } from 'react-router'
 
 import {
   useDirectorySession,
-  useDisplayedAssets,
   useGenerateExchangeWallet,
   useGenerateReceivingFundsWallet,
   useOnboarding,
@@ -13,6 +12,7 @@ import {
   INITIAL_WALLET_VALUE,
   RecentActivityCard,
   WALLET_CODENAME_RECEIVING_FUNDS,
+  type IRemoteReceiving,
   type IRemoteUser,
   type IUserWalletsMap,
 } from '@/features/onboarding'
@@ -177,17 +177,15 @@ function localReceivingWallets(account: { readonly address: string } | null): IU
   }
 }
 
-/** Live-rate valuation of holdings; falls back to the `balance` column. */
-function remotePortfolioUsd(
-  user: IRemoteUser,
-  totalValue: number | null,
-  quotesReady: boolean,
-): number | null {
-  if (user.assets.tokens.length > 0) {
-    return quotesReady ? totalValue : null
-  }
+/** Successful deposits are the sole source of the remote account balance. */
+function successfulReceivingsUsd(receivings: readonly IRemoteReceiving[]): number {
+  return receivings.reduce((total, receiving) => {
+    if (receiving.status !== 'success') {
+      return total
+    }
 
-  return parseDisplayAmount(user.balance)
+    return total + (parseDisplayAmount(receiving.usdAmount) ?? 0)
+  }, 0)
 }
 
 function RemoteAccountHome({
@@ -212,22 +210,16 @@ function RemoteAccountHome({
   const snapshot = useWalletSnapshot()
   const userSendings = useUserSendings(true)
   const userReceivings = useUserReceivings(true)
-  const displayed = useDisplayedAssets({
-    tokens: [],
-    portfolio: null,
-    isLoading: false,
-  })
-  const quotesReady = user !== null && !displayed.isLoading
   const amountUsd =
-    user === null
+    user === null || userReceivings.isLoading || userReceivings.error !== null
       ? null
-      : remotePortfolioUsd(user, displayed.portfolio?.totalValue ?? 0, quotesReady)
+      : successfulReceivingsUsd(userReceivings.receivings)
 
   return (
     <div className="flex min-w-0 flex-col gap-4 max-lg:gap-6">
       <FiatBalanceCard
         amountUsd={amountUsd}
-        isRefreshing={isRefreshing || displayed.isLoading}
+        isRefreshing={isRefreshing || userReceivings.isLoading}
         action={
           <QuickActions
             account={snapshot.activeAccount}

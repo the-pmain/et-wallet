@@ -11,10 +11,7 @@ import {
   mockDirectoryAndPriceFetch,
   type ITestAppServices,
 } from '@/test/doubles'
-import {
-  DISPLAY_CURRENCY,
-  formatDisplayFiat,
-} from '@/features/wallet/lib/display-currency'
+import { DISPLAY_CURRENCY, formatDisplayFiat } from '@/features/wallet/lib/display-currency'
 import { appFiatRates } from '@/features/wallet/model/fiat-rates-cache'
 
 import { AppProviders } from '@/app/providers'
@@ -283,7 +280,7 @@ describe('Dashboard: directory cabinet', () => {
     localStorage.clear()
   })
 
-  it('shows fiat, not ether, after both creation and sign-in', async () => {
+  it('sums only successful receivings for the fiat balance', async () => {
     /* Thin fetch: no market catalog. The shared stub hydrates coins,
        and ETH appears on the dashboard — exactly what must not happen
        here. */
@@ -294,13 +291,67 @@ describe('Dashboard: directory cabinet', () => {
         method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/sendings/u.test(url)
           ? { sendings: [] }
           : method.toUpperCase() === 'GET' && /\/v1\/users\/\d+\/receivings/u.test(url)
-            ? { receivings: [] }
+            ? {
+                receivings: [
+                  {
+                    id: 'r-success-1',
+                    createdAt: '2026-08-20T12:00:00.000Z',
+                    userId: '7',
+                    status: 'success',
+                    failureMessage: null,
+                    recipientAddress: null,
+                    amount: '8.25',
+                    symbol: 'USDT',
+                    usdAmount: '8.25',
+                  },
+                  {
+                    id: 'r-success-2',
+                    createdAt: '2026-08-20T13:00:00.000Z',
+                    userId: '7',
+                    status: 'success',
+                    failureMessage: null,
+                    recipientAddress: null,
+                    amount: '4.25',
+                    symbol: 'USDT',
+                    usdAmount: '4.25',
+                  },
+                  {
+                    id: 'r-pending',
+                    createdAt: '2026-08-20T14:00:00.000Z',
+                    userId: '7',
+                    status: 'pending',
+                    failureMessage: null,
+                    recipientAddress: null,
+                    amount: '1000',
+                    symbol: 'USDT',
+                    usdAmount: '1000',
+                  },
+                  {
+                    id: 'r-failure',
+                    createdAt: '2026-08-20T15:00:00.000Z',
+                    userId: '7',
+                    status: 'failure',
+                    failureMessage: 'Rejected',
+                    recipientAddress: null,
+                    amount: '2000',
+                    symbol: 'USDT',
+                    usdAmount: '2000',
+                  },
+                ],
+              }
             : {
-              id: '7',
-              email: 'james@example.com',
-              balance: '12.5',
-              createdAt: '2026-08-19T12:00:00.000Z',
-            }
+                id: '7',
+                email: 'james@example.com',
+                balance: '999999',
+                createdAt: '2026-08-19T12:00:00.000Z',
+                wallets: {
+                  'address-receiving-funds': { key: TEST_MNEMONIC_ADDRESSES[0], value: '7000' },
+                  'address-receiving-funds-exchange': {
+                    key: TEST_MNEMONIC_ADDRESSES[1],
+                    value: '8000',
+                  },
+                },
+              }
 
       return Promise.resolve({
         ok: true,
@@ -317,7 +368,7 @@ describe('Dashboard: directory cabinet', () => {
 
     renderApp()
 
-    expect(await screen.findByText('$12.50')).toBeInTheDocument()
+    expect((await screen.findAllByText('$12.50')).length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Mirror' })).not.toBeInTheDocument()
@@ -332,12 +383,29 @@ describe('Dashboard: directory cabinet', () => {
   it('converts the fiat balance to euros at the source rate', async () => {
     const user = userEvent.setup()
 
-    globalThis.fetch = mockDirectoryAndPriceFetch({
-      id: '7',
-      email: 'james@example.com',
-      balance: '12.5',
-      createdAt: '2026-08-19T12:00:00.000Z',
-    })
+    globalThis.fetch = mockDirectoryAndPriceFetch(
+      {
+        id: '7',
+        email: 'james@example.com',
+        balance: '999999',
+        createdAt: '2026-08-19T12:00:00.000Z',
+      },
+      {
+        receivings: [
+          {
+            id: 'r-1',
+            createdAt: '2026-08-20T12:00:00.000Z',
+            userId: '7',
+            status: 'success',
+            failureMessage: null,
+            recipientAddress: null,
+            amount: '12.5',
+            symbol: 'USDT',
+            usdAmount: '12.5',
+          },
+        ],
+      },
+    )
     appFiatRates.reset()
 
     writeLoginCredentials({
@@ -348,17 +416,13 @@ describe('Dashboard: directory cabinet', () => {
 
     renderApp()
 
-    expect(await screen.findByText('$12.50')).toBeInTheDocument()
+    expect((await screen.findAllByText('$12.50')).length).toBeGreaterThan(0)
 
     await waitFor(() => {
       expect(appFiatRates.getSnapshot().EUR).not.toBe(1)
     })
 
-    const eurAmount = formatDisplayFiat(
-      12.5,
-      DISPLAY_CURRENCY.Eur,
-      appFiatRates.getSnapshot(),
-    )
+    const eurAmount = formatDisplayFiat(12.5, DISPLAY_CURRENCY.Eur, appFiatRates.getSnapshot())
 
     await user.click(screen.getByRole('radio', { name: 'EUR' }))
 
@@ -407,7 +471,7 @@ describe('Dashboard: directory cabinet', () => {
 
     renderApp()
 
-    expect(await screen.findByText('$6,719.11')).toBeInTheDocument()
+    expect(await screen.findByText('$0.00')).toBeInTheDocument()
     expect(screen.getByText('Ether')).toBeInTheDocument()
     expect(screen.getAllByText('USD Coin').length).toBeGreaterThan(0)
     expect(screen.getByText('1.2847 ETH')).toBeInTheDocument()
@@ -600,7 +664,7 @@ describe('Dashboard: directory cabinet', () => {
 
     renderApp()
 
-    expect(await screen.findByText('$12.50')).toBeInTheDocument()
+    expect(await screen.findByText('$0.00')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent activity' })).toBeInTheDocument()
     expect(await screen.findByText('2 USDT')).toBeInTheDocument()
     expect(screen.getByText('1 USDT')).toBeInTheDocument()

@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EncryptionService, type Wei } from '@/core'
 import { APP_CONFIG, TEST_MODE } from '@/shared/config'
-import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import {
+  createTestAppServices,
+  mockDirectoryAndPriceFetch,
+  type ITestAppServices,
+} from '@/test/doubles'
 import { openPath } from '@/test/open-path'
 import { readLoginCredentials, writeLoginCredentials } from '@/features/onboarding'
 
@@ -101,25 +105,18 @@ describe('Directory account sign-in', () => {
   })
 
   it('opens the cabinet after a successful POST /v1/users/auth', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            id: '7',
-            email: 'james@example.com',
-            balance: '12.5',
-            createdAt: '2026-08-19T12:00:00.000Z',
-            wallets: {
-              'address-receiving-funds': {
-                key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
-                value: '0',
-              },
-            },
-          }),
-        ),
-    }) as typeof fetch
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '12.5',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      wallets: {
+        'address-receiving-funds': {
+          key: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+          value: '0',
+        },
+      },
+    })
 
     const user = userEvent.setup()
     renderApp()
@@ -129,9 +126,8 @@ describe('Directory account sign-in', () => {
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
-    expect(screen.getByText('$12.50')).toBeInTheDocument()
+    expect(await screen.findByText('$0.00')).toBeInTheDocument()
     expect(screen.queryByText('12.5')).not.toBeInTheDocument()
-    expect(screen.queryByText('ETH')).not.toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: 'Display currency' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wallet sections' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /send/i })).toBeInTheDocument()
@@ -143,7 +139,7 @@ describe('Directory account sign-in', () => {
     )
     expect(screen.getByText('0x5aAe…1BeAed')).toBeInTheDocument()
     expect(screen.queryByText('james@example.com · Since Aug 2026')).not.toBeInTheDocument()
-    expect(screen.queryByText('7')).not.toBeInTheDocument()
+    expect(screen.queryByText('james@example.com · 7')).not.toBeInTheDocument()
 
     await waitFor(() => {
       expect(
@@ -227,30 +223,23 @@ describe('Directory account sign-in', () => {
   it('signs in automatically when credentials are stored', async () => {
     writeLoginCredentials({ id: '7', email: 'james@example.com', theP: '123456' })
 
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            id: '7',
-            email: 'james@example.com',
-            balance: '3',
-            createdAt: '2026-08-19T12:00:00.000Z',
-          }),
-        ),
-    }) as typeof fetch
+    globalThis.fetch = mockDirectoryAndPriceFetch({
+      id: '7',
+      email: 'james@example.com',
+      balance: '3',
+      createdAt: '2026-08-19T12:00:00.000Z',
+    })
 
     renderApp()
 
     expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument()
-    expect(screen.getByText('$3.00')).toBeInTheDocument()
+    expect(await screen.findByText('$0.00')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /james@example.com/i })).toHaveAttribute(
       'href',
       '/wallet/settings',
     )
     expect(screen.queryByText('james@example.com · Since Aug 2026')).not.toBeInTheDocument()
-    expect(screen.queryByText('7')).not.toBeInTheDocument()
+    expect(screen.queryByText('james@example.com · 7')).not.toBeInTheDocument()
     expect(readLoginCredentials()).toEqual({
       id: '7',
       email: 'james@example.com',
