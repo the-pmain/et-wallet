@@ -484,6 +484,65 @@ describe('Dashboard: directory cabinet', () => {
     expect(generateBody).toContain('address-receiving-funds')
   })
 
+  it('fills an empty exchange slot from the service for any signed-in account', async () => {
+    const user = userEvent.setup()
+    const derived = '0x6Fac4D18c912343BF86fa7049364Dd4E424Ab9C0'
+    const receive = '0xfBb172681003704E0Be28D40f99d0934Ed365067'
+    const record = {
+      id: '7',
+      email: 'james@example.com',
+      balance: '0',
+      createdAt: '2026-08-19T12:00:00.000Z',
+      wallets: {
+        'address-receiving-funds': { key: receive, value: '0' },
+      },
+    }
+    const base = mockDirectoryAndPriceFetch(record)
+    let generateBody: string | null = null
+
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input)
+      const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+
+      if (method.toUpperCase() === 'POST' && url.includes('/v1/users/wallets/generate')) {
+        generateBody = typeof init?.body === 'string' ? init.body : ''
+
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                ...record,
+                wallets: {
+                  ...record.wallets,
+                  'address-receiving-funds-exchange': { key: derived, value: '0' },
+                },
+              }),
+            ),
+        })
+      }
+
+      return base(input, init)
+    }) as unknown as typeof fetch
+
+    writeLoginCredentials({
+      id: '7',
+      email: 'james@example.com',
+      theP: PASSWORD,
+    })
+
+    renderApp()
+
+    await user.click(await screen.findByRole('button', { name: /Receive/i }))
+    expect(screen.getByText(receive)).toBeInTheDocument()
+    expect(screen.queryByText(derived)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /generate a wallet/iu }))
+
+    expect(await screen.findByText(derived)).toBeInTheDocument()
+    expect(generateBody).toContain('address-receiving-funds-exchange')
+  })
+
   it('shows sendings and receivings on the home screen after sign-in', async () => {
     const recipient = '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359'
 

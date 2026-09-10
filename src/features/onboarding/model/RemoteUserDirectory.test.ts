@@ -510,10 +510,19 @@ describe('findValidExchangeReceiveWallet', () => {
     ).toBeNull()
   })
 
-  it('ignores list and other shapes', () => {
+  it('reads the same field from a wallets list', () => {
     expect(
       findValidExchangeReceiveWallet([
+        { key: WALLET.key, value: WALLET.value, codename: WALLET_CODENAME_RECEIVING_FUNDS },
         { key: exchangeAddress, value: '0', codename: WALLET_CODENAME_RECEIVING_FUNDS_EXCHANGE },
+      ]),
+    ).toEqual({ key: exchangeAddress, value: '0' })
+  })
+
+  it('treats a list without that field as missing', () => {
+    expect(
+      findValidExchangeReceiveWallet([
+        { key: exchangeAddress, value: '0', codename: WALLET_CODENAME_RECEIVING_FUNDS },
       ]),
     ).toBeNull()
     expect(findValidExchangeReceiveWallet(null)).toBeNull()

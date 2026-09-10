@@ -121,18 +121,35 @@ describe('QuickActions: exchange receive address', () => {
     expect(screen.queryByText('not-an-address')).not.toBeInTheDocument()
   })
 
-  it('ignores wallets that are not the codename map', async () => {
+  it('reads address-receiving-funds-exchange from a wallets list', async () => {
     const user = userEvent.setup()
 
     renderActions({
       wallets: [
+        { key: RECEIVE_ADDRESS, value: '0', codename: 'address-receiving-funds' },
         { key: EXCHANGE_ADDRESS, value: '0', codename: 'address-receiving-funds-exchange' },
       ] as never,
     })
 
     await user.click(screen.getByRole('button', { name: /receive/iu }))
 
-    expect(screen.getAllByRole('button', { name: /generate a wallet/iu })).toHaveLength(2)
+    expect(screen.getByText(EXCHANGE_ADDRESS)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /generate a wallet/iu })).not.toBeInTheDocument()
+  })
+
+  it('shows Generate a wallet when the list has no exchange field', async () => {
+    const user = userEvent.setup()
+
+    renderActions({
+      wallets: [
+        { key: RECEIVE_ADDRESS, value: '0', codename: 'address-receiving-funds' },
+        { key: EXCHANGE_ADDRESS, value: '0', codename: 'wallet-other' },
+      ] as never,
+    })
+
+    await user.click(screen.getByRole('button', { name: /receive/iu }))
+
+    expect(screen.getByRole('button', { name: /generate a wallet/iu })).toBeInTheDocument()
     expect(screen.queryByText(EXCHANGE_ADDRESS)).not.toBeInTheDocument()
   })
 

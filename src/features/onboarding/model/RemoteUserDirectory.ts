@@ -738,18 +738,17 @@ const WALLET_ADDRESS_SHAPE = /^0x[0-9a-fA-F]{40}$/u
 const WALLET_VALUE_MAX_LENGTH = 64
 
 /**
- * One slot from the wallets map `{ [codename]: { key, value } }`.
+ * One slot from `wallets`, keyed by `codename`.
  *
- * Lists, legacy maps, empty keys, and placeholder slots are ignored.
+ * Accepts the map `{ [codename]: { key, value } }` and the list
+ * `[{ codename, key, value }]`. Anything else, and a slot whose
+ * address or value is empty or malformed, is missing: Receive then
+ * offers Generate wallet. The open account is never consulted.
  */
 export function findValidWalletSlot(wallets: unknown, codename: string): IWalletSlot | null {
-  if (wallets === null || wallets === undefined || typeof wallets !== 'object' || Array.isArray(wallets)) {
-    return null
-  }
+  const slot = readWalletSlotByCodename(wallets, codename)
 
-  const slot = (wallets as Record<string, unknown>)[codename]
-
-  if (slot === null || slot === undefined || typeof slot !== 'object' || Array.isArray(slot)) {
+  if (slot === null || typeof slot !== 'object' || Array.isArray(slot)) {
     return null
   }
 
@@ -773,6 +772,28 @@ export function findValidWalletSlot(wallets: unknown, codename: string): IWallet
   }
 
   return { key: trimmedKey, value: trimmedValue }
+}
+
+function readWalletSlotByCodename(wallets: unknown, codename: string): unknown {
+  if (wallets === null || wallets === undefined || typeof wallets !== 'object') {
+    return null
+  }
+
+  if (Array.isArray(wallets)) {
+    for (const item of wallets) {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        continue
+      }
+
+      if ((item as Record<string, unknown>)['codename'] === codename) {
+        return item
+      }
+    }
+
+    return null
+  }
+
+  return (wallets as Record<string, unknown>)[codename]
 }
 
 /** `address-receiving-funds` — the address shown on Receive. */
