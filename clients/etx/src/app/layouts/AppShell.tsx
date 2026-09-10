@@ -1,0 +1,432 @@
+import { ChevronDown, Lock } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
+
+import { ROUTE } from '@/app/router/routes'
+import {
+  ONBOARDING_STATE,
+  readLoginCredentials,
+  useDirectorySession,
+  useOnboarding,
+  useOnboardingState,
+  type IRemoteUser,
+} from '@/features/onboarding'
+import {
+  displayNameFromEmail,
+  formatMemberSince,
+} from '@/features/onboarding/lib/directory-identity'
+import { AutoLockWarning, useSecurity } from '@/features/security'
+import { AccountAvatar, SESSION_STATE, addressLabel, useWalletSnapshot } from '@/features/wallet'
+import { APP_CONFIG } from '@/shared/config'
+import { useTranslation } from '@/shared/i18n'
+import { cn } from '@/shared/lib/utils'
+import { BrandMark, Button, Skeleton, Toaster } from '@/shared/ui'
+
+import { AmbientBackground } from './AmbientBackground'
+import { INFO_LINKS, NAVIGATION } from './navigation'
+
+/**
+ * Оболочка разблокированного кошелька.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНЫЙ МАРШРУТ-ЛЕЙАУТ, А НЕ ОБЁРТКА В КАЖДОЙ СТРАНИЦЕ.
+ * Пять экранов делят шапку и навигацию; повторение их в каждой странице
+ * означало бы пять мест, где панель может разойтись, и перерисовку
+ * шапки при каждом переходе. Вложенный маршрут с `Outlet` сохраняет
+ * общие части смонтированными.
+ *
+ * Экраны онбординга оболочки не имеют намеренно: до разблокировки
+ * переходить некуда, а панель навигации на экране ввода пароля создала бы
+ * впечатление, что часть кошелька доступна без него.
+ */
+export function AppShell() {
+  const snapshot = useWalletSnapshot()
+  const onboarding = useOnboarding()
+  const onboardingState = useOnboardingState()
+  const directory = useDirectorySession()
+  const location = useLocation()
+  const { t } = useTranslation()
+  const { autoLock } = useSecurity()
+  const directoryUser = directory.user
+  const showShellContent =
+    snapshot.state === SESSION_STATE.Open || directoryUser !== null || directory.isRestoring
+
+  /*
+    Вход по почте открывает кабинет, не разблокируя хранилище на
+    устройстве: сохранённая сессия перескакивает экран пароля. Без
+    этого шага у отправки нет аккаунта, и кнопки остаются бессильными.
+    Пароль уже лежит в тех же учётных данных, что открыли кабинет.
+  */
+  useEffect(() => {
+    if (directoryUser === null || onboardingState !== ONBOARDING_STATE.Locked) {
+      return
+    }
+
+    const stored = readLoginCredentials()
+
+    if (stored === null) {
+      return
+    }
+
+    void onboarding.unlock(stored.theP).catch(() => {
+      /* Нет локального хранилища, либо пароль к нему другой. */
+    })
+  }, [directoryUser, onboarding, onboardingState])
+
+  /*
+    ПЕРЕХОД МЕЖДУ ЭКРАНАМИ ПЕРЕВОДИТ ФОКУС В СОДЕРЖИМОЕ.
+
+    Без этого переход был не виден тому, кто страницу слушает: нажатие
+    пункта панели подменяло содержимое, фокус оставался на ссылке, и
+    ничего не объявлялось. Человек не узнавал, что попал на другой
+    экран, — переход существовал только для зрячих.
+
+    Фокус на область содержимого, а не на заголовок: заголовок есть
+    не у всех экранов, а область есть всегда, и программа чтения
+    начинает читать её сверху — то есть с названия экрана, если оно
+    там есть.
+
+    ПЕРВЫЙ ПОКАЗ ПРОПУСКАЕТСЯ. Отнимать фокус при открытии приложения
+    незачем: человек ещё никуда не переходил, а перехваченный фокус
+    сбил бы того, кто уже начал обход клавишей.
+
+    СРАВНИВАЕТСЯ ПРЕЖНИЙ АДРЕС, А НЕ СЧИТАЮТСЯ ПОКАЗЫ. Первая редакция
+    держала признак «это первый показ» и снимала его в эффекте. В режиме
+    `StrictMode` React вызывает эффект дважды: первый вызов снимал
+    признак, второй забирал фокус — и приложение отнимало его ровно там,
+    где не должно. Измерено живьём. Сравнение адресов от числа вызовов
+    не зависит: пока адрес прежний, фокус не трогается, сколько бы раз
+    эффект ни выполнился.
+  */
+  const contentRef = useRef<HTMLElement>(null)
+  const previousPath = useRef<string | null>(null)
+
+  useEffect(() => {
+    const previous = previousPath.current
+    previousPath.current = location.pathname
+
+    if (previous === null || previous === location.pathname) {
+      return
+    }
+
+    /* Без прокрутки: экран и так показан сверху, а браузер иначе
+       дёрнул бы его к области, которую только что отрисовали. */
+    contentRef.current?.focus({ preventScroll: true })
+  }, [location.pathname])
+
+  return (
+    <div className="relative flex min-h-svh min-w-0 flex-col overflow-x-clip bg-background">
+      {/* Фон закреплён по окну просмотра и лежит под всем содержимым:
+          шапка и панель навигации размывают его собственным фильтром,
+          а карточки непрозрачны — текст читается на них, а не на нём. */}
+      <AmbientBackground />
+
+      {/* Область уведомлений: смонтирована один раз на всю оболочку. */}
+      <Toaster />
+
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
+        <div className="flex w-full min-w-0 items-center gap-3 px-4 py-3 lg:pl-64">
+          {/* На узком экране панели слева нет: знак и имя живут в шапке. */}
+          <BrandLockup className="shrink-0 lg:hidden" />
+          {snapshot.activeAccount === null ? (
+            directoryUser === null ? (
+              directory.isRestoring ? (
+                <RestoringIdentity />
+              ) : null
+            ) : (
+              <DirectoryIdentity user={directoryUser} />
+            )
+          ) : (
+            /* ПЕРЕКЛЮЧАТЕЛЬ ВЫГЛЯДИТ НАЖИМАЕМЫМ. Прежде здесь стояли
+               значок со стрелкой и текст без фона и без отклика на
+               наведение: стрелка обещала выбор, вид его не подтверждал.
+               Ссылка ведёт в настройки, где аккаунты и переключаются. */
+            <Link
+              to="/wallet/settings"
+              className="focus-ring -ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent"
+            >
+              <AccountAvatar address={snapshot.activeAccount.address} />
+
+              <div className="flex min-w-0 flex-col">
+                <span className="flex items-center gap-1 truncate text-sm font-semibold">
+                  {snapshot.activeAccount.name}
+                  <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                </span>
+                {/* Имя ENS вместо адреса, когда оно подтверждено сверкой.
+                    Моноширинный шрифт снимается: он существует ради
+                    посимвольного сличения адреса, а имя сличают целиком. */}
+                <span
+                  className={cn(
+                    'truncate text-xs text-muted-foreground',
+                    !snapshot.ensNames.has(snapshot.activeAccount.address.toLowerCase()) &&
+                      'font-mono',
+                  )}
+                >
+                  {addressLabel(snapshot.activeAccount.address, snapshot.ensNames)}
+                </span>
+              </div>
+            </Link>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Lock the wallet"
+              onClick={() => {
+                directory.signOut()
+                onboarding.lock()
+              }}
+            >
+              <Lock className="size-4" aria-hidden />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/*
+        Ключ по адресу перезапускает анимацию появления при каждом переходе.
+        Без него React переиспользует узел и переход выглядит рывком.
+      */}
+      {/* Предупреждение стоит над содержимым и вне ключа маршрута:
+          переход между экранами не должен его сбрасывать — до блокировки
+          осталось столько же, сколько было. */}
+      <div className="relative z-10 w-full min-w-0 px-4 pt-2 lg:pl-64">
+        <AutoLockWarning
+          isVisible={autoLock.isWarning}
+          remainingMs={autoLock.remainingMs}
+          onExtend={autoLock.extend}
+        />
+      </div>
+
+      {/* `relative z-10` обязателен: фон позиционирован, и без явного
+          слоя непозиционированное содержимое ушло бы под него.
+
+          ШИРИНА — ВСЯ ОБЛАСТЬ РЯДОМ С ПАНЕЛЬЮ, БЕЗ ВЫХОДА ЗА ОКНО.
+          Отступ слева — внутренний (`pl`), а не поле снаружи (`ml`):
+          `w-full` плюс `ml-60` даёт ширину окна плюс ширину панели
+          и горизонтальную прокрутку страницы. Внутренний отступ
+          оставляет элемент шириной в окно, а содержимое начинается
+          правее панели. `min-w-0` не даёт широкой таблице растянуть
+          колонку. */}
+      <main
+        key={location.pathname}
+        ref={contentRef}
+        /* Область получает фокус только программно, при переходе:
+           клавишей в неё не попадают, и кольцо здесь было бы шумом
+           на весь экран. */
+        tabIndex={-1}
+        className="relative z-10 w-full min-w-0 flex-1 animate-in px-4 pt-4 pb-24 duration-300 fade-in slide-in-from-bottom-2 focus:outline-none lg:pr-6 lg:pb-8 lg:pl-64"
+      >
+        {showShellContent ? <Outlet /> : <ShellPlaceholder />}
+      </main>
+
+      {/*
+        ОДНА ПАНЕЛЬ РАЗДЕЛОВ НА ОБЕ ШИРИНЫ, раскладка меняется классами.
+
+        Две панели — по одной на ширину — означали бы два одноимённых
+        ориентира в разметке: программа чтения с экрана объявила бы
+        «навигация» дважды. Отрисовывать нужную по замеру ширины из кода
+        тоже неверно: значение приходится держать в состоянии, и панель
+        зависит от события, которое может не прийти. Классы ширины
+        пересчитываются браузером всегда.
+
+        Снизу на телефоне: там до панели дотягивается большой палец.
+        Слева на широком экране: низ окна с мышью — самое далёкое от
+        взгляда место, и приложение с нижней панелью читается как
+        растянутое мобильное.
+      */}
+      <nav
+        aria-label="Wallet sections"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 backdrop-blur-md lg:inset-y-0 lg:right-auto lg:left-0 lg:w-60 lg:border-t-0 lg:border-r lg:bg-background/80"
+      >
+        <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:mx-0 lg:h-full lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:p-3 lg:pt-4">
+          {/*
+            Знак стоит в самой панели, а не над ней: шапка создаёт свой
+            слой, и закреплённый поверх неё знак оказывался под пунктами.
+          */}
+          <BrandLockup className="mb-3 hidden shrink-0 px-1 py-1 lg:flex" />
+          {NAVIGATION.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === NAVIGATION[0]?.to}
+              className={({ isActive }) =>
+                cn(
+                  'focus-ring flex flex-1 flex-col items-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium transition-colors',
+                  /* На широком экране подпись встаёт рядом со значком:
+                     в колонке есть ширина, и читать её проще, чем
+                     разбирать значок. */
+                  'lg:flex-none lg:flex-row lg:items-center lg:gap-3 lg:px-3 lg:text-sm',
+                  isActive
+                    ? 'text-primary-emphasis lg:bg-primary/12'
+                    : 'text-muted-foreground hover:text-foreground focus-visible:text-foreground lg:hover:bg-accent',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={cn(
+                      'flex size-8 items-center justify-center rounded-lg transition-colors lg:size-auto lg:bg-transparent',
+                      isActive ? 'bg-primary/12' : 'bg-transparent',
+                    )}
+                  >
+                    <item.icon className="size-4.5" />
+                  </span>
+                  {t(item.labelKey)}
+                </>
+              )}
+            </NavLink>
+          ))}
+
+          {/* Правовые страницы — только в боковой панели на широком экране.
+              На телефоне они доступны из настроек и с экрана входа. */}
+          <div
+            aria-label={t('info.section')}
+            className="mt-auto hidden w-full border-t border-border/60 pt-3 lg:block"
+          >
+            <p className="px-3 pb-1.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+              {t('info.section')}
+            </p>
+            {INFO_LINKS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                state={{ from: 'wallet' }}
+                className={({ isActive }) =>
+                  cn(
+                    'focus-ring block rounded-lg px-3 py-2 text-xs transition-colors',
+                    isActive
+                      ? 'font-medium text-primary-emphasis'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )
+                }
+              >
+                {t(item.labelKey)}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      </nav>
+    </div>
+  )
+}
+
+/**
+ * Знак и имя продукта. Один блок: знак без подписи, имя читается само.
+ */
+function BrandLockup({ className }: { readonly className?: string }) {
+  return (
+    <Link
+      to={ROUTE.Dashboard}
+      className={cn('focus-ring flex items-center gap-2.5 rounded-lg', className)}
+    >
+      <BrandMark alt="" className="size-9 lg:size-10" />
+      <span className="text-[15px] font-semibold tracking-tight whitespace-nowrap text-foreground lg:text-base">
+        {APP_CONFIG.brandLabel}
+      </span>
+    </Link>
+  )
+}
+
+/**
+ * Шапка кабинета: отпечаток, имя и почта.
+ *
+ * ТОТ ЖЕ УЗОР, ЧТО У АДРЕСА. Для входа по почте ключей на устройстве нет,
+ * поэтому картинка считается из адреса почты. Номер записи в шапку
+ * не выводится: это служебный ключ, а не то, чем человек представляется.
+ */
+function DirectoryIdentity({ user }: { readonly user: IRemoteUser }) {
+  const name = displayNameFromEmail(user.email)
+  const since = formatMemberSince(user.createdAt)
+  const details = [user.email, since].filter((part): part is string => part !== null && part !== '')
+  const seed = user.email === null || user.email === '' ? user.id : user.email
+
+  return (
+    <Link
+      to={ROUTE.Settings}
+      className="focus-ring -ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent"
+    >
+      <AccountAvatar address={seed} label={name} />
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold">{name}</span>
+        {details.length > 0 ? (
+          <span className="truncate text-xs text-muted-foreground">{details.join(' · ')}</span>
+        ) : null}
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * Header identity while the cabinet record is still loading.
+ *
+ * EMAIL SIGN-IN RESTORES THE RECORD BEFORE THE DEVICE SESSION. The
+ * email address is known at once, from the stored login, so the header
+ * carries it instead of standing as a grey placeholder next to an
+ * already loaded balance. With no stored login there is nothing to
+ * show and the placeholder remains.
+ */
+function RestoringIdentity() {
+  const stored = readLoginCredentials()
+
+  if (stored === null) {
+    return (
+      <div className="flex min-w-0 items-center gap-2.5" aria-hidden>
+        <Skeleton className="size-9 shrink-0 rounded-full" />
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-36" />
+        </div>
+      </div>
+    )
+  }
+
+  const name = displayNameFromEmail(stored.email)
+
+  return (
+    <Link
+      to={ROUTE.Settings}
+      className="focus-ring -ml-1.5 flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-3 pl-1.5 transition-colors hover:bg-accent"
+    >
+      <AccountAvatar address={stored.email} label={name} />
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold">{name}</span>
+        <span className="truncate text-xs text-muted-foreground">{stored.email}</span>
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * Заглушка на время открытия сессии.
+ *
+ * Показывается внутри оболочки, а не вместо неё: навигация и шапка,
+ * исчезающие на секунду при каждом входе, читаются как сбой.
+ */
+function ShellPlaceholder() {
+  return (
+    <div className="flex min-w-0 flex-col gap-4" aria-busy>
+      <div className="rounded-xl border border-border/60 bg-card p-6 shadow-raised">
+        <Skeleton className="mb-6 h-4 w-24" />
+        <Skeleton className="h-10 w-52 sm:h-12" />
+        <Skeleton className="mt-4 h-10 w-full" />
+      </div>
+      <div className="rounded-xl border border-border/60 bg-card">
+        <div className="p-6 pb-3">
+          <Skeleton className="h-4 w-16" />
+        </div>
+        {Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="flex items-center gap-3 px-6 py-3.5">
+            <Skeleton className="size-9 rounded-full" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <Skeleton className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

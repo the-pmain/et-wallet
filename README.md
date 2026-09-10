@@ -274,8 +274,8 @@ so plainly.
 
 ## Security module
 
-Built in [core/security](src/core/security/) (timekeeping, neutralizing
-text) and [features/security](src/features/security/) (browser events,
+Built in [core/security](clients/safe/src/core/security/) (timekeeping, neutralizing
+text) and [features/security](clients/safe/src/features/security/) (browser events,
 settings, components). The split is mandatory: the core does not know
 about the DOM and must work in an extension service worker.
 
@@ -502,7 +502,7 @@ a class of defects unreachable by unit checks or jsdom:
 - **CSP.** The policy is injected only into the production build and
   takes effect only in the browser.
 
-**Security.** The catalog [src/test/security](src/test/security/) —
+**Security.** The catalog [src/test/security](clients/safe/src/test/security/) —
 cross-cutting invariants, not individual functions: secrets do not
 land in storage, in the log, or in serialized state; a locked wallet
 does not perform operations; releasing a secret requires a password
@@ -629,7 +629,7 @@ Onboarding screens are imported from their own modules, not through
 `@/pages`: the barrel file statically pulls every page at once and
 would defeat lazy loading.
 
-### Virtualization — [shared/ui/virtual-list.tsx](src/shared/ui/virtual-list.tsx)
+### Virtualization — [shared/ui/virtual-list.tsx](clients/safe/src/shared/ui/virtual-list.tsx)
 
 Transfer history reaches hundreds of rows. `VirtualList` renders only
 those that fall into the visible area.
@@ -723,7 +723,7 @@ sped up. The cache is cleared in `wipe()` together with the keys.
 
 ---
 
-## Tracking sent transactions — [core/transaction](src/core/transaction/)
+## Tracking sent transactions — [core/transaction](clients/safe/src/core/transaction/)
 
 After sending a transfer, the user must learn its fate from the wallet,
 not from a block explorer. Previously every own send was marked the
@@ -787,7 +787,7 @@ these addresses exists.
 
 ---
 
-## Sending ERC-20 tokens — [core/token/erc20.ts](src/core/token/erc20.ts)
+## Sending ERC-20 tokens — [core/token/erc20.ts](clients/safe/src/core/token/erc20.ts)
 
 The send screen chooses what leaves: the network's native currency or
 any of the tracked tokens. The list is the same as on the home screen —
@@ -862,7 +862,7 @@ recorded in [TECH_DEBT.md](TECH_DEBT.md) as A-114, sending as A-113.
 
 ---
 
-## Collectible tokens — [core/nft](src/core/nft/)
+## Collectible tokens — [core/nft](clients/safe/src/core/nft/)
 
 The NFT section shows ERC-721 and ERC-1155 items belonging to the
 active address and allows transferring them.
@@ -928,7 +928,7 @@ sends.
 
 ---
 
-## Speeding up and canceling a stuck transaction — [core/transaction](src/core/transaction/)
+## Speeding up and canceling a stuck transaction — [core/transaction](clients/safe/src/core/transaction/)
 
 A transaction with an underpriced fee can sit in the queue for hours.
 Worse is something else: its number (nonce) is taken, and **no later
@@ -1004,7 +1004,7 @@ what to sign — and the user's confirmation could be bypassed.
 
 ---
 
-## ENS names — [core/ens](src/core/ens/)
+## ENS names — [core/ens](clients/safe/src/core/ens/)
 
 The recipient field accepts both an address and a name of the form
 `name.eth`. Wallet accounts are labeled with a name instead of an
@@ -1147,7 +1147,7 @@ any network call.
 
 ---
 
-## Backup — [core/backup](src/core/backup/), [pages/BackupPage.tsx](src/pages/BackupPage.tsx)
+## Backup — [core/backup](clients/safe/src/core/backup/), [pages/BackupPage.tsx](clients/safe/src/pages/BackupPage.tsx)
 
 The `#/wallet/backup` screen releases the seed phrase and the private
 key of the active account. This is the most dangerous part of the
@@ -1257,7 +1257,7 @@ an already existing wallet — and a second way to overwrite it.
 
 ## Temporary security relaxations — off
 
-The file [src/shared/config/test-mode.ts](src/shared/config/test-mode.ts),
+The file [src/shared/config/test-mode.ts](clients/safe/src/shared/config/test-mode.ts),
 the constant `IS_TEST_MODE`. Currently **`false`**: the seed-phrase
 write-down check and unlock-by-phrase work in full.
 
@@ -1316,7 +1316,7 @@ pair has been guessed.
 
 ## Localization
 
-Russian and English. The mechanism is [shared/i18n](src/shared/i18n/);
+Russian and English. The mechanism is [shared/i18n](clients/safe/src/shared/i18n/);
 the switch is on the onboarding screens and in the wallet header.
 
 ### No translation library
@@ -1346,7 +1346,7 @@ read aloud unintelligibly.
 
 jsdom reports `en-US`, and the suite would fail for a developer with
 an English system where it passes for a developer with a Russian one.
-The language is pinned in [src/test/setup.ts](src/test/setup.ts).
+The language is pinned in [src/test/setup.ts](clients/safe/src/test/setup.ts).
 
 ### Scope
 
@@ -1356,19 +1356,20 @@ stages — see `TECH_DEBT.md`.
 
 ---
 
-## One application
+## One server, isolated clients
 
-The repository root is one npm package. `src/` is the wallet interface
-(Vite, browser). `server/src` is a Fastify Node process: catalogs,
-`POST /v1/users`, and serving the built UI. One `package.json`, one
-`npm install`.
+The repository root is one npm package. `clients/safe` and `clients/etx`
+are complete Vite applications selected at build time by `THEME`.
+`server/src` is a shared Fastify Node process: catalogs, `POST /v1/users`,
+and serving the selected client from `dist/`. There is one `package.json`
+and one `npm install`.
 
 The layers have different runtimes and different rules (the Node layer
 is forbidden from importing signing libraries; the wallet is forbidden
 from touching `localStorage` directly). A shared `tsconfig` for
 browser and Node would mean neither environment is checked properly:
-that is why `tsconfig.app.json` and `tsconfig.server.json` sit side by
-side.
+that is why each client owns a `tsconfig.json` and the server has
+`tsconfig.server.json`.
 
 **The wallet works without the Node process.** A built-in network list
 exists in the client itself. A non-custodial app must remain usable
@@ -1460,7 +1461,7 @@ with state.
 | Base | 8453 | ETH | basescan.org | yes |
 | Avalanche C-Chain | 43114 | AVAX | snowtrace.io | yes |
 
-Catalog: [src/core/network/built-in.ts](src/core/network/built-in.ts). Each
+Catalog: [src/core/network/built-in.ts](clients/safe/src/core/network/built-in.ts). Each
 network has at least two independent RPC nodes; all addresses are strictly
 `https`.
 
@@ -1493,7 +1494,7 @@ must be accounted for at the transaction stage.
 
 ### Seed phrase: what is protected and what is not
 
-The module [core/mnemonic](src/core/mnemonic/) implements BIP-39 on top
+The module [core/mnemonic](clients/safe/src/core/mnemonic/) implements BIP-39 on top
 of `@scure/bip39`. Generation is 12 or 24 words; import is every length
 allowed by the standard (12, 15, 18, 21, 24).
 
@@ -1533,7 +1534,7 @@ be rejected as invalid.
 
 ### HD wallet: derivation paths and extended keys
 
-The module [core/hdwallet](src/core/hdwallet/) implements BIP-32 and
+The module [core/hdwallet](clients/safe/src/core/hdwallet/) implements BIP-32 and
 BIP-44 on top of `@scure/bip32`. The default path is `m/44'/60'/0'/0/n`.
 
 **Two incompatible path conventions.** Wallets disagree on which index
@@ -1592,7 +1593,7 @@ of the user is worse than the original risk.
 `m/44'/60' → m/44'/60'/n'` is hardened, so climbing to the seed or to
 a neighboring account is impossible.
 
-**What is done instead — [core/security](src/core/security/):**
+**What is done instead — [core/security](clients/safe/src/core/security/):**
 
 1. **Signing and export are separated.** `getPrivateKeyForSigning`
    serves internal signing; `exportPrivateKey` serves release to the
@@ -1632,7 +1633,7 @@ a neighboring account is impossible.
 | xpub, private key already released | **`account-compromise`** |
 | xprv or mnemonic | `critical` |
 
-### Addresses — [core/address](src/core/address/)
+### Addresses — [core/address](clients/safe/src/core/address/)
 
 The only point of computing and checking addresses. A second
 independent implementation is not allowed: two address-computation
@@ -1683,7 +1684,7 @@ The heuristic is intentionally narrow — only the zero address and
 `0x…dEaD`. A false positive on a real recipient address would force
 canceling a legitimate transfer.
 
-### Encryption and protected storage — [core/encryption](src/core/encryption/)
+### Encryption and protected storage — [core/encryption](clients/safe/src/core/encryption/)
 
 | Parameter | Value | Rationale |
 | --- | --- | --- |
@@ -1744,7 +1745,7 @@ protection here is the strength of the KDF and the short lifetime of
 an unlocked session, not the pretense that the password is protected
 from a memory dump.
 
-### Transport to nodes — [core/provider](src/core/provider/)
+### Transport to nodes — [core/provider](clients/safe/src/core/provider/)
 
 `RpcClient` is the only place in the app that knows ethers exists.
 The domain depends on `IProvider`, so replacing the library touches
@@ -1788,7 +1789,7 @@ foreign chainId is excluded from the walk with a separate warning in
 the log — that is either a configuration error or an impersonation
 attempt.
 
-### Signing — [core/signing](src/core/signing/)
+### Signing — [core/signing](clients/safe/src/core/signing/)
 
 Legacy, EIP-1559, `personal_sign`, and `eth_signTypedData_v4` are
 supported. Serialization is performed by ethers: RLP, EIP-2718
@@ -1844,7 +1845,7 @@ token-spend allowance is a valid structure with a correct chainId.
 Parsing dangerous templates (`Permit`, `PermitSingle`, marketplace
 orders) is the job of the confirmation layer.
 
-### Accounts — [core/account](src/core/account/)
+### Accounts — [core/account](clients/safe/src/core/account/)
 
 `AccountManager` works with the public projection of keys: addresses,
 names, display order. The only method that releases a secret is
@@ -1897,7 +1898,7 @@ An address by itself is public, but a list of addresses ties all of
 one user's accounts together, and names ("Salary", "Exchange") reveal
 the purpose of the funds. A locked wallet reports neither.
 
-### Design system — [app/styles/index.css](src/app/styles/index.css)
+### Design system — [app/styles/index.css](clients/safe/src/app/styles/index.css)
 
 A palette of three colors: deep violet, a neutral scale, and red for
 irreversible actions. The limit is not aesthetic — in a wallet color
@@ -2028,7 +2029,7 @@ a manifest v3 requirement, where each is needed as a separate file.
 A recognizable look for the app is a weak but real barrier against a
 phishing copy, so the mark is the same on every onboarding screen.
 
-### Shell and navigation — [app/layouts](src/app/layouts/)
+### Shell and navigation — [app/layouts](clients/safe/src/app/layouts/)
 
 Five screens of the unlocked wallet share the header and the bottom
 bar through a nested route with `Outlet`. Repeating the shell on every
@@ -2047,7 +2048,7 @@ Five items is the limit. An extension popup is about 360 pixels wide;
 a sixth item makes labels unreadable, and unlabeled icons are
 unacceptable in a wallet.
 
-### Address fingerprint — [features/wallet/ui/AccountAvatar.tsx](src/features/wallet/ui/AccountAvatar.tsx)
+### Address fingerprint — [features/wallet/ui/AccountAvatar.tsx](clients/safe/src/features/wallet/ui/AccountAvatar.tsx)
 
 A user recognizes an address by four to six characters, and picking an
 address with the desired edge characters is computationally cheap.
@@ -2059,7 +2060,7 @@ The fingerprint does not replace a check. An FNV-1a fold gives no
 resistance to search and is unfit for other purposes — all that is
 needed from it is distinguishability of pictures.
 
-### Empty states explain the reason — [shared/ui/empty-state.tsx](src/shared/ui/empty-state.tsx)
+### Empty states explain the reason — [shared/ui/empty-state.tsx](clients/safe/src/shared/ui/empty-state.tsx)
 
 The `description` field is required, not optional. An empty list
 without an explanation the user reads as "I have nothing" — a
@@ -2072,7 +2073,7 @@ The Assets and NFT sections at the current stage consist exactly of
 such states: ERC-20 balances and collectible tokens are not
 implemented, and there will be no lists with invented values there.
 
-### Onboarding screens — [features/onboarding](src/features/onboarding/), [pages](src/pages/)
+### Onboarding screens — [features/onboarding](clients/safe/src/features/onboarding/), [pages](clients/safe/src/pages/)
 
 Five screens: welcome, create, restore, unlock, reset. The core does
 not know about them — `OnboardingService` remains the only place
@@ -2090,7 +2091,7 @@ state values are visible in React developer tools; ref values are
 not. The buffer is wiped on leaving the screen and immediately after
 the wallet is created.
 
-#### Password policy — [core/security/password-policy.ts](src/core/security/password-policy.ts)
+#### Password policy — [core/security/password-policy.ts](clients/safe/src/core/security/password-policy.ts)
 
 | Requirement | Value |
 | --- | --- |
@@ -2146,7 +2147,7 @@ The heading immediately says the password cannot be recovered. Reset
 requires both a consent checkbox and typing the word `ERASE`: a
 single checkbox is ticked mechanically.
 
-### Network management — [core/network](src/core/network/)
+### Network management — [core/network](clients/safe/src/core/network/)
 
 Add, remove, switch. Built-in networks cannot be changed or deleted:
 their configuration is part of the defense against impersonation.
@@ -2195,7 +2196,7 @@ The default network becomes active, the connection to the removed one
 is closed, the balance and history are reread. A state of "there is
 no active network" does not exist.
 
-### RPC node selection — [core/provider](src/core/provider/)
+### RPC node selection — [core/provider](clients/safe/src/core/provider/)
 
 The wallet is not tied to one node operator. Addresses are collected
 from several sources, checked, and substituted on failure.
@@ -2287,7 +2288,7 @@ Alchemy panel — otherwise outsiders will use it and the quota will
 run out. Without a key the wallet works on public nodes; that is a
 working state, not a failure.
 
-### Tokens — [core/token](src/core/token/)
+### Tokens — [core/token](clients/safe/src/core/token/)
 
 Import by contract address, reading `symbol`, `name`, `decimals`,
 and `balanceOf` directly from the contract.
@@ -2350,7 +2351,7 @@ For the same reason discovered tokens are not added automatically:
 anyone can send bait named after a known project to a foreign address
 almost for free, and a token shown in the wallet looks approved.
 
-### Transfer history — [core/history](src/core/history/)
+### Transfer history — [core/history](clients/safe/src/core/history/)
 
 Transfers of native currency, ERC-20 tokens, and ERC-721 and ERC-1155
 collectibles are supported.
@@ -2430,7 +2431,7 @@ ERC-20 and ERC-721 use the same `Transfer` event and differ only in
 the number of indexed parameters: for ERC-721 the item identifier
 occupies the fourth topic. There is no other signal in the event.
 
-### History filtering and search — [features/wallet/lib/transfer-filter.ts](src/features/wallet/lib/transfer-filter.ts), [pages/ActivityPage.tsx](src/pages/ActivityPage.tsx)
+### History filtering and search — [features/wallet/lib/transfer-filter.ts](clients/safe/src/features/wallet/lib/transfer-filter.ts), [pages/ActivityPage.tsx](clients/safe/src/pages/ActivityPage.tsx)
 
 The history screen filters records by asset type (native currency,
 ERC-20, NFT), by transfer direction, and by a search string.
@@ -2499,7 +2500,7 @@ visible label is short — there is little room in an extension window
 to someone who listens to the page rather than looks at it: a hidden
 group's `legend` is not part of the button name.
 
-### Home screen — [features/wallet](src/features/wallet/), [pages/DashboardPage.tsx](src/pages/DashboardPage.tsx)
+### Home screen — [features/wallet](clients/safe/src/features/wallet/), [pages/DashboardPage.tsx](clients/safe/src/pages/DashboardPage.tsx)
 
 The panel shows the balance, accounts, networks, operations, and
 quick actions.
@@ -2576,7 +2577,7 @@ exactly a character-by-character check protects against a malicious
 extension substituting clipboard contents. When truncating in lists
 the case is preserved: it carries the EIP-55 checksum.
 
-### Sending — [core/transaction](src/core/transaction/), [pages/SendPage.tsx](src/pages/SendPage.tsx)
+### Sending — [core/transaction](clients/safe/src/core/transaction/), [pages/SendPage.tsx](clients/safe/src/pages/SendPage.tsx)
 
 The screen walks the user through three steps: form, confirmation,
 result. The split is not cosmetic — on the first step values are still
@@ -2597,7 +2598,7 @@ structure, not reassembled from form fields.
 
 `Number('0.1') * 1e18` yields `100000000000000001` — one more than
 requested. For money such error is unacceptable.
-[parseAmount](src/features/wallet/lib/amount-input.ts) works with a
+[parseAmount](clients/safe/src/features/wallet/lib/amount-input.ts) works with a
 string and `BigInt`. A fractional part longer than the token's
 decimal count is **rejected**, not rounded: silently dropping digits
 would mean sending an amount different from the one entered.
@@ -2616,7 +2617,7 @@ Verified on a live node: an account with a zero balance gets
 
 #### Recipient findings are computed from the entered string
 
-[findRecipientRisks](src/core/transaction/risk.ts) takes the address
+[findRecipientRisks](clients/safe/src/core/transaction/risk.ts) takes the address
 **in the form the user entered it**. The reason is that `toAddress`
 brings the record to an EIP-55 checksum, and the "entered without a
 checksum" signal is lost after normalization — the warning would
@@ -2664,7 +2665,7 @@ The result screen shows the hash and states the difference plainly.
 The transaction may remain in the queue or be displaced; status
 tracking is not yet implemented (see [TECH_DEBT.md](TECH_DEBT.md)).
 
-### Logging — [core/platform/ConsoleLogger.ts](src/core/platform/ConsoleLogger.ts)
+### Logging — [core/platform/ConsoleLogger.ts](clients/safe/src/core/platform/ConsoleLogger.ts)
 
 Redaction of secrets is built into the implementation, not left to
 calling code: a rule whose observance depends on the attentiveness of
@@ -2688,7 +2689,7 @@ Constructor DI, a manual composition root, no container. The contract
 is `IWalletCoreDependencies`; the factory type is `WalletCoreFactory`.
 
 Concrete implementations are chosen in one place —
-[`createAppServices`](src/app/composition/createAppServices.ts). A
+[`createAppServices`](clients/safe/src/app/composition/createAppServices.ts). A
 move to IndexedDB or to `chrome.storage` in the extension will touch
 this file and no other.
 
@@ -2701,7 +2702,7 @@ The production build is not parameterized with doubles. The ability
 to inject accelerated encryption or a fake node into it would mean
 that such a substitution is reachable in production as well. Tests
 assemble the same set of classes separately —
-[`createTestAppServices`](src/test/doubles/createTestAppServices.ts).
+[`createTestAppServices`](clients/safe/src/test/doubles/createTestAppServices.ts).
 
 Decorator containers were rejected: they require `emitDecoratorMetadata`
 (forbidden by the `erasableSyntaxOnly` setting), pull `reflect-metadata`
@@ -2724,31 +2725,38 @@ import { KeyringService } from '@/core'
 Aliases per layer (`@core`, `@features`, ...) are deliberately not
 introduced. They duplicate information already contained in the path,
 require a synchronized change of three configurations (`tsconfig`,
-`vite`, `components.json`) and are not supported by the shadcn/ui
+`vite`, and each client's `components.json`) and are not supported by the shadcn/ui
 CLI, which expects a single root alias.
 
-The alias is declared in two places and must be changed in both at
-once:
+The alias is declared per client and selected by the build:
 
-- `tsconfig.app.json` — `compilerOptions.paths` (for type checking);
-- `vite.config.ts` — `resolve.alias` (for the build and tests).
+- `clients/<theme>/tsconfig.json` — `compilerOptions.paths` for type checking;
+- `vite.config.ts` — `resolve.alias` for the selected build and tests.
 
 ---
 
 ## Project structure
 
+The expanded tree below documents the Safe client internals. Its `brand`,
+`public`, `src`, `e2e`, `index.html`, and `tsconfig.json` live under
+`clients/safe/`; `clients/etx/` owns the corresponding independent tree.
+Shared build tooling and the server remain at the repository root.
+
 ```
 wallet/
 ├─ build/
 │  └─ csp-plugin.ts             # CSP injection into the production build
-├─ brand/                       # Logo sources. Do not enter the build
+├─ clients/
+│  ├─ safe/                     # Newer Safe client
+│  └─ etx/                      # ETX client from main
+├─ brand/                       # Shown expanded: clients/safe/brand
 │  ├─ icon.png                  # Mark without lettering, 1024×1024
 │  └─ logo-full.png             # Full lockup: mark, lettering, motto
 ├─ scripts/
 │  └─ generate-icons.mjs        # Preparing the icon set
-├─ public/
+├─ public/                      # Shown expanded: clients/safe/public
 │  └─ icons/                    # Icons 16…512, prepared by `npm run icons`
-├─ src/
+├─ src/                         # Shown expanded: clients/safe/src
 │  ├─ app/                      # Application composition
 │  │  ├─ composition/
 │  │  │  └─ createAppServices.ts # Choice of concrete implementations
@@ -2843,13 +2851,13 @@ wallet/
 ├─ .gitignore
 ├─ .prettierignore
 ├─ .prettierrc.json
-├─ components.json              # shadcn/ui CLI configuration
+├─ clients/*/components.json    # Per-client shadcn/ui CLI configuration
 ├─ eslint.config.js
-├─ index.html
+├─ index.html                   # clients/safe/index.html
 ├─ package.json
 ├─ README.md
 ├─ tsconfig.json
-├─ tsconfig.app.json
+├─ tsconfig.json                # clients/safe/tsconfig.json
 ├─ tsconfig.node.json
 ├─ tsconfig.server.json
 ├─ vite.config.ts
@@ -2906,7 +2914,7 @@ of sensitive data.
 
 ### Strict typing
 
-In `tsconfig.app.json`, `strict`, `noUncheckedIndexedAccess`,
+In each `clients/<theme>/tsconfig.json`, `strict`, `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `noPropertyAccessFromIndexSignature`,
 and `erasableSyntaxOnly` are enabled. For a wallet the cost of a
 typing error is lost funds, so strictness is set to the maximum

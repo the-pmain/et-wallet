@@ -1,62 +1,69 @@
-# Dual client: `elm-wallet-main` and `main`
+# Multi-client architecture
 
-This repo ships **one server** and **two clients**. Do not merge the UIs.
-
-| Branch | Remote | Client | Role |
-|---|---|---|---|
-| `elm-wallet-main` | `et-wallet` (`the-pmain/et-wallet`) | Newer UI (this checkout, from elm-wallet) | Daily work |
-| `main` | `et-wallet` | Older / different UI | Production-style et-wallet client |
-| `adapt/elm-wallet-main` | `et-wallet` | Main's client, with ports of elm-wallet-main behavior | Merge vehicle into `main` |
-
-`origin` is `the-pmain/elm-wallet`. Do not push client work there unless James asks.
-
-The two histories do not share a merge base. Cherry-pick and file copy will often fail. **Reimplement** the same behavior against main's files.
-
-## After every commit or push on `elm-wallet-main`
-
-1. Stay on `elm-wallet-main` in this directory. Do not `git checkout main` here.
-2. Fetch `et-wallet/main`.
-3. Use a sibling worktree, not this checkout:
-   - path: `../elm-safe-adapt-main`
-   - branch: `adapt/elm-wallet-main` (create from `et-wallet/main` if missing)
-4. Port the **behavior**, not the newer `src/` tree:
-   - server/API/auth changes usually apply with small context edits
-   - client changes must match main's components, copy, layout, and tests
-   - never replace main's wallet UI with elm-wallet-main's
-5. Run the tests that cover the ported files (`tsc -b` if the client changed).
-6. Commit on `adapt/elm-wallet-main` and push to `et-wallet`.
-7. Open or update a PR: `adapt/elm-wallet-main` → `et-wallet/main`. Do not merge into `main` unless James asks.
-
-## Standing worktree
+This repository ships one Fastify server and multiple isolated clients from one branch.
+The active client is selected at Vite startup and build time through `THEME`.
 
 ```text
-git fetch et-wallet main
-git worktree add -b adapt/elm-wallet-main ../elm-safe-adapt-main et-wallet/main
+clients/
+  safe/  # newer Safe client; storage identity: elmsafe
+  etx/   # ETX client from main; storage identity: etwallet
+server/  # shared API and static-file host
+build/themes.json
 ```
 
-If the worktree already exists, update that branch from `et-wallet/main` and add the new port on top.
+The clients are complete applications. Each owns its `src`, `public`, `brand`, `e2e`,
+`index.html`, and TypeScript project. Do not merge their layouts, copy, CSS, providers,
+feature implementations, or tests.
 
-## Current port (2026-09-10)
+## Selecting a client
 
-The exchange receive panel follows only `address-receiving-funds-exchange` in `wallets` (map or list). A missing or malformed field always offers Generate wallet / Generate a wallet and never reads the open account.
+Set exactly one supported value in `.env`:
 
-elm-wallet-main: `cff7f59`.
-adapt: `0727bf5`.
+```dotenv
+THEME=safe
+```
 
-### Earlier port (2026-09-09)
+or:
 
-`POST /v1/users/wallets/generate` derives a receive address from the record's own `seed_phrase`, so a browser signed in by email alone can fill a slot with no vault to unlock. It answers 409 when the row carries no phrase, and only then does the device derive locally. Both receive slots read `wallets`; an empty slot offers the generate button, and a wallet with no cabinet record falls back to the open account.
+```dotenv
+THEME=etx
+```
 
-The server files were identical across the two branches, so they carried over as-is. On the client the port keeps main's `ReceiveAddressPanel`, its Russian comments, and its copy — the button stays "Generate a wallet".
+`THEME` is intentionally not prefixed with `VITE_`: it controls the build but is not
+exposed to browser code. A missing or unknown value stops Vite rather than silently
+building the wrong wallet.
 
-elm-wallet-main: `1bd1f8a`.
-adapt: `bfcc3c9`.
+The selected client becomes Vite's root and is the only client included in `dist/`.
+The server continues to serve the single `dist/` directory.
 
-### Earlier port
+## Commands
 
-Cabinet directory lists are paginated (`GET /v1/admin/directory/*`), with a short TTL scan cache and joined emails. Receivings does not GET sendings. Pending toasts hydrate from Users/Activity, or from the Sendings list itself.
+- `npm run dev` — start the client selected by `.env`.
+- `npm run build` — typecheck both clients and build the selected client.
+- `npm test` — test the selected client plus the shared server.
+- `npm run build:themes` — build every registered client sequentially.
+- `npm run test:themes` — test every registered client sequentially.
+- `npm run verify:themes` — run the complete verification pipeline for every client.
+- `npm run icons` — regenerate icons only for the selected client.
 
-Regular admins can **view** all sendings and receivings. Writes, Edit, and the cabinet SSE stream stay super-admin only.
+## Isolation rules
 
-elm-wallet-main: `af55ecb` (also `3f12884`, `8316df7`).
-adapt: `31ced7d`.
+- `@/*` resolves inside the selected client only.
+- Direct imports between `clients/*` are lint errors.
+- Shared packages may not import a client or branch on `THEME`.
+- Browser storage identities are permanent. `safe` retains `elmsafe`; `etx` retains
+  `etwallet`. This covers IndexedDB, localStorage keys, and broadcast channels.
+- Client metadata and assets stay in the client root, so the unselected brand cannot
+  leak into the output through a shared `index.html` or `public` directory.
+
+## Adding another client
+
+1. Add a complete `clients/<theme>/` root with `src/app/main.tsx`, `public`,
+   `brand`, `e2e`, `index.html`, and `tsconfig.json`.
+2. Add one entry to `build/themes.json`.
+3. Assign a unique, permanent `storageNamespace`.
+4. Add the client TypeScript project to the root `tsconfig.json`.
+5. Run `npm run verify:themes`.
+
+Code may move into a neutral shared package only after semantic comparison and
+contract tests show that every consuming client implements the same behavior.

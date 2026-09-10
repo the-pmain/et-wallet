@@ -107,19 +107,24 @@ describe('supabase-clients', () => {
     expect(() => requireBearerAuthorization(undefined)).toThrow(UnauthorizedError)
   })
 
-  it('does not keep a service-role key in wallet source or the env example', () => {
-    const frontend = readFileSync(
-      join(import.meta.dirname, '../../../src/features/onboarding/model/RemoteUserDirectory.ts'),
-      'utf8',
-    )
-    const adminClient = readFileSync(
-      join(import.meta.dirname, '../../../src/features/admin/model/AdminClient.ts'),
-      'utf8',
-    )
+  it('does not keep a service-role key in client source or the env example', () => {
     const envExample = readFileSync(join(import.meta.dirname, '../../../.env.example'), 'utf8')
 
-    expect(frontend).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service.role/iu)
-    expect(adminClient).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service.role/iu)
+    for (const theme of ['safe', 'etx']) {
+      const clientRoot = join(import.meta.dirname, `../../../clients/${theme}/src`)
+      const frontend = readFileSync(
+        join(clientRoot, 'features/onboarding/model/RemoteUserDirectory.ts'),
+        'utf8',
+      )
+      const adminClient = readFileSync(
+        join(clientRoot, 'features/admin/model/AdminClient.ts'),
+        'utf8',
+      )
+
+      expect(frontend).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service.role/iu)
+      expect(adminClient).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service.role/iu)
+    }
+
     expect(envExample).toMatch(/^SUPABASE_SERVICE_ROLE_KEY=$/m)
     expect(envExample).not.toMatch(/VITE_SUPABASE_SERVICE_ROLE_KEY/u)
   })

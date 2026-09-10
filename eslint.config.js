@@ -20,7 +20,7 @@ const LAYER_BOUNDARIES = [
     /* core is the domain kernel. It knows nothing of React, UI, or features.
        That is a hard requirement for moving the kernel into an MV3 service
        worker, where DOM and React are unavailable. */
-    files: ['src/core/**/*.ts'],
+    files: ['clients/*/src/core/**/*.ts'],
     patterns: [
       { group: ['@/app', '@/app/*'], message: 'core cannot depend on the app layer.' },
       { group: ['@/pages', '@/pages/*'], message: 'core cannot depend on the pages layer.' },
@@ -40,7 +40,7 @@ const LAYER_BOUNDARIES = [
   },
   {
     /* shared is the lowest layer. It knows about nobody. */
-    files: ['src/shared/**/*.{ts,tsx}'],
+    files: ['clients/*/src/shared/**/*.{ts,tsx}'],
     patterns: [
       { group: ['@/app', '@/app/*'], message: 'shared cannot depend on the app layer.' },
       { group: ['@/pages', '@/pages/*'], message: 'shared cannot depend on the pages layer.' },
@@ -53,7 +53,7 @@ const LAYER_BOUNDARIES = [
   },
   {
     /* features are vertical slices. They know nothing of pages or app composition. */
-    files: ['src/features/**/*.{ts,tsx}'],
+    files: ['clients/*/src/features/**/*.{ts,tsx}'],
     patterns: [
       { group: ['@/app', '@/app/*'], message: 'features cannot depend on the app layer.' },
       { group: ['@/pages', '@/pages/*'], message: 'features cannot depend on the pages layer.' },
@@ -61,10 +61,16 @@ const LAYER_BOUNDARIES = [
   },
   {
     /* pages compose features. They know nothing of the app layer. */
-    files: ['src/pages/**/*.{ts,tsx}'],
+    files: ['clients/*/src/pages/**/*.{ts,tsx}'],
     patterns: [{ group: ['@/app', '@/app/*'], message: 'pages cannot depend on the app layer.' }],
   },
 ]
+
+const CROSS_CLIENT_IMPORT = {
+  group: ['**/clients/safe/**', '**/clients/etx/**', '**/safe/src/**', '**/etx/src/**'],
+  message:
+    'Clients are isolated. Import only from the current client or an approved shared package.',
+}
 
 /**
  * Storage APIs forbidden for direct use.
@@ -81,8 +87,7 @@ const LAYER_BOUNDARIES = [
 const FORBIDDEN_STORAGE_GLOBALS = [
   {
     name: 'localStorage',
-    message:
-      'Direct localStorage access is forbidden. Use core/storage (IndexedDB + encryption).',
+    message: 'Direct localStorage access is forbidden. Use core/storage (IndexedDB + encryption).',
   },
   {
     name: 'sessionStorage',
@@ -111,7 +116,7 @@ export default tseslint.config(
 
   /* Shared settings for wallet source (browser). */
   {
-    files: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts'],
+    files: ['clients/*/src/**/*.{ts,tsx}', 'clients/*/e2e/**/*.ts'],
     languageOptions: {
       ecmaVersion: 2023,
       globals: globals.browser,
@@ -175,13 +180,14 @@ export default tseslint.config(
       'prefer-const': 'error',
       'no-var': 'error',
       'object-shorthand': 'error',
+      'no-restricted-imports': ['error', { patterns: [CROSS_CLIENT_IMPORT] }],
     },
   },
 
   ...LAYER_BOUNDARIES.map(({ files, patterns }) => ({
     files,
     rules: {
-      'no-restricted-imports': ['error', { patterns }],
+      'no-restricted-imports': ['error', { patterns: [...patterns, CROSS_CLIENT_IMPORT] }],
     },
   })),
 
@@ -272,7 +278,7 @@ export default tseslint.config(
   {
     files: ['server/src/users/seed-phrase.ts', 'server/src/users/derive-address.ts'],
     rules: {
-      'no-restricted-imports': 'off',
+      'no-restricted-imports': ['error', { patterns: [CROSS_CLIENT_IMPORT] }],
     },
   },
 
@@ -298,7 +304,7 @@ export default tseslint.config(
 
   /* Tests: mocks and assertions that production code cannot make. */
   {
-    files: ['**/*.test.{ts,tsx}', 'src/test/**/*.ts', 'e2e/**/*.ts'],
+    files: ['**/*.test.{ts,tsx}', 'clients/*/src/test/**/*.ts', 'clients/*/e2e/**/*.ts'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
     },
@@ -320,7 +326,7 @@ export default tseslint.config(
     only the fields of `POST /v1/users/auth`.
   */
   {
-    files: ['src/features/onboarding/model/login-credentials.ts'],
+    files: ['clients/*/src/features/onboarding/model/login-credentials.ts'],
     rules: {
       'no-restricted-globals': 'off',
     },
@@ -332,7 +338,7 @@ export default tseslint.config(
     again. The server checks the PIN on every request.
   */
   {
-    files: ['src/features/admin/model/admin-pin.ts'],
+    files: ['clients/*/src/features/admin/model/admin-pin.ts'],
     rules: {
       'no-restricted-globals': 'off',
     },
@@ -344,7 +350,7 @@ export default tseslint.config(
     before the encrypted wallet store. The record is a hex colour.
   */
   {
-    files: ['src/shared/theme/accent-storage.ts'],
+    files: ['clients/*/src/shared/theme/accent-storage.ts'],
     rules: {
       'no-restricted-globals': 'off',
     },

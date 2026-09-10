@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import sharp from 'sharp'
+import { loadEnv } from 'vite'
 
 /**
  * Prepare app icons from the source logo.
@@ -26,6 +27,19 @@ import sharp from 'sharp'
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const environment = loadEnv(process.env.NODE_ENV ?? 'development', ROOT, '')
+const themeDefinitions = JSON.parse(
+  await readFile(resolve(ROOT, 'build/themes.json'), { encoding: 'utf8' }),
+)
+const theme = environment.THEME
+
+if (typeof theme !== 'string' || !Object.hasOwn(themeDefinitions, theme)) {
+  throw new Error(
+    `THEME must be one of: ${Object.keys(themeDefinitions).join(', ')}. Received: ${JSON.stringify(theme ?? '')}.`,
+  )
+}
+
+const CLIENT_ROOT = resolve(ROOT, themeDefinitions[theme].root)
 
 /**
  * Source mark without lettering.
@@ -35,7 +49,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
  * requests it. `brand/` also holds the full wordmark for store listings
  * and documents where a light background is appropriate.
  */
-const SOURCE = resolve(ROOT, 'brand/icon.png')
+const SOURCE = resolve(CLIENT_ROOT, 'brand/icon.png')
 
 /**
  * Required sizes.
@@ -88,7 +102,7 @@ async function main() {
   /* Transparent margins are trimmed once: doing it per size would
      decode the source six times. */
   const trimmed = await toWhite(await sharp(source).trim({ threshold: 10 }).png().toBuffer())
-  const outputDirectory = resolve(ROOT, 'public/icons')
+  const outputDirectory = resolve(CLIENT_ROOT, 'public/icons')
 
   await mkdir(outputDirectory, { recursive: true })
 

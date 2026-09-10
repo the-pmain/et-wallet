@@ -10,6 +10,6 @@
   "bracketSpacing": true,
   "endOfLine": "lf",
   "plugins": ["prettier-plugin-tailwindcss"],
-  "tailwindStylesheet": "./src/app/styles/index.css",
+  "tailwindStylesheet": "./clients/safe/src/app/styles/index.css",
   "tailwindFunctions": ["cn", "cva"]
 }

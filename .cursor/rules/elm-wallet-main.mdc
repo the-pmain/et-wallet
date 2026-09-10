@@ -1,13 +1,15 @@
 ---
-description: Dual-client workflow — elm-wallet-main daily, adapt/elm-wallet-main for main
+description: One-branch workflow for isolated Safe and ETX clients
 alwaysApply: true
 ---
 
-# elm-wallet-main and main
+# Multi-client workflow
 
 - Daily work stays on `elm-wallet-main`. Push to remote `et-wallet`, not `origin`, unless James asks.
-- This checkout is the **newer client**. `et-wallet/main` is the same app with a **different client**. Never replace one UI with the other.
-- Do not `git checkout main` in this directory. Port through sibling worktree `../elm-safe-adapt-main` on branch `adapt/elm-wallet-main`.
-- **After every commit or push on `elm-wallet-main`**, immediately reimplement the same behavior on `adapt/elm-wallet-main` (from `et-wallet/main`), run the relevant tests, push to `et-wallet`, and open or update a PR into `main`. Do not merge that PR unless James asks.
-- Reimplement against main's files. Do not copy `src/` wholesale. Server/auth ports are usually small; client ports must keep main's layout and copy.
+- Both clients live on this branch: `clients/safe` and `clients/etx`.
+- Keep the client trees isolated. Never import one client from another or replace one UI with the other.
+- `THEME=safe` or `THEME=etx` selects exactly one client at Vite startup/build time.
+- Preserve storage identities: Safe uses `elmsafe`; ETX uses `etwallet`.
+- Shared behavior must be extracted through a neutral package with contract tests, not by cross-client imports.
+- Run the relevant client test and `npm run test:themes` for changes that affect both clients or shared infrastructure.
 - Full reminder: `docs/dual-client.md`

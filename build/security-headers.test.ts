@@ -10,7 +10,7 @@ import {
   buildNginxSnippet,
   buildSecurityHeaders,
 } from './security-headers-plugin'
-
+import { resolveTheme, THEMES } from './themes'
 
 function header(name: string, connectSrc?: string): string {
   return buildSecurityHeaders(connectSrc).find((entry) => entry.name === name)?.value ?? ''
@@ -93,8 +93,9 @@ describe('Host headers', () => {
   })
 
   it('the meta tag and robots.txt say the same as the header', () => {
-    const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
-    const robots = readFileSync(join(process.cwd(), 'public/robots.txt'), 'utf8')
+    const clientRoot = join(process.cwd(), THEMES[resolveTheme(process.env.THEME)].root)
+    const html = readFileSync(join(clientRoot, 'index.html'), 'utf8')
+    const robots = readFileSync(join(clientRoot, 'public/robots.txt'), 'utf8')
 
     expect(html).toContain(`content="${ROBOTS_TAG_VALUE}"`)
     expect(robots).toMatch(/^User-agent:\s*\*/mu)

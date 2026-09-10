@@ -1,4 +1,15 @@
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { defineConfig, devices } from '@playwright/test'
+import { loadEnv } from 'vite'
+
+import { resolveTheme, THEMES } from './build/themes'
+
+const REPOSITORY_ROOT = fileURLToPath(new URL('.', import.meta.url))
+const environment = loadEnv(process.env.NODE_ENV ?? 'test', REPOSITORY_ROOT, '')
+const theme = resolveTheme(environment.THEME)
+const clientRoot = resolve(REPOSITORY_ROOT, THEMES[theme].root)
 
 /**
  * Port where `vite preview` serves the built app.
@@ -28,7 +39,7 @@ const PORT = 4190
  * live in a check that must pass in a minute with no network.
  */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: resolve(clientRoot, 'e2e'),
   fullyParallel: true,
 
   /*

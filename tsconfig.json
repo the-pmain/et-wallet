@@ -1,7 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
+    { "path": "./clients/safe/tsconfig.json" },
+    { "path": "./clients/etx/tsconfig.json" },
     { "path": "./tsconfig.node.json" },
     { "path": "./tsconfig.server.json" },
     { "path": "./tsconfig.e2e.json" }

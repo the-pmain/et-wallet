@@ -1,13 +1,17 @@
 /// <reference types="vitest/config" />
 import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
 import { cspPlugin } from './build/csp-plugin'
 import { ROBOTS_TAG_VALUE, securityHeadersPlugin } from './build/security-headers-plugin'
+import { resolveTheme, THEMES } from './build/themes'
 import packageJson from './package.json' with { type: 'json' }
+
+const REPOSITORY_ROOT = fileURLToPath(new URL('.', import.meta.url))
 
 /** Dev-server port. Fixed so the app URL is predictable. */
 const DEV_SERVER_PORT = 3000
@@ -31,81 +35,93 @@ const PREVIEW_PORT =
     ? null
     : Number.parseInt(process.env.PORT, 10)
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), cspPlugin(), securityHeadersPlugin()],
+export default defineConfig(({ mode }) => {
+  const environment = loadEnv(mode, REPOSITORY_ROOT, '')
+  const theme = resolveTheme(environment.THEME)
+  const clientRoot = resolve(REPOSITORY_ROOT, THEMES[theme].root)
 
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+  return {
+    root: clientRoot,
+    publicDir: resolve(clientRoot, 'public'),
+
+    plugins: [react(), tailwindcss(), cspPlugin(), securityHeadersPlugin()],
+
+    resolve: {
+      alias: {
+        '@': resolve(clientRoot, 'src'),
+      },
     },
-  },
 
-  define: {
-    /* App version is inlined at build time so the UI never reads package.json. */
-    __APP_VERSION__: JSON.stringify(packageJson.version),
-  },
-
-  server: {
-    port: DEV_SERVER_PORT,
-    strictPort: true,
-    headers: {
-      'X-Robots-Tag': ROBOTS_TAG_VALUE,
+    define: {
+      /* App version is inlined at build time so the UI never reads package.json. */
+      __APP_VERSION__: JSON.stringify(packageJson.version),
     },
-    proxy: {
-      /* Wallet create/import and POST /v1/users/auth in dev. */
-      '/v1': {
-        target: 'http://127.0.0.1:8080',
-        changeOrigin: true,
-        timeout: 0,
-        configure(proxy) {
-          proxy.on('proxyRes', (proxyRes, req) => {
-            const path = (req.url ?? '').split('?')[0]
-            if (path === '/v1/sendings' || path === '/v1/receivings') {
-              proxyRes.headers['cache-control'] = 'no-store, no-transform'
-              proxyRes.headers['x-accel-buffering'] = 'no'
-            }
-          })
+
+    server: {
+      port: DEV_SERVER_PORT,
+      strictPort: true,
+      headers: {
+        'X-Robots-Tag': ROBOTS_TAG_VALUE,
+      },
+      proxy: {
+        /* Wallet create/import and POST /v1/users/auth in dev. */
+        '/v1': {
+          target: 'http://127.0.0.1:8080',
+          changeOrigin: true,
+          timeout: 0,
+          configure(proxy) {
+            proxy.on('proxyRes', (proxyRes, req) => {
+              const path = (req.url ?? '').split('?')[0]
+              if (path === '/v1/sendings' || path === '/v1/receivings') {
+                proxyRes.headers['cache-control'] = 'no-store, no-transform'
+                proxyRes.headers['x-accel-buffering'] = 'no'
+              }
+            })
+          },
         },
       },
     },
-  },
 
-  preview: {
-    /* Strict only when a port is assigned from outside: quietly sliding
+    preview: {
+      /* Strict only when a port is assigned from outside: quietly sliding
        to a neighbour after an explicit assignment would serve the app
        at an address nobody expects. With no assignment, Vite's default
        remains. */
-    ...(PREVIEW_PORT === null ? {} : { port: PREVIEW_PORT, strictPort: true }),
-    headers: {
-      'X-Robots-Tag': ROBOTS_TAG_VALUE,
+      ...(PREVIEW_PORT === null ? {} : { port: PREVIEW_PORT, strictPort: true }),
+      headers: {
+        'X-Robots-Tag': ROBOTS_TAG_VALUE,
+      },
     },
-  },
 
-  build: {
-    target: 'es2022',
-    /* Source maps are off in production: they make wallet code easier
+    build: {
+      target: 'es2022',
+      outDir: resolve(REPOSITORY_ROOT, 'dist'),
+      emptyOutDir: true,
+      /* Source maps are off in production: they make wallet code easier
        to analyse and grow the artefact. Build with `--sourcemap` to debug. */
-    sourcemap: false,
-  },
-
-  test: {
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov'],
-      include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/index.ts', 'src/vite-env.d.ts'],
+      sourcemap: false,
     },
-    projects: [
-      {
-        extends: true,
-        test: {
-          name: 'wallet',
-          environment: 'jsdom',
-          globals: true,
-          setupFiles: ['./src/test/setup.ts'],
-          css: false,
-          include: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts'],
-          /*
+
+    test: {
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'lcov'],
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/index.ts', 'src/vite-env.d.ts'],
+      },
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: `wallet-${theme}`,
+            root: clientRoot,
+            environment: 'jsdom',
+            env: { THEME: theme },
+            globals: true,
+            setupFiles: ['./src/test/setup.ts'],
+            css: false,
+            include: ['src/**/*.test.{ts,tsx}', '../../build/**/*.test.ts'],
+            /*
             Per-test limit is 20 seconds.
 
             The default (5 seconds) matched the Testing Library wait
@@ -115,17 +131,19 @@ export default defineConfig({
             got a useless "test timed out". The overall limit must be
             well above any single wait.
           */
-          testTimeout: 20_000,
+            testTimeout: 20_000,
+          },
         },
-      },
-      {
-        test: {
-          name: 'server',
-          environment: 'node',
-          include: ['server/src/**/*.test.ts'],
-          env: { NODE_ENV: 'test' },
+        {
+          test: {
+            name: 'server',
+            root: REPOSITORY_ROOT,
+            environment: 'node',
+            include: ['server/src/**/*.test.ts'],
+            env: { NODE_ENV: 'test' },
+          },
         },
-      },
-    ],
-  },
+      ],
+    },
+  }
 })

@@ -1,0 +1,65 @@
+import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { STORAGE_DURABILITY, type Wei } from '@/core'
+import { TEST_MNEMONIC } from '@/core/hdwallet/vectors'
+import { createTestAppServices, type ITestAppServices } from '@/test/doubles'
+import { openPath } from '@/test/open-path'
+
+import { AppProviders } from '@/app/providers'
+import { AppRouter } from '@/app/router'
+
+const PASSWORD = 'Korova-7-Luna!'
+
+let services: ITestAppServices
+
+function renderApp() {
+  return render(
+    <AppProviders services={services}>
+      <AppRouter />
+    </AppProviders>,
+  )
+}
+
+/** Открывает раздел настроек разблокированного кошелька. */
+async function openSettings(): Promise<void> {
+  await screen.findByText('Account 1')
+  openPath('/wallet/settings')
+
+  await screen.findByRole('heading', { name: 'Settings' })
+}
+
+beforeEach(async () => {
+  window.location.hash = ''
+  services = createTestAppServices()
+  services.providerFactory.configure({ balance: 0n as Wei })
+
+  await services.onboarding.importWallet(TEST_MNEMONIC, PASSWORD)
+})
+
+describe('Предупреждение о стойкости хранилища', () => {
+  it('хранилище в памяти признаётся непереживающим перезагрузку', async () => {
+    /* Тестовая сборка работает на хранилище в памяти, и оно отвечает
+       честно. Молчание здесь означало бы, что кошелёк утверждает
+       сохранность, которой нет. */
+    await expect(services.storage.durability()).resolves.toBe(STORAGE_DURABILITY.Session)
+  })
+
+  it('настройки больше не показывают предупреждение о стойкости хранилища', async () => {
+    renderApp()
+    await openSettings()
+
+    expect(screen.queryByText(/will not survive closing the tab/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/from the\s+seed phrase you wrote down/i)).not.toBeInTheDocument()
+  })
+
+  it('устаревшего утверждения про потерю доступа после перезагрузки больше нет', async () => {
+    /* Текст был верен, пока хранилище работало в памяти. После
+       появления IndexedDB он превратился бы в ложь на экране
+       настроек. */
+    renderApp()
+    await openSettings()
+
+    expect(screen.queryByText(/The storage works in memory/i)).not.toBeInTheDocument()
+  })
+})

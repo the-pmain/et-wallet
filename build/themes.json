@@ -1,0 +1,10 @@
+{
+  "safe": {
+    "root": "clients/safe",
+    "storageNamespace": "elmsafe"
+  },
+  "etx": {
+    "root": "clients/etx",
+    "storageNamespace": "etwallet"
+  }
+}
