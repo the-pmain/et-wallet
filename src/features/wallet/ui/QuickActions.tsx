@@ -40,6 +40,10 @@ interface QuickActionsProps {
  * and what can be done with it read as one object. Lock and Refresh
  * were removed as duplicates of the header lock and the balance-card
  * refresh — five equal tiles made Send disappear.
+ *
+ * BOTH RECEIVE PANELS READ ONLY `wallets`. The open account never
+ * fills a slot: a missing or invalid `address-receiving-funds-exchange`
+ * always shows Generate wallet, including on a locked vault.
  */
 export function QuickActions({
   wallets = {},
